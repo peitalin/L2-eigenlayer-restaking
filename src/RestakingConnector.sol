@@ -23,8 +23,6 @@ contract RestakingConnector is IRestakingConnector, Adminable {
 
     error AddressNull();
 
-    mapping(address => mapping(address => uint256)) public stakerToAmount;
-
     constructor() {
         __Adminable_init();
     }
@@ -35,7 +33,7 @@ contract RestakingConnector is IRestakingConnector, Adminable {
         address indexed staker
     );
 
-    function getEigenlayerContracts() public returns (
+    function getEigenlayerContracts() public view returns (
         IDelegationManager,
         IStrategyManager,
         IStrategy
@@ -87,9 +85,6 @@ contract RestakingConnector is IRestakingConnector, Adminable {
             amount: amount,
             staker: staker
         });
-
-        // check if address has existing deposit
-        stakerToAmount[staker][address(strategy)] += amount;
 
         emit EigenlayerContractCallParams(
             msgForEigenlayer.functionSelector,

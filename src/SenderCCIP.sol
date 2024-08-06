@@ -350,7 +350,9 @@ contract SenderCCIP is CCIPReceiver, OwnerIsCreator {
                 tokenAmounts: tokenAmounts, // The amount and type of token being transferred
                 extraArgs: Client._argsToBytes(
                     // Additional arguments, setting gas limit
-                    Client.EVMExtraArgsV1({gasLimit: 200_000})
+                    Client.EVMExtraArgsV1({gasLimit: 600_000})
+                    // increase gas limit to 600_000 for deposits into Eigenlayer
+                    // Gas used by this deposit tx: 565,307
                 ),
                 // Set the feeToken to a feeTokenAddress, indicating specific asset will be used for fees
                 feeToken: _feeTokenAddress

@@ -40,6 +40,11 @@ contract MessagePassingTest is Test {
 
         bytes memory sender = hex"0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c";
         receiverContract.allowlistSender(abi.decode(sender, (address)), true);
+        vm.stopBroadcast();
+
+        ///////////////////////////////////////////
+        // Prepare CCIP Message
+        ///////////////////////////////////////////
 
         // bytes memory message = hex"00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000044f7e784ef00000000000000000000000000000000000000000000000000000000000000020000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c00000000000000000000000000000000000000000000000000000000";
         // incoming CCIP message is in string format:
@@ -65,7 +70,18 @@ contract MessagePassingTest is Test {
             data: message, // bytes: payload sent in original message.
             destTokenAmounts: destTokenAmounts // Tokens and their amounts in their destination chain representation.
         });
-        vm.stopBroadcast();
+
+        // Client.EVM2AnyMessage memory evm2AnyMessage = Client.EVM2AnyMessage({
+        //     receiver: abi.encode(_receiver), // ABI-encoded receiver address
+        //     data: abi.encode(_text), // ABI-encoded string
+        //     tokenAmounts: tokenAmounts, // The amount and type of token being transferred
+        //     extraArgs: Client._argsToBytes(
+        //         // gasLimit set to 20_000 on purpose to force the execution to fail on the destination chain
+        //         Client.EVMExtraArgsV1({gasLimit: 20_000})
+        //     ),
+        //     // Set the feeToken to a LINK token address
+        //     feeToken: address(s_linkToken)
+        // });
 
         // simulate router sending message to receiverContract on L1
         vm.startBroadcast(router);

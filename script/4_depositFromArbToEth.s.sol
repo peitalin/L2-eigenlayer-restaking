@@ -12,7 +12,7 @@ import {IRestakingConnector} from "../src/IRestakingConnector.sol";
 import {FileUtils} from "./FileUtils.sol";
 
 
-contract SendMsgFromArbToEthScript is Script {
+contract DepositFromArbToEthScript is Script {
 
     IReceiverCCIP public receiverContract;
     SenderCCIP public senderContract;
@@ -71,7 +71,7 @@ contract SendMsgFromArbToEthScript is Script {
 
         if (payFeeWithETH) {
 
-            topupSenderEthBalance(senderAddr, deployer);
+            topupSenderEthBalance(senderAddr);
 
             senderContract.sendMessagePayNative(
                 destinationChainSelector,
@@ -96,7 +96,7 @@ contract SendMsgFromArbToEthScript is Script {
         vm.stopBroadcast();
     }
 
-    function topupSenderEthBalance(address senderAddr, address deployerAddr) public {
+    function topupSenderEthBalance(address senderAddr) public {
         if (senderAddr.balance < 0.02 ether) {
             (bool sent, ) = address(senderAddr).call{value: 0.05 ether}("");
             require(sent, "Failed to send Ether");

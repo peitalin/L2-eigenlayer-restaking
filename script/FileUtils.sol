@@ -24,25 +24,25 @@ contract FileUtils is Test {
 
     function getReceiverRestakingConnectorContracts() public view returns (IReceiverCCIP, IRestakingConnector) {
 
-        string memory deploymentDataR = vm.readFile("broadcast/3_deployOnEth.s.sol/11155111/run-latest.json");
+        string memory broadcastDataR = vm.readFile("broadcast/3_deployOnEth.s.sol/11155111/run-latest.json");
 
         // Check transaction is the correct ReceiveCCIP deployment tx
-        uint256 txNumber = findCreateTx(deploymentDataR, "ReceiveCCIP");
+        uint256 txNumber = findCreateTx(broadcastDataR, "ReceiverCCIP");
         string memory contractAddr = string(abi.encodePacked(".transactions[", Strings.toString(txNumber), "].contractAddress"));
-        IReceiverCCIP _receiverContract = IReceiverCCIP(address(stdJson.readAddress(deploymentDataR, contractAddr)));
+        IReceiverCCIP _receiverContract = IReceiverCCIP(address(stdJson.readAddress(broadcastDataR, contractAddr)));
 
         // Check transaction is the correct RestakingConnector deployment tx
-        uint256 txNumber2 = findCreateTx(deploymentDataR, "RestakingConnector");
+        uint256 txNumber2 = findCreateTx(broadcastDataR, "RestakingConnector");
         string memory contractAddr2 = string(abi.encodePacked(".transactions[", Strings.toString(txNumber2), "].contractAddress"));
-        IRestakingConnector _restakingConnector = IRestakingConnector(address(stdJson.readAddress(deploymentDataR, contractAddr2)));
+        IRestakingConnector _restakingConnector = IRestakingConnector(address(stdJson.readAddress(broadcastDataR, contractAddr2)));
 
         return (_receiverContract, _restakingConnector);
     }
 
-    function findCreateTx(string memory deploymentDataR, string memory _contractName) public pure returns (uint256) {
+    function findCreateTx(string memory broadcastDataR, string memory _contractName) public pure returns (uint256) {
         for (uint256 i; i < 4; i++) {
-            string memory contractName = stdJson.readString(deploymentDataR, string(abi.encodePacked(".transactions[", Strings.toString(i), "].contractName")));
-            string memory transactionType = stdJson.readString(deploymentDataR, string(abi.encodePacked(".transactions[", Strings.toString(i), "].transactionType")));
+            string memory contractName = stdJson.readString(broadcastDataR, string(abi.encodePacked(".transactions[", Strings.toString(i), "].contractName")));
+            string memory transactionType = stdJson.readString(broadcastDataR, string(abi.encodePacked(".transactions[", Strings.toString(i), "].transactionType")));
             if (
                 keccak256(abi.encodePacked(contractName)) == keccak256(abi.encodePacked(_contractName)) &&
                 keccak256(abi.encodePacked(transactionType)) == keccak256(abi.encodePacked("CREATE"))
@@ -50,7 +50,9 @@ contract FileUtils is Test {
                 return i;
             }
         }
+        console.log(_contractName);
         revert("CREATE deployment TX not found in 3_deployOnEth.s.sol/1155111/run-latest.json");
     }
+
 
 }
