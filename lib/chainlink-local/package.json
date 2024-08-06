@@ -1,0 +1,48 @@
+{
+  "name": "@chainlink/local",
+  "description": "Chainlink Local Simulator",
+  "license": "MIT",
+  "version": "0.2.1",
+  "files": [
+    "src/**/*.sol",
+    "!src/test/**/*",
+    "scripts/ccipLocalSimulatorFork.js",
+    "abi/**/*.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smartcontractkit/chainlink-local.git"
+  },
+  "keywords": [
+    "chainlink"
+  ],
+  "scripts": {
+    "hardhat-compile": "npx hardhat compile",
+    "forge-compile": "forge build",
+    "hardhat-test": "npx hardhat test",
+    "forge-test": "forge test",
+    "test": "npm run hardhat-test && npm run forge-test",
+    "prettier": "prettier --write 'api_reference/**/*'",
+    "generate-solidity": "rimraf api_reference/solidity && npm run hardhat-compile && npm run forge-compile && npx hardhat docgen",
+    "generate-jsdoc": "rimraf api_reference/javascript && npx ts-node helper_doc/generate-jsdoc.ts",
+    "generate-index": "npx ts-node helper_doc/generate-index-files.ts",
+    "generate-docs": "npm run generate-solidity && npm run generate-jsdoc && npm run generate-index && npm run prettier"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-foundry": "^1.1.1",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@types/fs-extra": "^11.0.4",
+    "@types/jsdoc-to-markdown": "^7.0.6",
+    "dotenv": "^16.4.5",
+    "fs-extra": "^11.2.0",
+    "hardhat": "^2.20.1",
+    "jsdoc-to-markdown": "^8.0.1",
+    "prettier": "^3.3.3",
+    "rimraf": "^6.0.1",
+    "solidity-docgen": "^0.6.0-beta.36"
+  },
+  "dependencies": {
+    "@chainlink/contracts": "^1.1.1",
+    "@chainlink/contracts-ccip": "^1.4.0"
+  }
+}

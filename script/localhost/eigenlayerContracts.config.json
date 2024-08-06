@@ -1,0 +1,18 @@
+{
+  "addresses": {
+    "delegationManager": "0xe8ad6a693825fdcd128a5641d4443BEBDCd0f73C",
+    "pauserRegistry": "0x7392daA1B9349E6362b7f75fF5cE7d502F22f21a",
+    "rewardsCoordinator": "0xe1Ab123D238AF74F77BfD59450e2428c9214123C",
+    "strategies": {
+      "CCIPStrategy": "0x70bD534579cbaBbE9Cd4AD4210e29CC9BA1E9287"
+    },
+    "strategyManager": "0x3Eef6ec7a9679e60CC57D9688E9eC0e6624D687A"
+  },
+  "chainInfo": {
+    "chainId": 31337,
+    "deploymentBlock": 1
+  },
+  "parameters": {
+    "deployer": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c"
+  }
+}

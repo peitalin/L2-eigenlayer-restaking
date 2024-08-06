@@ -1,0 +1,27 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+fs_permissions = [
+  { access = "read-write", path = "./"},
+]
+
+remappings = [
+  '@chainlink/local/=lib/chainlink-local/',
+  '@chainlink/contracts-ccip/=lib/chainlink-local/lib/ccip/contracts/',
+  'forge-std/=lib/forge-std/src/',
+  ### NOTE: use eigenlayer's openzeppelin dependencies
+  '@openzeppelin/contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts',
+  '@openzeppelin/contracts-upgradeable/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable/contracts'
+]
+
+[rpc_endpoints]
+holesky = "https://holesky.drpc.org"
+arbsepolia = "https://sepolia-rollup.arbitrum.io/rpc"
+ethsepolia = "https://sepolia.drpc.org"
+localhost = "http://localhost:8545"
+
+[etherscan]
+holesky = { key = "${ETHERSCAN_API_KEY}" }
+ethsepolia = { key = "${ETHERSCAN_API_KEY}" }
+arbsepolia = { key = "${ARBISCAN_API_KEY}" }
