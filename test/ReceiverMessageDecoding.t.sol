@@ -19,10 +19,13 @@ contract MessagePassingTest is Test {
     uint256 public deployerKey;
     address public deployer;
 
+    EigenlayerMsgEncoders public eigenlayerMsgEncoders;
+
     function setUp() public {
 		deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
+        eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
     }
 
     function decodeFunctionSelector(bytes memory message) public pure returns (bytes4) {
@@ -112,7 +115,7 @@ contract MessagePassingTest is Test {
             expiry,
             signature
         );
-        bytes memory messageBytes2 = EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+        bytes memory messageBytes2 = eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
             strategy,
             token,
             amount,
@@ -139,7 +142,7 @@ contract MessagePassingTest is Test {
         // ) external onlyWhenNotPaused(PAUSED_DEPOSITS) nonReentrant returns (uint256 shares)
 
         // encode message payload
-        bytes memory message_bytes = EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+        bytes memory message_bytes = eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
             0xBd4bcb3AD20E9d85D5152aE68F45f40aF8952159,
             0x3Eef6ec7a9679e60CC57D9688E9eC0e6624D687A,
             0.0077 ether,

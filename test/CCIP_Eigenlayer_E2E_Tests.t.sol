@@ -123,7 +123,7 @@ contract CCIP_Eigenlayer_E2E_Tests is Test {
             sourceChainSelector: sourceChainSelector, // Arb Sepolia source chain selector
             sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
             data: abi.encode(string(
-                EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+                eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
                     address(strategy),
                     address(token),
                     amount,
