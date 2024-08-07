@@ -5,7 +5,7 @@ TODO:
 - [DONE] deploy CCIP-BnM ERC20 strategy vault on Eigenlayer
 - Test cross-chain messages for:
     - [DONE] `depositIntoStrategy`
-    - `depositIntoStrategyWithSignature` (EIP1271 signatures to attribute deposits to stakers on L2)
+    - [DONE] `depositIntoStrategyWithSignature` (EIP1271 signatures to attribute deposits to stakers on L2)
     - `queueWithdrawals`
     - `completeQueuedWithdrawals`
     - `delegate`

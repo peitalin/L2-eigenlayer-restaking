@@ -343,15 +343,14 @@ contract SenderCCIP is CCIPReceiver, OwnerIsCreator {
         bytes memory message = abi.encode(_text); // ABI-encoded string
         bytes4 functionSelector = decodeFunctionSelector(message);
         uint256 gasLimit = 600_000;
-        // increase gas limit to 600_000 for deposits into Eigenlayer
-        // Gas used by this deposit tx: 565,307
+        // increase gas limit for deposits into Eigenlayer
 
         if (functionSelector == 0xf7e784ef) {
             // depositIntoStrategy: [gas: 565,307]
             gasLimit = 600_000;
         }
         if (functionSelector == 0x32e89ace) {
-            // depositIntoStrategyWithSignature: [gas: 678,841]
+            // depositIntoStrategyWithSignature: [gas: 713,400]
             gasLimit = 800_000;
         }
 
