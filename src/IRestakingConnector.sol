@@ -53,8 +53,6 @@ interface IRestakingConnector {
         IStrategy _strategy
     ) external;
 
-    function decodeFunctionSelector(bytes calldata message) external returns (bytes4);
-
     function decodeDepositMessage(
         bytes calldata message
     ) external returns (EigenlayerDepositMessage memory);

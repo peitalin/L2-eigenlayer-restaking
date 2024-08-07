@@ -12,7 +12,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {SenderCCIP} from "./SenderCCIP.sol";
 import {IRestakingConnector} from "./IRestakingConnector.sol";
@@ -68,7 +67,7 @@ contract ReceiverCCIP is SenderCCIP {
         if (address(restakingConnector) == address(0)) revert("restakingConnector not set");
 
         bytes memory message = any2EvmMessage.data;
-        bytes4 functionSelector = restakingConnector.decodeFunctionSelector(message);
+        bytes4 functionSelector = decodeFunctionSelector(message);
 
         (
             IDelegationManager delegationManager,

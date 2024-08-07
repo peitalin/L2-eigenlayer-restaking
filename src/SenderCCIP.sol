@@ -44,6 +44,10 @@ contract SenderCCIP is CCIPReceiver, OwnerIsCreator {
         uint256 tokenAmount // The token amount that was transferred.
     );
 
+    event BuildMessageDecodedFunctionSelector(
+        bytes4 indexed functionSelector
+    );
+
     bytes32 internal s_lastReceivedMessageId; // Store the last received messageId.
     address internal s_lastReceivedTokenAddress; // Store the last received token address.
     uint256 internal s_lastReceivedTokenAmount; // Store the last received amount.
@@ -327,7 +331,7 @@ contract SenderCCIP is CCIPReceiver, OwnerIsCreator {
         address _token,
         uint256 _amount,
         address _feeTokenAddress
-    ) private pure returns (Client.EVM2AnyMessage memory) {
+    ) private returns (Client.EVM2AnyMessage memory) {
         // Set the token amounts
         Client.EVMTokenAmount[]
             memory tokenAmounts = new Client.EVMTokenAmount[](1);
@@ -335,17 +339,31 @@ contract SenderCCIP is CCIPReceiver, OwnerIsCreator {
             token: _token,
             amount: _amount
         });
+
+        bytes memory message = abi.encode(_text); // ABI-encoded string
+        bytes4 functionSelector = decodeFunctionSelector(message);
+        uint256 gasLimit = 600_000;
+        // increase gas limit to 600_000 for deposits into Eigenlayer
+        // Gas used by this deposit tx: 565,307
+
+        if (functionSelector == 0xf7e784ef) {
+            // depositIntoStrategy: [gas: 565,307]
+            gasLimit = 600_000;
+        }
+        if (functionSelector == 0x32e89ace) {
+            // depositIntoStrategyWithSignature: [gas: 678,841]
+            gasLimit = 800_000;
+        }
+
         // Create an EVM2AnyMessage struct in memory with necessary information for sending a cross-chain message
         return
             Client.EVM2AnyMessage({
                 receiver: abi.encode(_receiver), // ABI-encoded receiver address
-                data: abi.encode(_text), // ABI-encoded string
+                data: message, // ABI-encoded string
                 tokenAmounts: tokenAmounts, // The amount and type of token being transferred
                 extraArgs: Client._argsToBytes(
                     // Additional arguments, setting gas limit
-                    Client.EVMExtraArgsV1({gasLimit: 600_000})
-                    // increase gas limit to 600_000 for deposits into Eigenlayer
-                    // Gas used by this deposit tx: 565,307
+                    Client.EVMExtraArgsV1({gasLimit: gasLimit})
                 ),
                 // Set the feeToken to a feeTokenAddress, indicating specific asset will be used for fees
                 feeToken: _feeTokenAddress
@@ -390,6 +408,24 @@ contract SenderCCIP is CCIPReceiver, OwnerIsCreator {
         if (amount == 0) revert NothingToWithdraw();
 
         IERC20(_token).safeTransfer(_beneficiary, amount);
+    }
+
+    function decodeFunctionSelector(bytes memory message) public returns (bytes4) {
+        // decodes just the leading bytes4 in the message to decide how to deserialize
+        // the rest of the message
+        bytes32 offset;
+        bytes32 length;
+        bytes4 functionSelector;
+
+        assembly {
+            offset := mload(add(message, 32))
+            length := mload(add(message, 64))
+            functionSelector := mload(add(message, 96))
+        }
+
+        emit BuildMessageDecodedFunctionSelector(functionSelector);
+
+        return functionSelector;
     }
 }
 
