@@ -17,20 +17,22 @@ import {IMockERC20} from "../src/IMockERC20.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/IReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
-import {IRestakingConnector, EigenlayerDepositParams} from "../src/IRestakingConnector.sol";
+import {IRestakingConnector, EigenlayerDepositWithSignatureParams} from "../src/IRestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
 
 import {StrategyManager} from "eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
-
+import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 
 
 contract CCIP_Eigenlayer_E2E_Tests is Test {
 
     DeployOnEthScript public deployOnEthScript;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
+    SignatureUtilsEIP1271 public signatureUtils;
+    EigenlayerMsgEncoders public eigenlayerMsgEncoders;
 
     uint256 public deployerKey;
     address public deployer;
@@ -56,6 +58,8 @@ contract CCIP_Eigenlayer_E2E_Tests is Test {
 		deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
+        eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
+        signatureUtils = new SignatureUtilsEIP1271();
         deployOnEthScript = new DeployOnEthScript();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
@@ -85,47 +89,72 @@ contract CCIP_Eigenlayer_E2E_Tests is Test {
     }
 
 
-    function test_Eigenlayer_DepositIntoStrategy() public {
-        /////////////////////////////////////
-        //// Send message from CCIP to Eigenlayer
-        /////////////////////////////////////
+    function test_Eigenlayer_CCIP_E2E_DepositIntoStrategyWithSignature() public {
+
         vm.startBroadcast(deployerKey);
-        bytes memory sender_bytes = hex"0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c";
-        receiverContract.allowlistSender(abi.decode(sender_bytes, (address)), true);
+        receiverContract.allowlistSender(deployer, true);
         vm.stopBroadcast();
 
-        uint256 amountBridgedAndStaked = 0.0093 ether;
+        uint256 amount = 0.0077 ether;
+        address staker = deployer;
+        uint256 expiry = block.timestamp + 1 days;
+        uint256 nonce = 0;
+        bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), block.chainid);
+        (bytes memory signature, bytes32 digestHash) = createSignature(
+            strategy,
+            token,
+            amount,
+            staker,
+            nonce,
+            expiry,
+            domainSeparator
+        );
+
+        signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
             token: address(token), // CCIP-BnM token address on Eth Sepolia.
-            amount: amountBridgedAndStaked
+            amount: amount
         });
 
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0x598fff8ee56c84a5d8793c1ac075501711392720209f72ae3cfb445d4116d272),
             sourceChainSelector: sourceChainSelector, // Arb Sepolia source chain selector
-            sender: sender_bytes, // bytes: abi.decode(sender) if coming from an EVM chain.
-            data: abi.encode(string(abi.encodeWithSelector(
-                bytes4(keccak256("depositIntoStrategy(uint256,address)")),
-                amountBridgedAndStaked,
-                deployer
-            ))), // CCIP abi.encodes the string message when sending
+            sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
+            data: abi.encode(string(
+                EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+                    address(strategy),
+                    address(token),
+                    amount,
+                    staker,
+                    expiry,
+                    signature
+                )
+            )), // CCIP abi.encodes a string message when sending
             destTokenAmounts: destTokenAmounts // Tokens and their amounts in their destination chain representation.
         });
 
-        // simulate router sending message to receiverContract on L1
-        vm.startBroadcast(router);
-        // (first 3 args: check indexed topics), (4th arg = true = check data)
+        //// Test emitted events
+        //// (first 3 args: check indexed topics), (4th arg = true = check data)
         vm.expectEmit(true, true, true, true);
-        // the event we expect
-        emit EigenlayerDepositParams(0xf7e784ef, amountBridgedAndStaked, address(0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c));
+        emit EigenlayerDepositWithSignatureParams(
+            0x32e89ace,
+            amount,
+            0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c
+        );
+
+        /////////////////////////////////////
+        //// Send message from CCIP to Eigenlayer
+        /////////////////////////////////////
+        vm.startBroadcast(router); // simulate router sending message to receiverContract on L1
         receiverContract.mockCCIPReceive(any2EvmMessage);
 
         uint256 receiverBalance = token.balanceOf(address(receiverContract));
-        console.log("receiver balance:", receiverBalance);
+        uint256 valueOfShares = strategy.userUnderlying(address(deployer));
 
-        uint256 valueOfShares = strategy.userUnderlying(address(receiverContract));
+        require(valueOfShares == amount, "valueofShares incorrect");
+        console.log("receiver balance:", receiverBalance);
         console.log("receiver shares value:", valueOfShares);
 
         vm.stopBroadcast();
@@ -137,7 +166,7 @@ contract CCIP_Eigenlayer_E2E_Tests is Test {
         uint256 expiry = block.timestamp + 1 days;
         uint256 amount = 1 ether;
         uint256 nonce = 0;
-        bytes32 domainSeparator = SignatureUtilsEIP1271.getDomainSeparator(address(strategyManager));
+        bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), block.chainid);
 
         vm.startBroadcast(deployerKey);
         mockERC20.mint(staker, amount);
@@ -156,7 +185,7 @@ contract CCIP_Eigenlayer_E2E_Tests is Test {
         console.log("strategy:", address(strategy));
         console.log("token:", address(token));
 
-        SignatureUtilsEIP1271.checkSignature_EIP1271(staker, digestHash, signature);
+        signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
 
         strategyManager.depositIntoStrategyWithSignature(
             strategy,
@@ -191,7 +220,6 @@ contract CCIP_Eigenlayer_E2E_Tests is Test {
 
     }
 
-    /// user creates signatures via a wallet like metamask
     function createSignature(
         IStrategy _strategy,
         IERC20 _token,
@@ -202,7 +230,7 @@ contract CCIP_Eigenlayer_E2E_Tests is Test {
         bytes32 domainSeparator
     ) public returns (bytes memory, bytes32) {
 
-        bytes32 digestHash = SignatureUtilsEIP1271.createDigest(
+        bytes32 digestHash = signatureUtils.createEigenlayerDepositDigest(
             _strategy,
             _token,
             amount,
@@ -216,8 +244,6 @@ contract CCIP_Eigenlayer_E2E_Tests is Test {
         bytes memory signature = abi.encodePacked(r, s, v);
         // r,s,v packed into 65byte signature: 32 + 32 + 1.
         // the order of r,s,v differs from the above
-        console.log("signature:");
-        console.logBytes(signature);
         return (signature, digestHash);
     }
 }

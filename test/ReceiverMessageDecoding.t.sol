@@ -11,6 +11,7 @@ import {IRestakingConnector} from "../src/IRestakingConnector.sol";
 import {EigenlayerDepositParams, EigenlayerDepositMessage} from "../src/IRestakingConnector.sol";
 
 import {EIP1271SignatureUtils} from "eigenlayer-contracts/src/contracts/libraries/EIP1271SignatureUtils.sol";
+import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 
 
 contract MessagePassingTest is Test {
@@ -24,18 +25,15 @@ contract MessagePassingTest is Test {
 
     }
 
-    function decodeFunctionSelector(bytes memory message) public returns (bytes4) {
-
+    function decodeFunctionSelector(bytes memory message) public pure returns (bytes4) {
         bytes32 offset;
         bytes32 length;
         bytes4 functionSelector;
-
         assembly {
             offset := mload(add(message, 32))
             length := mload(add(message, 64))
             functionSelector := mload(add(message, 96))
         }
-
         return functionSelector;
     }
 
@@ -58,7 +56,7 @@ contract MessagePassingTest is Test {
         require(functionSelector2 == 0x32e89ace, "wrong functionSelector");
     }
 
-    function test_DecodeEigenlayerMessage() public pure {
+    function test_DecodeEigenlayerDepositMessage() public pure {
 
         // 0000000000000000000000000000000000000000000000000000000000000020
         // 0000000000000000000000000000000000000000000000000000000000000044
@@ -96,22 +94,62 @@ contract MessagePassingTest is Test {
         require(emsg.staker == 0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c, "decoded incorrect EigenlayerDepositMessage.staker");
     }
 
+    function test_encodesDepositWithSignatureCorrectly() public {
 
-    function test_DecodeEigenlayerMessage_WithSignature() public pure {
+        address strategy = 0xBd4bcb3AD20E9d85D5152aE68F45f40aF8952159;
+        address token = 0x3Eef6ec7a9679e60CC57D9688E9eC0e6624D687A;
+        uint256 amount = 0.0077 ether;
+        address staker = 0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c;
+        uint256 expiry = 86421;
+        bytes memory signature = hex"3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d51c";
+
+        bytes memory messageBytes = abi.encodeWithSelector(
+            bytes4(keccak256("depositIntoStrategyWithSignature(address,address,uint256,address,uint256,bytes)")),
+            strategy,
+            token,
+            amount,
+            staker,
+            expiry,
+            signature
+        );
+        bytes memory messageBytes2 = EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+            strategy,
+            token,
+            amount,
+            staker,
+            expiry,
+            signature
+        );
+
+        require(
+            keccak256(messageBytes) == keccak256(messageBytes2),
+            "encoding from encodeDepositIntoStrategyWithSignatureMsg() did not match"
+        );
+    }
+
+    function test_DecodeEigenlayerMessage_WithSignature() public {
+
+        // function depositIntoStrategyWithSignature(
+        //     IStrategy strategy,
+        //     IERC20 token,
+        //     uint256 amount,
+        //     address staker,
+        //     uint256 expiry,
+        //     bytes memory signature
+        // ) external onlyWhenNotPaused(PAUSED_DEPOSITS) nonReentrant returns (uint256 shares)
 
         // encode message payload
-        bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("depositIntoStrategyWithSignature(address,address,uint256,address,uint256,bytes)")),
-            86421,
+        bytes memory message_bytes = EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
             0xBd4bcb3AD20E9d85D5152aE68F45f40aF8952159,
             0x3Eef6ec7a9679e60CC57D9688E9eC0e6624D687A,
             0.0077 ether,
             0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c,
+            86421,
             hex"3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d51c"
         );
         // CCIP turns the message into string when sending
         bytes memory message = abi.encode(string(message_bytes));
-        console.log("message_str");
+        console.log("message:");
         console.logBytes(message);
 
         ////////////////////////////
@@ -120,28 +158,28 @@ contract MessagePassingTest is Test {
 
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
         // 0000000000000000000000000000000000000000000000000000000000000144 [64]
-        // 32e89ace00000000000000000000000000000000000000000000000000000000 [96] bytes4 truncates every on the right
-        // 00015195 [100] reads 32 bytes from offset [100] right-to-left
-        // 000000000000000000000000bd4bcb3ad20e9d85d5152ae68f45f40af8952159 [132]
-        // 0000000000000000000000003eef6ec7a9679e60cc57d9688e9ec0e6624d687a [164]
-        // 000000000000000000000000000000000000000000000000001b5b1bf4c54000 [196] uint256 in hex
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [228]
+        // 32e89ace000000000000000000000000bd4bcb3ad20e9d85d5152ae68f45f40a [96] bytes4 truncates the right
+        // f8952159        [100] reads 32 bytes from offset [100] right-to-left up to the function selector
+        // 0000000000000000000000003eef6ec7a9679e60cc57d9688e9ec0e6624d687a [132]
+        // 000000000000000000000000000000000000000000000000001b5b1bf4c54000 [164] uint256 amount in hex
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [196]
+        // 0000000000000000000000000000000000000000000000000000000000015195 [228] expiry
         // 00000000000000000000000000000000000000000000000000000000000000c0 [260] offset: 192 bytes
         // 0000000000000000000000000000000000000000000000000000000000000041 [292] length: 65 bytes
         // 3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee [324]
         // 3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d5 [356]
-        // 1c00000000000000000000000000000000000000000000000000000000000000 [388] uint8 = bytes1
+        // 1c00000000000000000000000000000000000000000000000000000000000000 [388] uin8 = bytes1
         // 00000000000000000000000000000000000000000000000000000000
 
         bytes32 offset;
         bytes32 length;
 
         bytes4 functionSelector;
-        uint256 expiry;
-        address _strategy;
-        address _token;
+        address strategy;
+        address token;
         uint256 amount;
         address staker;
+        uint256 expiry;
 
         bytes32 sig_offset;
         bytes32 sig_length;
@@ -154,11 +192,11 @@ contract MessagePassingTest is Test {
             length := mload(add(message, 64))
 
             functionSelector := mload(add(message, 96))
-            expiry := mload(add(message, 100))
-            _strategy := mload(add(message, 132))
-            _token := mload(add(message, 164))
-            amount := mload(add(message, 196))
-            staker := mload(add(message, 228))
+            strategy := mload(add(message, 100))
+            token := mload(add(message, 132))
+            amount := mload(add(message, 164))
+            staker := mload(add(message, 196))
+            expiry := mload(add(message, 228))
 
             sig_offset := mload(add(message, 260))
             sig_length := mload(add(message, 292))
@@ -181,10 +219,10 @@ contract MessagePassingTest is Test {
         console.log(expiry);
 
         console.log("strategy:");
-        console.log(_strategy);
+        console.log(strategy);
 
         console.log("token:");
-        console.log(_token);
+        console.log(token);
 
         console.log("amount:");
         console.log(amount);
@@ -210,15 +248,6 @@ contract MessagePassingTest is Test {
         bytes memory signature = abi.encodePacked(r,s,v);
         console.log("signature:");
         console.logBytes(signature);
-
-        // function depositIntoStrategyWithSignature(
-        //     IStrategy strategy, 0xBd4bcb3AD20E9d85D5152aE68F45f40aF8952159
-        //     IERC20 token, 0x3Eef6ec7a9679e60CC57D9688E9eC0e6624D687A
-        //     uint256 amount, 0.0077e18 7700000000000000
-        //     address staker, 0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c
-        //     uint256 expiry, 86421
-        //     bytes memory signature, 0x3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d51c
-        // ) external returns (uint256 shares);
 
         require(signature.length == 65, "invalid signature length");
         bytes4 functionSelector2 = bytes4(keccak256("depositIntoStrategyWithSignature(address,address,uint256,address,uint256,bytes)"));
