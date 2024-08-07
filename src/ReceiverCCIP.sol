@@ -6,17 +6,18 @@ import {OwnerIsCreator} from "@chainlink/contracts-ccip/src/v0.8/shared/access/O
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {CCIPReceiver} from "@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol";
 import {SafeERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-
-import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
-import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {IRestakingConnector} from "./IRestakingConnector.sol";
-import {MsgForEigenlayer} from "./RestakingConnector.sol";
-import {SenderCCIP} from "./SenderCCIP.sol";
-
 import {IERC20 as IERC20_CCIP} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {console} from "forge-std/Test.sol";
+import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
+import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import {SenderCCIP} from "./SenderCCIP.sol";
+import {IRestakingConnector} from "./IRestakingConnector.sol";
+import {EigenlayerDepositMessage, EigenlayerDepositWithSignatureMessage} from "./IRestakingConnector.sol";
+
 
 
 /// Same as SenderCCIP except it handles message deserialization + Eigenlayer contract calls
@@ -67,39 +68,58 @@ contract ReceiverCCIP is SenderCCIP {
         if (address(restakingConnector) == address(0)) revert("restakingConnector not set");
 
         bytes memory message = any2EvmMessage.data;
-        MsgForEigenlayer memory msgForEigenlayer = restakingConnector.decodeMessageForEigenlayer(message);
+        bytes4 functionSelector = restakingConnector.decodeFunctionSelector(message);
 
-        // if function selector matches...
-        // bytes4(keccak256("depositIntoStrategy(uint256,address)")) == 0xf7e784ef
+        (
+            IDelegationManager delegationManager,
+            IStrategyManager strategyManager,
+            IStrategy strategy
+        ) = restakingConnector.getEigenlayerContracts();
 
-        // abi.encodeWithSelector(bytes4(keccak256("depositIntoStrategy(IStrategy,IERC20,uint256)")), 10, 10);
-        // strategyManager.depositIntoStrategy(
-        //     IStrategy(address(mockMagicStrategy)),
-        //     IERC20(address(mockMagic)),
-        //     AMOUNT_TO_DEPOSIT
-        // );
-        if (msgForEigenlayer.functionSelector == 0xf7e784ef) {
+        IERC20 underlyingToken = strategy.underlyingToken();
 
-            IStrategy strategy = restakingConnector.getStrategy();
-            IERC20 token = strategy.underlyingToken();
-            IStrategyManager strategyManager = IStrategyManager(address(restakingConnector.getStrategyManager()));
+        if (functionSelector == 0xf7e784ef) {
+            // bytes4(keccak256("depositIntoStrategy(uint256,address)")) == 0xf7e784ef
 
+            EigenlayerDepositMessage memory eigenlayerMsg = restakingConnector.decodeDepositMessage(message);
             // Receiver contract approves eigenlayer StrategyManager for deposits
-            token.approve(address(strategyManager), msgForEigenlayer.amount);
-
+            underlyingToken.approve(address(strategyManager), eigenlayerMsg.amount);
             // deposit into Eigenlayer
-            strategyManager.depositIntoStrategy(strategy, token, msgForEigenlayer.amount);
+            strategyManager.depositIntoStrategy(strategy, underlyingToken, eigenlayerMsg.amount);
+        }
+
+        if (functionSelector == 0x32e89ace) {
+            // bytes4(keccak256("depositIntoStrategyWithSignature(address,address,uint256,address,uint256,bytes)")) == 0x32e89ace
+
+            EigenlayerDepositWithSignatureMessage memory eigen_msg = restakingConnector.decodeDepositWithSignatureMessage(message);
+            // Receiver contract approves eigenlayer StrategyManager for deposits
+            underlyingToken.approve(address(strategyManager), eigen_msg.amount);
+            // deposit into Eigenlayer with user signature
+            // function depositIntoStrategyWithSignature(
+            //     IStrategy strategy, 0xBd4bcb3AD20E9d85D5152aE68F45f40aF8952159
+            //     IERC20 token, 0x3Eef6ec7a9679e60CC57D9688E9eC0e6624D687A
+            //     uint256 amount, 0.0077e18 7700000000000000
+            //     address staker, 0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c
+            //     uint256 expiry, 86421
+            //     bytes memory signature, 0x3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d51c
+            // ) external returns (uint256 shares);
+            strategyManager.depositIntoStrategyWithSignature(
+                IStrategy(eigen_msg.strategy),
+                IERC20(eigen_msg.token),
+                eigen_msg.amount,
+                eigen_msg.staker,
+                eigen_msg.expiry,
+                eigen_msg.signature
+            );
         }
 
         emit MessageReceived(
             any2EvmMessage.messageId,
             any2EvmMessage.sourceChainSelector, // fetch the source chain identifier (aka selector)
             abi.decode(any2EvmMessage.sender, (address)), // abi-decoding of the sender address,
-            // msgForEigenlayer.staker,
             abi.decode(any2EvmMessage.data, (string)),
             any2EvmMessage.destTokenAmounts[0].token,
             any2EvmMessage.destTokenAmounts[0].amount
-            // msgForEigenlayer.amount
         );
     }
 }

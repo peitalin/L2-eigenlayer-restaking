@@ -44,12 +44,6 @@ contract SenderCCIP is CCIPReceiver, OwnerIsCreator {
         uint256 tokenAmount // The token amount that was transferred.
     );
 
-    event EigenlayerContractCallParams(
-        bytes4 indexed functionSelector,
-        uint256 indexed amount,
-        address indexed staker
-    );
-
     bytes32 internal s_lastReceivedMessageId; // Store the last received messageId.
     address internal s_lastReceivedTokenAddress; // Store the last received token address.
     uint256 internal s_lastReceivedTokenAmount; // Store the last received amount.
@@ -64,7 +58,6 @@ contract SenderCCIP is CCIPReceiver, OwnerIsCreator {
     // Mapping to keep track of allowlisted senders.
     mapping(address => bool) public allowlistedSenders;
 
-    // IERC20 private s_linkToken;
     IERC20 internal s_linkToken;
 
     /// @notice Constructor initializes the contract with the router address.

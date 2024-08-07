@@ -3,16 +3,13 @@ pragma solidity 0.8.22;
 
 import {Test, console} from "forge-std/Test.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-
-import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
-import {MockERC20Strategy} from "../src/MockERC20Strategy.sol";
-import {MockERC20} from "../src/MockERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 import {IRouterClient, WETH9, LinkToken, BurnMintERC677Helper} from "@chainlink/local/src/ccip/CCIPLocalSimulator.sol";
 import {CCIPLocalSimulator} from "@chainlink/local/src/ccip/CCIPLocalSimulator.sol";
+
+import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
+import {MockERC20} from "../src/MockERC20.sol";
 
 
 contract CCIPLocalSimulatorTest is Test {
@@ -60,7 +57,7 @@ contract CCIPLocalSimulatorTest is Test {
 
         ProxyAdmin proxyAdmin = deployMockEigenlayerContractsScript.deployProxyAdmin();
 
-        IERC20 mockERC20 = deployMockEigenlayerContractsScript.deployMockERC20(
+        MockERC20 mockERC20 = deployMockEigenlayerContractsScript.deployMockERC20(
             "Mock Magic",
             "MMAGIC",
             proxyAdmin

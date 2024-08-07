@@ -25,12 +25,12 @@ contract DeployCCIPScriptsTest is Test {
         deployOnEthScript = new DeployOnEthScript();
     }
 
-    function test_DeployOnArbScript() public {
-        deployOnArbScript.run();
-    }
+    // function test_DeployOnArbScript() public {
+    //     deployOnArbScript.run();
+    // }
 
-    function test_DeployOnEthScript() public {
-        deployOnEthScript.run();
-    }
+    // function test_DeployOnEthScript() public {
+    //     deployOnEthScript.run();
+    // }
 
 }

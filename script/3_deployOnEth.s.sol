@@ -12,6 +12,7 @@ import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IS
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IReceiverCCIP} from "../src/IReceiverCCIP.sol";
 import {IRestakingConnector} from "../src/IRestakingConnector.sol";
 

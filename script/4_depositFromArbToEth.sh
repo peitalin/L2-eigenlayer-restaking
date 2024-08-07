@@ -24,3 +24,7 @@ forge script script/4_depositFromArbToEth.s.sol:DepositFromArbToEthScript  \
 # https://ccip.chain.link/msg/0xa2c8e4973ba3fac9378a04bcd438e28e70115c2ae4cd66be9c73ef02d7c28f56
 # with associated Eigenlayer deposit events
 # https://sepolia.etherscan.io/tx/0xc8fe44c453e8f39949b0e7ff81dbf770790fb92b3fb37a976e1291b1b4deb355#eventlog
+
+# Example 2:
+# https://ccip.chain.link/msg/0x9ead55326be80ed9956c97ecd4a7b5a701b3e2dc6921a0672d9f8f8ba978c248
+# https://sepolia.etherscan.io/tx/0xee7e78fe09d24dbf7d20010228af21e3011ae0c293f2ce3fd5eba727631453c2#eventlog

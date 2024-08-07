@@ -48,7 +48,8 @@ contract DeployMockEigenlayerContractsScript is Script {
         IPauserRegistry,
         IRewardsCoordinator,
         IDelegationManager,
-        IStrategy
+        IStrategy,
+        IERC20
     ) {
 
         IStrategyManager strategyManager;
@@ -71,7 +72,7 @@ contract DeployMockEigenlayerContractsScript is Script {
 
         if (block.chainid == 31337) {
             // can mint in localhost tests
-            mockERC20 = deployMockERC20("Mock MAGIC", "MMAGIC", proxyAdmin);
+            mockERC20 = IERC20(address(deployMockERC20("Mock MAGIC", "MMAGIC", proxyAdmin)));
         } else {
             // CCIP BnM Token on ETH Sepolia
             // can't mint, you need to transfer CCIP-BnM tokens to receiver contract
@@ -101,7 +102,8 @@ contract DeployMockEigenlayerContractsScript is Script {
             pauserRegistry,
             rewardsCoordinator,
             delegationManager,
-            strategy
+            strategy,
+            mockERC20
         );
     }
 
@@ -232,7 +234,7 @@ contract DeployMockEigenlayerContractsScript is Script {
         string memory name,
         string memory symbol,
         ProxyAdmin proxyAdmin
-    ) public returns (IERC20) {
+    ) public returns (MockERC20) {
 
         vm.startBroadcast(deployer);
 
@@ -253,7 +255,7 @@ contract DeployMockEigenlayerContractsScript is Script {
         );
 
         vm.stopBroadcast();
-        return IERC20(address(erc20proxy));
+        return erc20proxy;
     }
 
     function deployERC20Strategy(
@@ -300,7 +302,8 @@ contract DeployMockEigenlayerContractsScript is Script {
         bool[] memory thirdPartyTransfersForbiddenValues = new bool[](1);
 
         strategiesToWhitelist[0] = strategy;
-        thirdPartyTransfersForbiddenValues[0] = true;
+        thirdPartyTransfersForbiddenValues[0] = false;
+        // allow third parties to deposit on behalf of a user (with their signature)
 
         vm.startBroadcast(deployer);
         strategyManager.addStrategiesToDepositWhitelist(strategiesToWhitelist, thirdPartyTransfersForbiddenValues);

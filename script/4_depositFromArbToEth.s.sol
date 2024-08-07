@@ -103,7 +103,6 @@ contract DepositFromArbToEthScript is Script {
         }
     }
 
-
     function topupSenderLINKBalance(address senderAddr, address deployerAddr) public {
         /// Only if using sendMessagePayLINK()
         address linkAddressOnArb = address(0xb1D4538B4571d411F07960EF2838Ce337FE1E80E);
