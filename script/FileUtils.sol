@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, stdJson, console} from "forge-std/Script.sol";
+import {stdJson, console} from "forge-std/Script.sol";
 import {Test} from "forge-std/Test.sol";
 
-import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
-import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 

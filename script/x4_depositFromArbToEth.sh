@@ -1,9 +1,9 @@
 #!/bin/bash
 source .env
 
-echo forge script script/4_depositFromArbToEth.s.sol:DepositFromArbToEthScript --rpc-url arbsepolia --broadcast -vvvv
+echo forge script script/x4_depositFromArbToEth.s.sol:DepositFromArbToEthScript --rpc-url arbsepolia --broadcast -vvvv
 
-forge script script/4_depositFromArbToEth.s.sol:DepositFromArbToEthScript  \
+forge script script/x4_depositFromArbToEth.s.sol:DepositFromArbToEthScript  \
     --rpc-url arbsepolia \
     --broadcast \
     -vvvv

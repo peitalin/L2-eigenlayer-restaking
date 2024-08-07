@@ -41,7 +41,7 @@ contract DeployMockEigenlayerContractsScript is Script {
     uint32 public GENESIS_REWARDS_TIMESTAMP = 0;
 
     uint256 public USER_DEPOSIT_LIMIT = 10 * 1e18;  // uint256 _maxPerDeposit,
-    uint256 public TOTAL_DEPOSIT_LIMIT = 10 * 1e18; // uint256 _maxTotalDeposits,
+    uint256 public TOTAL_DEPOSIT_LIMIT = 100 * 1e18; // uint256 _maxTotalDeposits,
 
     function run() public returns (
         IStrategyManager,
@@ -120,13 +120,21 @@ contract DeployMockEigenlayerContractsScript is Script {
         chains[421614] = "arbsepolia";
         chains[11155111] = "ethsepolia";
 
+        // Eigenlayer contract addresses are only on EthSepolia and localhost, not L2
+        uint256 chainid = 11155111;
+        if (block.chainid == 31337) {
+            chainid = 31337;
+        } else {
+            chainid = 11155111;
+        }
+
         IRewardsCoordinator rewardsCoordinator;
         IPauserRegistry pauserRegistry;
         IDelegationManager delegationManager;
         IStrategyManager strategyManager;
         IStrategy strategy;
 
-        string memory inputPath = string(abi.encodePacked("script/", chains[block.chainid], "/eigenLayerContracts.config.json"));
+        string memory inputPath = string(abi.encodePacked("script/", chains[chainid], "/eigenLayerContracts.config.json"));
         string memory deploymentData = vm.readFile(inputPath);
 
         strategyManager = IStrategyManager(stdJson.readAddress(deploymentData, ".addresses.strategyManager"));

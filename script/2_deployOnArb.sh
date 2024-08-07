@@ -17,5 +17,5 @@ forge script script/2_deployOnArb.s.sol:DeployOnArbScript \
 #     --watch \
 #     --etherscan-api-key $ARBISCAN_API_KEY \
 #     --compiler-version v0.8.22 \
-#     0x796f1dEA914878713d5D3573F294EAf7302b56B8 \
+#     0x411cD4080aB7eD1Bf0c68aD0B382EADBDAA87764 \
 #     ./src/SenderCCIP.sol:SenderCCIP

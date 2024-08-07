@@ -27,6 +27,9 @@ contract DepositFromArbToEthScript is Script {
 
         require(block.chainid == 421614, "Must run script on Arbitrum network");
 
+        // we are calling CCIP-BnM via an address which is only on mainnet, so fork mainnet
+        vm.createSelectFork("arbsepolia");
+
         bool payFeeWithETH = true;
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
@@ -41,8 +44,12 @@ contract DepositFromArbToEthScript is Script {
         // https://docs.chain.link/ccip/supported-networks/v1_2_0/testnet#arbitrum-sepolia-ethereum-sepolia
         IERC20 ccipBnM = IERC20(0xA8C0c11bf64AF62CDCA6f93D3769B88BdD7cb93D);
 
+        /////////////////////////////
+        /// Begin Broadcast
+        /////////////////////////////
         vm.startBroadcast(deployerKey);
 
+        // Note remember to vm.createSelectFork("arbsepolia");
         // check CCIP-BnM balances for sender contract if it's a lock/unlock bridge model
         if (ccipBnM.balanceOf(senderAddr) < 0.1 ether) {
             // we're sending 0.001 CCIPBnM
