@@ -13,8 +13,8 @@ import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/IRestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
-import {FileUtils} from "./FileUtils.sol";
-import {ArbSepolia, EthSepolia} from "./Constants.sol";
+import {FileReader} from "./Addresses.sol";
+import {ArbSepolia, EthSepolia} from "./Addresses.sol";
 
 
 contract DeployOnEthScript is Script {
@@ -32,7 +32,7 @@ contract DeployOnEthScript is Script {
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        FileUtils fileUtils = new FileUtils(); // keep outside vm.startBroadcast() to avoid deploying
+        FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         (
             IStrategyManager strategyManager,
@@ -60,7 +60,7 @@ contract DeployOnEthScript is Script {
 
         receiverContract.allowlistSourceChain(ArbSepolia.ChainSelector, true);
 
-        address sender = address(fileUtils.getSenderContract());
+        address sender = address(fileReader.getSenderContract());
         receiverContract.allowlistSender(sender, true);
 
         (

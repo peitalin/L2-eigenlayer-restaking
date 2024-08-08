@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import {Script} from "forge-std/Script.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
-import {ArbSepolia, EthSepolia} from "./Constants.sol";
+import {ArbSepolia, EthSepolia} from "./Addresses.sol";
 
 contract DeployOnArbScript is Script {
 

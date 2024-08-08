@@ -31,7 +31,15 @@ contract DeployMockEigenlayerContractsScript is Script {
     address public deployer = vm.addr(deployerKey);
 
     mapping(uint256 => string) public chains;
+
     IERC20 public mockERC20;
+    IStrategyManager public strategyManager;
+    ISlasher public slasher;
+    IEigenPodManager public eigenPodManager;
+    IPauserRegistry public pauserRegistry;
+    IRewardsCoordinator public rewardsCoordinator;
+    IDelegationManager public delegationManager;
+    ProxyAdmin public proxyAdmin;
 
     // RewardsCoordinator Parameters. TBD what they should be for Treasure chain
     uint32 public CALCULATION_INTERVAL_SECONDS = 604800; // 7 days
@@ -52,16 +60,12 @@ contract DeployMockEigenlayerContractsScript is Script {
         IERC20
     ) {
 
-        IStrategyManager strategyManager;
-        IPauserRegistry pauserRegistry;
-        IRewardsCoordinator rewardsCoordinator;
-        IDelegationManager delegationManager;
 
         if (block.chainid != 31337 && block.chainid != 11155111) revert("must deploy on Eth or local network");
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
-        ProxyAdmin proxyAdmin = deployProxyAdmin();
+        proxyAdmin = deployProxyAdmin();
 
         (
             strategyManager,
@@ -87,7 +91,7 @@ contract DeployMockEigenlayerContractsScript is Script {
             proxyAdmin
         ));
 
-        saveContractAddresses(
+        writeContractAddresses(
             address(strategyManager),
             address(pauserRegistry),
             address(rewardsCoordinator),
@@ -107,74 +111,41 @@ contract DeployMockEigenlayerContractsScript is Script {
         );
     }
 
-    function readSavedEigenlayerAddresses() public returns (
-        IStrategyManager,
-        IPauserRegistry,
-        IRewardsCoordinator,
-        IDelegationManager,
-        IStrategy
-    ) {
-
-        chains[31337] = "localhost";
-        chains[17000] = "holesky";
-        chains[421614] = "arbsepolia";
-        chains[11155111] = "ethsepolia";
-
-        // Eigenlayer contract addresses are only on EthSepolia and localhost, not L2
-        uint256 chainid = 11155111;
-        if (block.chainid == 31337) {
-            chainid = 31337;
-        } else {
-            chainid = 11155111;
-        }
-
-        IRewardsCoordinator rewardsCoordinator;
-        IPauserRegistry pauserRegistry;
-        IDelegationManager delegationManager;
-        IStrategyManager strategyManager;
-        IStrategy strategy;
-
-        string memory inputPath = string(abi.encodePacked("script/", chains[chainid], "/eigenLayerContracts.config.json"));
-        string memory deploymentData = vm.readFile(inputPath);
-
-        strategyManager = IStrategyManager(stdJson.readAddress(deploymentData, ".addresses.strategyManager"));
-        pauserRegistry = IPauserRegistry(stdJson.readAddress(deploymentData, ".addresses.pauserRegistry"));
-        rewardsCoordinator = IRewardsCoordinator(stdJson.readAddress(deploymentData, ".addresses.rewardsCoordinator"));
-        delegationManager = IDelegationManager(stdJson.readAddress(deploymentData, ".addresses.delegationManager"));
-        strategy = IStrategy(stdJson.readAddress(deploymentData, ".addresses.strategies.CCIPStrategy"));
-
-        return (strategyManager, pauserRegistry, rewardsCoordinator, delegationManager, strategy);
-    }
-
     function deployEigenlayerContracts(ProxyAdmin proxyAdmin) public returns (
         IStrategyManager,
         IPauserRegistry,
         IRewardsCoordinator,
         IDelegationManager
     ) {
+        ///////////////////////////////////////////////////
         vm.startBroadcast(deployer);
-
-        IDelegationManager delegationManager;
-        ISlasher slasher;
-        IEigenPodManager eigenPodManager;
-        StrategyManager strategyManager;
+        ///////////////////////////////////////////////////
+        EmptyContract emptyContract = new EmptyContract();
 
         address[] memory pausers = new address[](1);
         pausers[0] = deployer;
         PauserRegistry _pauserRegistry = new PauserRegistry(pausers, deployer);
 
-        EmptyContract emptyContract = new EmptyContract();
-
+        // deploy first to get address for delegationManager
         strategyManager = StrategyManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), ""))
         );
+        ///////////////////////////////////////////////////
+        vm.stopBroadcast();
+        ///////////////////////////////////////////////////
 
-        delegationManager = new DelegationManager(
-            strategyManager,
-            slasher,
-            eigenPodManager
-        );
+        delegationManager = IDelegationManager(address(
+            deployDelegationManager(
+                strategyManager,
+                slasher,
+                eigenPodManager,
+                _pauserRegistry
+            )
+        ));
 
+        ///////////////////////////////////////////////////
+        vm.startBroadcast(deployer);
+        ///////////////////////////////////////////////////
         StrategyManager strategyManagerImpl = new StrategyManager(
             delegationManager,
             eigenPodManager,
@@ -192,10 +163,41 @@ contract DeployMockEigenlayerContractsScript is Script {
                 0 // initialPauseStaus
             )
         );
+        ///////////////////////////////////////////////////
+        vm.stopBroadcast();
+        ///////////////////////////////////////////////////
 
-        RewardsCoordinator rewardsCoordinator = new RewardsCoordinator(
-            delegationManager,
+        RewardsCoordinator rewardsCoordinator = deployRewardsCoordinator(
             strategyManager,
+            delegationManager,
+            _pauserRegistry
+        );
+
+        return (
+            IStrategyManager(address(strategyManager)),
+            IPauserRegistry(address(_pauserRegistry)),
+            IRewardsCoordinator(address(rewardsCoordinator)),
+            IDelegationManager(address(delegationManager))
+        );
+    }
+
+    function deployProxyAdmin() public returns (ProxyAdmin) {
+        vm.startBroadcast(deployer);
+        ProxyAdmin _proxyAdmin = new ProxyAdmin();
+        vm.stopBroadcast();
+        return _proxyAdmin;
+    }
+
+    function deployRewardsCoordinator(
+        IStrategyManager _strategyManager,
+        IDelegationManager _delegationManager,
+        IPauserRegistry _pauserRegistry
+    ) internal returns (RewardsCoordinator) {
+        vm.startBroadcast(deployer);
+        // Eigenlayer disableInitialisers so they must be called via upgradeable proxy
+        RewardsCoordinator rewardsCoordinator = new RewardsCoordinator(
+            _delegationManager,
+            _strategyManager,
             CALCULATION_INTERVAL_SECONDS ,
             MAX_REWARDS_DURATION,
             MAX_RETROACTIVE_LENGTH ,
@@ -222,26 +224,49 @@ contract DeployMockEigenlayerContractsScript is Script {
         );
 
         vm.stopBroadcast();
-
-        return (
-            IStrategyManager(address(strategyManager)),
-            IPauserRegistry(address(_pauserRegistry)),
-            IRewardsCoordinator(address(rewardsCoordinator)),
-            IDelegationManager(address(delegationManager))
-        );
+        return rewardsCoordinator;
     }
 
-    function deployProxyAdmin() public returns (ProxyAdmin) {
+    function deployDelegationManager(
+        IStrategyManager _strategyManager,
+        ISlasher _slasher,
+        IEigenPodManager _eigenPodManager,
+        IPauserRegistry _pauserRegistry
+    ) internal returns (DelegationManager) {
         vm.startBroadcast(deployer);
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
+        // Eigenlayer disableInitialisers so they must be called via upgradeable proxy
+        DelegationManager delegationManagerImpl = new DelegationManager(
+            _strategyManager,
+            _slasher,
+            _eigenPodManager
+        );
+
+        // IStrategy[] memory _strategies = new IStrategy[](0);
+        // uint256[] memory _withdrawalDelayBlocks = new uint256[](0);
+         DelegationManager delegationManagerProxy = DelegationManager(
+            address(new TransparentUpgradeableProxy(
+                address(delegationManagerImpl),
+                address(proxyAdmin),
+                abi.encodeWithSelector(
+                    DelegationManager.initialize.selector,
+                    deployer,
+                    _pauserRegistry,
+                    0, // initialPausedStatus
+                    4, // _minWithdrawalDelayBlocks: 4x15 seconds = 1 min
+                    new IStrategy[](0), // _strategies
+                    new uint256[](0) // _withdrawalDelayBlocks
+                )
+            ))
+        );
+
         vm.stopBroadcast();
-        return proxyAdmin;
+        return delegationManagerProxy;
     }
 
     function deployMockERC20(
         string memory name,
         string memory symbol,
-        ProxyAdmin proxyAdmin
+        ProxyAdmin _proxyAdmin
     ) public returns (MockERC20) {
 
         vm.startBroadcast(deployer);
@@ -252,7 +277,7 @@ contract DeployMockEigenlayerContractsScript is Script {
             address(
                 new TransparentUpgradeableProxy(
                     address(erc20impl),
-                    address(proxyAdmin),
+                    address(_proxyAdmin),
                     abi.encodeWithSelector(
                         MockERC20.initialize.selector,
                         name,
@@ -270,7 +295,7 @@ contract DeployMockEigenlayerContractsScript is Script {
         IStrategyManager _strategyManager,
         IPauserRegistry _pauserRegistry,
         IERC20 _mockERC20,
-        ProxyAdmin proxyAdmin
+        ProxyAdmin _proxyAdmin
     ) public returns (MockERC20Strategy) {
 
         vm.startBroadcast(deployer);
@@ -285,7 +310,7 @@ contract DeployMockEigenlayerContractsScript is Script {
             address(
                 new TransparentUpgradeableProxy(
                     address(strategyImpl),
-                    address(proxyAdmin),
+                    address(_proxyAdmin),
                     abi.encodeWithSelector(
                         MockERC20Strategy.initialize.selector,
                         USER_DEPOSIT_LIMIT,  // uint256 _maxPerDeposit,
@@ -318,22 +343,61 @@ contract DeployMockEigenlayerContractsScript is Script {
         vm.stopBroadcast();
     }
 
-    function saveContractAddresses(
-        address strategyManager,
-        address pauserRegistry,
-        address rewardsCoordinator,
-        address delegationManager,
-        address strategy
+    function readSavedEigenlayerAddresses() public returns (
+        IStrategyManager,
+        IPauserRegistry,
+        IRewardsCoordinator,
+        IDelegationManager,
+        IStrategy
+    ) {
+
+        chains[31337] = "localhost";
+        chains[17000] = "holesky";
+        chains[421614] = "arbsepolia";
+        chains[11155111] = "ethsepolia";
+
+        // Eigenlayer contract addresses are only on EthSepolia and localhost, not L2
+        uint256 chainid = 11155111;
+        if (block.chainid == 31337) {
+            chainid = 31337;
+        } else {
+            chainid = 11155111;
+        }
+
+        IRewardsCoordinator _rewardsCoordinator;
+        IPauserRegistry _pauserRegistry;
+        IDelegationManager _delegationManager;
+        IStrategyManager _strategyManager;
+        IStrategy _strategy;
+
+        string memory inputPath = string(abi.encodePacked("script/", chains[chainid], "/eigenLayerContracts.config.json"));
+        string memory deploymentData = vm.readFile(inputPath);
+
+        _strategyManager = IStrategyManager(stdJson.readAddress(deploymentData, ".addresses.strategyManager"));
+        _pauserRegistry = IPauserRegistry(stdJson.readAddress(deploymentData, ".addresses.pauserRegistry"));
+        _rewardsCoordinator = IRewardsCoordinator(stdJson.readAddress(deploymentData, ".addresses.rewardsCoordinator"));
+        _delegationManager = IDelegationManager(stdJson.readAddress(deploymentData, ".addresses.delegationManager"));
+        _strategy = IStrategy(stdJson.readAddress(deploymentData, ".addresses.strategies.CCIPStrategy"));
+
+        return (_strategyManager, _pauserRegistry, _rewardsCoordinator, _delegationManager, _strategy);
+    }
+
+    function writeContractAddresses(
+        address _strategyManager,
+        address _pauserRegistry,
+        address _rewardsCoordinator,
+        address _delegationManager,
+        address _strategy
     ) public {
 
         /////////////////////////////////////////////////
         // { "addresses": <addresses_output>}
         /////////////////////////////////////////////////
         string memory keyAddresses = "addresses";
-        vm.serializeAddress(keyAddresses, "strategyManager", strategyManager);
-        vm.serializeAddress(keyAddresses, "pauserRegistry", pauserRegistry);
-        vm.serializeAddress(keyAddresses, "rewardsCoordinator", rewardsCoordinator);
-        vm.serializeAddress(keyAddresses, "delegationManager", delegationManager);
+        vm.serializeAddress(keyAddresses, "strategyManager", _strategyManager);
+        vm.serializeAddress(keyAddresses, "pauserRegistry", _pauserRegistry);
+        vm.serializeAddress(keyAddresses, "rewardsCoordinator", _rewardsCoordinator);
+        vm.serializeAddress(keyAddresses, "delegationManager", _delegationManager);
         // vm.serializeAddress(keyAddresses, "proxyAdmin", proxyAdmin);
 
         /////////////////////////////////////////////////
@@ -343,7 +407,7 @@ contract DeployMockEigenlayerContractsScript is Script {
         string memory strategies_output = vm.serializeAddress(
             keyStrategies,
             "CCIPStrategy",
-            strategy
+            _strategy
         );
         string memory addresses_output = vm.serializeString(
             keyAddresses,

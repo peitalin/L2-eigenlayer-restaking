@@ -11,11 +11,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IStrategyManagerDomain} from "../src/IStrategyManagerDomain.sol";
 
 import {IReceiverCCIP} from "../src/IReceiverCCIP.sol";
-import {SenderCCIP} from "../src/SenderCCIP.sol";
+import {ISenderCCIP} from "../src/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/IRestakingConnector.sol";
 
-import {FileUtils} from "./FileUtils.sol";
-import {ArbSepolia, EthSepolia} from "./Constants.sol";
+import {FileReader, ArbSepolia, EthSepolia} from "./Addresses.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
@@ -25,7 +24,7 @@ import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 contract DepositWithSignatureFromArbToEthScript is Script {
 
     IReceiverCCIP public receiverContract;
-    SenderCCIP public senderContract;
+    ISenderCCIP public senderContract;
     IRestakingConnector public restakingConnector;
     address public senderAddr;
 
@@ -37,7 +36,7 @@ contract DepositWithSignatureFromArbToEthScript is Script {
     IERC20 public ccipBnM;
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-    FileUtils public fileUtils; // keep outside vm.startBroadcast() to avoid deploying
+    FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
     SignatureUtilsEIP1271 public signatureUtils;
     EigenlayerMsgEncoders public eigenlayerMsgEncoders;
 
@@ -57,7 +56,7 @@ contract DepositWithSignatureFromArbToEthScript is Script {
 
         signatureUtils = new SignatureUtilsEIP1271();
         eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
-        fileUtils = new FileUtils(); // keep outside vm.startBroadcast() to avoid deploying
+        fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
         (
@@ -68,19 +67,20 @@ contract DepositWithSignatureFromArbToEthScript is Script {
             strategy
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
-        senderContract = fileUtils.getSenderContract();
+        senderContract = fileReader.getSenderContract();
         senderAddr = address(senderContract);
 
-        (receiverContract, restakingConnector) = fileUtils.getReceiverRestakingConnectorContracts();
+        (receiverContract, restakingConnector) = fileReader.getReceiverRestakingConnectorContracts();
 
         ccipBnM = IERC20(address(ArbSepolia.CcipBnM)); // ArbSepolia contract
         token = IERC20(address(EthSepolia.BridgeToken)); // CCIPBnM on EthSepolia
 
         /////////////////////////////
         /// Create message and signature
+        /// In production this is done on the client/frontend
         /////////////////////////////
         uint256 amount = 0.00515 ether; // bridging 0.00515 CCIPBnM
-        uint256 expiry = block.timestamp + 1 days;
+        uint256 expiry = block.timestamp + 12 hours;
         uint256 nonce = IStrategyManagerDomain(address(strategyManager)).nonces(deployer);
         bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), EthSepolia.ChainId);
         bytes32 digestHash = signatureUtils.createEigenlayerDepositDigest(

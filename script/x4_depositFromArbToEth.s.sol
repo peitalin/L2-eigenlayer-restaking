@@ -7,15 +7,15 @@ import "forge-std/Vm.sol";
 import {IERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
 import {IReceiverCCIP} from "../src/IReceiverCCIP.sol";
-import {SenderCCIP} from "../src/SenderCCIP.sol";
+import {ISenderCCIP} from "../src/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/IRestakingConnector.sol";
-import {FileUtils} from "./FileUtils.sol";
+import {FileReader} from "./Addresses.sol";
 
 
 contract DepositFromArbToEthScript is Script {
 
     IReceiverCCIP public receiverContract;
-    SenderCCIP public senderContract;
+    ISenderCCIP public senderContract;
     IRestakingConnector public restakingConnector;
     uint256 amountBridgedAndStaked;
 
@@ -35,7 +35,7 @@ contract DepositFromArbToEthScript is Script {
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        FileUtils fileUtils = new FileUtils();
+        FileReader fileUtils = new FileReader();
         senderContract = fileUtils.getSenderContract();
         address senderAddr = address(senderContract);
         (receiverContract, restakingConnector) = fileUtils.getReceiverRestakingConnectorContracts();

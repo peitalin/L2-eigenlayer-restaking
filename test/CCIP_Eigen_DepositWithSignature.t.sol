@@ -3,15 +3,15 @@ pragma solidity 0.8.22;
 
 import {Test, console} from "forge-std/Test.sol";
 
-import {IRouterClient, WETH9, LinkToken, BurnMintERC677Helper} from "@chainlink/local/src/ccip/CCIPLocalSimulator.sol";
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 import {IPauserRegistry} from "eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {StrategyManager} from "eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
 
 import {IMockERC20} from "../src/IMockERC20.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
@@ -22,12 +22,12 @@ import {IRestakingConnector, EigenlayerDepositWithSignatureParams} from "../src/
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
 
-import {StrategyManager} from "eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
+import {EthSepolia, ArbSepolia} from "../script/Addresses.sol";
 
 
-contract CCIP_Eigenlayer_E2E_Tests is Test {
+contract CCIP_Eigen_DepositWithSignature is Test {
 
     DeployOnEthScript public deployOnEthScript;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
@@ -48,20 +48,17 @@ contract CCIP_Eigenlayer_E2E_Tests is Test {
     IDelegationManager public delegationManager;
     IStrategy public strategy;
 
-    // Initial CCIP Receiver balance
     uint256 public initialReceiverBalance = 5 ether;
-    uint64 public sourceChainSelector = 3478487238524512106;
-    address public router = 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59;
 
     function setUp() public {
 
 		deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
-        signatureUtils = new SignatureUtilsEIP1271();
         deployOnEthScript = new DeployOnEthScript();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
+        eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
+        signatureUtils = new SignatureUtilsEIP1271();
 
         //// Configure CCIP contracts
         (
@@ -85,22 +82,22 @@ contract CCIP_Eigenlayer_E2E_Tests is Test {
         restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
         // fund receiver with tokens from CCIP bridge: EVM2EVMOffRamp contract
         mockERC20.mint(address(receiverContract), initialReceiverBalance);
+
+        receiverContract.allowlistSender(deployer, true);
+
         vm.stopBroadcast();
     }
 
 
     function test_Eigenlayer_CCIP_E2E_DepositIntoStrategyWithSignature() public {
 
-        vm.startBroadcast(deployerKey);
-        receiverContract.allowlistSender(deployer, true);
-        vm.stopBroadcast();
-
         uint256 amount = 0.0077 ether;
         address staker = deployer;
         uint256 expiry = block.timestamp + 1 days;
         uint256 nonce = 0;
         bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), block.chainid);
-        (bytes memory signature, bytes32 digestHash) = createSignature(
+        (bytes memory signature, bytes32 digestHash) = signatureUtils.createEigenlayerSignature(
+            deployerKey,
             strategy,
             token,
             amount,
@@ -119,8 +116,8 @@ contract CCIP_Eigenlayer_E2E_Tests is Test {
         });
 
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: bytes32(0x598fff8ee56c84a5d8793c1ac075501711392720209f72ae3cfb445d4116d272),
-            sourceChainSelector: sourceChainSelector, // Arb Sepolia source chain selector
+            messageId: bytes32(0xffffffffffff8888888888888888881111111111111111111111111222222222),
+            sourceChainSelector: ArbSepolia.ChainSelector, // Arb Sepolia source chain selector
             sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
             data: abi.encode(string(
                 eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
@@ -147,16 +144,17 @@ contract CCIP_Eigenlayer_E2E_Tests is Test {
         /////////////////////////////////////
         //// Send message from CCIP to Eigenlayer
         /////////////////////////////////////
-        vm.startBroadcast(router); // simulate router sending message to receiverContract on L1
+        vm.startBroadcast(EthSepolia.Router); // simulate router calling receiverContract on L1
         receiverContract.mockCCIPReceive(any2EvmMessage);
 
         uint256 receiverBalance = token.balanceOf(address(receiverContract));
         uint256 valueOfShares = strategy.userUnderlying(address(deployer));
 
         require(valueOfShares == amount, "valueofShares incorrect");
+        require(strategyManager.stakerStrategyShares(staker, strategy) == amount, "stakerStrategyShares incorrect");
+
         console.log("receiver balance:", receiverBalance);
         console.log("receiver shares value:", valueOfShares);
-
         vm.stopBroadcast();
     }
 
@@ -172,7 +170,8 @@ contract CCIP_Eigenlayer_E2E_Tests is Test {
         mockERC20.mint(staker, amount);
         mockERC20.approve(address(strategyManager), amount);
 
-        (bytes memory signature, bytes32 digestHash) = createSignature(
+        (bytes memory signature, bytes32 digestHash) = signatureUtils.createEigenlayerSignature(
+            deployerKey,
             strategy,
             token,
             amount,
@@ -199,51 +198,5 @@ contract CCIP_Eigenlayer_E2E_Tests is Test {
         require(strategyManager.stakerStrategyShares(staker, strategy) == 1 ether, "deposit failed");
 
         vm.stopBroadcast();
-    }
-
-    function test_Eigenlayer_DelegateToOperator() public {
-        // DelegationManager.undelegate
-        // DelegationManager.queueWithdrawals
-        // DelegationManager.completeQueuedWithdrawal
-        // DelegationManager.completeQueuedWithdrawals
-    }
-
-    function test_Eigenlayer_UndelegateFromOperator() public {
-
-    }
-
-    function test_Eigenlayer_QueueWithdrawal() public {
-
-    }
-
-    function test_Eigenlayer_QueueWithdrawals() public {
-
-    }
-
-    function createSignature(
-        IStrategy _strategy,
-        IERC20 _token,
-        uint256 amount,
-        address staker,
-        uint256 nonce,
-        uint256 expiry,
-        bytes32 domainSeparator
-    ) public returns (bytes memory, bytes32) {
-
-        bytes32 digestHash = signatureUtils.createEigenlayerDepositDigest(
-            _strategy,
-            _token,
-            amount,
-            staker,
-            nonce,
-            expiry,
-            domainSeparator
-        );
-        // generate ECDSA signature
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
-        bytes memory signature = abi.encodePacked(r, s, v);
-        // r,s,v packed into 65byte signature: 32 + 32 + 1.
-        // the order of r,s,v differs from the above
-        return (signature, digestHash);
     }
 }
