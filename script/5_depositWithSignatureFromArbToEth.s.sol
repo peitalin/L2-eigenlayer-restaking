@@ -8,6 +8,7 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IStrategyManagerDomain} from "../src/IStrategyManagerDomain.sol";
 
 import {IReceiverCCIP} from "../src/IReceiverCCIP.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
@@ -51,13 +52,14 @@ contract DepositWithSignatureFromArbToEthScript is Script {
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        // Need fork, as we are making contract calls to CCIP-BnM which is only on arbsepolia
-        vm.createSelectFork("arbsepolia");
+        // Fork to get nonce from StrategyManager in EthSepolia
+        vm.createSelectFork("ethsepolia"); // forkId: 1
 
         signatureUtils = new SignatureUtilsEIP1271();
         eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
         fileUtils = new FileUtils(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
+
         (
             strategyManager,
             ,
@@ -75,35 +77,21 @@ contract DepositWithSignatureFromArbToEthScript is Script {
         token = IERC20(address(EthSepolia.BridgeToken)); // CCIPBnM on EthSepolia
 
         /////////////////////////////
-        /// Begin Broadcast
+        /// Create message and signature
         /////////////////////////////
-        vm.startBroadcast(deployerKey);
-
-        // check L2 CCIP-BnM balances
-        if (ccipBnM.balanceOf(senderAddr) < 0.1 ether) {
-            // we're sending 0.00515 CCIPBnM
-            ccipBnM.approve(deployer, 0.1 ether);
-            ccipBnM.transferFrom(deployer, senderAddr, 0.1 ether);
-        }
-        uint256 amount = 0.00515 ether;
-        ccipBnM.approve(senderAddr, amount); // Approve senderContract to send ccip-BnM tokens
-
+        uint256 amount = 0.00515 ether; // bridging 0.00515 CCIPBnM
         uint256 expiry = block.timestamp + 1 days;
-
+        uint256 nonce = IStrategyManagerDomain(address(strategyManager)).nonces(deployer);
         bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), EthSepolia.ChainId);
-        // bytes32 domainSeparator = getDomainSeparator(address(strategyManager), EthSepolia.ChainId);
-
         bytes32 digestHash = signatureUtils.createEigenlayerDepositDigest(
             strategy,
             token,
             amount,
             deployer,
-            0, // nonce: how to be update this cross-chain?
+            nonce,
             expiry, // expiry
             domainSeparator
         );
-        console.log("digest");
-
         // generate ECDSA signature
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
         bytes memory signature = abi.encodePacked(r, s, v);
@@ -118,6 +106,22 @@ contract DepositWithSignatureFromArbToEthScript is Script {
             expiry,
             signature
         );
+
+        //// Make sure we are on ArbSepolia Fork to make contract calls to CCIP-BnM
+        vm.createSelectFork("arbsepolia"); // forkId: 2;
+
+        /////////////////////////////
+        /// Begin Broadcast
+        /////////////////////////////
+        vm.startBroadcast(deployerKey);
+
+        // Check L2 CCIP-BnM ETH balances for gas
+        if (ccipBnM.balanceOf(senderAddr) < 0.1 ether) {
+            ccipBnM.approve(deployer, 0.1 ether);
+            ccipBnM.transferFrom(deployer, senderAddr, 0.1 ether);
+        }
+        // Approve L2 senderContract to send ccip-BnM tokens
+        ccipBnM.approve(senderAddr, amount);
 
         if (payFeeWithETH) {
             topupSenderEthBalance(senderAddr);
@@ -165,22 +169,4 @@ contract DepositWithSignatureFromArbToEthScript is Script {
         linkTokenOnArb.approve(address(senderContract), 2 ether);
     }
 
-
-    function getDomainSeparator(
-        address strategyManagerAddr,
-        uint256 destinationChainid
-    ) public pure returns (bytes32) {
-
-        /// @notice The EIP-712 typehash for the contract's domain
-        bytes32 DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
-
-        uint256 chainid = destinationChainid;
-
-        return keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes("EigenLayer")), chainid, strategyManagerAddr));
-
-        // Note: in calculating the domainSeparator:
-        // address(this) is the StrategyManager, not this contract (SignatureUtilsEIP2172)
-        // chainid is the chain Eigenlayer was deployed on, not the chain from which you are calling this function
-        // so chainid should be destination chainid in the context of L2 -> L2 restaking calls
-    }
 }
