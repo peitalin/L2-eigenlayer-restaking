@@ -1,12 +1,12 @@
 {
   "addresses": {
-    "delegationManager": "0x5455c2227880c43b07d46a566354f5da9f2914fe",
-    "pauserRegistry": "0x36c270f9801e994fcdc123fdfe15132bf7b83e9d",
-    "rewardsCoordinator": "0x9a514cb1287359bf255d1e8fb739db833faadf8b",
+    "DelegationManager": "0x5455c2227880c43b07d46a566354f5da9f2914fe",
+    "PauserRegistry": "0x36c270f9801e994fcdc123fdfe15132bf7b83e9d",
+    "RewardsCoordinator": "0x9a514cb1287359bf255d1e8fb739db833faadf8b",
     "strategies": {
       "CCIPStrategy": "0x8C3c0Bab2D49EBA700B5D9bd1DF28764B9fA42dA"
     },
-    "strategyManager": "0x92ee79732857189a16f5f3139f13c22f1d40c247"
+    "StrategyManager": "0x92ee79732857189a16f5f3139f13c22f1d40c247"
   },
   "chainInfo": {
     "chainId": 11155111,

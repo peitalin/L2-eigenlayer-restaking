@@ -39,7 +39,7 @@ contract DeployEigenlayerContractsTest is Test {
 
     function test_ReadEigenlayerContractsScript() public {
 
-        (,,,,IStrategy _strategy) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+        (IStrategy _strategy,,,,,) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
         if (address(_strategy) == address(0)) {
             console.log("chain: ", block.chainid);

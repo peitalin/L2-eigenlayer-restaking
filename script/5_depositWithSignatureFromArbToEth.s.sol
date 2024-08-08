@@ -60,11 +60,12 @@ contract DepositWithSignatureFromArbToEthScript is Script {
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
         (
+            strategy,
             strategyManager,
-            ,
-            ,
+            , // strategyFactory
+            , // pauserRegistry
             delegationManager,
-            strategy
+            // _rewardsCoordinator
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
         senderContract = fileReader.getSenderContract();

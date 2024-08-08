@@ -71,7 +71,7 @@ contract SignatureUtilsEIP1271 is Script {
         uint256 nonce,
         uint256 expiry,
         bytes32 domainSeparator
-    ) public returns (bytes memory, bytes32) {
+    ) public pure returns (bytes memory, bytes32) {
 
         bytes32 digestHash = createEigenlayerDepositDigest(
             _strategy,

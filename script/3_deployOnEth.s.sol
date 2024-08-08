@@ -35,11 +35,12 @@ contract DeployOnEthScript is Script {
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         (
+            IStrategy strategy,
             IStrategyManager strategyManager,
-            ,
-            ,
+            , // strategyFactory
+            , // pauserRegistry
             IDelegationManager delegationManager,
-            IStrategy strategy
+            // rewardsCoordinator
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
         /////////////////////////////
