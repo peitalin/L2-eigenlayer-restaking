@@ -12,6 +12,11 @@ struct EigenlayerDepositMessage {
     uint256 amount;
     address staker;
 }
+event EigenlayerDepositParams(
+    bytes4 indexed functionSelector,
+    uint256 indexed amount,
+    address indexed staker
+);
 
 struct EigenlayerDepositWithSignatureMessage {
     // bytes4 functionSelector;
@@ -22,18 +27,19 @@ struct EigenlayerDepositWithSignatureMessage {
     address staker;
     bytes signature;
 }
-
-event EigenlayerDepositParams(
-    bytes4 indexed functionSelector,
-    uint256 indexed amount,
-    address indexed staker
-);
-
 event EigenlayerDepositWithSignatureParams(
     bytes4 indexed functionSelector,
     uint256 indexed amount,
     address indexed staker
 );
+
+event EigenlayerQueueWithdrawalsParams(
+    bytes4 indexed functionSelector,
+    uint256 indexed amount,
+    address indexed staker
+);
+
+
 
 interface IRestakingConnector {
 

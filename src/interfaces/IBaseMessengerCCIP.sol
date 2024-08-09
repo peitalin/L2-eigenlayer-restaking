@@ -1,17 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
-
-interface ISenderCCIP {
+interface IBaseMessengerCCIP {
 
     function allowlistDestinationChain(uint64 _destinationChainSelector, bool allowed) external;
 
     function allowlistSourceChain(uint64 _sourceChainSelector, bool allowed) external;
 
     function allowlistSender(address _sender, bool allowed) external;
-
-    function decodeFunctionSelector(bytes calldata message) external returns (bytes4);
 
     function sendMessagePayLINK(
         uint64 _destinationChainSelector,

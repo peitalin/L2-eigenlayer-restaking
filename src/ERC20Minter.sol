@@ -6,10 +6,10 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
 import {Adminable} from "./utils/Adminable.sol";
-import {IMockERC20} from "./IMockERC20.sol";
+import {IERC20Minter} from "./interfaces/IERC20Minter.sol";
 
 
-contract MockERC20 is Initializable, ERC20Upgradeable, Adminable {
+contract ERC20Minter is Initializable, ERC20Upgradeable, Adminable {
 
     function initialize(
         string memory name,
