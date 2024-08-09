@@ -6,9 +6,9 @@ import "forge-std/Vm.sol";
 
 import {IERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 
-import {IReceiverCCIP} from "../src/IReceiverCCIP.sol";
-import {ISenderCCIP} from "../src/ISenderCCIP.sol";
-import {IRestakingConnector} from "../src/IRestakingConnector.sol";
+import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
+import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
+import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {FileReader} from "./Addresses.sol";
 
 

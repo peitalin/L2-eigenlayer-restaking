@@ -4,9 +4,9 @@ pragma solidity 0.8.22;
 import {Script, stdJson, console} from "forge-std/Script.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
-import {ISenderCCIP} from "../src/ISenderCCIP.sol";
-import {IReceiverCCIP} from "../src/IReceiverCCIP.sol";
-import {IRestakingConnector} from "../src/IRestakingConnector.sol";
+import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
+import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
+import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 
 contract FileReader is Script {

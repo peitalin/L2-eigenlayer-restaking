@@ -1,7 +1,7 @@
 {
   "transactions": [
     {
-      "hash": "0x2711cd088b177707cefe0a238c523696483892aee1e04699d8af5b23a55c3352",
+      "hash": null,
       "transactionType": "CREATE",
       "contractName": "ProxyAdmin",
       "contractAddress": "0x15affbeb59c95097ad4ba3b4fd60bb1073578da7",
@@ -19,7 +19,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0xa5cc6547062703a867e91b772c5ec6bf7f82648ddd4b3a7c7ad8880e27b1eb74",
+      "hash": null,
       "transactionType": "CREATE",
       "contractName": "EmptyContract",
       "contractAddress": "0xbb54d7c61e77c03972d447779ef6f507edff1aa6",
@@ -37,7 +37,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0x1bb98578aecacfc113f3332c2139a3b2b8e849ff3776a927442b33ae9ccdce41",
+      "hash": null,
       "transactionType": "CREATE",
       "contractName": "PauserRegistry",
       "contractAddress": "0x017703fd817adcfcc38855a24362bd7b22664a49",
@@ -58,7 +58,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0xee4c56eee8858ca1617cfe93f753ab22b6f546d650e5d325d59e3bb33371bd47",
+      "hash": null,
       "transactionType": "CREATE",
       "contractName": "TransparentUpgradeableProxy",
       "contractAddress": "0x59568f727f8325961218f22285437f103eb4a4e8",
@@ -80,7 +80,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0x6b47e8f7450fc75d5fa39c32168c0be651609ce8b49b6a54ef3ee0ffa4125d4b",
+      "hash": null,
       "transactionType": "CREATE",
       "contractName": "DelegationManager",
       "contractAddress": "0x2af80b26ebeaeec4e9f9ae66658c867d3580ba78",
@@ -102,7 +102,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0xa24fc9c07aabc9a78cedc9a2c9a30e7d764a662343d891de1befb18b3dff2c1d",
+      "hash": null,
       "transactionType": "CREATE",
       "contractName": "TransparentUpgradeableProxy",
       "contractAddress": "0x111fc96a9cd0e130ee33742e4b286781f1c79a21",
@@ -124,7 +124,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0xa85c978c64d51ba8047d2b0e923a155e6434b24ac58289a653f7c23476f09dfd",
+      "hash": null,
       "transactionType": "CREATE",
       "contractName": "StrategyManager",
       "contractAddress": "0xf7b143f4a7f744944cb8f72ab594727d8311b976",
@@ -146,7 +146,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0x90e90920f55a213379088e33beff37627142c7bb3f885a91c3f1a1de378fb864",
+      "hash": null,
       "transactionType": "CALL",
       "contractName": "ProxyAdmin",
       "contractAddress": "0x15affbeb59c95097ad4ba3b4fd60bb1073578da7",
@@ -169,7 +169,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0x8f0cbc9a025cadfa299b1a147195b5fa99577b28fd1c9b67dcb9ef5e58354bf9",
+      "hash": null,
       "transactionType": "CREATE",
       "contractName": "RewardsCoordinator",
       "contractAddress": "0x9fdd22f2aee73204355d01a392193046d2d83504",
@@ -195,7 +195,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0x8815cec12f465d29b86be7913a9ef64a78fbe742e427a71aacbc8e2673d96560",
+      "hash": null,
       "transactionType": "CREATE",
       "contractName": "TransparentUpgradeableProxy",
       "contractAddress": "0x1299a26c64544169993a0d62ef101c9a9749e8d1",
@@ -217,7 +217,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0xa5b28a8448ad4e053676aa6905c006dcc571e8fe6f105d2f9e5cf0dd720b8e78",
+      "hash": null,
       "transactionType": "CREATE",
       "contractName": "EmptyContract",
       "contractAddress": "0xdfc3b868e01f2c7f979b1721535209d3c555eeff",
@@ -235,7 +235,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0xabb7f89b52f12cc3b25aa587552817e81379c2269dfbd96bc5ecf95665fb5067",
+      "hash": null,
       "transactionType": "CREATE",
       "contractName": "StrategyBase",
       "contractAddress": "0x8c3c0bab2d49eba700b5d9bd1df28764b9fa42da",
@@ -255,7 +255,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0xdb5cee5d6e7d8f9ae81099179c6e2020adfd21ca12296d4cc67e57cccc910a03",
+      "hash": null,
       "transactionType": "CREATE",
       "contractName": "UpgradeableBeacon",
       "contractAddress": "0x15ee670f432ab7b235d55be1f6c025c1f93922cd",
@@ -275,7 +275,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0x83a441088f1bfa77d553e035d58bc433daabf3bdf8ef184a165b5acd3606d62f",
+      "hash": null,
       "transactionType": "CREATE",
       "contractName": "TransparentUpgradeableProxy",
       "contractAddress": "0xf4f708cae9504eab202251769bb635e0c96ac072",
@@ -297,7 +297,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0x4fbe2b4267041063ac21805644f36fc31359d05a6eea9793d9e2e5e98bc26507",
+      "hash": null,
       "transactionType": "CREATE",
       "contractName": "StrategyFactory",
       "contractAddress": "0x225a4a979d16502c5e5249ad21a058ada1a2ff7f",
@@ -317,7 +317,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0x404856b7f7cfcc46afadc67e74470f4cbd0a95ab0e9f7320386ed313e8679bdb",
+      "hash": null,
       "transactionType": "CALL",
       "contractName": "ProxyAdmin",
       "contractAddress": "0x15affbeb59c95097ad4ba3b4fd60bb1073578da7",
@@ -340,7 +340,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0x5d59c6aaf6131b7b98cf96b246225b60aeb6f695efc196553daa75c8a22645d1",
+      "hash": null,
       "transactionType": "CALL",
       "contractName": "TransparentUpgradeableProxy",
       "contractAddress": "0x59568f727f8325961218f22285437f103eb4a4e8",
@@ -359,7 +359,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0x525f62f4de2910e87157957f5f904b62bd2f6a1aa22f1b35dd71d6d5d4c633c3",
+      "hash": null,
       "transactionType": "CALL",
       "contractName": "TransparentUpgradeableProxy",
       "contractAddress": "0xf4f708cae9504eab202251769bb635e0c96ac072",
@@ -384,7 +384,7 @@
       "isFixedGasLimit": false
     },
     {
-      "hash": "0x5d1556b3f6e0d508db79ab61aba9c7ab72c2ae00eef9b2c42806505ed0ad0fd0",
+      "hash": null,
       "transactionType": "CALL",
       "contractName": "TransparentUpgradeableProxy",
       "contractAddress": "0x111fc96a9cd0e130ee33742e4b286781f1c79a21",
@@ -405,54 +405,34 @@
   ],
   "receipts": [],
   "libraries": [],
-  "pending": [
-    "0x2711cd088b177707cefe0a238c523696483892aee1e04699d8af5b23a55c3352",
-    "0xa5cc6547062703a867e91b772c5ec6bf7f82648ddd4b3a7c7ad8880e27b1eb74",
-    "0x1bb98578aecacfc113f3332c2139a3b2b8e849ff3776a927442b33ae9ccdce41",
-    "0xee4c56eee8858ca1617cfe93f753ab22b6f546d650e5d325d59e3bb33371bd47",
-    "0x6b47e8f7450fc75d5fa39c32168c0be651609ce8b49b6a54ef3ee0ffa4125d4b",
-    "0xa24fc9c07aabc9a78cedc9a2c9a30e7d764a662343d891de1befb18b3dff2c1d",
-    "0xa85c978c64d51ba8047d2b0e923a155e6434b24ac58289a653f7c23476f09dfd",
-    "0x90e90920f55a213379088e33beff37627142c7bb3f885a91c3f1a1de378fb864",
-    "0x8f0cbc9a025cadfa299b1a147195b5fa99577b28fd1c9b67dcb9ef5e58354bf9",
-    "0x8815cec12f465d29b86be7913a9ef64a78fbe742e427a71aacbc8e2673d96560",
-    "0xa5b28a8448ad4e053676aa6905c006dcc571e8fe6f105d2f9e5cf0dd720b8e78",
-    "0xabb7f89b52f12cc3b25aa587552817e81379c2269dfbd96bc5ecf95665fb5067",
-    "0xdb5cee5d6e7d8f9ae81099179c6e2020adfd21ca12296d4cc67e57cccc910a03",
-    "0x83a441088f1bfa77d553e035d58bc433daabf3bdf8ef184a165b5acd3606d62f",
-    "0x4fbe2b4267041063ac21805644f36fc31359d05a6eea9793d9e2e5e98bc26507",
-    "0x404856b7f7cfcc46afadc67e74470f4cbd0a95ab0e9f7320386ed313e8679bdb",
-    "0x5d59c6aaf6131b7b98cf96b246225b60aeb6f695efc196553daa75c8a22645d1",
-    "0x525f62f4de2910e87157957f5f904b62bd2f6a1aa22f1b35dd71d6d5d4c633c3",
-    "0x5d1556b3f6e0d508db79ab61aba9c7ab72c2ae00eef9b2c42806505ed0ad0fd0"
-  ],
+  "pending": [],
   "returns": {
-    "0": {
-      "internal_type": "contract IStrategyManager",
-      "value": "0x59568f727f8325961218f22285437F103eB4a4e8"
+    "5": {
+      "internal_type": "contract IERC20",
+      "value": "0xFd57b4ddBf88a4e07fF4e34C487b99af2Fe82a05"
     },
-    "2": {
-      "internal_type": "contract IRewardsCoordinator",
-      "value": "0x1299a26C64544169993a0D62eF101c9A9749E8D1"
+    "1": {
+      "internal_type": "contract IPauserRegistry",
+      "value": "0x017703fd817adCfCc38855a24362BD7B22664A49"
     },
     "3": {
       "internal_type": "contract IDelegationManager",
       "value": "0x111fc96a9Cd0e130ee33742E4b286781f1c79A21"
     },
-    "5": {
-      "internal_type": "contract IERC20",
-      "value": "0xFd57b4ddBf88a4e07fF4e34C487b99af2Fe82a05"
+    "2": {
+      "internal_type": "contract IRewardsCoordinator",
+      "value": "0x1299a26C64544169993a0D62eF101c9A9749E8D1"
+    },
+    "0": {
+      "internal_type": "contract IStrategyManager",
+      "value": "0x59568f727f8325961218f22285437F103eB4a4e8"
     },
     "4": {
       "internal_type": "contract IStrategy",
       "value": "0xb0e5d223403B8dE370791F67edb442C06c58372b"
-    },
-    "1": {
-      "internal_type": "contract IPauserRegistry",
-      "value": "0x017703fd817adCfCc38855a24362BD7B22664A49"
     }
   },
-  "timestamp": 1723202619,
+  "timestamp": 1723202582,
   "chain": 11155111,
   "commit": "e1e34df"
 }

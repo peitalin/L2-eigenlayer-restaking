@@ -8,11 +8,11 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IStrategyManagerDomain} from "../src/IStrategyManagerDomain.sol";
+import {IStrategyManagerDomain} from "../src/interfaces/IStrategyManagerDomain.sol";
 
-import {IReceiverCCIP} from "../src/IReceiverCCIP.sol";
-import {ISenderCCIP} from "../src/ISenderCCIP.sol";
-import {IRestakingConnector} from "../src/IRestakingConnector.sol";
+import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
+import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
+import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {FileReader, ArbSepolia, EthSepolia} from "./Addresses.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";

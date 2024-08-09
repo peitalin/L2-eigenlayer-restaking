@@ -7,7 +7,6 @@ import {ArbSepolia, EthSepolia} from "./Addresses.sol";
 
 contract DeployOnArbScript is Script {
 
-    SenderCCIP public senderContract;
     uint256 public deployerKey;
 
     function run() public {
@@ -18,7 +17,7 @@ contract DeployOnArbScript is Script {
         /////////////////////////////
         vm.startBroadcast(deployerKey);
         // deploy sender contract
-        senderContract = new SenderCCIP(ArbSepolia.Router, ArbSepolia.Link);
+        SenderCCIP senderContract = new SenderCCIP(ArbSepolia.Router, ArbSepolia.Link);
         // whitelist destination chain
         senderContract.allowlistDestinationChain(EthSepolia.ChainSelector, true);
         vm.stopBroadcast();

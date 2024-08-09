@@ -8,7 +8,7 @@ import {IRouterClient, WETH9, LinkToken, BurnMintERC677Helper} from "@chainlink/
 import {CCIPLocalSimulator} from "@chainlink/local/src/ccip/CCIPLocalSimulator.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
-import {MockERC20} from "../src/MockERC20.sol";
+import {ERC20Minter} from "../src/ERC20Minter.sol";
 
 
 contract CCIPLocalSimulatorTest is Test {
@@ -56,26 +56,26 @@ contract CCIPLocalSimulatorTest is Test {
 
         ProxyAdmin proxyAdmin = deployMockEigenlayerContractsScript.deployProxyAdmin();
 
-        MockERC20 mockERC20 = deployMockEigenlayerContractsScript.deployMockERC20(
+        ERC20Minter erc20Minter = deployMockEigenlayerContractsScript.deployERC20Minter(
             "Mock Magic",
             "MMAGIC",
             proxyAdmin
         );
 
-        ccipLocalSimulator.supportNewToken(address(mockERC20));
+        ccipLocalSimulator.supportNewToken(address(erc20Minter));
 
         address[] memory supportedTokens = ccipLocalSimulator.getSupportedTokens(chainSelector);
 
-        bool supportsMockERC20 = false;
+        bool supportsERC20Minter = false;
         for (uint32 i = 0; i < supportedTokens.length; i++) {
-            if (supportedTokens[i] == address(mockERC20)) {
-                console.log("supports MockERC20: ", supportedTokens[i]);
-                supportsMockERC20 = true;
+            if (supportedTokens[i] == address(erc20Minter)) {
+                console.log("supports ERC20Minter: ", supportedTokens[i]);
+                supportsERC20Minter = true;
             }
         }
 
         require(balance == 1.25e18, "balance not matching");
-        require(supportsMockERC20, "ccip should support new MockERC20");
+        require(supportsERC20Minter, "ccip should support new ERC20Minter");
     }
 
 }

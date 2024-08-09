@@ -8,9 +8,9 @@ import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IS
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
-import {IReceiverCCIP} from "../src/IReceiverCCIP.sol";
+import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
-import {IRestakingConnector} from "../src/IRestakingConnector.sol";
+import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 import {FileReader} from "./Addresses.sol";

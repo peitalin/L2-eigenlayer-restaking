@@ -13,11 +13,11 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {StrategyManager} from "eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
 
-import {IMockERC20} from "../src/IMockERC20.sol";
+import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
-import {IReceiverCCIP} from "../src/IReceiverCCIP.sol";
+import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
-import {IRestakingConnector, EigenlayerDepositWithSignatureParams} from "../src/IRestakingConnector.sol";
+import {IRestakingConnector, EigenlayerDepositWithSignatureParams} from "../src/interfaces/IRestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
@@ -39,7 +39,7 @@ contract CCIP_Eigen_DepositWithSignature is Test {
 
     IReceiverCCIP public receiverContract;
     IRestakingConnector public restakingConnector;
-    IMockERC20 public mockERC20; // has admin mint/burn functions
+    IERC20Minter public erc20Minter; // has admin mint/burn functions
     IERC20 public token;
 
     IStrategyManager public strategyManager;
@@ -76,12 +76,12 @@ contract CCIP_Eigen_DepositWithSignature is Test {
             token
         ) = deployMockEigenlayerContractsScript.run();
 
-        mockERC20 = IMockERC20(address(token));
+        erc20Minter = IERC20Minter(address(token));
 
         vm.startBroadcast(deployerKey);
         restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
         // fund receiver with tokens from CCIP bridge: EVM2EVMOffRamp contract
-        mockERC20.mint(address(receiverContract), initialReceiverBalance);
+        erc20Minter.mint(address(receiverContract), initialReceiverBalance);
 
         receiverContract.allowlistSender(deployer, true);
 
@@ -89,7 +89,7 @@ contract CCIP_Eigen_DepositWithSignature is Test {
     }
 
 
-    function test_Eigenlayer_CCIP_E2E_DepositIntoStrategyWithSignature() public {
+    function test_CCIP_Eigenlayer_DepositIntoStrategyWithSignature() public {
 
         uint256 amount = 0.0077 ether;
         address staker = deployer;
@@ -116,7 +116,7 @@ contract CCIP_Eigen_DepositWithSignature is Test {
         });
 
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: bytes32(0xffffffffffff8888888888888888881111111111111111111111111222222222),
+            messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
             sourceChainSelector: ArbSepolia.ChainSelector, // Arb Sepolia source chain selector
             sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
             data: abi.encode(string(
@@ -167,8 +167,8 @@ contract CCIP_Eigen_DepositWithSignature is Test {
         bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), block.chainid);
 
         vm.startBroadcast(deployerKey);
-        mockERC20.mint(staker, amount);
-        mockERC20.approve(address(strategyManager), amount);
+        erc20Minter.mint(staker, amount);
+        erc20Minter.approve(address(strategyManager), amount);
 
         (bytes memory signature, bytes32 digestHash) = signatureUtils.createEigenlayerSignature(
             deployerKey,

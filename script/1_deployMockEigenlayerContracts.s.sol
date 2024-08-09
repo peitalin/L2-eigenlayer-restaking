@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import "forge-std/Script.sol";
+import {Script, stdJson, console} from "forge-std/Script.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {IBeacon} from "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
@@ -23,21 +23,22 @@ import {RewardsCoordinator} from "eigenlayer-contracts/src/contracts/core/Reward
 import {EmptyContract} from "eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 import {StrategyBase} from  "eigenlayer-contracts/src/contracts/strategies/StrategyBase.sol";
 import {StrategyFactory} from "eigenlayer-contracts/src/contracts/strategies/StrategyFactory.sol";
+import {StrategyBaseTVLLimits} from "eigenlayer-contracts/src/contracts/strategies/StrategyBaseTVLLimits.sol";
 
-import {MockERC20Strategy} from "../src/MockERC20Strategy.sol";
-import {MockERC20} from "../src/MockERC20.sol";
+import {ERC20Minter} from "../src/ERC20Minter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {EthSepolia} from "./Addresses.sol";
 
 
 
 contract DeployMockEigenlayerContractsScript is Script {
 
-    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+    uint256 private deployerKey = vm.envUint("DEPLOYER_KEY");
     address public deployer = vm.addr(deployerKey);
 
     mapping(uint256 => string) public chains;
 
-    IERC20 public mockERC20;
+    IERC20 public tokenERC20;
     IStrategyManager public strategyManager;
     ISlasher public slasher;
     IEigenPodManager public eigenPodManager;
@@ -53,8 +54,8 @@ contract DeployMockEigenlayerContractsScript is Script {
     uint32 public MAX_FUTURE_LENGTH = 2419200; // 28 days
     uint32 public GENESIS_REWARDS_TIMESTAMP = 0;
 
-    uint256 public USER_DEPOSIT_LIMIT = 10 * 1e18;  // uint256 _maxPerDeposit,
-    uint256 public TOTAL_DEPOSIT_LIMIT = 100 * 1e18; // uint256 _maxTotalDeposits,
+    uint256 public USER_DEPOSIT_LIMIT = 1_000 * 1e18;  // uint256 _maxPerDeposit,
+    uint256 public TOTAL_DEPOSIT_LIMIT = 100_000 * 1e18; // uint256 _maxTotalDeposits,
 
     function run() public returns (
         IStrategyManager,
@@ -81,31 +82,31 @@ contract DeployMockEigenlayerContractsScript is Script {
 
         if (block.chainid == 31337) {
             // can mint in localhost tests
-            mockERC20 = IERC20(address(deployMockERC20("Mock MAGIC", "MMAGIC", proxyAdmin)));
+            tokenERC20 = IERC20(address(deployERC20Minter("Mock MAGIC", "MMAGIC", proxyAdmin)));
         } else {
-            // CCIP BnM Token on ETH Sepolia
             // can't mint, you need to transfer CCIP-BnM tokens to receiver contract
-            mockERC20 = IERC20(0xFd57b4ddBf88a4e07fF4e34C487b99af2Fe82a05);
-            // mockERC20 = ccipBnM;
+            tokenERC20 = IERC20(EthSepolia.CcipBnM);
         }
 
-        StrategyFactory strategyFactory = deployStrategyFactory(
+        (StrategyFactory strategyFactory, UpgradeableBeacon strategyBeacon) = _deployStrategyFactory(
             StrategyManager(address(strategyManager)),
             pauserRegistry,
             proxyAdmin
         );
 
-        // automatically deploys Strategy and whitelist it
-        // IStrategy strategy = strategyFactory.deployNewStrategy(mockERC20);
+        vm.startBroadcast(deployer);
+        IStrategy strategy = strategyFactory.deployNewStrategy(tokenERC20);
 
-        IStrategy strategy = IStrategy(deployERC20Strategy(
-            strategyManager,
-            pauserRegistry,
-            mockERC20,
-            proxyAdmin
-        ));
+        // setStrategyWithdrawalDelayBlocks
+        IStrategy[] memory strategies = new IStrategy[](1);
+        strategies[0] = strategy;
 
-        whitelistStrategy(strategyFactory, strategy);
+        uint256[] memory withdrawalDelayBlocks = new uint256[](1);
+        withdrawalDelayBlocks[0] = 1;
+
+        DelegationManager(address(delegationManager)).setStrategyWithdrawalDelayBlocks(strategies, withdrawalDelayBlocks);
+
+        vm.stopBroadcast();
 
         writeContractAddresses(
             address(strategy),
@@ -114,6 +115,7 @@ contract DeployMockEigenlayerContractsScript is Script {
             address(pauserRegistry),
             address(delegationManager),
             address(rewardsCoordinator),
+            address(strategyBeacon),
             address(proxyAdmin)
         );
 
@@ -123,11 +125,11 @@ contract DeployMockEigenlayerContractsScript is Script {
             rewardsCoordinator,
             delegationManager,
             strategy,
-            mockERC20
+            tokenERC20
         );
     }
 
-    function deployEigenlayerContracts(ProxyAdmin proxyAdmin) public returns (
+    function deployEigenlayerContracts(ProxyAdmin _proxyAdmin) public returns (
         IStrategyManager,
         IPauserRegistry,
         IRewardsCoordinator,
@@ -144,14 +146,14 @@ contract DeployMockEigenlayerContractsScript is Script {
 
         // deploy first to get address for delegationManager
         strategyManager = StrategyManager(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(proxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(_proxyAdmin), ""))
         );
         ///////////////////////////////////////////////////
         vm.stopBroadcast();
         ///////////////////////////////////////////////////
 
         delegationManager = IDelegationManager(address(
-            deployDelegationManager(
+            _deployDelegationManager(
                 strategyManager,
                 slasher,
                 eigenPodManager,
@@ -183,7 +185,7 @@ contract DeployMockEigenlayerContractsScript is Script {
         vm.stopBroadcast();
         ///////////////////////////////////////////////////
 
-        RewardsCoordinator rewardsCoordinator = deployRewardsCoordinator(
+        rewardsCoordinator = _deployRewardsCoordinator(
             strategyManager,
             delegationManager,
             _pauserRegistry
@@ -204,14 +206,14 @@ contract DeployMockEigenlayerContractsScript is Script {
         return _proxyAdmin;
     }
 
-    function deployRewardsCoordinator(
+    function _deployRewardsCoordinator(
         IStrategyManager _strategyManager,
         IDelegationManager _delegationManager,
         IPauserRegistry _pauserRegistry
     ) internal returns (RewardsCoordinator) {
         vm.startBroadcast(deployer);
         // Eigenlayer disableInitialisers so they must be called via upgradeable proxy
-        RewardsCoordinator rewardsCoordinator = new RewardsCoordinator(
+        RewardsCoordinator _rewardsCoordinator = new RewardsCoordinator(
             _delegationManager,
             _strategyManager,
             CALCULATION_INTERVAL_SECONDS ,
@@ -221,10 +223,10 @@ contract DeployMockEigenlayerContractsScript is Script {
             GENESIS_REWARDS_TIMESTAMP
         );
 
-        rewardsCoordinator = RewardsCoordinator(
+        _rewardsCoordinator = RewardsCoordinator(
             address(
                 new TransparentUpgradeableProxy(
-                    address(rewardsCoordinator),
+                    address(_rewardsCoordinator),
                     address(proxyAdmin),
                     abi.encodeWithSelector(
                         RewardsCoordinator.initialize.selector,
@@ -240,10 +242,10 @@ contract DeployMockEigenlayerContractsScript is Script {
         );
 
         vm.stopBroadcast();
-        return rewardsCoordinator;
+        return _rewardsCoordinator;
     }
 
-    function deployDelegationManager(
+    function _deployDelegationManager(
         IStrategyManager _strategyManager,
         ISlasher _slasher,
         IEigenPodManager _eigenPodManager,
@@ -279,11 +281,11 @@ contract DeployMockEigenlayerContractsScript is Script {
         return delegationManagerProxy;
     }
 
-    function deployStrategyFactory(
+    function _deployStrategyFactory(
         StrategyManager _strategyManager,
         IPauserRegistry _pauserRegistry,
         ProxyAdmin _proxyAdmin
-    ) internal returns (StrategyFactory) {
+    ) internal returns (StrategyFactory, UpgradeableBeacon) {
         vm.startBroadcast(deployer);
 
         EmptyContract emptyContract = new EmptyContract();
@@ -315,26 +317,24 @@ contract DeployMockEigenlayerContractsScript is Script {
         _strategyManager.setStrategyWhitelister(address(strategyFactory));
 
         vm.stopBroadcast();
-        return strategyFactory;
+
+        return (strategyFactory, strategyBeacon);
     }
 
-    function deployMockERC20(
+    function deployERC20Minter(
         string memory name,
         string memory symbol,
         ProxyAdmin _proxyAdmin
-    ) public returns (MockERC20) {
-
+    ) public returns (ERC20Minter) {
         vm.startBroadcast(deployer);
 
-        MockERC20 erc20impl = new MockERC20();
-
-        MockERC20 erc20proxy = MockERC20(
+        ERC20Minter erc20proxy = ERC20Minter(
             address(
                 new TransparentUpgradeableProxy(
-                    address(erc20impl),
+                    address(new ERC20Minter()),
                     address(_proxyAdmin),
                     abi.encodeWithSelector(
-                        MockERC20.initialize.selector,
+                        ERC20Minter.initialize.selector,
                         name,
                         symbol
                     )
@@ -346,31 +346,31 @@ contract DeployMockEigenlayerContractsScript is Script {
         return erc20proxy;
     }
 
-    function deployERC20Strategy(
+    function deployStrategyTVLLimits(
         IStrategyManager _strategyManager,
         IPauserRegistry _pauserRegistry,
-        IERC20 _mockERC20,
+        IERC20 _tokenERC20,
         ProxyAdmin _proxyAdmin
-    ) public returns (MockERC20Strategy) {
-
+    ) public returns (StrategyBaseTVLLimits) {
         vm.startBroadcast(deployer);
 
-        require(address(_mockERC20) != address(0), "mockERC20 cannot be address(0)");
+        require(address(_tokenERC20) != address(0), "tokenERC20 cannot be address(0)");
         require(address(_strategyManager) != address(0), "strategyManager cannot be address(0)");
         require(address(_pauserRegistry) != address(0), "pauserRegistry cannot be address(0)");
 
-        MockERC20Strategy strategyImpl = new MockERC20Strategy(_strategyManager);
+        StrategyBaseTVLLimits strategyImpl = new StrategyBaseTVLLimits(_strategyManager);
+        console.log("s", address(strategyImpl));
 
-        MockERC20Strategy strategyProxy = MockERC20Strategy(
+        StrategyBaseTVLLimits strategyProxy = StrategyBaseTVLLimits(
             address(
                 new TransparentUpgradeableProxy(
                     address(strategyImpl),
                     address(_proxyAdmin),
                     abi.encodeWithSelector(
-                        MockERC20Strategy.initialize.selector,
+                        StrategyBaseTVLLimits.initialize.selector,
                         USER_DEPOSIT_LIMIT,  // uint256 _maxPerDeposit,
                         TOTAL_DEPOSIT_LIMIT, // uint256 _maxTotalDeposits,
-                        _mockERC20,          // IERC20 _underlyingToken,
+                        _tokenERC20,          // IERC20 _underlyingToken,
                         _pauserRegistry      // IPauserRegistry _pauserRegistry
                     )
                 )
@@ -378,7 +378,6 @@ contract DeployMockEigenlayerContractsScript is Script {
         );
 
         vm.stopBroadcast();
-
         return strategyProxy;
     }
 
@@ -454,6 +453,7 @@ contract DeployMockEigenlayerContractsScript is Script {
         address _pauserRegistry,
         address _delegationManager,
         address _rewardsCoordinator,
+        address _strategyBeacon,
         address _proxyAdmin
     ) public {
 
@@ -466,6 +466,7 @@ contract DeployMockEigenlayerContractsScript is Script {
         vm.serializeAddress(keyAddresses, "PauserRegistry", _pauserRegistry);
         vm.serializeAddress(keyAddresses, "RewardsCoordinator", _rewardsCoordinator);
         vm.serializeAddress(keyAddresses, "DelegationManager", _delegationManager);
+        vm.serializeAddress(keyAddresses, "StrategyBeacon", _strategyBeacon);
         vm.serializeAddress(keyAddresses, "ProxyAdmin", _proxyAdmin);
 
         /////////////////////////////////////////////////
