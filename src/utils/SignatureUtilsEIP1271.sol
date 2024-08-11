@@ -1,10 +1,11 @@
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP1271SignatureUtils} from "eigenlayer-contracts/src/contracts/libraries/EIP1271SignatureUtils.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 
 contract SignatureUtilsEIP1271 is Script {
@@ -38,14 +39,14 @@ contract SignatureUtilsEIP1271 is Script {
     }
 
     function getDomainSeparator(
-        address strategyManagerAddr,
+        address contractAddr, // strategyManagerAddr, or delegationManagerAddr
         uint256 destinationChainid
     ) public pure returns (bytes32) {
-        return calculateDomainSeparator(strategyManagerAddr, destinationChainid);
+        return calculateDomainSeparator(contractAddr, destinationChainid);
     }
 
     function calculateDomainSeparator(
-        address strategyManagerAddr,
+        address contractAddr, // strategyManagerAddr, or delegationManagerAddr
         uint256 destinationChainid
     ) public pure returns (bytes32) {
 
@@ -54,7 +55,7 @@ contract SignatureUtilsEIP1271 is Script {
 
         uint256 chainid = destinationChainid;
 
-        return keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes("EigenLayer")), chainid, strategyManagerAddr));
+        return keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes("EigenLayer")), chainid, contractAddr));
 
         // Note: in calculating the domainSeparator:
         // address(this) is the StrategyManager, not this contract (SignatureUtilsEIP2172)
@@ -62,7 +63,7 @@ contract SignatureUtilsEIP1271 is Script {
         // So chainid should be destination chainid in the context of L2 -> L1 restaking calls
     }
 
-    function createEigenlayerSignature(
+    function createEigenlayerDepositSignature(
         uint256 signingKey,
         IStrategy _strategy,
         IERC20 _token,
@@ -82,11 +83,45 @@ contract SignatureUtilsEIP1271 is Script {
             expiry,
             domainSeparator
         );
+
+
         // generate ECDSA signature
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signingKey, digestHash);
         bytes memory signature = abi.encodePacked(r, s, v);
         // r,s,v packed into 65byte signature: 32 + 32 + 1.
         // the order of r,s,v differs from the above
+
         return (signature, digestHash);
+    }
+
+    function calculateQueueWithdrawalDigestHash(
+        address staker,
+        IStrategy[] memory strategies,
+        uint256[] memory shares,
+        uint256 _stakerNonce,
+        address delegationManagerAddr,
+        uint256 destinationChainid
+    ) public pure returns (bytes32) {
+
+        /// @notice The EIP-712 typehash for the deposit struct used by the contract
+        bytes32 QUEUE_WITHDRAWAL_TYPEHASH =
+            keccak256("QueueWithdrawal(address staker,address[] strategies,uint256[] shares,uint256 nonce)");
+
+        // calculate the struct hash
+        bytes32 structHash = keccak256(abi.encode(
+            QUEUE_WITHDRAWAL_TYPEHASH,
+            staker,
+            strategies,
+            shares,
+            _stakerNonce
+        ));
+
+        // calculate the digest hash
+        bytes32 digestHash = keccak256(abi.encodePacked(
+            "\x19\x01",
+            getDomainSeparator(delegationManagerAddr, destinationChainid),
+            structHash
+        ));
+        return digestHash;
     }
 }

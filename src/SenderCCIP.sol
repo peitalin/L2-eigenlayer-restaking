@@ -86,6 +86,10 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
             // depositIntoStrategyWithSignature: [gas: 713,400]
             gasLimit = 800_000;
         }
+        if (functionSelector == 0x0dd8dd02) {
+            // queueWithdrawals: [gas: ?]
+            gasLimit = 800_000;
+        }
 
         // Create an EVM2AnyMessage struct in memory with necessary information for sending a cross-chain message
         return

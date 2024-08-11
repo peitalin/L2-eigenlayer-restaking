@@ -13,6 +13,8 @@ import {EigenlayerDepositMessage, EigenlayerDepositWithSignatureMessage} from ".
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 
+import {console} from "forge-std/Test.sol";
+
 
 /// ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them.
 contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
@@ -103,7 +105,44 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
             amountMsg = eigenMsg.amount;
         }
 
-        if (functionSelector == 0x32e89ace) {
+        if (functionSelector == 0x0dd8dd02) {
+            // bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
+
+            IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams;
+
+            queuedWithdrawalParams = restakingConnector.decodeQueueWithdrawalsMessage(message);
+
+            console.log("msg.sender:", msg.sender);
+            console.log("withdrawer:", queuedWithdrawalParams[0].withdrawer);
+            // require(msg.sender == queuedWithdrawalParams[0].withdrawer, "msg.sender should be withdrawer");
+
+            bytes32[] memory withdrawalRoots = delegationManager.queueWithdrawals(queuedWithdrawalParams);
+
+            textMsg = "queueWithdrawals()";
+            // amountMsg = eigenMsg.amount;
+        }
+
+        if (functionSelector == 0x54b2bf29) {
+            // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)")),
+            (
+                IDelegationManager.Withdrawal memory withdrawal,
+                IERC20[] memory tokensToWithdraw,
+                uint256 middlewareTimesIndex,
+                bool receiveAsTokens
+            ) = restakingConnector.decodeCompleteWithdrawalMessage(message);
+
+            delegationManager.completeQueuedWithdrawal(
+                withdrawal,
+                tokensToWithdraw,
+                middlewareTimesIndex,
+                receiveAsTokens
+            );
+
+            textMsg = "completeQueuedWithdrawal()";
+            // amountMsg = eigenMsg.amount;
+        } else {
+
+            textMsg = "no matching functionSelector";
         }
 
         emit MessageReceived(
@@ -115,5 +154,37 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
             amountMsg
         );
     }
+
+    bytes4 constant internal MAGICVALUE = 0x1626ba7e;
+
+    function isValidSignature(
+        bytes32 _hash,
+        bytes memory _signature
+    ) public view returns (bytes4 magicValue) {
+
+        // implement some hash/signature scheme
+
+        // if (Address.isContract(signer)) {
+        //     require(
+        //         IERC1271(signer).isValidSignature(digestHash, signature) == EIP1271_MAGICVALUE,
+        //         "EIP1271SignatureUtils.checkSignature_EIP1271: ERC1271 signature verification failed"
+        //     );
+        // }
+        // address signer = ECDSA.recover(digestHash, signature);
+        // console.log("signer", signer);
+
+        // // bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _hash));
+        // // if (signer == address(0)) {
+        // //     return 0x00000000;
+        // // } else if (signer == msg.sender) {
+        // //     return 0x20c13b0b;
+        // // } else {
+        // //     return 0x00000000;
+        // // }
+
+        // IERC1271(signer).isValidSignature(digestHash, signature) == EIP1271_MAGICVALUE,
+        return MAGICVALUE;
+    }
+
 }
 

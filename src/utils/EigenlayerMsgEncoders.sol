@@ -3,9 +3,26 @@ pragma solidity 0.8.22;
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 
 contract EigenlayerMsgEncoders {
+
+    function encodeDepositIntoStrategyMsg(
+        address strategy,
+        address token,
+        uint256 amount,
+        address staker,
+        uint256 expiry,
+        bytes memory signature
+    ) public pure returns (bytes memory) {
+        bytes memory message_bytes = abi.encodeWithSelector(
+            bytes4(keccak256("depositIntoStrategy(uint256,address)")),
+            strategy,
+            amount
+        );
+        return message_bytes;
+    }
 
     function encodeDepositIntoStrategyWithSignatureMsg(
         address strategy,
@@ -52,8 +69,10 @@ contract EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-    function encodeCompleteWithdrawalMsg(
-        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
+   function encodeQueueWithdrawalWithSignatureMsg(
+        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams,
+        address staker,
+        bytes memory signature
     ) public pure returns (bytes memory) {
 
         ///// Function signature: structs are encoded as tuples:
@@ -66,8 +85,46 @@ contract EigenlayerMsgEncoders {
         // }
 
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
-            queuedWithdrawalParams
+            bytes4(keccak256("queueWithdrawalsWithSignature((address[],uint256[],address)[],address,bytes)")),
+            queuedWithdrawalParams,
+            staker,
+            signature
+        );
+
+        return message_bytes;
+    }
+
+    function encodeCompleteWithdrawalMsg(
+        IDelegationManager.Withdrawal memory withdrawal,
+        IERC20[] memory tokensToWithdraw,
+        uint256 middlewareTimesIndex,
+        bool receiveAsTokens
+    ) public pure returns (bytes memory) {
+
+        // functionSignature
+        // function completeQueuedWithdrawal(
+        //     IDelegationManager.Withdrawal withdrawal,
+        //     IERC20[] tokensToWithdraw,
+        //     uint256 middlewareTimesIndex,
+        //     bool receiveAsTokens
+        // )
+
+        // struct Withdrawal {
+        //     address staker;
+        //     address delegatedTo;
+        //     address withdrawer;
+        //     uint256 nonce;
+        //     uint32 startBlock;
+        //     IStrategy[] strategies;
+        //     uint256[] shares;
+        // }
+
+        bytes memory message_bytes = abi.encodeWithSelector(
+            bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)")),
+            withdrawal,
+            tokensToWithdraw,
+            middlewareTimesIndex,
+            receiveAsTokens
         );
 
         return message_bytes;

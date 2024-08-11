@@ -18,7 +18,7 @@ remappings = [
 [rpc_endpoints]
 holesky = "https://holesky.drpc.org"
 arbsepolia = "https://sepolia-rollup.arbitrum.io/rpc"
-ethsepolia = "https://sepolia.drpc.org"
+ethsepolia = "https://rpc2.sepolia.org"
 localhost = "http://localhost:8545"
 
 [etherscan]

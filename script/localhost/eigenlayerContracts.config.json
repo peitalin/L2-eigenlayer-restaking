@@ -1,14 +1,14 @@
 {
   "addresses": {
-    "DelegationManager": "0xe8ad6a693825fdcd128a5641d4443BEBDCd0f73C",
-    "PauserRegistry": "0x7392daA1B9349E6362b7f75fF5cE7d502F22f21a",
-    "ProxyAdmin": "0x9F631b6E37045E0C66ed2d6AE28eEb53A5bda82D",
-    "RewardsCoordinator": "0xe1Ab123D238AF74F77BfD59450e2428c9214123C",
-    "StrategyBeacon": "0x89B80858163F40228166611A46cC9456E180a4ff",
-    "StrategyFactory": "0x3C0238e242C6dab9372f0c0d8aF9849CA7aC6142",
-    "StrategyManager": "0xBC9cF705E17a95C82f3689f214A09e5cC8c58B6b",
+    "DelegationManager": "0x8FdFb0D901dE9055C110569Cdc08F54bd4aF7128",
+    "PauserRegistry": "0x3Eef6ec7a9679e60CC57D9688E9eC0e6624D687A",
+    "ProxyAdmin": "0x7392daA1B9349E6362b7f75fF5cE7d502F22f21a",
+    "RewardsCoordinator": "0x71f655CaB647265B0f24C814644e2dD01F9b23e1",
+    "StrategyBeacon": "0xe125E7f8E257a69271847D26a1da96c9D64813cD",
+    "StrategyFactory": "0xFB22af8D95bb7861b5d2C4a706A38e73152CE062",
+    "StrategyManager": "0xe8ad6a693825fdcd128a5641d4443BEBDCd0f73C",
     "strategies": {
-      "CCIPStrategy": "0xf0b7fbb1DADaE6c84ec689CD2C3609275d2A6161"
+      "CCIPStrategy": "0x382B4c7AF0FFC425dBc1314EE6F98B466325eD8B"
     }
   },
   "chainInfo": {

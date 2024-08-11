@@ -6,8 +6,9 @@ echo forge script script/1_deployMockEigenlayerContracts.s.sol:DeployMockEigenla
 forge script script/1_deployMockEigenlayerContracts.s.sol:DeployMockEigenlayerContractsScript \
     --rpc-url ethsepolia \
     --broadcast \
-    --verify \
-    --private-key $DEPLOYER_KEY \
+    --verify  \
+    # --private-key $DEPLOYER_KEY \
+    # --resume \
     -vvvv
 
 echo "uncomment --private-key to deploy Eigenlayer contracts (~10 contracts)"

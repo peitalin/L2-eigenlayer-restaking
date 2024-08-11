@@ -3,13 +3,14 @@ pragma solidity 0.8.22;
 
 import {Script} from "forge-std/Script.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
+import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {ArbSepolia, EthSepolia} from "./Addresses.sol";
 
 contract DeployOnArbScript is Script {
 
     uint256 public deployerKey;
 
-    function run() public {
+    function run() public returns (ISenderCCIP) {
         deployerKey = vm.envUint("DEPLOYER_KEY");
 
         /////////////////////////////
@@ -21,5 +22,7 @@ contract DeployOnArbScript is Script {
         // whitelist destination chain
         senderContract.allowlistDestinationChain(EthSepolia.ChainSelector, true);
         vm.stopBroadcast();
+
+        return ISenderCCIP(address(senderContract));
     }
 }

@@ -3,14 +3,16 @@ pragma solidity 0.8.22;
 
 import {Test, console} from "forge-std/Test.sol";
 
-import {EigenlayerDepositParams, EigenlayerDepositMessage} from "../src/interfaces/IRestakingConnector.sol";
 import {EIP1271SignatureUtils} from "eigenlayer-contracts/src/contracts/libraries/EIP1271SignatureUtils.sol";
+import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+import {EigenlayerDepositParams, EigenlayerDepositMessage} from "../src/interfaces/IRestakingConnector.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {FunctionSelectorDecoder} from "../src/FunctionSelectorDecoder.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 
-import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
 
 contract MessagePassingTest is Test {
@@ -20,6 +22,7 @@ contract MessagePassingTest is Test {
 
     EigenlayerMsgEncoders public eigenlayerMsgEncoders;
     FunctionSelectorDecoder public functionSelectorDecoder;
+    RestakingConnector public restakingConnector;
 
     function setUp() public {
 		deployerKey = vm.envUint("DEPLOYER_KEY");
@@ -27,6 +30,7 @@ contract MessagePassingTest is Test {
 
         eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
         functionSelectorDecoder = new FunctionSelectorDecoder();
+        restakingConnector = new RestakingConnector();
     }
 
     function test_DecodeFunctionSelectors() public {
@@ -316,17 +320,17 @@ contract MessagePassingTest is Test {
             _sharesToWithdraw := mload(add(message, 388))
         }
 
-        console.log("functionSelector");
-        console.logBytes4(functionSelector);
+        // console.log("functionSelector");
+        // console.logBytes4(functionSelector);
 
-        console.log("withdrawer");
-        console.log(_withdrawer);
+        // console.log("withdrawer");
+        // console.log(_withdrawer);
 
-        console.log("strategy");
-        console.log(_strategy);
+        // console.log("strategy");
+        // console.log(_strategy);
 
-        console.log("sharesToWithdraw");
-        console.log(_sharesToWithdraw);
+        // console.log("sharesToWithdraw");
+        // console.log(_sharesToWithdraw);
 
         require(_withdrawer == queuedWithdrawalParams[0].withdrawer, "decoded withdrawer incorrect");
         require(_sharesToWithdraw == queuedWithdrawalParams[0].shares[0], "decoded shares incorrect");
@@ -384,13 +388,11 @@ contract MessagePassingTest is Test {
 
         // CCIP turns the message into string when sending
         bytes memory message = abi.encode(string(message_bytes));
-        console.log("message:");
-        console.logBytes(message);
-
-        RestakingConnector restakingConnector = new RestakingConnector();
+        // console.log("message:");
+        // console.logBytes(message);
 
         IDelegationManager.QueuedWithdrawalParams[] memory decodedQueuedWithdrawals;
-        decodedQueuedWithdrawals = restakingConnector.decodeQueueWithdrawalsArrayMessage(message);
+        decodedQueuedWithdrawals = restakingConnector.decodeQueueWithdrawalsMessage(message);
 
         require(
             decodedQueuedWithdrawals[0].shares[0] == sharesToWithdraw1[0],
@@ -407,48 +409,55 @@ contract MessagePassingTest is Test {
     }
 
 
-    // function test_DecodeEigenlayerMsg_CompleteQueuedWithdrawal() public {
+    function test_DecodeEigenlayerMsg_CompleteQueuedWithdrawal() public {
 
-    //     IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
-    //     uint256[] memory sharesToWithdraw = new uint256[](1);
+        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
+        uint256[] memory sharesToWithdraw = new uint256[](1);
 
-    //     IStrategy strategy = IStrategy(0xBd4bcb3AD20E9d85D5152aE68F45f40aF8952159);
-    //     strategiesToWithdraw[0] = strategy;
-    //     sharesToWithdraw[0] = 0.00321;
+        IStrategy strategy = IStrategy(0xBd4bcb3AD20E9d85D5152aE68F45f40aF8952159);
+        strategiesToWithdraw[0] = strategy;
+        sharesToWithdraw[0] = 0.00321 ether;
 
-    //     // IDelegationManager.Withdrawal[] memory withdrawals = new IDelegationManager.Withdrawal()[1];
-    //     // withdrawals[0] = IDelegationManager.Withdrawal({
-    //     IDelegationManager.Withdrawal memory withdrawal;
-    //     withdrawal = IDelegationManager.Withdrawal({
-    //         staker: deployer, // msg.sender
-    //         delegatedTo: address(0), // not delegated to anyone
-    //         withdrawer: deployer,
-    //         nonce: 0,
-    //         startBlock: uint32(1),
-    //         strategies: strategiesToWithdraw,
-    //         shares: sharesToWithdraw
-    //     });
+        /// Note: Look at the array version later.
+        // IDelegationManager.Withdrawal[] memory withdrawals = new IDelegationManager.Withdrawal()[1];
 
-    //     IERC20[] memory tokensToWithdraw = new IERC20[](1);
-    //     tokensToWithdraw[0] = strategy.underlyingToken();
-    //     uint256 middlewareTimesIndex = 0; // not used, used when slashing is enabled;
-    //     bool receiveAsTokens = true;
+        IDelegationManager.Withdrawal memory withdrawal;
+        withdrawal = IDelegationManager.Withdrawal({
+            staker: deployer, // msg.sender
+            delegatedTo: address(0), // not delegated to anyone
+            withdrawer: vm.addr(0x1),
+            nonce: 0,
+            startBlock: uint32(1),
+            strategies: strategiesToWithdraw,
+            shares: sharesToWithdraw
+        });
 
-    //     uint256 newTimestamp = block.timestamp + 60; // 60 seconds = 5 blocks (12second per block)
-    //     vm.warp(newTimestamp);
-    //     vm.roll(newTimestamp / 12);
-    //     console.log("block.timestamp :", block.timestamp);
-    //     console.log("block.number :", block.number);
+        IERC20[] memory tokensToWithdraw = new IERC20[](1);
+        tokensToWithdraw[0] = IERC20(0x3Eef6ec7a9679e60CC57D9688E9eC0e6624D687A);
+        uint256 middlewareTimesIndex = 0; // not used, used when slashing is enabled;
+        bool receiveAsTokens = true;
 
-    //     uint256 delay = delegationManager.getWithdrawalDelay(strategiesToWithdraw);
-    //     console.log("withdrawal delay (blocks)", delay); // 4 blocks withdrawal delay
+        bytes memory message_bytes = eigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+            withdrawal,
+            tokensToWithdraw,
+            middlewareTimesIndex,
+            receiveAsTokens
+        );
 
-    //     delegationManager.completeQueuedWithdrawal(
-    //         withdrawal,
-    //         tokensToWithdraw,
-    //         middlewareTimesIndex,
-    //         receiveAsTokens
-    //     );
+        // CCIP turns the message into string when sending
+        bytes memory message = abi.encode(string(message_bytes));
 
-    // }
+        console.logBytes(message);
+
+        (
+            IDelegationManager.Withdrawal memory _withdrawal,
+            IERC20[] memory _tokensToWithdraw,
+            uint256 _middlewareTimesIndex,
+            bool _receiveAsTokens
+        ) = restakingConnector.decodeCompleteWithdrawalMessage(message);
+
+        require(_withdrawal.shares[0] == withdrawal.shares[0], "decodeCompleteWithdrawalMessagePart1 error");
+        require(_receiveAsTokens == receiveAsTokens, "decodeCompleteWithdrawalMessagePart2 error");
+    }
+
 }

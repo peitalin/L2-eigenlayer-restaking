@@ -1,19 +1,19 @@
 {
   "addresses": {
-    "DelegationManager": "0x111fc96a9Cd0e130ee33742E4b286781f1c79A21",
-    "PauserRegistry": "0x017703fd817adCfCc38855a24362BD7B22664A49",
-    "ProxyAdmin": "0x15AFfBEB59c95097AD4Ba3B4fd60Bb1073578da7",
-    "RewardsCoordinator": "0x1299a26C64544169993a0D62eF101c9A9749E8D1",
-    "StrategyBeacon": "0x15ee670f432aB7b235D55be1f6C025C1F93922Cd",
-    "StrategyFactory": "0xF4f708caE9504EAb202251769Bb635e0C96aC072",
-    "StrategyManager": "0x59568f727f8325961218f22285437F103eB4a4e8",
+    "DelegationManager": "0x0de691bD504f0dA38f33a09EBFe0D1228602D130",
+    "PauserRegistry": "0xFbD750f138F5159D3Ed92824fbB90d31A412e83C",
+    "ProxyAdmin": "0x9aE350F9c3123a39EEA7dE5F067A920882776529",
+    "RewardsCoordinator": "0x33AccE377312ae613cEbe2b528AF16236F4f70dd",
+    "StrategyBeacon": "0x937b1d767C4c3313A46dAc0419F8c35B5915f0e7",
+    "StrategyFactory": "0x10bAd1f74c79dA5A2839Ce04d094D565136A7c97",
+    "StrategyManager": "0x89073805Bc7203E745807b8A7f5f40aa9EEB2Be7",
     "strategies": {
-      "CCIPStrategy": "0xb0e5d223403B8dE370791F67edb442C06c58372b"
+      "CCIPStrategy": "0x34330E47aD172143189a0267ddb88c849095157c"
     }
   },
   "chainInfo": {
     "chainId": 11155111,
-    "deploymentBlock": 6466579
+    "deploymentBlock": 6474429
   },
   "parameters": {
     "deployer": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c"

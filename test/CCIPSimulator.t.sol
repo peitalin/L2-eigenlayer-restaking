@@ -52,7 +52,6 @@ contract CCIPLocalSimulatorTest is Test {
 
         ccipLocalSimulator.requestLinkFromFaucet(deployer, 1.25e18);
         uint256 balance = linkToken.balanceOf(deployer);
-        console.log("ccipLocalSimulator.requestLinkFromFaucet(balance): ", balance);
 
         ProxyAdmin proxyAdmin = deployMockEigenlayerContractsScript.deployProxyAdmin();
 
@@ -69,7 +68,6 @@ contract CCIPLocalSimulatorTest is Test {
         bool supportsERC20Minter = false;
         for (uint32 i = 0; i < supportedTokens.length; i++) {
             if (supportedTokens[i] == address(erc20Minter)) {
-                console.log("supports ERC20Minter: ", supportedTokens[i]);
                 supportsERC20Minter = true;
             }
         }
