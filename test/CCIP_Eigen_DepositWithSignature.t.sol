@@ -139,7 +139,6 @@ contract CCIP_Eigen_DepositWithSignature is Test {
         //// (first 3 args: check indexed topics), (4th arg = true = check data)
         vm.expectEmit(true, true, true, true);
         emit EigenlayerDepositWithSignatureParams(
-            0x32e89ace,
             amount,
             0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c
         );
