@@ -28,52 +28,52 @@ contract CCIPLocalSimulatorTest is Test {
     uint256 public deployerKey;
     address public deployer;
 
-    // function setUp() public {
+    function setUp() public {
 
-	// 	deployerKey = vm.envUint("DEPLOYER_KEY");
-    //     deployer = vm.addr(deployerKey);
+		deployerKey = vm.envUint("DEPLOYER_KEY");
+        deployer = vm.addr(deployerKey);
 
-    //     ccipLocalSimulator = new CCIPLocalSimulator();
+        ccipLocalSimulator = new CCIPLocalSimulator();
 
-    //     (
-    //         chainSelector,
-    //         sourceRouter,
-    //         destinationRouter,
-    //         wrappedNative,
-    //         linkToken,
-    //         ccipBnM,
-    //         ccipLnM
-    //     ) = ccipLocalSimulator.configuration();
+        (
+            chainSelector,
+            sourceRouter,
+            destinationRouter,
+            wrappedNative,
+            linkToken,
+            ccipBnM,
+            ccipLnM
+        ) = ccipLocalSimulator.configuration();
 
-    //     deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-    // }
+        deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
+    }
 
-    // function test_CCIPConfigurationInitialized() public {
+    function test_CCIPConfigurationInitialized() public {
 
-    //     ccipLocalSimulator.requestLinkFromFaucet(deployer, 1.25e18);
-    //     uint256 balance = linkToken.balanceOf(deployer);
+        ccipLocalSimulator.requestLinkFromFaucet(deployer, 1.25e18);
+        uint256 balance = linkToken.balanceOf(deployer);
 
-    //     ProxyAdmin proxyAdmin = deployMockEigenlayerContractsScript.deployProxyAdmin();
+        ProxyAdmin proxyAdmin = deployMockEigenlayerContractsScript.deployProxyAdmin();
 
-    //     ERC20Minter erc20Minter = deployMockEigenlayerContractsScript.deployERC20Minter(
-    //         "Mock Magic",
-    //         "MMAGIC",
-    //         proxyAdmin
-    //     );
+        ERC20Minter erc20Minter = deployMockEigenlayerContractsScript.deployERC20Minter(
+            "Mock Magic",
+            "MMAGIC",
+            proxyAdmin
+        );
 
-    //     ccipLocalSimulator.supportNewToken(address(erc20Minter));
+        ccipLocalSimulator.supportNewToken(address(erc20Minter));
 
-    //     address[] memory supportedTokens = ccipLocalSimulator.getSupportedTokens(chainSelector);
+        address[] memory supportedTokens = ccipLocalSimulator.getSupportedTokens(chainSelector);
 
-    //     bool supportsERC20Minter = false;
-    //     for (uint32 i = 0; i < supportedTokens.length; i++) {
-    //         if (supportedTokens[i] == address(erc20Minter)) {
-    //             supportsERC20Minter = true;
-    //         }
-    //     }
+        bool supportsERC20Minter = false;
+        for (uint32 i = 0; i < supportedTokens.length; i++) {
+            if (supportedTokens[i] == address(erc20Minter)) {
+                supportsERC20Minter = true;
+            }
+        }
 
-    //     require(balance == 1.25e18, "balance not matching");
-    //     require(supportsERC20Minter, "ccip should support new ERC20Minter");
-    // }
+        require(balance == 1.25e18, "balance not matching");
+        require(supportsERC20Minter, "ccip should support new ERC20Minter");
+    }
 
 }

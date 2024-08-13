@@ -7,7 +7,7 @@ forge script script/1_deployMockEigenlayerContracts.s.sol:DeployMockEigenlayerCo
     --rpc-url ethsepolia \
     --broadcast \
     --verify  \
-    # --private-key $DEPLOYER_KEY \
+    --private-key $DEPLOYER_KEY \
     # --resume \
     -vvvv
 
