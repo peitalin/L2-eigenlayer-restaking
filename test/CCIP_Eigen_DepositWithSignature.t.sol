@@ -89,120 +89,120 @@ contract CCIP_Eigen_DepositWithSignature is Test {
     }
 
 
-    // function test_CCIP_Eigenlayer_DepositIntoStrategyWithSignature() public {
+    function test_CCIP_Eigenlayer_DepositIntoStrategyWithSignature() public {
 
-    //     uint256 amount = 0.0077 ether;
-    //     address staker = deployer;
-    //     uint256 expiry = block.timestamp + 1 days;
-    //     uint256 nonce = 0;
-    //     bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), block.chainid);
-        // (
-        //     bytes memory signature,
-        //     bytes32 digestHash
-        // ) = signatureUtils.createEigenlayerDepositSignature(
-        //     deployerKey,
-        //     strategy,
-        //     token,
-        //     amount,
-        //     staker,
-        //     nonce,
-        //     expiry,
-        //     domainSeparator
-        // );
+        uint256 amount = 0.0077 ether;
+        address staker = deployer;
+        uint256 expiry = block.timestamp + 1 days;
+        uint256 nonce = 0;
+        bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), block.chainid);
+        (
+            bytes memory signature,
+            bytes32 digestHash
+        ) = signatureUtils.createEigenlayerDepositSignature(
+            deployerKey,
+            strategy,
+            token,
+            amount,
+            staker,
+            nonce,
+            expiry,
+            domainSeparator
+        );
 
-    //     signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
+        signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
 
-    //     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
-    //     destTokenAmounts[0] = Client.EVMTokenAmount({
-    //         token: address(token), // CCIP-BnM token address on Eth Sepolia.
-    //         amount: amount
-    //     });
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(token), // CCIP-BnM token address on Eth Sepolia.
+            amount: amount
+        });
 
-    //     Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-    //         messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
-    //         sourceChainSelector: ArbSepolia.ChainSelector, // Arb Sepolia source chain selector
-    //         sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
-    //         data: abi.encode(string(
-    //             eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
-    //                 address(strategy),
-    //                 address(token),
-    //                 amount,
-    //                 staker,
-    //                 expiry,
-    //                 signature
-    //             )
-    //         )), // CCIP abi.encodes a string message when sending
-    //         destTokenAmounts: destTokenAmounts // Tokens and their amounts in their destination chain representation.
-    //     });
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
+            sourceChainSelector: ArbSepolia.ChainSelector, // Arb Sepolia source chain selector
+            sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
+            data: abi.encode(string(
+                eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+                    address(strategy),
+                    address(token),
+                    amount,
+                    staker,
+                    expiry,
+                    signature
+                )
+            )), // CCIP abi.encodes a string message when sending
+            destTokenAmounts: destTokenAmounts // Tokens and their amounts in their destination chain representation.
+        });
 
-    //     //// Test emitted events
-    //     //// (first 3 args: check indexed topics), (4th arg = true = check data)
-    //     vm.expectEmit(true, true, true, true);
-    //     emit EigenlayerDepositWithSignatureParams(
-    //         0x32e89ace,
-    //         amount,
-    //         0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c
-    //     );
+        //// Test emitted events
+        //// (first 3 args: check indexed topics), (4th arg = true = check data)
+        vm.expectEmit(true, true, true, true);
+        emit EigenlayerDepositWithSignatureParams(
+            0x32e89ace,
+            amount,
+            0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c
+        );
 
-    //     /////////////////////////////////////
-    //     //// Send message from CCIP to Eigenlayer
-    //     /////////////////////////////////////
-    //     vm.startBroadcast(EthSepolia.Router); // simulate router calling receiverContract on L1
-    //     receiverContract.mockCCIPReceive(any2EvmMessage);
+        /////////////////////////////////////
+        //// Send message from CCIP to Eigenlayer
+        /////////////////////////////////////
+        vm.startBroadcast(EthSepolia.Router); // simulate router calling receiverContract on L1
+        receiverContract.mockCCIPReceive(any2EvmMessage);
 
-    //     uint256 receiverBalance = token.balanceOf(address(receiverContract));
-    //     uint256 valueOfShares = strategy.userUnderlying(address(deployer));
+        uint256 receiverBalance = token.balanceOf(address(receiverContract));
+        uint256 valueOfShares = strategy.userUnderlying(address(deployer));
 
-    //     require(valueOfShares == amount, "valueofShares incorrect");
-    //     require(strategyManager.stakerStrategyShares(staker, strategy) == amount, "stakerStrategyShares incorrect");
+        require(valueOfShares == amount, "valueofShares incorrect");
+        require(strategyManager.stakerStrategyShares(staker, strategy) == amount, "stakerStrategyShares incorrect");
 
-    //     console.log("receiver balance:", receiverBalance);
-    //     console.log("receiver shares value:", valueOfShares);
-    //     vm.stopBroadcast();
-    // }
+        console.log("receiver balance:", receiverBalance);
+        console.log("receiver shares value:", valueOfShares);
+        vm.stopBroadcast();
+    }
 
-    // function test_Eigenlayer_DepositIntoStrategyWithSignature() public {
+    function test_Eigenlayer_DepositIntoStrategyWithSignature() public {
 
-        // address staker = deployer;
-        // uint256 expiry = block.timestamp + 1 days;
-        // uint256 amount = 1 ether;
-        // uint256 nonce = 0;
-        // bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), block.chainid);
+        address staker = deployer;
+        uint256 expiry = block.timestamp + 1 days;
+        uint256 amount = 1 ether;
+        uint256 nonce = 0;
+        bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), block.chainid);
 
-        // vm.startBroadcast(deployerKey);
-        // erc20Minter.mint(staker, amount);
-        // erc20Minter.approve(address(strategyManager), amount);
+        vm.startBroadcast(deployerKey);
+        erc20Minter.mint(staker, amount);
+        erc20Minter.approve(address(strategyManager), amount);
 
-        // (
-        //     bytes memory signature,
-        //     bytes32 digestHash
-        // ) = signatureUtils.createEigenlayerDepositSignature(
-        //     deployerKey,
-        //     strategy,
-        //     token,
-        //     amount,
-        //     staker,
-        //     nonce,
-        //     expiry,
-        //     domainSeparator
-        // );
+        (
+            bytes memory signature,
+            bytes32 digestHash
+        ) = signatureUtils.createEigenlayerDepositSignature(
+            deployerKey,
+            strategy,
+            token,
+            amount,
+            staker,
+            nonce,
+            expiry,
+            domainSeparator
+        );
 
-    //     console.log("strategy:", address(strategy));
-    //     console.log("token:", address(token));
+        console.log("strategy:", address(strategy));
+        console.log("token:", address(token));
 
-    //     signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
+        signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
 
-    //     strategyManager.depositIntoStrategyWithSignature(
-    //         strategy,
-    //         token,
-    //         amount,
-    //         staker,
-    //         expiry,
-    //         signature
-    //     );
+        strategyManager.depositIntoStrategyWithSignature(
+            strategy,
+            token,
+            amount,
+            staker,
+            expiry,
+            signature
+        );
 
-    //     require(strategyManager.stakerStrategyShares(staker, strategy) == 1 ether, "deposit failed");
+        require(strategyManager.stakerStrategyShares(staker, strategy) == 1 ether, "deposit failed");
 
-    //     vm.stopBroadcast();
-    // }
+        vm.stopBroadcast();
+    }
 }
