@@ -98,14 +98,15 @@ contract SignatureUtilsEIP1271 is Script {
         address staker,
         IStrategy[] memory strategies,
         uint256[] memory shares,
-        uint256 _stakerNonce,
+        uint256 stakerNonce,
+        uint256 expiry,
         address delegationManagerAddr,
         uint256 destinationChainid
     ) public pure returns (bytes32) {
 
         /// @notice The EIP-712 typehash for the deposit struct used by the contract
         bytes32 QUEUE_WITHDRAWAL_TYPEHASH =
-            keccak256("QueueWithdrawal(address staker,address[] strategies,uint256[] shares,uint256 nonce)");
+            keccak256("QueueWithdrawal(address staker,address[] strategies,uint256[] shares,uint256 nonce,uint256 expiry)");
 
         // calculate the struct hash
         bytes32 structHash = keccak256(abi.encode(
@@ -113,7 +114,8 @@ contract SignatureUtilsEIP1271 is Script {
             staker,
             strategies,
             shares,
-            _stakerNonce
+            stakerNonce,
+            expiry
         ));
 
         // calculate the digest hash
@@ -124,4 +126,5 @@ contract SignatureUtilsEIP1271 is Script {
         ));
         return digestHash;
     }
+
 }

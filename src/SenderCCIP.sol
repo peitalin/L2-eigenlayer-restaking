@@ -75,7 +75,7 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
 
         bytes memory message = abi.encode(_text); // ABI-encoded string
         bytes4 functionSelector = decodeFunctionSelector(message);
-        uint256 gasLimit = 600_000;
+        uint256 gasLimit = 500_000;
         // increase gas limit for deposits into Eigenlayer
 
         if (functionSelector == 0xf7e784ef) {
@@ -89,6 +89,14 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
         if (functionSelector == 0x0dd8dd02) {
             // queueWithdrawals: [gas: ?]
             gasLimit = 800_000;
+        }
+        if (functionSelector == 0xa140f06e) {
+            // queueWithdrawalsWithSignature: [gas: ?]
+            gasLimit = 990_000;
+        }
+        if (functionSelector == 0x54b2bf29) {
+            // completeQueuedWithdrawals: [gas: ?]
+            gasLimit = 990_000;
         }
 
         // Create an EVM2AnyMessage struct in memory with necessary information for sending a cross-chain message

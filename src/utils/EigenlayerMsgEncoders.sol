@@ -52,15 +52,12 @@ contract EigenlayerMsgEncoders {
         IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
     ) public pure returns (bytes memory) {
 
-        ///// Function signature: structs are encoded as tuples:
-        //
-        // function queueWithdrawals(QueuedWithdrawalParams[] q)
-        // where q = QueuedWithdrawalParams {
+        // structs are encoded as tuples:
+        // QueuedWithdrawalParams {
         //     IStrategy[] strategies;
         //     uint256[] shares;
         //     address withdrawer;
         // }
-
         bytes memory message_bytes = abi.encodeWithSelector(
             bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
             queuedWithdrawalParams
@@ -69,26 +66,16 @@ contract EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-   function encodeQueueWithdrawalWithSignatureMsg(
-        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams,
-        address staker,
-        bytes memory signature
+   function encodeQueueWithdrawalsWithSignatureMsg(
+        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigParams
     ) public pure returns (bytes memory) {
 
-        ///// Function signature: structs are encoded as tuples:
-        //
-        // function queueWithdrawals(QueuedWithdrawalParams[] q)
-        // where q = QueuedWithdrawalParams {
-        //     IStrategy[] strategies;
-        //     uint256[] shares;
-        //     address withdrawer;
-        // }
+        // Structs are encoded as tuples:
+        // queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])
 
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("queueWithdrawalsWithSignature((address[],uint256[],address)[],address,bytes)")),
-            queuedWithdrawalParams,
-            staker,
-            signature
+            bytes4(keccak256("queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])")),
+            queuedWithdrawalWithSigParams
         );
 
         return message_bytes;
@@ -101,7 +88,7 @@ contract EigenlayerMsgEncoders {
         bool receiveAsTokens
     ) public pure returns (bytes memory) {
 
-        // functionSignature
+        // Function Signature:
         // function completeQueuedWithdrawal(
         //     IDelegationManager.Withdrawal withdrawal,
         //     IERC20[] tokensToWithdraw,

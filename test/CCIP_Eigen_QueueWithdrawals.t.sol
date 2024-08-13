@@ -87,7 +87,6 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
 
         erc20Minter = IERC20Minter(address(token));
 
-        // staker = address(receiverContract);
         staker = deployer;
 
         //////////////////////////////////////
@@ -105,35 +104,33 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         //// Setup deposits on Eigenlayer
         /////////////////////////////////////
         vm.startBroadcast(address(receiverContract)); // simulate router sending receiver message on L1
-        Client.Any2EVMMessage memory any2EvmMessage = makeCCIPEigenlayerDepositMessage(
+        Client.Any2EVMMessage memory any2EvmMessage = makeCCIPEigenlayerMsg_DepositWithSignature(
             amountToStake,
             staker,
             block.timestamp + 1 hours
         );
         receiverContract.mockCCIPReceive(any2EvmMessage);
 
-        uint256 valueOfShares = strategy.userUnderlying(staker);
-
         stakerShares = strategyManager.stakerStrategyShares(staker, strategy);
         uint256 receiverShares = strategyManager.stakerStrategyShares(address(receiverContract), strategy);
 
-        require(valueOfShares == amountToStake, "valueofShares incorrect");
         require(stakerShares == amountToStake, "stakerStrategyShares incorrect");
-        console.log("stakerShares:", stakerShares);
-        console.log("receiverShares:", receiverShares);
+        require(receiverShares == 0, "receiverContract should not hold any shares");
 
         vm.stopBroadcast();
+
+        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
+        strategiesToWithdraw[0] = strategy;
+
+        uint256[] memory sharesToWithdraw = new uint256[](1);
+        sharesToWithdraw[0] = stakerShares;
     }
 
 
 
-    function test_Eigenlayer_QueueWithdrawal() public {
+    function test_Eigenlayer_Revert_QueueWithdrawal() public {
 
-        vm.startBroadcast(staker);
-
-        /////////////////////////////////////////////////////////////////
-        ////// Queue Withdrawal
-        /////////////////////////////////////////////////////////////////
+        vm.startBroadcast(deployerKey);
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         strategiesToWithdraw[0] = strategy;
@@ -141,17 +138,15 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         uint256[] memory sharesToWithdraw = new uint256[](1);
         sharesToWithdraw[0] = stakerShares;
 
-        IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal;
-        queuedWithdrawal = IDelegationManager.QueuedWithdrawalParams({
-            strategies: strategiesToWithdraw,
-            shares: sharesToWithdraw,
-            // withdrawer: address(receiverContract)
-            withdrawer: staker
-            // @note must be receiverContract
-        });
+        IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal =
+            IDelegationManager.QueuedWithdrawalParams({
+                strategies: strategiesToWithdraw,
+                shares: sharesToWithdraw,
+                withdrawer: msg.sender
+            });
 
-        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams;
-        queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](1);
+        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams =
+            new IDelegationManager.QueuedWithdrawalParams[](1);
         queuedWithdrawalParams[0] = queuedWithdrawal;
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
@@ -172,70 +167,214 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
             destTokenAmounts: destTokenAmounts // Tokens and their amounts in their destination chain representation.
         });
 
-        // receiverContract.mockCCIPReceive(any2EvmMessage);
+        // msg.sender must be staker, so it's impossible for the CCIP bridge contract to conduct
+        // third party queueWithdrawals for a staker.
+        // We would need a queueWithdrawalWithSignature feature:
+        // https://github.com/Layr-Labs/eigenlayer-contracts/pull/676
+        vm.expectRevert("DelegationManager.queueWithdrawal: withdrawer must be staker");
+        receiverContract.mockCCIPReceive(any2EvmMessage);
 
-        uint256 stakerNonce = 0; // implement getNonce on DelegationManager
+        vm.stopBroadcast();
+    }
+
+
+    function test_Eigenlayer_QueueWithdrawalsWithSignature() public {
+        // Note: This test needs the queueWithdrawalWithSignature feature:
+        // https://github.com/Layr-Labs/eigenlayer-contracts/pull/676
+        vm.startBroadcast(address(receiverContract));
+
+        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
+        strategiesToWithdraw[0] = strategy;
+
+        uint256[] memory sharesToWithdraw = new uint256[](1);
+        sharesToWithdraw[0] = stakerShares;
+
+        uint256 expiry = block.timestamp + 6 hours;
+        address withdrawer = address(receiverContract);
+        uint256 stakerNonce = delegationManager.cumulativeWithdrawalsQueued(staker);
+        uint32 startBlock = uint32(block.number); // needed to CompleteWithdrawals
+
         bytes32 digestHash = signatureUtils.calculateQueueWithdrawalDigestHash(
             staker,
-            queuedWithdrawal.strategies,
-            queuedWithdrawal.shares,
+            strategiesToWithdraw,
+            sharesToWithdraw,
             stakerNonce,
+            expiry,
             address(delegationManager),
             block.chainid
         );
 
-        // generate ECDSA signature
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
-        bytes memory signature = abi.encodePacked(r, s, v);
+        bytes memory signature;
+        {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
+            signature = abi.encodePacked(r, s, v);
+        }
 
         signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
 
-        delegationManager.queueWithdrawalsWithSignature(
-            queuedWithdrawalParams,
+        /////////////////////////////////////////////////////////////////
+        ////// Queue Withdrawals via CCIP
+        /////////////////////////////////////////////////////////////////
+
+        (
+            IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigParams,
+            Client.Any2EVMMessage memory any2EvmMessage1
+        ) = makeCCIPEigenlayerMsg_QueueWithdrawalsWithSignature(
+            strategiesToWithdraw,
+            sharesToWithdraw,
+            withdrawer,
             staker,
-            signature
+            signature,
+            expiry
         );
 
-        console.log("balanceOfStaker before:", token.balanceOf(staker));
+        /// send CCIP message to QueueWithdrawalswithSignature
+        receiverContract.mockCCIPReceive(any2EvmMessage1);
 
         /////////////////////////////////////////////////////////////////
         ////// Complete Queued Withdrawals
         /////////////////////////////////////////////////////////////////
 
-        // IDelegationManager.Withdrawal[] memory withdrawals = new IDelegationManager.Withdrawal[](1);
         IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
-            // staker: address(receiverContract), // msg.sender
             staker: staker,
-            delegatedTo: address(0), // not delegated to anyone
-            withdrawer: staker,
-            nonce: 0,
-            startBlock: uint32(block.number),
+            delegatedTo: delegationManager.delegatedTo(staker),
+            withdrawer: withdrawer,
+            nonce: stakerNonce,
+            startBlock: startBlock,
             strategies: strategiesToWithdraw,
             shares: sharesToWithdraw
         });
 
+        bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
         IERC20[] memory tokensToWithdraw = new IERC20[](1);
-        tokensToWithdraw[0] = strategy.underlyingToken();
+        tokensToWithdraw[0] = strategiesToWithdraw[0].underlyingToken();
 
-        vm.warp(block.timestamp + 120); // 120 seconds = 10 blocks (12second per block)
-        vm.roll((block.timestamp + 120) / 12);
-        // delegationManager.getWithdrawalDelay(strategiesToWithdraw);
-
-        delegationManager.completeQueuedWithdrawal(
+        Client.Any2EVMMessage memory any2EvmMessage2 = makeCCIPEigenlayerMsg_CompleteWithdrawal(
             withdrawal,
             tokensToWithdraw,
             0, // middlewareTimesIndex
             true // receiveAsTokens
         );
 
+        vm.warp(block.timestamp + 120); // 120 seconds = 10 blocks (12second per block)
+        vm.roll((block.timestamp + 120) / 12);
+
+        // send CCIP message to CompleteWithdrawal
+        receiverContract.mockCCIPReceive(any2EvmMessage2);
+        /////////////////////////////////////////////////////////////////
+
+        require(token.balanceOf(staker) == 0, "staker balance should be 0, in the ReceiverCCIP contract");
+        // tokens are in the RecieverCCIP bridge contract, need to send them to the staker on L2
         console.log("balanceOfStaker after:", token.balanceOf(staker));
-        console.log("amountToStake:", amountToStake);
+        require(withdrawalRoot != 0, "withdrawal root missing");
 
         vm.stopBroadcast();
     }
 
 
-    function makeCCIPEigenlayerDepositMessage(
+    function test_Eigenlayer_DelegateToOperator() public {
+
+        // function delegateToBySignature(
+        //     address staker,
+        //     address operator,
+        //     SignatureWithExpiry memory stakerSignatureAndExpiry,
+        //     SignatureWithExpiry memory approverSignatureAndExpiry,
+        //     bytes32 approverSalt
+        // ) external {
+    }
+
+    function test_Eigenlayer_UndelegateFromOperator() public {
+        // DelegationManager.undelegate
+
+    }
+
+    ////////////////////////////////////////////////
+    // Make CCIP messages
+    ////////////////////////////////////////////////
+
+    function makeCCIPEigenlayerMsg_QueueWithdrawalsWithSignature(
+            IStrategy[] memory _strategiesToWithdraw,
+            uint256[] memory _sharesToWithdraw,
+            address _withdrawer,
+            address _staker,
+            bytes memory _signature,
+            uint256 _expiry
+    ) public returns (
+        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory,
+        Client.Any2EVMMessage memory
+    ) {
+
+        IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig;
+        queuedWithdrawalWithSig = IDelegationManager.QueuedWithdrawalWithSignatureParams({
+            strategies: _strategiesToWithdraw,
+            shares: _sharesToWithdraw,
+            withdrawer: _withdrawer,
+            staker: _staker,
+            signature: _signature,
+            expiry: _expiry
+        });
+
+        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigParams;
+        queuedWithdrawalWithSigParams = new IDelegationManager.QueuedWithdrawalWithSignatureParams[](1);
+        queuedWithdrawalWithSigParams[0] = queuedWithdrawalWithSig;
+
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(token),
+            amount: 0 ether // not bridging, just sending CCIP message
+        });
+
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
+            sourceChainSelector: ArbSepolia.ChainSelector, // Arb Sepolia source chain selector
+            sender: abi.encode(address(deployer)), // bytes: abi.decode(sender) if coming from an EVM chain.
+            data: abi.encode(string(
+                eigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
+                    queuedWithdrawalWithSigParams
+                )
+            )), // CCIP abi.encodes a string message when sending
+            destTokenAmounts: destTokenAmounts // Tokens and their amounts in their destination chain representation.
+        });
+
+        return (
+            queuedWithdrawalWithSigParams,
+            any2EvmMessage
+        );
+    }
+
+
+    function makeCCIPEigenlayerMsg_CompleteWithdrawal(
+        IDelegationManager.Withdrawal memory withdrawal,
+        IERC20[] memory tokensToWithdraw,
+        uint256 middlewareTimesIndex,
+        bool receiveAsTokens
+    ) public returns (Client.Any2EVMMessage memory) {
+
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(0x0),
+            amount: 0 ether // just send CCIP message, no token bridging
+        });
+
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
+            sourceChainSelector: ArbSepolia.ChainSelector, // Arb Sepolia source chain selector
+            sender: abi.encode(deployer),
+            data: abi.encode(string(
+                eigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+                    withdrawal,
+                    tokensToWithdraw,
+                    middlewareTimesIndex,
+                    receiveAsTokens
+                )
+            )), // CCIP abi.encodes a string message when sending
+            destTokenAmounts: destTokenAmounts
+        });
+
+        return any2EvmMessage;
+    }
+
+    function makeCCIPEigenlayerMsg_DepositWithSignature(
         uint256 _amount,
         address _staker,
         uint256 expiry
@@ -257,7 +396,6 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
             expiry,
             domainSeparator
         );
-
 
         signatureUtils.checkSignature_EIP1271(_staker, digestHash, signature);
 
@@ -285,36 +423,6 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         });
 
         return any2EvmMessage;
-    }
-
-
-    function test_Eigenlayer_CompleteQueuedWithdrawals() public {
-        // function completeQueuedWithdrawals(
-        //     Withdrawal[] calldata withdrawals,
-        //     IERC20[][] calldata tokens,
-        //     uint256[] calldata middlewareTimesIndexes,
-        //     bool[] calldata receiveAsTokens
-        // ) external onlyWhenNotPaused(PAUSED_EXIT_WITHDRAWAL_QUEUE) nonReentrant {
-        //     for (uint256 i = 0; i < withdrawals.length; ++i) {
-        //         _completeQueuedWithdrawal(withdrawals[i], tokens[i], middlewareTimesIndexes[i], receiveAsTokens[i]);
-        //     }
-        // }
-    }
-
-    function test_Eigenlayer_DelegateToOperator() public {
-
-        // function delegateToBySignature(
-        //     address staker,
-        //     address operator,
-        //     SignatureWithExpiry memory stakerSignatureAndExpiry,
-        //     SignatureWithExpiry memory approverSignatureAndExpiry,
-        //     bytes32 approverSalt
-        // ) external {
-    }
-
-    function test_Eigenlayer_UndelegateFromOperator() public {
-        // DelegationManager.undelegate
-
     }
 
 }

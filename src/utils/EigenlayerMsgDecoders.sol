@@ -17,11 +17,18 @@ import {
     EigenlayerDepositWithSignatureParams
 } from "../interfaces/IRestakingConnector.sol";
 // QueueWithdrawals
-import {EigenlayerQueueWithdrawalsParams} from "../interfaces/IRestakingConnector.sol";
+import {
+    EigenlayerQueueWithdrawalsParams,
+    EigenlayerQueueWithdrawalsWithSignatureParams
+} from "../interfaces/IRestakingConnector.sol";
 import {IEigenlayerMsgDecoders} from "../interfaces/IEigenlayerMsgDecoders.sol";
 
 
 contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
+
+    //////////////////////////////////////////////
+    // DepositIntoStrategy
+    //////////////////////////////////////////////
 
     function decodeDepositMessage(
         bytes memory message
@@ -42,15 +49,18 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         }
 
         EigenlayerDepositMessage memory eigenlayerDepositMessage = EigenlayerDepositMessage({
-            functionSelector: functionSelector,
             amount: amount,
             staker: staker
         });
 
-        emit EigenlayerDepositParams(functionSelector, amount, staker);
+        emit EigenlayerDepositParams(amount, staker);
 
         return eigenlayerDepositMessage;
     }
+
+    //////////////////////////////////////////////
+    // DepositIntoStrategy with Signature
+    //////////////////////////////////////////////
 
     function decodeDepositWithSignatureMessage(
         bytes memory message
@@ -123,11 +133,14 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
             signature: signature
         });
 
-        emit EigenlayerDepositWithSignatureParams(functionSelector, amount, staker);
+        emit EigenlayerDepositWithSignatureParams(amount, staker);
 
         return eigenlayerDepositWithSignatureMessage;
     }
 
+    //////////////////////////////////////////////
+    // Queue Withdrawals
+    //////////////////////////////////////////////
 
     function decodeQueueWithdrawalsMessage(
         bytes memory message
@@ -155,7 +168,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
         return arrayQueuedWithdrawalParams;
     }
-
 
     function decodeSingleQueueWithdrawalMessage(
         bytes memory message,
@@ -286,155 +298,154 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
             withdrawer: _withdrawer
         });
 
-        emit EigenlayerQueueWithdrawalsParams(functionSelector, _sharesToWithdraw, _withdrawer);
+        emit EigenlayerQueueWithdrawalsParams(_sharesToWithdraw, _withdrawer);
 
         return queuedWithdrawalParams;
     }
 
+    //////////////////////////////////////////////
+    // Queue Withdrawals with Signatures
+    //////////////////////////////////////////////
+
     function decodeQueueWithdrawalsWithSignatureMessage(
         bytes memory message
     ) public returns (
-        IDelegationManager.QueuedWithdrawalParams[] memory
+        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory
     ) {
 
         /// @dev note: Need to account for bytes message including arrays of QueuedWithdrawalParams
         /// We will need to check array length in SenderCCIP to determine gas as well.
 
         uint256 arrayLength;
-
         assembly {
             arrayLength := mload(add(message, 132))
+            // check correct length for QueuedWithdrawalWithSignatureParams[] array
         }
 
-        IDelegationManager.QueuedWithdrawalParams[] memory arrayQueuedWithdrawalParams =
-            new IDelegationManager.QueuedWithdrawalParams[](arrayLength);
+        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory arrayQueuedWithdrawalWithSigParams =
+            new IDelegationManager.QueuedWithdrawalWithSignatureParams[](arrayLength);
+
+        console.logBytes(message);
 
         for (uint256 i; i < arrayLength; i++) {
-            IDelegationManager.QueuedWithdrawalParams memory wp;
-            wp = decodeSingleQueueWithdrawalMessage(message, arrayLength, i);
-            // console.log("wp.shares:", wp.shares[0]);
-            // console.log("wp.withdrawer:", wp.withdrawer);
-            arrayQueuedWithdrawalParams[i] = wp;
+
+            IDelegationManager.QueuedWithdrawalWithSignatureParams memory wp;
+            wp = _decodeSingleQueueWithdrawalsWithSignatureMessage(message, arrayLength, i);
+
+            console.log("wp.shares:", wp.shares[0]);
+            console.log("wp.withdrawer:", wp.withdrawer);
+            console.log("staker: ", wp.staker);
+            console.log("signature: ");
+            console.logBytes(wp.signature);
+
+            arrayQueuedWithdrawalWithSigParams[i] = wp;
         }
 
-        return arrayQueuedWithdrawalParams;
+        return arrayQueuedWithdrawalWithSigParams;
     }
 
-    function decodeSingleQueueWithdrawalWithSignatureMessage(
+    function _decodeSingleQueueWithdrawalsWithSignatureMessage(
         bytes memory message,
         uint256 arrayLength,
         uint256 i
-    ) internal returns (IDelegationManager.QueuedWithdrawalParams memory) {
+    ) internal returns (
+        IDelegationManager.QueuedWithdrawalWithSignatureParams memory
+    ) {
         /// @dev: expect to use this in a for-loop with i iteration variable
 
-        //////////////////////////////////////////////////
-        //// Deserializing messages: offsets for assembly
-        //////////////////////////////////////////////////
-        //
-        // functionSelector signature:
-        // bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
-        //
+        // Function Signature:
+        //     bytes5(keccak256("queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])"))
         // Params:
-        // queuedWithdrawal = IDelegationManager.QueuedWithdrawalParams({
-        //     strategies: strategiesToWithdraw,
-        //     shares: sharesToWithdraw,
-        //     withdrawer: withdrawer
-        // });
+        //     queuedWithdrawalWithSig = IDelegationManager.QueuedWithdrawalWithSignatureParams({
+        //         IStrategy[] strategies,
+        //         uint256[] shares,
+        //         address withdrawer,
+        //         address staker,
+        //         bytes memory signature,
+        //         uint256 expiry
+        //     });
 
-        ////////////////////////////////////////////////////////////////////////
-        //// An example with 1 element in QueuedWithdrawalParams[]
-        ////////////////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////
+        //// Message payload offsets for assembly decoding
+        ////////////////////////////////////////////////////////
+
         // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
-        // 0000000000000000000000000000000000000000000000000000000000000144 [64] string length
-        // 0dd8dd02                                                         [96] function selector
-        // 0000000000000000000000000000000000000000000000000000000000000020 [100] array offset
-        // 0000000000000000000000000000000000000000000000000000000000000001 [132] array length
-        // 0000000000000000000000000000000000000000000000000000000000000020 [164] struct offset: QueuedWithdrawalParams (3 fields)
-        // 0000000000000000000000000000000000000000000000000000000000000060 [196] - 1st field offset: 96 bytes (3 rows down)
-        // 00000000000000000000000000000000000000000000000000000000000000a0 [228] - 2nd field offset: 160 bytes (5 rows down)
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [260] - 3rd field is static: withdrawer address
-        // 0000000000000000000000000000000000000000000000000000000000000001 [292] - 1st field `strategies` is dynamic array of length: 1
-        // 000000000000000000000000bd4bcb3ad20e9d85d5152ae68f45f40af8952159 [324]     - value of strategies[0]
-        // 0000000000000000000000000000000000000000000000000000000000000001 [356] - 2nd field `shares` is dynamic array of length: 1
-        // 00000000000000000000000000000000000000000000000000045eadb112e000 [388]     - value of shares[0]
+        // 0000000000000000000000000000000000000000000000000000000000000224 [64] string length
+        // a140f06e                                                         [96] function selector
+        // 0000000000000000000000000000000000000000000000000000000000000020 [100] QueuedWithdrawWithSigParams offset
+        // 0000000000000000000000000000000000000000000000000000000000000001 [132] QWWSP[] array length
+        // 0000000000000000000000000000000000000000000000000000000000000020 [164] QWWSP[0] struct offset
+        // 00000000000000000000000000000000000000000000000000000000000000c0 [196] struct_field_1 offset (192 bytes = 6 lines)
+        // 0000000000000000000000000000000000000000000000000000000000000100 [228] struct_field_2 offset (256 bytes = 8 lines)
+        // 0000000000000000000000005bf6756a91c2ce08c74fd2c50df5829ce5349317 [260] struct_field_3 withdrawer (static value)
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [292] struct_field_4 staker (static value)
+        // 0000000000000000000000000000000000000000000000000000000000000140 [324] struct_field_5 signature offset (320 bytes = 10 lines)
+        // 0000000000000000000000000000000000000000000000000000000000005461 [356] struct_field_6 expiry
+        // 0000000000000000000000000000000000000000000000000000000000000001 [388] struct_field_1 length
+        // 000000000000000000000000bd4bcb3ad20e9d85d5152ae68f45f40af8952159 [420] struct_field_1 value (strategy)
+        // 0000000000000000000000000000000000000000000000000000000000000001 [452] struct_field_2 length
+        // 00000000000000000000000000000000000000000000000000045eadb112e000 [484] struct_field_2 value (shares)
+        // 0000000000000000000000000000000000000000000000000000000000000041 [516] signature length (hex 41 = 65 bytes)
+        // 64e763caedbddd9837d970a9ba7d6d32ed81065e6974fbd5c25a042d05155549 [548] signature r
+        // 014b117b4e37bddb7e5804cb809193d3a69d57233025728413e6c4a94208ca4a [580] signature s
+        // 1c00000000000000000000000000000000000000000000000000000000000000 [612] signature v (uint8 = bytes1)
         // 00000000000000000000000000000000000000000000000000000000
 
-        ////////////////////////////////////////////////////////////////////////
-        //// An example with 2 elements in QueuedWithdrawalParams[]
-        ////////////////////////////////////////////////////////////////////////
-        // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
-        // 0000000000000000000000000000000000000000000000000000000000000244 [64] string length
-        // 0dd8dd02                                                         [96] function selector
-        // 0000000000000000000000000000000000000000000000000000000000000020 [100] array offset
-        // 0000000000000000000000000000000000000000000000000000000000000002 [132] array length
-        // 0000000000000000000000000000000000000000000000000000000000000040 [164] struct1 offset (2 lines down)
-        // 0000000000000000000000000000000000000000000000000000000000000120 [196] struct2 offset (9 lines down)
-        // 0000000000000000000000000000000000000000000000000000000000000060 [228] struct1_field1 offset
-        // 00000000000000000000000000000000000000000000000000000000000000a0 [260] struct1_field2 offset
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [292] struct1_field3 (static var)
-        // 0000000000000000000000000000000000000000000000000000000000000001 [324] struct1_field1 length
-        // 000000000000000000000000b222222ad20e9d85d5152ae68f45f40a22222222 [356] struct1_field1 value
-        // 0000000000000000000000000000000000000000000000000000000000000001 [388] struct1_field2 length
-        // 0000000000000000000000000000000000000000000000000003f18a03b36000 [420] struct1_field2 value
-        // 0000000000000000000000000000000000000000000000000000000000000060 [452] struct2_field1 offset
-        // 00000000000000000000000000000000000000000000000000000000000000a0 [484] struct2_field2 offset
-        // 0000000000000000000000002b5ad5c4795c026514f8317c7a215e218dccd6cf [516] struct2_field3 (static var)
-        // 0000000000000000000000000000000000000000000000000000000000000001 [548] struct2_field1 length
-        // 000000000000000000000000b999999ad20e9d85d5152ae68f45f40a99999999 [580] struct2_field1 value
-        // 0000000000000000000000000000000000000000000000000000000000000001 [612] struct2_field2 length
-        // 000000000000000000000000000000000000000000000000000c38a96a070000 [644] struct2_field2 value
-        // 00000000000000000000000000000000000000000000000000000000
+        bytes4 _functionSelector;
+        uint256 _arrayLength;
 
-
-        // bytes32 _strOffset;
-        // bytes32 _strLength;
-        bytes4 functionSelector;
-        // bytes32 _arrayOffset;
-        // bytes32 _arrayLength;
-        // bytes32 _structOffset;
-        // bytes32 _structField1Offset;
-        // bytes32 _structField2Offset;
         address _withdrawer;
-        // bytes32 _structField1ArrayLength;
+        address _staker;
+        uint256 _expiry;
+        // uint256 _structField1ArrayLength; // strategies
         address _strategy;
-        // bytes32 _structField2ArrayLength;
+        // uint256 _structField2ArrayLength; // shares
         uint256 _sharesToWithdraw;
 
-        /// @dev note: Need to account for arrays of QueuedWithdrawalParams.
-        /// - determine length of QueuedWithdrawalParam[] from bytes message
-        /// - loop through and deserialise each element in QueuedWithdrawalParams[]
-        /// with the correct offsets
-        require(arrayLength >= 1, "array cannot be zero length");
-
-        uint256 offset = (arrayLength - 1) + (7 * i);
-        // Every extra element in the QueueWithdrawalParams[] array adds
-        // one extra struct offset 32byte word (1 line), so shift everything down by (arrayLength - 1).
-        //
-        // Each QueueWithdrawalParams takes 7 lines, so when reading the ith element,
-        // increase offset by 7 * i:
-        //      1 element:  offset = (1 - 1) + (7 * 0) = 0
-        //      2 elements: offset = (2 - 1) + (7 * 1) = 8
-        //      3 elements: offset = (3 - 1) + (7 * 2) = 16
-
-        uint256 withdrawerOffset = 260 + offset * 32;
-        uint256 strategyOffset = 324 + offset * 32;
-        uint256 sharesToWithdrawOffset = 388 + offset * 32;
+        bytes32 r;
+        bytes32 s;
+        bytes1 v;
 
         assembly {
-            // _strOffset := mload(add(message, 32))
-            // _strLength := mload(add(message, 64))
-            functionSelector := mload(add(message, 96))
-            // _arrayOffset := mload(add(message, 100))
-            // _arrayLength := mload(add(message, 132))
-            // _structOffset := mload(add(message, 164))
-            // _structField1Offset := mload(add(message, 196))
-            // _structField2Offset := mload(add(message, 228))
-            _withdrawer := mload(add(message, withdrawerOffset))
-            // _structField1ArrayLength := mload(add(message, 292))
-            _strategy := mload(add(message, strategyOffset))
+            _functionSelector := mload(add(message, 96))
+
+            _arrayLength := mload(add(message, 132))
+            _withdrawer := mload(add(message, 260))
+            _staker := mload(add(message, 292))
+            _expiry := mload(add(message, 356))
+            // _structField1ArrayLength := mload(add(message, 356))
+            _strategy := mload(add(message, 420))
             // _structField2ArrayLength := mload(add(message, 356))
-            _sharesToWithdraw := mload(add(message, sharesToWithdrawOffset))
+            _sharesToWithdraw := mload(add(message, 484))
+
+            r := mload(add(message, 548))
+            s := mload(add(message, 580))
+            v := mload(add(message, 612))
         }
+
+        console.log("functionSelector");
+        console.logBytes4(_functionSelector);
+
+        console.log("staker");
+        console.log(_staker);
+
+        console.log("withdrawer");
+        console.log(_withdrawer);
+
+        console.log("strategy");
+        console.log(_strategy);
+
+        console.log("sharesToWithdraw");
+        console.log(_sharesToWithdraw);
+
+        bytes memory signature = abi.encodePacked(r,s,v);
+        require(signature.length == 65, "invalid signature length");
+
+        // emit EigenlayerQueueWithdrawalsWithSignatureParams(
+        //     _sharesToWithdraw,
+        //     _withdrawer,
+        //     signature
+        // );
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         uint256[] memory sharesToWithdraw = new uint256[](1);
@@ -442,18 +453,22 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         strategiesToWithdraw[0] = IStrategy(_strategy);
         sharesToWithdraw[0] = _sharesToWithdraw;
 
-        IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawalParams;
-        queuedWithdrawalParams = IDelegationManager.QueuedWithdrawalParams({
+        IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSigParams;
+        queuedWithdrawalWithSigParams = IDelegationManager.QueuedWithdrawalWithSignatureParams({
             strategies: strategiesToWithdraw,
             shares: sharesToWithdraw,
-            withdrawer: _withdrawer
+            withdrawer: _withdrawer,
+            staker: _staker,
+            signature: signature,
+            expiry: _expiry
         });
 
-        emit EigenlayerQueueWithdrawalsParams(functionSelector, _sharesToWithdraw, _withdrawer);
-
-        return queuedWithdrawalParams;
+        return queuedWithdrawalWithSigParams;
     }
 
+    //////////////////////////////////////////////
+    // Complete Withdrawals
+    //////////////////////////////////////////////
 
     function decodeCompleteWithdrawalMessage(bytes memory message) public returns (
         IDelegationManager.Withdrawal memory,

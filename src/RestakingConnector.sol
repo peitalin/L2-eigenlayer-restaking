@@ -53,12 +53,4 @@ contract RestakingConnector is IRestakingConnector, EigenlayerMsgDecoders, Admin
         strategy = _strategy;
     }
 
-    function getStrategy() public view returns (IStrategy) {
-        return strategy;
-    }
-
-    function getStrategyManager() public view returns (IStrategyManager) {
-        return strategyManager;
-    }
-
 }

@@ -11,18 +11,15 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IEigenlayerMsgDecoders} from "../interfaces/IEigenlayerMsgDecoders.sol";
 
 struct EigenlayerDepositMessage {
-    bytes4 functionSelector;
     uint256 amount;
     address staker;
 }
 event EigenlayerDepositParams(
-    bytes4 indexed functionSelector,
     uint256 indexed amount,
     address indexed staker
 );
 
 struct EigenlayerDepositWithSignatureMessage {
-    // bytes4 functionSelector;
     uint256 expiry;
     address strategy;
     address token;
@@ -31,24 +28,24 @@ struct EigenlayerDepositWithSignatureMessage {
     bytes signature;
 }
 event EigenlayerDepositWithSignatureParams(
-    bytes4 indexed functionSelector,
     uint256 indexed amount,
     address indexed staker
 );
 
 event EigenlayerQueueWithdrawalsParams(
-    bytes4 indexed functionSelector,
     uint256 indexed amount,
     address indexed staker
+);
+
+event EigenlayerQueueWithdrawalsWithSignatureParams(
+    uint256 indexed amount,
+    address indexed staker,
+    bytes indexed signature
 );
 
 
 
 interface IRestakingConnector is IEigenlayerMsgDecoders {
-
-    function getStrategy() external returns (IStrategy);
-
-    function getStrategyManager() external returns (IStrategyManager);
 
     function getEigenlayerContracts() external returns (
         IDelegationManager,

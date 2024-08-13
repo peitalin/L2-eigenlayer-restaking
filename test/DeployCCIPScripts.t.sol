@@ -20,16 +20,16 @@ contract DeployCCIPScriptsTest is Test {
     uint256 public deployerKey;
     address public deployer;
 
-    function setUp() public {
+    // function setUp() public {
 
-		deployerKey = vm.envUint("DEPLOYER_KEY");
-        deployer = vm.addr(deployerKey);
+	// 	deployerKey = vm.envUint("DEPLOYER_KEY");
+    //     deployer = vm.addr(deployerKey);
 
-        deployOnArbScript = new DeployOnArbScript();
-        deployOnEthScript = new DeployOnEthScript();
-        depositFromArbToEthScript = new DepositFromArbToEthScript();
-        depositWithSignatureFromArbToEthScript = new DepositWithSignatureFromArbToEthScript();
-    }
+    //     deployOnArbScript = new DeployOnArbScript();
+    //     deployOnEthScript = new DeployOnEthScript();
+    //     depositFromArbToEthScript = new DepositFromArbToEthScript();
+    //     depositWithSignatureFromArbToEthScript = new DepositWithSignatureFromArbToEthScript();
+    // }
 
     // function test_DeployOnArbScript() public {
     //     deployOnArbScript.run();

@@ -108,18 +108,33 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
         if (functionSelector == 0x0dd8dd02) {
             // bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
 
-            IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams;
+            IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams =
+                restakingConnector.decodeQueueWithdrawalsMessage(message);
 
-            queuedWithdrawalParams = restakingConnector.decodeQueueWithdrawalsMessage(message);
-
-            console.log("msg.sender:", msg.sender);
+            console.log("msg.sender", msg.sender);
             console.log("withdrawer:", queuedWithdrawalParams[0].withdrawer);
-            // require(msg.sender == queuedWithdrawalParams[0].withdrawer, "msg.sender should be withdrawer");
 
             bytes32[] memory withdrawalRoots = delegationManager.queueWithdrawals(queuedWithdrawalParams);
 
             textMsg = "queueWithdrawals()";
             // amountMsg = eigenMsg.amount;
+        }
+
+        if (functionSelector == 0xa140f06e) {
+            // bytes4(keccak256("queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])")),
+
+            IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalsWithSigParams =
+                restakingConnector.decodeQueueWithdrawalsWithSignatureMessage(message);
+
+            console.log("staker", queuedWithdrawalsWithSigParams[0].staker);
+            console.log("withdrawer:", queuedWithdrawalsWithSigParams[0].withdrawer);
+
+            bytes32[] memory withdrawalRoots = delegationManager.queueWithdrawalsWithSignature(
+                queuedWithdrawalsWithSigParams
+            );
+
+            textMsg = "queueWithdrawalsWithSignature()";
+            amountMsg = queuedWithdrawalsWithSigParams[0].shares[0];
         }
 
         if (functionSelector == 0x54b2bf29) {
@@ -138,10 +153,11 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
                 receiveAsTokens
             );
 
+            /// return token to staker via bridge
+
             textMsg = "completeQueuedWithdrawal()";
             // amountMsg = eigenMsg.amount;
         } else {
-
             textMsg = "no matching functionSelector";
         }
 

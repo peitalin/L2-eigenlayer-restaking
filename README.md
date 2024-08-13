@@ -17,8 +17,10 @@ TODO:
 - Test cross-chain messages for:
     - [DONE] `depositIntoStrategy`
     - [DONE] `depositIntoStrategyWithSignature` (EIP1271 signatures to attribute deposits to stakers on L2)
-    - `queueWithdrawals`
+    - [DONE] `queueWithdrawals`
+    - [DONE] `queueWithdrawalsWithSignature` ([requires PR #646 to work](https://github.com/Layr-Labs/eigenlayer-contracts/pull/676/files))
     - `completeQueuedWithdrawals`
+        - Transfer withdrawn tokens from L1 back to L2
     - `delegate`
     - `undelegate`
 - Gas

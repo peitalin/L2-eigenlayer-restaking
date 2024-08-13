@@ -34,11 +34,13 @@ interface IEigenlayerMsgDecoders {
         bytes memory message
     ) external returns (IDelegationManager.QueuedWithdrawalParams[] memory);
 
+
     function decodeQueueWithdrawalsWithSignatureMessage(
         bytes memory message
     ) external returns (
-        IDelegationManager.QueuedWithdrawalParams[] memory
+        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory
     );
+
 
     function decodeCompleteWithdrawalMessage(
         bytes memory message
