@@ -171,7 +171,7 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         // third party queueWithdrawals for a staker.
         // We would need a queueWithdrawalWithSignature feature:
         // https://github.com/Layr-Labs/eigenlayer-contracts/pull/676
-        vm.expectRevert("queueWithdrawal: withdrawer must be staker");
+        vm.expectRevert("DelegationManager.queueWithdrawal: withdrawer must be staker");
         receiverContract.mockCCIPReceive(any2EvmMessage);
 
         vm.stopBroadcast();
