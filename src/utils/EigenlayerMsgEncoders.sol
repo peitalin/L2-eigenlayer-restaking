@@ -10,11 +10,7 @@ contract EigenlayerMsgEncoders {
 
     function encodeDepositIntoStrategyMsg(
         address strategy,
-        address token,
-        uint256 amount,
-        address staker,
-        uint256 expiry,
-        bytes memory signature
+        uint256 amount
     ) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
             bytes4(keccak256("depositIntoStrategy(uint256,address)")),
@@ -114,6 +110,20 @@ contract EigenlayerMsgEncoders {
             receiveAsTokens
         );
 
+        return message_bytes;
+    }
+
+    function encodeTransferToStakerMsg(
+        uint256 amount,
+        address staker,
+        address tokenDestination
+    ) public pure returns (bytes memory) {
+        bytes memory message_bytes = abi.encodeWithSelector(
+            bytes4(keccak256("transferToStaker(uint256,address,address)")),
+            amount,
+            staker,
+            tokenDestination
+        );
         return message_bytes;
     }
 }

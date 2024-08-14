@@ -15,6 +15,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Adminable} from "./utils/Adminable.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
+import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 
 
 

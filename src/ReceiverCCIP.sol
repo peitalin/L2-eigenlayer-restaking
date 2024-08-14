@@ -8,18 +8,29 @@ import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IS
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
-import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
-import {EigenlayerDepositMessage, EigenlayerDepositWithSignatureMessage} from "./interfaces/IRestakingConnector.sol";
+import {
+    EigenlayerDepositMessage,
+    EigenlayerDepositWithSignatureMessage,
+    IRestakingConnector
+} from "./interfaces/IRestakingConnector.sol";
+import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
+import {IReceiverCCIP} from "./interfaces/IReceiverCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
+
+import {Adminable} from "./utils/Adminable.sol";
+import {ArbSepolia} from "../script/Addresses.sol";
+import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
+import {TransferToStakerMessage} from "./interfaces/IRestakingConnector.sol";
 
 import {console} from "forge-std/Test.sol";
 
 
 /// ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them.
-contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
+contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsgEncoders {
 
     IRestakingConnector public restakingConnector;
+    address public senderContractL2Addr;
 
     /// @notice Constructor initializes the contract with the router address.
     /// @param _router The address of the router contract.
@@ -29,12 +40,27 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
         address _router,
         address _link,
         address _restakingConnector
+        // address _senderContractL2Addr
     ) BaseMessengerCCIP(_router, _link) {
         restakingConnector = IRestakingConnector(_restakingConnector);
+        // senderContractL2Addr = ISenderCCIP(_senderContractL2Addr);
+    }
+
+    function getSenderContractL2Addr() public view returns (address) {
+        // address, contract only exists on L2
+        return senderContractL2Addr;
+    }
+
+    function setSenderContractL2Addr(address _senderContractL2Addr) public onlyOwner {
+        senderContractL2Addr = _senderContractL2Addr;
     }
 
     function getRestakingConnector() public view returns (IRestakingConnector) {
         return restakingConnector;
+    }
+
+    function setRestakingConnector(IRestakingConnector _restakingConnector) public onlyOwner {
+        restakingConnector = _restakingConnector;
     }
 
     function mockCCIPReceive(
@@ -153,7 +179,30 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
                 receiveAsTokens
             );
 
-            /// return token to staker via bridge
+            address original_staker = withdrawal.staker;
+            uint256 amount = withdrawal.shares[0];
+            // L2 Sender contract address
+            address _senderContractL2Addr = getSenderContractL2Addr();
+
+            // Approve L1 receiverContract to send ccip-BnM tokens to Router
+            IERC20 token = withdrawal.strategies[0].underlyingToken();
+            token.approve(address(this), amount);
+
+            address token_destination = ArbSepolia.CcipBnM;
+
+            string memory text_message = string(abi.encode(
+                encodeTransferToStakerMsg(amount, original_staker, token_destination)
+            ));
+
+            /// return token to staker via bridge with message to transferToStaker
+            this.sendMessagePayNative(
+                ArbSepolia.ChainSelector, // destination chain
+                _senderContractL2Addr,
+                text_message,
+                address(token), // L1 token address to burn/lock
+                amount
+            );
+            console.log(text_message);
 
             textMsg = "completeQueuedWithdrawal()";
             // amountMsg = eigenMsg.amount;
@@ -176,7 +225,7 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
     function isValidSignature(
         bytes32 _hash,
         bytes memory _signature
-    ) public view returns (bytes4 magicValue) {
+    ) public pure returns (bytes4 magicValue) {
 
         // implement some hash/signature scheme
 

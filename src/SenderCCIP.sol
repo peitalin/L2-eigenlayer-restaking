@@ -1,16 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
+import {console} from "forge-std/Test.sol";
+
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
+import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
+import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
+import {TransferToStakerMessage} from "./interfaces/IRestakingConnector.sol";
 
 
 /// @title - Arb L2 Messenger Contract: sends Eigenlayer messages to L1,
 /// and receives responses from L1 (e.g. queueing withdrawals).
-contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
+contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsgDecoders {
 
     mapping(bytes4 => uint256) gasLimitsForFunctionSelectors;
+
+    event WithdrawlDetectedFromL1(address, uint256);
 
     /// @notice Constructor initializes the contract with the router address.
     /// @param _router The address of the router contract.
@@ -19,6 +28,12 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
         address _router,
         address _link
     ) BaseMessengerCCIP(_router, _link) {}
+
+    function mockCCIPReceive(
+        Client.Any2EVMMessage memory any2EvmMessage
+    ) public {
+        _ccipReceive(any2EvmMessage);
+    }
 
     /// handle a received message
     function _ccipReceive(
@@ -30,7 +45,7 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
         onlyAllowlisted(
             any2EvmMessage.sourceChainSelector,
             abi.decode(any2EvmMessage.sender, (address))
-        ) // Make sure source chain and sender are allowlisted
+        )
     {
         s_lastReceivedMessageId = any2EvmMessage.messageId; // fetch the messageId
         s_lastReceivedText = abi.decode(any2EvmMessage.data, (string)); // abi-decoding of the sent text
@@ -38,15 +53,41 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder {
         s_lastReceivedTokenAddress = any2EvmMessage.destTokenAmounts[0].token;
         s_lastReceivedTokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
 
+        address token = any2EvmMessage.destTokenAmounts[0].token;
+
+        bytes memory message = any2EvmMessage.data;
+
+        bytes4 functionSelector = decodeFunctionSelector(message);
+
+        if (functionSelector == 0x2fcb6cd5) {
+            // keccak256(abi.encode("transferToStaker(uint256,address,address)")) == 0x2fcb6cd5
+
+            console.logBytes(message);
+            TransferToStakerMessage memory transferToStakerMsg = decodeTransferToStakerMessage(message);
+
+            address staker = transferToStakerMsg.staker;
+            uint256 amount = transferToStakerMsg.amount;
+            address token_destination = transferToStakerMsg.token_destination;
+
+            console.log("senderCCIP staker:", staker);
+            console.log("senderCCIP amount:", amount);
+            console.log("senderCCIP token destination:", token_destination);
+
+            console.log("token balance L2 before:", IERC20(token_destination).balanceOf(staker));
+
+            // 1) decode message payload
+            // 2) get staker
+            // 3) transfer tokens back to original staker
+            IERC20(token_destination).transfer(staker, amount);
+        }
+
         emit MessageReceived(
             any2EvmMessage.messageId,
             any2EvmMessage.sourceChainSelector, // fetch the source chain identifier (aka selector)
             abi.decode(any2EvmMessage.sender, (address)), // abi-decoding of the sender address,
-            // msgForEigenlayer.staker,
             abi.decode(any2EvmMessage.data, (string)),
             any2EvmMessage.destTokenAmounts[0].token,
             any2EvmMessage.destTokenAmounts[0].amount
-            // msgForEigenlayer.amount
         );
     }
 

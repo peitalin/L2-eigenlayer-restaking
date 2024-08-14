@@ -8,6 +8,8 @@ import {CCIPReceiver} from "@chainlink/contracts-ccip/src/v0.8/ccip/applications
 import {IERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import {console} from "forge-std/Test.sol";
+
 
 /// @title - A simple messenger contract for transferring/receiving tokens and data across chains.
 contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
@@ -142,7 +144,7 @@ contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
         uint256 _amount
     )
         external
-        onlyOwner
+        // onlyOwner // users should be able to bridge
         onlyAllowlistedDestinationChain(_destinationChainSelector)
         validateReceiver(_receiver)
         returns (bytes32 messageId)
@@ -208,7 +210,7 @@ contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
         uint256 _amount
     )
         external
-        onlyOwner
+        // onlyOwner // users should be able to bridge
         onlyAllowlistedDestinationChain(_destinationChainSelector)
         validateReceiver(_receiver)
         returns (bytes32 messageId)
@@ -226,8 +228,10 @@ contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
         // Initialize a router client instance to interact with cross-chain router
         IRouterClient router = IRouterClient(this.getRouter());
 
+        console.log("address(this).balance:", address(this).balance);
         // Get the fee required to send the CCIP message
         uint256 fees = router.getFee(_destinationChainSelector, evm2AnyMessage);
+        console.log("fees:", fees);
 
         if (fees > address(this).balance)
             revert NotEnoughBalance(address(this).balance, fees);
@@ -325,8 +329,7 @@ contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
         address _feeTokenAddress
     ) internal virtual returns (Client.EVM2AnyMessage memory) {
         // Set the token amounts
-        Client.EVMTokenAmount[]
-            memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
         tokenAmounts[0] = Client.EVMTokenAmount({
             token: _token,
             amount: _amount

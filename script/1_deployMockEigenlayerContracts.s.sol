@@ -27,6 +27,7 @@ import {StrategyBaseTVLLimits} from "eigenlayer-contracts/src/contracts/strategi
 
 import {ERC20Minter} from "../src/ERC20Minter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {EthSepolia} from "./Addresses.sol";
 
 
@@ -65,8 +66,6 @@ contract DeployMockEigenlayerContractsScript is Script {
         IStrategy,
         IERC20
     ) {
-
-
         if (block.chainid != 31337 && block.chainid != 11155111) revert("must deploy on Eth or local network");
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
@@ -80,12 +79,12 @@ contract DeployMockEigenlayerContractsScript is Script {
             delegationManager
         ) = deployEigenlayerContracts(proxyAdmin);
 
-        if (block.chainid == 31337) {
+        if (block.chainid != 11155111) {
             // can mint in localhost tests
             tokenERC20 = IERC20(address(deployERC20Minter("Mock MAGIC", "MMAGIC", proxyAdmin)));
         } else {
             // can't mint, you need to transfer CCIP-BnM tokens to receiver contract
-            tokenERC20 = IERC20(EthSepolia.CcipBnM);
+            tokenERC20 = IERC20(address(IERC20_CCIPBnM(EthSepolia.CcipBnM)));
         }
 
         (StrategyFactory strategyFactory, UpgradeableBeacon strategyBeacon) = _deployStrategyFactory(

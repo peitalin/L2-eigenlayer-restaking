@@ -21,6 +21,11 @@ import {
     EigenlayerQueueWithdrawalsParams,
     EigenlayerQueueWithdrawalsWithSignatureParams
 } from "../interfaces/IRestakingConnector.sol";
+// TransferToStaker
+import {
+    TransferToStakerMessage,
+    TransferToStakerParams
+} from "../interfaces/IRestakingConnector.sol";
 import {IEigenlayerMsgDecoders} from "../interfaces/IEigenlayerMsgDecoders.sol";
 
 
@@ -309,7 +314,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
     function decodeQueueWithdrawalsWithSignatureMessage(
         bytes memory message
-    ) public returns (
+    ) public pure returns (
         IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory
     ) {
 
@@ -348,7 +353,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         bytes memory message,
         uint256 arrayLength,
         uint256 i
-    ) internal returns (
+    ) internal pure returns (
         IDelegationManager.QueuedWithdrawalWithSignatureParams memory
     ) {
         /// @dev: expect to use this in a for-loop with i iteration variable
@@ -470,7 +475,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
     // Complete Withdrawals
     //////////////////////////////////////////////
 
-    function decodeCompleteWithdrawalMessage(bytes memory message) public returns (
+    function decodeCompleteWithdrawalMessage(bytes memory message) public pure returns (
         IDelegationManager.Withdrawal memory,
         IERC20[] memory,
         uint256,
@@ -492,7 +497,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         );
     }
 
-    function _decodeCompleteWithdrawalMessagePart1(bytes memory message) internal returns (
+    function _decodeCompleteWithdrawalMessagePart1(bytes memory message) internal pure returns (
         IDelegationManager.Withdrawal memory
     ) {
         /// @note decodes the first half of the CompleteWithdrawalMessage as we run into
@@ -597,7 +602,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         return withdrawal;
     }
 
-    function _decodeCompleteWithdrawalMessagePart2(bytes memory message) internal returns (
+    function _decodeCompleteWithdrawalMessagePart2(bytes memory message) internal pure returns (
         IERC20[] memory,
         uint256,
         bool
@@ -674,14 +679,42 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         IERC20[] memory tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = IERC20(tokensToWithdraw0);
 
-        console.log("middlewareTimesIndex ", middlewareTimesIndex );
-        console.log("receiveAsTokens", receiveAsTokens);
-        console.log("tokensToWithdraw[0]", address(tokensToWithdraw[0]));
-
         return (
             tokensToWithdraw,
             middlewareTimesIndex,
             receiveAsTokens
         );
     }
+
+    function decodeTransferToStakerMessage(
+        bytes memory message
+    ) public returns (TransferToStakerMessage memory) {
+
+        bytes32 offset;
+        bytes32 length;
+        bytes4 functionSelector;
+        uint256 amount;
+        address staker;
+        address token_destination;
+
+        assembly {
+            offset := mload(add(message, 32))
+            length := mload(add(message, 64))
+            functionSelector := mload(add(message, 96))
+            amount := mload(add(message, 100))
+            staker := mload(add(message, 132))
+            token_destination := mload(add(message, 164))
+        }
+
+        TransferToStakerMessage memory transferToStakerMessage = TransferToStakerMessage({
+            amount: amount,
+            staker: staker,
+            token_destination: token_destination
+        });
+
+        emit TransferToStakerParams(amount, staker, token_destination);
+
+        return transferToStakerMessage;
+    }
+
 }

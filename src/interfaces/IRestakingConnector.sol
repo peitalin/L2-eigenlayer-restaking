@@ -43,6 +43,16 @@ event EigenlayerQueueWithdrawalsWithSignatureParams(
     bytes indexed signature
 );
 
+struct TransferToStakerMessage {
+    uint256 amount;
+    address staker;
+    address token_destination;
+}
+event TransferToStakerParams(
+    uint256 indexed amount,
+    address indexed staker,
+    address indexed token_destination
+);
 
 
 interface IRestakingConnector is IEigenlayerMsgDecoders {

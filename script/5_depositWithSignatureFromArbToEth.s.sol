@@ -121,7 +121,7 @@ contract DepositWithSignatureFromArbToEthScript is Script {
             ccipBnM.approve(deployer, 0.1 ether);
             ccipBnM.transferFrom(deployer, senderAddr, 0.1 ether);
         }
-        // Approve L2 senderContract to send ccip-BnM tokens
+        // Approve L2 senderContract to send ccip-BnM tokens to Router
         ccipBnM.approve(senderAddr, amount);
 
         if (payFeeWithETH) {

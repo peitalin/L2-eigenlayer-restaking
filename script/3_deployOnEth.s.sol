@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
@@ -9,6 +9,7 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
+import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
@@ -63,6 +64,8 @@ contract DeployOnEthScript is Script {
 
         address sender = address(fileReader.getSenderContract());
         receiverContract.allowlistSender(sender, true);
+        receiverContract.allowlistDestinationChain(ArbSepolia.ChainSelector, true);
+        receiverContract.setSenderContractL2Addr(sender);
 
         (
             IDelegationManager _d,
