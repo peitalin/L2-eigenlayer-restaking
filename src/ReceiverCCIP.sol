@@ -23,8 +23,6 @@ import {ArbSepolia} from "../script/Addresses.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 import {TransferToStakerMessage} from "./interfaces/IRestakingConnector.sol";
 
-import {console} from "forge-std/Test.sol";
-
 
 /// ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them.
 contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsgEncoders {
@@ -97,8 +95,9 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
         ) = restakingConnector.getEigenlayerContracts();
 
         IERC20 underlyingToken = strategy.underlyingToken();
-        string memory textMsg;
+        string memory textMsg = "no matching functionSelector";
         uint256 amountMsg = any2EvmMessage.destTokenAmounts[0].amount;
+
 
         if (functionSelector == 0xf7e784ef) {
             // bytes4(keccak256("depositIntoStrategy(uint256,address)")) == 0xf7e784ef
@@ -137,10 +136,7 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
             IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams =
                 restakingConnector.decodeQueueWithdrawalsMessage(message);
 
-            console.log("msg.sender", msg.sender);
-            console.log("withdrawer:", queuedWithdrawalParams[0].withdrawer);
-
-            bytes32[] memory withdrawalRoots = delegationManager.queueWithdrawals(queuedWithdrawalParams);
+            delegationManager.queueWithdrawals(queuedWithdrawalParams);
 
             textMsg = "queueWithdrawals()";
             // amountMsg = eigenMsg.amount;
@@ -152,10 +148,7 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
             IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalsWithSigParams =
                 restakingConnector.decodeQueueWithdrawalsWithSignatureMessage(message);
 
-            console.log("staker", queuedWithdrawalsWithSigParams[0].staker);
-            console.log("withdrawer:", queuedWithdrawalsWithSigParams[0].withdrawer);
-
-            bytes32[] memory withdrawalRoots = delegationManager.queueWithdrawalsWithSignature(
+            delegationManager.queueWithdrawalsWithSignature(
                 queuedWithdrawalsWithSigParams
             );
 
@@ -212,12 +205,9 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
                 address(token), // L1 token address to burn/lock
                 amount
             );
-            console.log(text_message);
 
             textMsg = "completeQueuedWithdrawal()";
             // amountMsg = eigenMsg.amount;
-        } else {
-            textMsg = "no matching functionSelector";
         }
 
         emit MessageReceived(
@@ -246,7 +236,6 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
         //     );
         // }
         // address signer = ECDSA.recover(digestHash, signature);
-        // console.log("signer", signer);
 
         // // bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _hash));
         // // if (signer == address(0)) {

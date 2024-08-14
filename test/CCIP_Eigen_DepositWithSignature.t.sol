@@ -5,6 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
@@ -39,7 +40,7 @@ contract CCIP_Eigen_DepositWithSignature is Test {
 
     IReceiverCCIP public receiverContract;
     IRestakingConnector public restakingConnector;
-    IERC20Minter public erc20Minter; // has admin mint/burn functions
+    IERC20_CCIPBnM public erc20Drip; // has drip faucet functions
     IERC20 public token;
 
     IStrategyManager public strategyManager;
@@ -60,15 +61,19 @@ contract CCIP_Eigen_DepositWithSignature is Test {
         eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
         signatureUtils = new SignatureUtilsEIP1271();
 
+        uint256 arbForkId = vm.createFork("arbsepolia");
+        uint256 ethForkId = vm.createSelectFork("ethsepolia");
+
         //// Configure Eigenlayer contracts
         (
-            strategyManager,
-            _pauserRegistry,
-            _rewardsCoordinator,
-            delegationManager,
             strategy,
+            strategyManager,
+            , //IStrategyFactory
+            _pauserRegistry,
+            delegationManager,
+            _rewardsCoordinator,
             token
-        ) = deployMockEigenlayerContractsScript.run();
+        ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
         //// Configure CCIP contracts
         (
@@ -76,12 +81,13 @@ contract CCIP_Eigen_DepositWithSignature is Test {
             restakingConnector
         ) = deployOnEthScript.run();
 
-        erc20Minter = IERC20Minter(address(token));
+        erc20Drip = IERC20_CCIPBnM(address(token));
 
         vm.startBroadcast(deployerKey);
         restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
         // fund receiver with tokens from CCIP bridge: EVM2EVMOffRamp contract
-        erc20Minter.mint(address(receiverContract), initialReceiverBalance);
+        erc20Drip.drip(address(receiverContract));
+        erc20Drip.drip(address(receiverContract));
 
         receiverContract.allowlistSender(deployer, true);
 
@@ -169,8 +175,8 @@ contract CCIP_Eigen_DepositWithSignature is Test {
         bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), block.chainid);
 
         vm.startBroadcast(deployerKey);
-        erc20Minter.mint(staker, amount);
-        erc20Minter.approve(address(strategyManager), amount);
+        erc20Drip.drip(staker);
+        erc20Drip.approve(address(strategyManager), amount);
 
         (
             bytes memory signature,

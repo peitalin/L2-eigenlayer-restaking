@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {console} from "forge-std/Test.sol";
-
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
-import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
+// import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 import {TransferToStakerMessage} from "./interfaces/IRestakingConnector.sol";
-
-import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
+// import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
+import {console} from "forge-std/Test.sol";
 
 
 /// @title - Arb L2 Messenger Contract: sends Eigenlayer messages to L1,
@@ -60,11 +58,11 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
         bytes memory message = any2EvmMessage.data;
 
         bytes4 functionSelector = decodeFunctionSelector(message);
+        string memory text_msg;
 
         if (functionSelector == 0x2fcb6cd5) {
             // keccak256(abi.encode("transferToStaker(uint256,address,address)")) == 0x2fcb6cd5
 
-            console.logBytes(message);
             TransferToStakerMessage memory transferToStakerMsg = decodeTransferToStakerMessage(message);
 
             // TODO: add signature to TransferToStakerMessage struct to verify withdrawal with:
@@ -78,22 +76,18 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
             // TODO: check signature is legit, then transfer tokens
             // signatureUtils.checkSignature_EIP1271(_staker, digestHash, signature);
 
-            console.log("senderCCIP staker:", staker);
-            console.log("senderCCIP amount:", amount);
-            console.log("senderCCIP token destination:", token_destination);
-            console.log("token balance L2 before:", IERC20(token_destination).balanceOf(staker));
-
             // 1) decode message payload
             // 2) get staker
             // 3) transfer tokens back to original staker
             IERC20(token_destination).transfer(staker, amount);
+            text_msg = "completed eigenlayer withdrawal and transferred token to L2 staker";
         }
 
         emit MessageReceived(
             any2EvmMessage.messageId,
             any2EvmMessage.sourceChainSelector, // fetch the source chain identifier (aka selector)
             abi.decode(any2EvmMessage.sender, (address)), // abi-decoding of the sender address,
-            abi.decode(any2EvmMessage.data, (string)),
+            text_msg,
             any2EvmMessage.destTokenAmounts[0].token,
             any2EvmMessage.destTokenAmounts[0].amount
         );
@@ -140,12 +134,13 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
             gasLimit = 800_000;
         }
         if (functionSelector == 0xa140f06e) {
-            // queueWithdrawalsWithSignature: [gas: ?]
-            gasLimit = 999_000;
+            // queueWithdrawalsWithSignature: [gas: 603,301]
+            console.log("queueWithdrawalsWithSignature");
+            gasLimit = 800_000;
         }
         if (functionSelector == 0x54b2bf29) {
             // completeQueuedWithdrawals: [gas: ?]
-            gasLimit = 999_000;
+            gasLimit = 800_000;
         }
 
         // Create an EVM2AnyMessage struct in memory with necessary information for sending a cross-chain message

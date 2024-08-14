@@ -7,6 +7,7 @@
     "StrategyBeacon": "0xbb85080E6953f25197ec68798360667140EbAf4b",
     "StrategyFactory": "0xe1Ab123D238AF74F77BfD59450e2428c9214123C",
     "StrategyManager": "0x907B2ac97B073E7336D746231811BcB727594C02",
+    "TokenERC20": "0xe8ad6a693825fdcd128a5641d4443BEBDCd0f73C",
     "strategies": {
       "CCIPStrategy": "0xaF3f05b8C2E0358cedD69c5ee6bceAaC2a9c2B67"
     }

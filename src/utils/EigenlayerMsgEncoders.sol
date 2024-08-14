@@ -63,7 +63,7 @@ contract EigenlayerMsgEncoders {
     }
 
    function encodeQueueWithdrawalsWithSignatureMsg(
-        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigParams
+        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray
     ) public pure returns (bytes memory) {
 
         // Structs are encoded as tuples:
@@ -71,7 +71,7 @@ contract EigenlayerMsgEncoders {
 
         bytes memory message_bytes = abi.encodeWithSelector(
             bytes4(keccak256("queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])")),
-            queuedWithdrawalWithSigParams
+            queuedWithdrawalWithSigArray
         );
 
         return message_bytes;

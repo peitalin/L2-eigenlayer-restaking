@@ -314,7 +314,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
     function decodeQueueWithdrawalsWithSignatureMessage(
         bytes memory message
-    ) public pure returns (
+    ) public returns (
         IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory
     ) {
 
@@ -336,12 +336,11 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
             IDelegationManager.QueuedWithdrawalWithSignatureParams memory wp;
             wp = _decodeSingleQueueWithdrawalsWithSignatureMessage(message, arrayLength, i);
-
-            console.log("wp.shares:", wp.shares[0]);
-            console.log("wp.withdrawer:", wp.withdrawer);
-            console.log("staker: ", wp.staker);
-            console.log("signature: ");
-            console.logBytes(wp.signature);
+            // console.log("wp.shares:", wp.shares[0]);
+            // console.log("wp.withdrawer:", wp.withdrawer);
+            // console.log("staker: ", wp.staker);
+            // console.log("signature: ");
+            // console.logBytes(wp.signature);
 
             arrayQueuedWithdrawalWithSigParams[i] = wp;
         }
@@ -353,7 +352,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         bytes memory message,
         uint256 arrayLength,
         uint256 i
-    ) internal pure returns (
+    ) internal returns (
         IDelegationManager.QueuedWithdrawalWithSignatureParams memory
     ) {
         /// @dev: expect to use this in a for-loop with i iteration variable
@@ -428,29 +427,14 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
             v := mload(add(message, 612))
         }
 
-        console.log("functionSelector");
-        console.logBytes4(_functionSelector);
-
-        console.log("staker");
-        console.log(_staker);
-
-        console.log("withdrawer");
-        console.log(_withdrawer);
-
-        console.log("strategy");
-        console.log(_strategy);
-
-        console.log("sharesToWithdraw");
-        console.log(_sharesToWithdraw);
-
         bytes memory signature = abi.encodePacked(r,s,v);
         require(signature.length == 65, "invalid signature length");
 
-        // emit EigenlayerQueueWithdrawalsWithSignatureParams(
-        //     _sharesToWithdraw,
-        //     _withdrawer,
-        //     signature
-        // );
+        emit EigenlayerQueueWithdrawalsWithSignatureParams(
+            _sharesToWithdraw,
+            _withdrawer,
+            signature
+        );
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         uint256[] memory sharesToWithdraw = new uint256[](1);

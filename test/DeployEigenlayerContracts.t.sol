@@ -26,6 +26,11 @@ contract DeployEigenlayerContractsTest is Test {
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
     }
 
+    ///// Note: overwrites ethsepolia Eigenlayer contract deployment addresses
+    ///// due to vm.forkSelect().
+    ///// TODO: Need to store test deployments in another folder
+    // function test_ReadEigenlayerContractsScript() public {
+
     // function test_DeployEigenlayerContractsScript() public {
     //     (
     //         IStrategyManager strategyManager,
@@ -36,8 +41,6 @@ contract DeployEigenlayerContractsTest is Test {
     //         IERC20 token
     //     ) = deployMockEigenlayerContractsScript.run();
     // }
-
-    // function test_ReadEigenlayerContractsScript() public {
 
     //     (IStrategy _strategy,,,,,) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 

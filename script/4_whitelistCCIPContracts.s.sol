@@ -3,12 +3,8 @@ pragma solidity 0.8.22;
 
 import {Script, console} from "forge-std/Script.sol";
 
-import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
-import {SenderCCIP} from "../src/SenderCCIP.sol";
-
-import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
@@ -18,7 +14,7 @@ import {FileReader} from "./Addresses.sol";
 import {ArbSepolia, EthSepolia} from "./Addresses.sol";
 
 
-contract WhitelistSenderReceiverScript is Script {
+contract WhitelistCCIPContractsScript is Script {
 
     IRestakingConnector public restakingConnector;
     IReceiverCCIP public receiverContract;
@@ -32,27 +28,17 @@ contract WhitelistSenderReceiverScript is Script {
 
     function run() public returns (IReceiverCCIP, IRestakingConnector) {
 
+        deployerKey = vm.envUint("DEPLOYER_KEY");
+        deployer = vm.addr(deployerKey);
+
         uint256 arbForkId = vm.createFork("arbsepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
-
         console.log("arbForkId:", arbForkId);
         console.log("ethForkId:", ethForkId);
         console.log("block.chainid", block.chainid);
 
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
-        // deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-
-        // (
-        //     strategy,
-        //     strategyManager,
-        //     , // strategyFactory
-        //     , // pauserRegistry
-        //     delegationManager,
-        //     // _rewardsCoordinator
-        // ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
-
         senderContract = fileReader.getSenderContract();
-
         (receiverContract, restakingConnector) = fileReader.getReceiverRestakingConnectorContracts();
 
         address tokenL1 = EthSepolia.CcipBnM;

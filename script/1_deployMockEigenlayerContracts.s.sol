@@ -59,11 +59,25 @@ contract DeployMockEigenlayerContractsScript is Script {
     uint256 public TOTAL_DEPOSIT_LIMIT = 100_000 * 1e18; // uint256 _maxTotalDeposits,
 
     function run() public returns (
-        IStrategyManager,
-        IPauserRegistry,
-        IRewardsCoordinator,
-        IDelegationManager,
         IStrategy,
+        IStrategyManager,
+        IStrategyFactory,
+        IPauserRegistry,
+        IDelegationManager,
+        IRewardsCoordinator,
+        IERC20
+    ) {
+        bool saveDeployedContracts = true;
+        return deployEigenlayerContracts(saveDeployedContracts);
+    }
+
+    function deployEigenlayerContracts(bool saveDeployedContracts) public returns (
+        IStrategy,
+        IStrategyManager,
+        IStrategyFactory,
+        IPauserRegistry,
+        IDelegationManager,
+        IRewardsCoordinator,
         IERC20
     ) {
         if (block.chainid != 31337 && block.chainid != 11155111) revert("must deploy on Eth or local network");
@@ -77,7 +91,7 @@ contract DeployMockEigenlayerContractsScript is Script {
             pauserRegistry,
             rewardsCoordinator,
             delegationManager
-        ) = deployEigenlayerContracts(proxyAdmin);
+        ) = _deployEigenlayerCoreContracts(proxyAdmin);
 
         if (block.chainid != 11155111) {
             // can mint in localhost tests
@@ -107,28 +121,33 @@ contract DeployMockEigenlayerContractsScript is Script {
 
         vm.stopBroadcast();
 
-        writeContractAddresses(
-            address(strategy),
-            address(strategyManager),
-            address(strategyFactory),
-            address(pauserRegistry),
-            address(delegationManager),
-            address(rewardsCoordinator),
-            address(strategyBeacon),
-            address(proxyAdmin)
-        );
+        if (saveDeployedContracts) {
+            // only when deploying
+            writeContractAddresses(
+                address(strategy),
+                address(strategyManager),
+                address(strategyFactory),
+                address(pauserRegistry),
+                address(delegationManager),
+                address(rewardsCoordinator),
+                address(strategyBeacon),
+                address(tokenERC20),
+                address(proxyAdmin)
+            );
+        }
 
         return (
-            strategyManager,
-            pauserRegistry,
-            rewardsCoordinator,
-            delegationManager,
             strategy,
+            strategyManager,
+            strategyFactory,
+            pauserRegistry,
+            delegationManager,
+            rewardsCoordinator,
             tokenERC20
         );
     }
 
-    function deployEigenlayerContracts(ProxyAdmin _proxyAdmin) public returns (
+    function _deployEigenlayerCoreContracts(ProxyAdmin _proxyAdmin) internal returns (
         IStrategyManager,
         IPauserRegistry,
         IRewardsCoordinator,
@@ -402,21 +421,15 @@ contract DeployMockEigenlayerContractsScript is Script {
         IStrategyFactory,
         IPauserRegistry,
         IDelegationManager,
-        IRewardsCoordinator
+        IRewardsCoordinator,
+        IERC20
     ) {
 
         chains[31337] = "localhost";
         chains[17000] = "holesky";
         chains[421614] = "arbsepolia";
         chains[11155111] = "ethsepolia";
-
         // Eigenlayer contract addresses are only on EthSepolia and localhost, not L2
-        uint256 chainid = 11155111;
-        if (block.chainid == 31337) {
-            chainid = 31337;
-        } else {
-            chainid = 11155111;
-        }
 
         IStrategy _strategy;
         IStrategyManager _strategyManager;
@@ -424,16 +437,23 @@ contract DeployMockEigenlayerContractsScript is Script {
         IDelegationManager _delegationManager;
         IRewardsCoordinator _rewardsCoordinator;
         IPauserRegistry _pauserRegistry;
+        IERC20 _tokenERC20;
 
-        string memory inputPath = string(abi.encodePacked("script/", chains[chainid], "/eigenLayerContracts.config.json"));
-        string memory deploymentData = vm.readFile(inputPath);
+        string memory deploymentData = vm.readFile(
+            string(abi.encodePacked(
+                "script/",
+                chains[block.chainid],
+                "/eigenLayerContracts.config.json"
+            ))
+        );
 
         _strategy = IStrategy(stdJson.readAddress(deploymentData, ".addresses.strategies.CCIPStrategy"));
         _strategyManager = IStrategyManager(stdJson.readAddress(deploymentData, ".addresses.StrategyManager"));
         _strategyFactory = IStrategyFactory(stdJson.readAddress(deploymentData, ".addresses.StrategyFactory"));
-        _pauserRegistry = IPauserRegistry(stdJson.readAddress(deploymentData, ".addresses.PauserRegistry"));
         _delegationManager = IDelegationManager(stdJson.readAddress(deploymentData, ".addresses.DelegationManager"));
         _rewardsCoordinator = IRewardsCoordinator(stdJson.readAddress(deploymentData, ".addresses.RewardsCoordinator"));
+        _pauserRegistry = IPauserRegistry(stdJson.readAddress(deploymentData, ".addresses.PauserRegistry"));
+        _tokenERC20 = IERC20(stdJson.readAddress(deploymentData, ".addresses.TokenERC20"));
 
         return (
             _strategy,
@@ -441,7 +461,8 @@ contract DeployMockEigenlayerContractsScript is Script {
             _strategyFactory,
             _pauserRegistry,
             _delegationManager,
-            _rewardsCoordinator
+            _rewardsCoordinator,
+            _tokenERC20
         );
     }
 
@@ -453,6 +474,7 @@ contract DeployMockEigenlayerContractsScript is Script {
         address _delegationManager,
         address _rewardsCoordinator,
         address _strategyBeacon,
+        address _tokenERC20,
         address _proxyAdmin
     ) public {
 
@@ -466,7 +488,11 @@ contract DeployMockEigenlayerContractsScript is Script {
         vm.serializeAddress(keyAddresses, "RewardsCoordinator", _rewardsCoordinator);
         vm.serializeAddress(keyAddresses, "DelegationManager", _delegationManager);
         vm.serializeAddress(keyAddresses, "StrategyBeacon", _strategyBeacon);
+        vm.serializeAddress(keyAddresses, "TokenERC20", _tokenERC20);
         vm.serializeAddress(keyAddresses, "ProxyAdmin", _proxyAdmin);
+
+        console.log("strategyBeacon 2:", address(_strategyBeacon));
+        console.log("strategy 2:", address(_strategy));
 
         /////////////////////////////////////////////////
         // { "addresses": { "strategies": <strategies_output>}}

@@ -78,13 +78,14 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
 
         //// Configure Eigenlayer contracts
         (
-            strategyManager,
-            _pauserRegistry,
-            _rewardsCoordinator,
-            delegationManager,
             strategy,
+            strategyManager,
+            , //IStrategyFactory
+            _pauserRegistry,
+            delegationManager,
+            _rewardsCoordinator,
             token
-        ) = deployMockEigenlayerContractsScript.run();
+        ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
         staker = deployer;
 

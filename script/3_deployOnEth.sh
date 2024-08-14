@@ -6,6 +6,7 @@ echo forge script script/3_deployOnEth.s.sol:DeployOnEthScript --rpc-url ethsepo
 forge script script/3_deployOnEth.s.sol:DeployOnEthScript \
     --rpc-url ethsepolia \
     --broadcast \
+    --etherscan-api-key $ETHERSCAN_API_KEY \
     --verify \
     -vvvv
 

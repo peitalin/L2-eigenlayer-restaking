@@ -8,7 +8,6 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IStrategyManagerDomain} from "../src/interfaces/IStrategyManagerDomain.sol";
 
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
@@ -21,7 +20,7 @@ import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 
 
-contract DepositWithSignatureFromArbToEthScript is Script {
+contract QueueWithdrawalWithSignatureScript is Script {
 
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
@@ -32,7 +31,6 @@ contract DepositWithSignatureFromArbToEthScript is Script {
     IDelegationManager public delegationManager;
     IStrategy public strategy;
     IERC20 public token;
-    IERC20 public token2;
     IERC20 public ccipBnM;
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
@@ -43,6 +41,9 @@ contract DepositWithSignatureFromArbToEthScript is Script {
     uint256 public deployerKey;
     address public deployer;
     bool public payFeeWithETH = true;
+    address public staker;
+    uint256 public amount;
+    uint256 public expiry;
 
     function run() public {
 
@@ -78,59 +79,78 @@ contract DepositWithSignatureFromArbToEthScript is Script {
         (receiverContract, restakingConnector) = fileReader.getReceiverRestakingConnectorContracts();
 
         ccipBnM = IERC20(address(ArbSepolia.CcipBnM)); // ArbSepolia contract
-        token = IERC20(address(EthSepolia.BridgeToken)); // CCIPBnM on EthSepolia
 
         //////////////////////////////////////////////////////////
         /// Create message and signature
         /// In production this is done on the client/frontend
         //////////////////////////////////////////////////////////
 
-        // First get nonce from StrategyManager in EthSepolia
+        // First get nonce from Eigenlayer contracts in EthSepolia
         vm.selectFork(ethForkId);
-        uint256 nonce = IStrategyManagerDomain(address(strategyManager)).nonces(deployer);
-        uint256 amount = 0.00515 ether; // bridging 0.00515 CCIPBnM
-        uint256 expiry = block.timestamp + 12 hours;
 
-        bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), EthSepolia.ChainId);
-        bytes32 digestHash = signatureUtils.createEigenlayerDepositDigest(
-            strategy,
-            token,
-            amount,
-            deployer,
-            nonce,
-            expiry, // expiry
-            domainSeparator
-        );
-        // generate ECDSA signature
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
-        bytes memory signature = abi.encodePacked(r, s, v);
+        // TODO: refactor SenderCCIP to allow sending 0 tokens
+        amount = 0.00001 ether; // only sending a withdrawal message, not bridging tokens.
+        staker = deployer;
+        expiry = block.timestamp + 6 hours;
 
-        signatureUtils.checkSignature_EIP1271(deployer, digestHash, signature);
+        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
+        strategiesToWithdraw[0] = strategy;
 
-        bytes memory message = eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
-            address(strategy),
-            address(token),
-            amount,
-            deployer,
+        uint256[] memory sharesToWithdraw = new uint256[](1);
+        sharesToWithdraw[0] = strategyManager.stakerStrategyShares(staker, strategy);
+
+        address withdrawer = address(receiverContract);
+        uint256 stakerNonce = delegationManager.cumulativeWithdrawalsQueued(staker);
+        uint32 startBlock = uint32(block.number); // needed to CompleteWithdrawals
+
+        bytes32 digestHash = signatureUtils.calculateQueueWithdrawalDigestHash(
+            staker,
+            strategiesToWithdraw,
+            sharesToWithdraw,
+            stakerNonce,
             expiry,
-            signature
+            address(delegationManager),
+            block.chainid
         );
 
-        //// Make sure we are on ArbSepolia Fork to make contract calls to CCIP-BnM
-        vm.selectFork(arbForkId);
-
-        /////////////////////////////
-        /// Begin Broadcast
-        /////////////////////////////
-        vm.startBroadcast(deployerKey);
-
-        // Check L2 CCIP-BnM ETH balances for gas
-        if (ccipBnM.balanceOf(senderAddr) < 0.1 ether) {
-            ccipBnM.approve(deployer, 0.1 ether);
-            ccipBnM.transferFrom(deployer, senderAddr, 0.1 ether);
+        bytes memory signature;
+        {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
+            signature = abi.encodePacked(r, s, v);
         }
-        // Approve L2 senderContract to send ccip-BnM tokens to Router
-        ccipBnM.approve(senderAddr, amount);
+
+        signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
+
+        /////////////////////////////////////////////////////////////////
+        ////// Setup Queue Withdrawals Params (reads from Eigenlayer contracts on L1)
+        /////////////////////////////////////////////////////////////////
+
+        // Note: This test needs the queueWithdrawalWithSignature feature:
+        // https://github.com/Layr-Labs/eigenlayer-contracts/pull/676
+
+        IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig;
+        queuedWithdrawalWithSig = IDelegationManager.QueuedWithdrawalWithSignatureParams({
+            strategies: strategiesToWithdraw,
+            shares: sharesToWithdraw,
+            withdrawer: withdrawer,
+            staker: staker,
+            signature: signature,
+            expiry: expiry
+        });
+
+        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray;
+        queuedWithdrawalWithSigArray = new IDelegationManager.QueuedWithdrawalWithSignatureParams[](1);
+        queuedWithdrawalWithSigArray[0] = queuedWithdrawalWithSig;
+
+        bytes memory message = eigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
+            queuedWithdrawalWithSigArray
+        );
+        /////////////////////////////////////////////////////////////////
+        /////// Broadcast to Arb L2
+        /////////////////////////////////////////////////////////////////
+
+        vm.selectFork(arbForkId);
+        vm.startBroadcast(deployerKey);
 
         if (payFeeWithETH) {
             topupSenderEthBalance(senderAddr);
@@ -158,8 +178,8 @@ contract DepositWithSignatureFromArbToEthScript is Script {
     }
 
     function topupSenderEthBalance(address _senderAddr) public {
-        if (_senderAddr.balance < 0.02 ether) {
-            (bool sent, ) = address(_senderAddr).call{value: 0.05 ether}("");
+        if (_senderAddr.balance < 0.05 ether) {
+            (bool sent, ) = address(_senderAddr).call{value: 0.1 ether}("");
             require(sent, "Failed to send Ether");
         }
     }
