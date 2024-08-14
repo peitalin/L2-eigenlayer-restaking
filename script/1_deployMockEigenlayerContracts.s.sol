@@ -491,9 +491,6 @@ contract DeployMockEigenlayerContractsScript is Script {
         vm.serializeAddress(keyAddresses, "TokenERC20", _tokenERC20);
         vm.serializeAddress(keyAddresses, "ProxyAdmin", _proxyAdmin);
 
-        console.log("strategyBeacon 2:", address(_strategyBeacon));
-        console.log("strategy 2:", address(_strategy));
-
         /////////////////////////////////////////////////
         // { "addresses": { "strategies": <strategies_output>}}
         /////////////////////////////////////////////////

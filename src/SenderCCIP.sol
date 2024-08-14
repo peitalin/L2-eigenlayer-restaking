@@ -139,7 +139,7 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
             gasLimit = 800_000;
         }
         if (functionSelector == 0x54b2bf29) {
-            // completeQueuedWithdrawals: [gas: ?]
+            // completeQueuedWithdrawals: [gas: 506,164]
             gasLimit = 800_000;
         }
 

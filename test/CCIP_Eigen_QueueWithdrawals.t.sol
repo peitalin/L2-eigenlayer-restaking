@@ -228,7 +228,7 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
     }
 
 
-    function test_Eigenlayer_QueueWithdrawalsWithSignature() public {
+    function test_Eigenlayer_QueueAndCompleteWithdrawalsWithSignature() public {
 
         // Note: This test needs the queueWithdrawalWithSignature feature:
         // https://github.com/Layr-Labs/eigenlayer-contracts/pull/676
@@ -243,6 +243,7 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         uint256 expiry = block.timestamp + 6 hours;
         address withdrawer = address(receiverContract);
         uint256 stakerNonce = delegationManager.cumulativeWithdrawalsQueued(staker);
+        // calculated on the block when queueWithdrawals was called.
         uint32 startBlock = uint32(block.number); // needed to CompleteWithdrawals
 
         bytes32 digestHash = signatureUtils.calculateQueueWithdrawalDigestHash(

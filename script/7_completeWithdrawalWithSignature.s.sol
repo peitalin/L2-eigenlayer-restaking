@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, console} from "forge-std/Script.sol";
-import "forge-std/Vm.sol";
+import {Script, stdJson, console} from "forge-std/Script.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
@@ -87,7 +87,6 @@ contract CompleteWithdrawalWithSignatureScript is Script {
         /// In production this is done on the client/frontend
         //////////////////////////////////////////////////////////
 
-        // First get nonce from Eigenlayer contracts in EthSepolia
         vm.selectFork(ethForkId);
 
         // TODO: refactor SenderCCIP to allow sending 0 tokens
@@ -95,15 +94,10 @@ contract CompleteWithdrawalWithSignatureScript is Script {
         staker = deployer;
         expiry = block.timestamp + 6 hours;
 
-        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
-        strategiesToWithdraw[0] = strategy;
-
-        uint256[] memory sharesToWithdraw = new uint256[](1);
-        sharesToWithdraw[0] = strategyManager.stakerStrategyShares(staker, strategy);
-
-        address withdrawer = address(receiverContract);
-        uint256 stakerNonce = delegationManager.cumulativeWithdrawalsQueued(staker);
-        uint32 startBlock = uint32(block.number); // needed to CompleteWithdrawals
+        (
+            IDelegationManager.Withdrawal memory withdrawal,
+            bytes32 withdrawalRoot
+        ) = readWithdrawalRoot(staker);
 
         // bytes32 digestHash = signatureUtils.calculateQueueWithdrawalDigestHash(
         //     staker,
@@ -114,30 +108,34 @@ contract CompleteWithdrawalWithSignatureScript is Script {
         //     address(delegationManager),
         //     block.chainid
         // );
-
         // bytes memory signature;
         // {
         //     (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
         //     signature = abi.encodePacked(r, s, v);
         // }
-
         // signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
 
-        IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
-            staker: staker,
-            delegatedTo: delegationManager.delegatedTo(staker),
-            withdrawer: withdrawer,
-            nonce: stakerNonce,
-            startBlock: startBlock,
-            strategies: strategiesToWithdraw,
-            shares: sharesToWithdraw
-        });
+        bytes32 withdrawalRoot2 = delegationManager.calculateWithdrawalRoot(withdrawal);
 
-        bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
-        require(withdrawalRoot != 0, "withdrawal root missing");
+        bytes32 targetWithdrawalRoot = hex"6473944b7edb8a41daccbc19b8ab074ea4adf188fa4163e0459d26af1ffba472";
+        // https://sepolia.etherscan.io/tx/0x20baf6809a2dc7120f4ad81b1df6c1e876b47cc6deb88800ef538d1cb3803bf2
+
+        console.log("withdrawalRoot:");
+        console.logBytes32(withdrawalRoot);
+        console.log("");
+        console.log("withdrawalRoot2:");
+        console.logBytes32(withdrawalRoot2);
+        console.log("");
+        console.log("targetWithdrawalRoot:");
+        console.logBytes32(targetWithdrawalRoot);
+
+        require(
+            targetWithdrawalRoot == withdrawalRoot,
+            "withdrawalRoots do not match"
+        );
 
         IERC20[] memory tokensToWithdraw = new IERC20[](1);
-        tokensToWithdraw[0] = strategiesToWithdraw[0].underlyingToken();
+        tokensToWithdraw[0] = withdrawal.strategies[0].underlyingToken();
 
         /////////////////////////////////////////////////////////////////
         ////// Setup Complete Withdrawals Params
@@ -183,6 +181,46 @@ contract CompleteWithdrawalWithSignatureScript is Script {
         }
 
         vm.stopBroadcast();
+    }
+
+
+    function readWithdrawalRoot(
+        address stakerAddress
+    ) public returns (IDelegationManager.Withdrawal memory, bytes32) {
+
+        string memory withdrawalData = vm.readFile(
+            string(abi.encodePacked(
+                "script/withdrawals/",
+                Strings.toHexString(uint160(stakerAddress), 20),
+                "/run-latest.json"
+            ))
+        );
+        uint256 _nonce = stdJson.readUint(withdrawalData, ".inputs.nonce");
+        uint256 _shares = stdJson.readUint(withdrawalData, ".inputs.shares");
+        address _staker = stdJson.readAddress(withdrawalData, ".inputs.staker");
+        uint32 _startBlock = uint32(stdJson.readUint(withdrawalData, ".inputs.startBlock"));
+        address _strategy = stdJson.readAddress(withdrawalData, ".inputs.strategy");
+        address _withdrawer = stdJson.readAddress(withdrawalData, ".inputs.withdrawer");
+        bytes32 _withdrawalRoot = stdJson.readBytes32(withdrawalData, ".outputs.withdrawalRoot");
+
+        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
+        uint256[] memory sharesToWithdraw = new uint256[](1);
+
+        strategiesToWithdraw[0] = IStrategy(_strategy);
+        sharesToWithdraw[0] = _shares;
+
+        return (
+            IDelegationManager.Withdrawal({
+                staker: _staker,
+                delegatedTo: delegationManager.delegatedTo(_staker),
+                withdrawer: _withdrawer,
+                nonce: _nonce,
+                startBlock: _startBlock,
+                strategies: strategiesToWithdraw,
+                shares: sharesToWithdraw
+            }),
+            _withdrawalRoot
+        );
     }
 
     function topupSenderEthBalance(address _senderAddr) public {

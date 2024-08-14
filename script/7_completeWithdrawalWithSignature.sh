@@ -13,5 +13,6 @@ forge script script/7_completeWithdrawalWithSignature.s.sol:CompleteWithdrawalWi
 
 ## Example:
 ## Complete Withdrawal from L2 (with signatures)
+# https://ccip.chain.link/msg/0x2051e290ad0c5387d240eb5be450aff6bf863131783f14f630016be2e4a83658
 
 ## with associated Eigenlayer queueWithdrawal events:
