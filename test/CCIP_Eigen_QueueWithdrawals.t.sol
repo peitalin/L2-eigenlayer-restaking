@@ -4,7 +4,9 @@ pragma solidity 0.8.22;
 import {Test, console} from "forge-std/Test.sol";
 
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
+import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
@@ -42,7 +44,6 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
     IRestakingConnector public restakingConnector;
-    IERC20Minter public erc20Minter; // has admin mint/burn functions
     IERC20 public token;
 
     IStrategyManager public strategyManager;
@@ -56,6 +57,9 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
     uint256 public amountToStake = 0.0091 ether;
     address public staker;
 
+    uint256 arbForkId;
+    uint256 ethForkId;
+
     function setUp() public {
 
 		deployerKey = vm.envUint("DEPLOYER_KEY");
@@ -67,13 +71,10 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
         signatureUtils = new SignatureUtilsEIP1271();
 
-        //// Configure CCIP contracts
-        (
-            receiverContract,
-            restakingConnector
-        ) = deployOnEthScript.run();
-
-        senderContract = deployOnArbScript.run();
+        arbForkId = vm.createFork("arbsepolia");        // 0
+        ethForkId = vm.createSelectFork("ethsepolia"); // 1
+        console.log("arbForkId:", arbForkId);
+        console.log("ethForkId:", ethForkId);
 
         //// Configure Eigenlayer contracts
         (
@@ -85,23 +86,71 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
             token
         ) = deployMockEigenlayerContractsScript.run();
 
-        erc20Minter = IERC20Minter(address(token));
-
         staker = deployer;
 
-        //////////////////////////////////////
-        // Broadcast
-        //////////////////////////////////////
-        vm.startBroadcast(deployerKey);
+        //////////// Arb Sepolia ////////////
+        vm.selectFork(arbForkId);
+        senderContract = deployOnArbScript.run();
+        /////////////////////////////////////
 
-        restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
-        // fund receiver with tokens from CCIP bridge: EVM2EVMOffRamp contract
-        erc20Minter.mint(address(receiverContract), initialReceiverBalance);
-        receiverContract.allowlistSender(deployer, true);
+
+        //////////// Eth Sepolia ////////////
+        vm.selectFork(ethForkId);
+        (receiverContract, restakingConnector) = deployOnEthScript.run();
+        /////////////////////////////////////
+
+
+        //////////// Arb Sepolia ////////////
+        vm.selectFork(arbForkId);
+        vm.startBroadcast(deployerKey);
+        // allow L2 sender contract to receive tokens back from L1
+        senderContract.allowlistSourceChain(EthSepolia.ChainSelector, true);
+        senderContract.allowlistSender(address(receiverContract), true);
+        senderContract.allowlistSender(deployer, true);
+        // fund L2 sender with gas and CCIP-BnM tokens
+        vm.deal(address(senderContract), 1.333 ether); // fund for gas
+        if (block.chainid == 421614) {
+            // drip() using CCIP's BnM faucet if forking from Arb Sepolia
+            for (uint256 i = 0; i < 5; ++i) {
+                IERC20_CCIPBnM(ArbSepolia.CcipBnM).drip(address(senderContract));
+                // each drip() gives you 1e18 coin
+            }
+        } else {
+            // mint() if we deployed our own Mock ERC20
+            IERC20Minter(ArbSepolia.CcipBnM).mint(address(senderContract), 5 ether);
+        }
         vm.stopBroadcast();
+        /////////////////////////////////////
+
+
+        //////////// Eth Sepolia ////////////
+        vm.selectFork(ethForkId);
+        vm.startBroadcast(deployerKey);
+        receiverContract.allowlistSender(deployer, true);
+        restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
+        console.log("block.chainid", block.chainid);
+
+        // fund L1 receiver with gas and CCIP-BnM tokens
+        vm.deal(address(receiverContract), 1.111 ether); // fund for gas
+        if (block.chainid == 11155111) {
+            // drip() using CCIP's BnM faucet if forking from Eth Sepolia
+            for (uint256 i = 0; i < 5; ++i) {
+                IERC20_CCIPBnM(address(token)).drip(address(receiverContract));
+                // each drip() gives you 1e18 coin
+            }
+            initialReceiverBalance = IERC20_CCIPBnM(address(token)).balanceOf(address(receiverContract));
+            // set initialReceiverBalancer for tests
+        } else {
+            // mint() if we deployed our own Mock ERC20
+            IERC20Minter(address(token)).mint(address(receiverContract), initialReceiverBalance);
+        }
+
+        vm.stopBroadcast();
+        /////////////////////////////////////
 
         /////////////////////////////////////
-        //// Setup deposits on Eigenlayer
+        //// ETH: Mock deposits on Eigenlayer
+        vm.selectFork(ethForkId);
         /////////////////////////////////////
         vm.startBroadcast(address(receiverContract)); // simulate router sending receiver message on L1
         Client.Any2EVMMessage memory any2EvmMessage = makeCCIPEigenlayerMsg_DepositWithSignature(
@@ -179,6 +228,7 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
 
 
     function test_Eigenlayer_QueueWithdrawalsWithSignature() public {
+
         // Note: This test needs the queueWithdrawalWithSignature feature:
         // https://github.com/Layr-Labs/eigenlayer-contracts/pull/676
         vm.startBroadcast(address(receiverContract));
@@ -215,21 +265,22 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         /////////////////////////////////////////////////////////////////
         ////// Queue Withdrawals via CCIP
         /////////////////////////////////////////////////////////////////
-
-        (
-            IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigParams,
-            Client.Any2EVMMessage memory any2EvmMessage1
-        ) = makeCCIPEigenlayerMsg_QueueWithdrawalsWithSignature(
-            strategiesToWithdraw,
-            sharesToWithdraw,
-            withdrawer,
-            staker,
-            signature,
-            expiry
+        receiverContract.mockCCIPReceive(
+            makeCCIPEigenlayerMsg_QueueWithdrawalsWithSignature(
+                strategiesToWithdraw,
+                sharesToWithdraw,
+                withdrawer,
+                staker,
+                signature,
+                expiry
+            )
         );
 
-        /// send CCIP message to QueueWithdrawalswithSignature
-        receiverContract.mockCCIPReceive(any2EvmMessage1);
+        console.log("balanceOf(receiverContract) before:", token.balanceOf(address(receiverContract)));
+        require(
+            token.balanceOf(address(receiverContract)) == initialReceiverBalance - amountToStake,
+            "balance should be: initialReceiverBalance - amountToStake"
+        );
 
         /////////////////////////////////////////////////////////////////
         ////// Complete Queued Withdrawals
@@ -246,46 +297,75 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         });
 
         bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
+        require(withdrawalRoot != 0, "withdrawal root missing");
+
         IERC20[] memory tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = strategiesToWithdraw[0].underlyingToken();
 
-        Client.Any2EVMMessage memory any2EvmMessage2 = makeCCIPEigenlayerMsg_CompleteWithdrawal(
-            withdrawal,
-            tokensToWithdraw,
-            0, // middlewareTimesIndex
-            true // receiveAsTokens
-        );
+        vm.stopBroadcast();
+
+        // need to fork ethsepolia to get: ReceiverCCIP -> Router calls to work
+        // for gas estimation, call dispatch, etc.
+        vm.selectFork(ethForkId);
+        vm.startBroadcast(address(receiverContract));
 
         vm.warp(block.timestamp + 120); // 120 seconds = 10 blocks (12second per block)
         vm.roll((block.timestamp + 120) / 12);
 
         // send CCIP message to CompleteWithdrawal
-        receiverContract.mockCCIPReceive(any2EvmMessage2);
+        receiverContract.mockCCIPReceive(
+            makeCCIPEigenlayerMsg_CompleteWithdrawal(
+                withdrawal,
+                tokensToWithdraw,
+                0, // middlewareTimesIndex
+                true // receiveAsTokens
+            )
+        );
+        // tokens are now in the RecieverCCIP bridge contract, need to send them to the staker on L2
+        console.log("balanceOf(receiverContract):", token.balanceOf(address(receiverContract)));
+        vm.stopBroadcast();
         /////////////////////////////////////////////////////////////////
 
-        require(token.balanceOf(staker) == 0, "staker balance should be 0, in the ReceiverCCIP contract");
-        // tokens are in the RecieverCCIP bridge contract, need to send them to the staker on L2
-        console.log("balanceOfStaker after:", token.balanceOf(staker));
-        require(withdrawalRoot != 0, "withdrawal root missing");
+        vm.selectFork(arbForkId);
+        vm.startBroadcast(deployerKey);
+
+        address token_destination = ArbSepolia.CcipBnM; // CCIP-BnM L2 address, not L1 address
+        uint256 stakerBalanceOnL2Before = IERC20(token_destination).balanceOf(staker);
+
+        //// Mock SenderContract on L2 receiving the tokens and TransferToStaker message from L1
+        senderContract.mockCCIPReceive(
+            makeCCIPEigenlayerMsg_TransferToStaker(
+                amountToStake,
+                staker,
+                token_destination
+            )
+        );
+
+        uint256 stakerBalanceOnL2After = IERC20(token_destination).balanceOf(staker);
+        console.log("balanceOf(staker) on L2 before:", stakerBalanceOnL2Before);
+        console.log("balanceOf(staker) on L2 after:", stakerBalanceOnL2After);
+
+        require(
+            (stakerBalanceOnL2Before + amountToStake) == stakerBalanceOnL2After,
+            "balanceOf(staker) on L2 should increase by +amountToStake after L2 -> L2 withdrawal"
+        );
 
         vm.stopBroadcast();
     }
 
 
     function test_Eigenlayer_DelegateToOperator() public {
-
         // function delegateToBySignature(
         //     address staker,
         //     address operator,
         //     SignatureWithExpiry memory stakerSignatureAndExpiry,
         //     SignatureWithExpiry memory approverSignatureAndExpiry,
         //     bytes32 approverSalt
-        // ) external {
+        // )
     }
 
     function test_Eigenlayer_UndelegateFromOperator() public {
         // DelegationManager.undelegate
-
     }
 
     ////////////////////////////////////////////////
@@ -299,10 +379,7 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
             address _staker,
             bytes memory _signature,
             uint256 _expiry
-    ) public returns (
-        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory,
-        Client.Any2EVMMessage memory
-    ) {
+    ) public view returns (Client.Any2EVMMessage memory) {
 
         IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig;
         queuedWithdrawalWithSig = IDelegationManager.QueuedWithdrawalWithSignatureParams({
@@ -314,9 +391,9 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
             expiry: _expiry
         });
 
-        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigParams;
-        queuedWithdrawalWithSigParams = new IDelegationManager.QueuedWithdrawalWithSignatureParams[](1);
-        queuedWithdrawalWithSigParams[0] = queuedWithdrawalWithSig;
+        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray;
+        queuedWithdrawalWithSigArray = new IDelegationManager.QueuedWithdrawalWithSignatureParams[](1);
+        queuedWithdrawalWithSigArray[0] = queuedWithdrawalWithSig;
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
@@ -330,25 +407,21 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
             sender: abi.encode(address(deployer)), // bytes: abi.decode(sender) if coming from an EVM chain.
             data: abi.encode(string(
                 eigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
-                    queuedWithdrawalWithSigParams
+                    queuedWithdrawalWithSigArray
                 )
             )), // CCIP abi.encodes a string message when sending
             destTokenAmounts: destTokenAmounts // Tokens and their amounts in their destination chain representation.
         });
 
-        return (
-            queuedWithdrawalWithSigParams,
-            any2EvmMessage
-        );
+        return any2EvmMessage;
     }
-
 
     function makeCCIPEigenlayerMsg_CompleteWithdrawal(
         IDelegationManager.Withdrawal memory withdrawal,
         IERC20[] memory tokensToWithdraw,
         uint256 middlewareTimesIndex,
         bool receiveAsTokens
-    ) public returns (Client.Any2EVMMessage memory) {
+    ) public view returns (Client.Any2EVMMessage memory) {
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
@@ -374,11 +447,40 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         return any2EvmMessage;
     }
 
+    function makeCCIPEigenlayerMsg_TransferToStaker(
+        uint256 _amount,
+        address _staker,
+        address _token_destination // BnM token addr on L2 destination
+    ) public view returns (Client.Any2EVMMessage memory) {
+
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: _token_destination,
+            amount: _amount
+        });
+
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
+            sourceChainSelector: EthSepolia.ChainSelector,
+            sender: abi.encode(deployer),
+            data: abi.encode(string(
+                eigenlayerMsgEncoders.encodeTransferToStakerMsg(
+                    _amount,
+                    _staker,
+                    _token_destination
+                )
+            )), // CCIP abi.encodes a string message when sending
+            destTokenAmounts: destTokenAmounts
+        });
+
+        return any2EvmMessage;
+    }
+
     function makeCCIPEigenlayerMsg_DepositWithSignature(
         uint256 _amount,
         address _staker,
         uint256 expiry
-    ) public returns (Client.Any2EVMMessage memory) {
+    ) public view returns (Client.Any2EVMMessage memory) {
 
         uint256 nonce = 0; // in production retrieve on StrategyManager on L1
         bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), block.chainid);

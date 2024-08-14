@@ -12,17 +12,19 @@ forge test -vvv
 
 
 TODO:
-- [DONE] deploy mock Eigenlayer contracts on Sepolia (Eigenlayer uses Holesky, but Chainlink are on Sepolia)
-- [DONE] deploy CCIP-BnM ERC20 strategy vault on Eigenlayer
+- [x] deploy mock Eigenlayer contracts on Sepolia (Eigenlayer uses Holesky, but Chainlink are on Sepolia)
+- [x] deploy CCIP-BnM ERC20 strategy vault on Eigenlayer
 - Test cross-chain messages for:
-    - [DONE] `depositIntoStrategy`
-    - [DONE] `depositIntoStrategyWithSignature` (EIP1271 signatures to attribute deposits to stakers on L2)
-    - [DONE] `queueWithdrawals`
-    - [DONE] `queueWithdrawalsWithSignature` ([requires PR #646 to work](https://github.com/Layr-Labs/eigenlayer-contracts/pull/676/files))
-    - `completeQueuedWithdrawals`
-        - Transfer withdrawn tokens from L1 back to L2
-    - `delegate`
-    - `undelegate`
+    - [x] `depositIntoStrategy`
+    - [x] `depositIntoStrategyWithSignature` (EIP1271 signatures to attribute deposits to stakers on L2)
+    - [x] `queueWithdrawals`
+    - [x] `queueWithdrawalsWithSignature` ([requires PR #646 to work](https://github.com/Layr-Labs/eigenlayer-contracts/pull/676/files))
+    - [x] `completeQueuedWithdrawals`
+        - [x] Transfer withdrawn tokens from L1 back to L2
+        - [ ] Add signatures on L1 receiver contract to verify staker's intent to completeWithdrawal on L1.
+        - [ ] Add signatures on L2 sender contract and CCIP Message to verify tokens are transferred to the right staker address on L2.
+    - [ ] `delegate`
+    - [ ] `undelegate`
 - Gas
     - estimate gas limit for each of the previous operations
     - CCIP offers manual execution in case of gas failures, need to look into this.

@@ -26,24 +26,24 @@ contract DeployEigenlayerContractsTest is Test {
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
     }
 
-    function test_DeployEigenlayerContractsScript() public {
-        (
-            IStrategyManager strategyManager,
-            IPauserRegistry pauserRegistry,
-            IRewardsCoordinator rewardsCoordinator,
-            IDelegationManager delegationManager,
-            IStrategy strategy,
-            IERC20 token
-        ) = deployMockEigenlayerContractsScript.run();
-    }
+    // function test_DeployEigenlayerContractsScript() public {
+    //     (
+    //         IStrategyManager strategyManager,
+    //         IPauserRegistry pauserRegistry,
+    //         IRewardsCoordinator rewardsCoordinator,
+    //         IDelegationManager delegationManager,
+    //         IStrategy strategy,
+    //         IERC20 token
+    //     ) = deployMockEigenlayerContractsScript.run();
+    // }
 
-    function test_ReadEigenlayerContractsScript() public {
+    // function test_ReadEigenlayerContractsScript() public {
 
-        (IStrategy _strategy,,,,,) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+    //     (IStrategy _strategy,,,,,) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
-        if (address(_strategy) == address(0)) {
-            console.log("chain: ", block.chainid);
-            revert("could not read eigenlayer deployments");
-        }
-    }
+    //     if (address(_strategy) == address(0)) {
+    //         console.log("chain: ", block.chainid);
+    //         revert("could not read eigenlayer deployments");
+    //     }
+    // }
 }

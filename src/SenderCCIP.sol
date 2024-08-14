@@ -12,6 +12,8 @@ import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 import {TransferToStakerMessage} from "./interfaces/IRestakingConnector.sol";
 
+import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
+
 
 /// @title - Arb L2 Messenger Contract: sends Eigenlayer messages to L1,
 /// and receives responses from L1 (e.g. queueing withdrawals).
@@ -65,14 +67,20 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
             console.logBytes(message);
             TransferToStakerMessage memory transferToStakerMsg = decodeTransferToStakerMessage(message);
 
+            // TODO: add signature to TransferToStakerMessage struct to verify withdrawal with:
+            //  staker, amount, token_destination parameters were signed by the staker
+
             address staker = transferToStakerMsg.staker;
             uint256 amount = transferToStakerMsg.amount;
             address token_destination = transferToStakerMsg.token_destination;
+            // bytes memory signature = transferToStakerMsg.signature;
+
+            // TODO: check signature is legit, then transfer tokens
+            // signatureUtils.checkSignature_EIP1271(_staker, digestHash, signature);
 
             console.log("senderCCIP staker:", staker);
             console.log("senderCCIP amount:", amount);
             console.log("senderCCIP token destination:", token_destination);
-
             console.log("token balance L2 before:", IERC20(token_destination).balanceOf(staker));
 
             // 1) decode message payload
@@ -133,11 +141,11 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
         }
         if (functionSelector == 0xa140f06e) {
             // queueWithdrawalsWithSignature: [gas: ?]
-            gasLimit = 990_000;
+            gasLimit = 999_000;
         }
         if (functionSelector == 0x54b2bf29) {
             // completeQueuedWithdrawals: [gas: ?]
-            gasLimit = 990_000;
+            gasLimit = 999_000;
         }
 
         // Create an EVM2AnyMessage struct in memory with necessary information for sending a cross-chain message

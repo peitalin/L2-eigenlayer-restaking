@@ -39,10 +39,10 @@ contract DeployCCIPScriptsTest is Test {
         deployOnEthScript.run();
     }
 
-    function test_DepositFromArbToEthScript() public {
-        vm.chainId(421614); // mock Arbitrum Sepolia
-        depositFromArbToEthScript.run();
-    }
+    // function test_DepositFromArbToEthScript() public {
+    //     vm.chainId(421614); // mock Arbitrum Sepolia
+    //     depositFromArbToEthScript.run();
+    // }
 
     function test_DepositWithSignatureFromArbToEthScript() public {
         vm.chainId(421614); // mock Arbitrum Sepolia

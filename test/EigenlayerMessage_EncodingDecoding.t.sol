@@ -92,15 +92,15 @@ contract EigenlayerMessage_EncodingDecodingTests is Test {
         bytes32 offset;
         bytes32 length;
         bytes4 functionSelector;
-        uint256 amount;
-        address staker;
+        uint256 _amount;
+        address _staker;
 
         assembly {
             offset := mload(add(message, 32))
             length := mload(add(message, 64))
             functionSelector := mload(add(message, 96))
-            amount := mload(add(message, 100))
-            staker := mload(add(message, 132))
+            _amount := mload(add(message, 100))
+            _staker := mload(add(message, 132))
         }
 
         bytes4 functionSelector2 = bytes4(keccak256("depositIntoStrategy(uint256,address)"));
@@ -108,12 +108,12 @@ contract EigenlayerMessage_EncodingDecodingTests is Test {
         require(functionSelector == functionSelector2, "functionSelectors do not match");
 
         EigenlayerDepositMessage memory emsg = EigenlayerDepositMessage({
-            amount: amount,
-            staker: staker
+            amount: _amount,
+            staker: _staker
         });
 
         require(emsg.amount == 2, "decoded incorrect EigenlayerDepositMessage.amount");
-        require(emsg.staker == staker, "decoded incorrect EigenlayerDepositMessage.staker");
+        require(emsg.staker == _staker, "decoded incorrect EigenlayerDepositMessage.staker");
     }
 
     function test_encodesDepositWithSignature() public {
@@ -145,7 +145,7 @@ contract EigenlayerMessage_EncodingDecodingTests is Test {
         );
     }
 
-    function test_DecodeEigenlayerMsg_DepositWithSignature() public {
+    function test_DecodeEigenlayerMsg_DepositWithSignature() public view {
 
         // function depositIntoStrategyWithSignature(
         //     IStrategy strategy,
@@ -232,7 +232,7 @@ contract EigenlayerMessage_EncodingDecodingTests is Test {
         require(_strategy == address(strategy), "strategy does not match");
     }
 
-    function test_DecodeEigenlayerMsg_QueueWithdrawal() public {
+    function test_DecodeEigenlayerMsg_QueueWithdrawal() public view {
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         uint256[] memory sharesToWithdraw = new uint256[](1);
@@ -396,14 +396,11 @@ contract EigenlayerMessage_EncodingDecodingTests is Test {
     /// Note: Need to do a array version of this
     function test_DecodeEigenlayerMsg_QueueWithdrawalsWithSignature() public {
 
-        address staker = deployer;
-
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         strategiesToWithdraw[0] = strategy;
 
         uint256[] memory sharesToWithdraw = new uint256[](1);
         sharesToWithdraw[0] = amount;
-        uint256 expiry = block.timestamp + 6 hours;
 
         bytes32 digestHash = signatureUtils.calculateQueueWithdrawalDigestHash(
             staker,
@@ -475,11 +472,11 @@ contract EigenlayerMessage_EncodingDecodingTests is Test {
         strategiesToWithdraw[0] = strategy;
         sharesToWithdraw[0] = 0.00321 ether;
 
-        address staker = deployer;
+        address _staker = deployer;
 
         IDelegationManager.Withdrawal memory withdrawal;
         withdrawal = IDelegationManager.Withdrawal({
-            staker: staker,
+            staker: _staker,
             delegatedTo: address(0x0),
             withdrawer: address(receiverContract),
             nonce: 0,

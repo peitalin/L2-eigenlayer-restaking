@@ -170,7 +170,12 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
                 IERC20[] memory tokensToWithdraw,
                 uint256 middlewareTimesIndex,
                 bool receiveAsTokens
+                // TODO: add signature for bridging back to L2 staker address
             ) = restakingConnector.decodeCompleteWithdrawalMessage(message);
+
+            // TODO: check signature before completing withdrawal, to reduce griefing withdrawals
+
+            // signatureUtils.checkSignature_EIP1271(_staker, digestHash, signature);
 
             delegationManager.completeQueuedWithdrawal(
                 withdrawal,
@@ -190,6 +195,11 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
 
             address token_destination = ArbSepolia.CcipBnM;
 
+            // TODO: add signature for bridging back to L2 staker address
+            // signature needs to sign over digestHash made up of:
+            // amount, original_staker, token_destination, expiry, nonce.
+            //
+            // otherwise anyone can mock a CCIP message and drain funds on L2 sender contract
             string memory text_message = string(abi.encode(
                 encodeTransferToStakerMsg(amount, original_staker, token_destination)
             ));

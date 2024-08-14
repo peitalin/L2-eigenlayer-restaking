@@ -60,12 +60,6 @@ contract CCIP_Eigen_DepositWithSignature is Test {
         eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
         signatureUtils = new SignatureUtilsEIP1271();
 
-        //// Configure CCIP contracts
-        (
-            receiverContract,
-            restakingConnector
-        ) = deployOnEthScript.run();
-
         //// Configure Eigenlayer contracts
         (
             strategyManager,
@@ -75,6 +69,12 @@ contract CCIP_Eigen_DepositWithSignature is Test {
             strategy,
             token
         ) = deployMockEigenlayerContractsScript.run();
+
+        //// Configure CCIP contracts
+        (
+            receiverContract,
+            restakingConnector
+        ) = deployOnEthScript.run();
 
         erc20Minter = IERC20Minter(address(token));
 
