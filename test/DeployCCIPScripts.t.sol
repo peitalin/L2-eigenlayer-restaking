@@ -45,6 +45,7 @@ contract DeployCCIPScriptsTest is Test {
     }
 
     function test_step3_DeployOnEthScript() public {
+        vm.deal(deployer, 1 ether);
         deployOnEthScript.run();
     }
 
@@ -62,13 +63,14 @@ contract DeployCCIPScriptsTest is Test {
         depositWithSignatureFromArbToEthScript.run();
     }
 
-    function test_step6_QueueWithdrawalWithSignatureScript() public {
-        vm.chainId(421614); // mock Arbitrum Sepolia
-        queueWithdrawalWithSignatureScript.run();
-    }
+    // writes new withdrawalRoots
+    // function test_step6_QueueWithdrawalWithSignatureScript() public {
+    //     vm.chainId(421614); // mock Arbitrum Sepolia
+    //     queueWithdrawalWithSignatureScript.run();
+    // }
 
-    function test_step7_CompleteWithdrawalWithSignatureScript() public {
-        vm.chainId(421614); // mock Arbitrum Sepolia
-        completeWithdrawalWithSignatureScript.run();
-    }
+    // function test_step7_CompleteWithdrawalWithSignatureScript() public {
+    //     vm.chainId(421614); // mock Arbitrum Sepolia
+    //     completeWithdrawalWithSignatureScript.run();
+    // }
 }

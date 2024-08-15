@@ -264,8 +264,6 @@ contract QueueWithdrawalWithSignatureScript is Script {
             stakerAddress,
              "/run-latest.json"
         ));
-        console.log("finaloutputPath", finalOutputPath);
-        console.log("finaloutputPathLatest", finalOutputPathLatest);
 
         vm.writeJson(finalJson, finalOutputPath);
         vm.writeJson(finalJson, finalOutputPathLatest);

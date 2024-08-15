@@ -71,6 +71,7 @@ Once we wait for the L1 -> L2 bridge back, we can see the token transferred back
         - [x] Transfer withdrawn tokens from L1 back to L2
         - [ ] Add signatures on L1 receiver contract to verify staker's intent to completeWithdrawal on L1.
         - [ ] Add signatures on L2 sender contract and CCIP Message to verify tokens are transferred to the right staker address on L2.
+        - [ ] Alternatively, we can make a withdrawalRoot => original_staker mapping, then message the withdrawalRoot back to L2 instead of needing another user signature.  We look up the staker on L2 when the L1 message payload arrives: `withdrawalRootsToOriginalStaker[withdrawalRoot] = original_staker`, then delete the withdrawalRoot.
     - [ ] `delegate`
     - [ ] `undelegate`
 - [ ] Refactor CCIP for messaging passing with no-token bridging option (currently sending 0.0001 tokens for withdrawals)

@@ -243,7 +243,7 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         uint256 expiry = block.timestamp + 6 hours;
         address withdrawer = address(receiverContract);
         uint256 stakerNonce = delegationManager.cumulativeWithdrawalsQueued(staker);
-        // calculated on the block when queueWithdrawals was called.
+        // startBlock: calculated on the block when queueWithdrawals was called.
         uint32 startBlock = uint32(block.number); // needed to CompleteWithdrawals
 
         bytes32 digestHash = signatureUtils.calculateQueueWithdrawalDigestHash(

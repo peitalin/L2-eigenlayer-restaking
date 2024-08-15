@@ -27,9 +27,8 @@ contract DeployEigenlayerContractsTest is Test {
     }
 
     ///// Note: overwrites ethsepolia Eigenlayer contract deployment addresses
-    ///// due to vm.forkSelect().
-    ///// TODO: Need to store test deployments in another folder
-    // function test_ReadEigenlayerContractsScript() public {
+    ///// due to vm.forkSelect(). We won't need this as Eigenlayer contracts are
+    ///// already deployed.
 
     // function test_DeployEigenlayerContractsScript() public {
     //     (
