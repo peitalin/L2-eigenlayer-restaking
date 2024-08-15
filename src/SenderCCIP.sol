@@ -7,19 +7,19 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
-// import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 import {TransferToStakerMessage} from "./interfaces/IRestakingConnector.sol";
+// import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 // import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
-import {console} from "forge-std/Test.sol";
 
 
 /// @title - Arb L2 Messenger Contract: sends Eigenlayer messages to L1,
 /// and receives responses from L1 (e.g. queueing withdrawals).
 contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsgDecoders {
 
-    mapping(bytes4 => uint256) gasLimitsForFunctionSelectors;
+    // mapping(bytes4 => uint256) gasLimitsForFunctionSelectors;
 
     event WithdrawlDetectedFromL1(address, uint256);
+    event MalformedMessagePayload(bytes);
 
     /// @notice Constructor initializes the contract with the router address.
     /// @param _router The address of the router contract.
@@ -76,11 +76,16 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
             // TODO: check signature is legit, then transfer tokens
             // signatureUtils.checkSignature_EIP1271(_staker, digestHash, signature);
 
+            emit WithdrawlDetectedFromL1(staker, amount);
             // 1) decode message payload
             // 2) get staker
             // 3) transfer tokens back to original staker
             IERC20(token_destination).transfer(staker, amount);
             text_msg = "completed eigenlayer withdrawal and transferred token to L2 staker";
+        } else {
+
+            emit MalformedMessagePayload(message);
+            text_msg = "messaging decoding failed";
         }
 
         emit MessageReceived(
@@ -135,11 +140,10 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
         }
         if (functionSelector == 0xa140f06e) {
             // queueWithdrawalsWithSignature: [gas: 603,301]
-            console.log("queueWithdrawalsWithSignature");
             gasLimit = 800_000;
         }
         if (functionSelector == 0x54b2bf29) {
-            // completeQueuedWithdrawals: [gas: 506,164]
+            // completeQueuedWithdrawals: [gas: 645,948]
             gasLimit = 800_000;
         }
 
@@ -158,11 +162,11 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
             });
     }
 
-    function setGasLimitsForFunctionSelectors(
-        bytes4 functionSelector,
-        uint256 gasLimit
-    ) public onlyOwner {
-        gasLimitsForFunctionSelectors[functionSelector] = gasLimit;
-    }
+    // function setGasLimitsForFunctionSelectors(
+    //     bytes4 functionSelector,
+    //     uint256 gasLimit
+    // ) public onlyOwner {
+    //     gasLimitsForFunctionSelectors[functionSelector] = gasLimit;
+    // }
 }
 

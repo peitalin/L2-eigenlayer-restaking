@@ -193,9 +193,9 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
             // amount, original_staker, token_destination, expiry, nonce.
             //
             // otherwise anyone can mock a CCIP message and drain funds on L2 sender contract
-            string memory text_message = string(abi.encode(
+            string memory text_message = string(
                 encodeTransferToStakerMsg(amount, original_staker, token_destination)
-            ));
+            );
 
             /// return token to staker via bridge with message to transferToStaker
             this.sendMessagePayNative(

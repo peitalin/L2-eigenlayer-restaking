@@ -334,6 +334,14 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         address token_destination = ArbSepolia.CcipBnM; // CCIP-BnM L2 address, not L1 address
         uint256 stakerBalanceOnL2Before = IERC20(token_destination).balanceOf(staker);
 
+        //// Test emitted events
+        //// (first 3 args: check indexed topics), (4th arg = true = check data)
+        // vm.expectEmit(true, true, true, true);
+        // emit Receiver.MessageSent(
+        //     amount,
+        //     0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c
+        // );
+
         //// Mock SenderContract on L2 receiving the tokens and TransferToStaker message from L1
         senderContract.mockCCIPReceive(
             makeCCIPEigenlayerMsg_TransferToStaker(
@@ -431,6 +439,14 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
             amount: 0 ether // just send CCIP message, no token bridging
         });
 
+
+        bytes memory message = eigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+            withdrawal,
+            tokensToWithdraw,
+            middlewareTimesIndex,
+            receiveAsTokens
+        );
+
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
             sourceChainSelector: ArbSepolia.ChainSelector, // Arb Sepolia source chain selector
@@ -442,7 +458,8 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
                     middlewareTimesIndex,
                     receiveAsTokens
                 )
-            )), // CCIP abi.encodes a string message when sending
+            )),
+            // CCIP abi.encode(string(message))
             destTokenAmounts: destTokenAmounts
         });
 

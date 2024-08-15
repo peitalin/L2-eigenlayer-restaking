@@ -674,16 +674,20 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         bytes memory message
     ) public returns (TransferToStakerMessage memory) {
 
-        bytes32 offset;
-        bytes32 length;
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
+        // 0000000000000000000000000000000000000000000000000000000000000064 [64] string length
+        // 2fcb6cd5                                                         [96] functionselector
+        // 00000000000000000000000000000000000000000000000000124be5d097e000 [100] amount
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] original staker
+        // 000000000000000000000000a8c0c11bf64af62cdca6f93d3769b88bdd7cb93d [164] token addr at destination
+        // 00000000000000000000000000000000000000000000000000000000
+
         bytes4 functionSelector;
         uint256 amount;
         address staker;
         address token_destination;
 
         assembly {
-            offset := mload(add(message, 32))
-            length := mload(add(message, 64))
             functionSelector := mload(add(message, 96))
             amount := mload(add(message, 100))
             staker := mload(add(message, 132))

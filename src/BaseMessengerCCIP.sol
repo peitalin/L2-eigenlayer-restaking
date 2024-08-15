@@ -228,10 +228,8 @@ contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
         // Initialize a router client instance to interact with cross-chain router
         IRouterClient router = IRouterClient(this.getRouter());
 
-        console.log("address(this).balance:", address(this).balance);
         // Get the fee required to send the CCIP message
         uint256 fees = router.getFee(_destinationChainSelector, evm2AnyMessage);
-        console.log("fees:", fees);
 
         if (fees > address(this).balance)
             revert NotEnoughBalance(address(this).balance, fees);
