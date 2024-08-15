@@ -115,22 +115,15 @@ contract CompleteWithdrawalWithSignatureScript is Script {
         // }
         // signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
 
-        bytes32 withdrawalRoot2 = delegationManager.calculateWithdrawalRoot(withdrawal);
-
-        bytes32 targetWithdrawalRoot = hex"6473944b7edb8a41daccbc19b8ab074ea4adf188fa4163e0459d26af1ffba472";
-        // https://sepolia.etherscan.io/tx/0x20baf6809a2dc7120f4ad81b1df6c1e876b47cc6deb88800ef538d1cb3803bf2
+        bytes32 withdrawalRootCalculated = delegationManager.calculateWithdrawalRoot(withdrawal);
 
         console.log("withdrawalRoot:");
         console.logBytes32(withdrawalRoot);
-        console.log("");
-        console.log("withdrawalRoot2:");
-        console.logBytes32(withdrawalRoot2);
-        console.log("");
-        console.log("targetWithdrawalRoot:");
-        console.logBytes32(targetWithdrawalRoot);
+        console.log("withdrawalRootCalculated:");
+        console.logBytes32(withdrawalRootCalculated);
 
         require(
-            targetWithdrawalRoot == withdrawalRoot,
+            withdrawalRootCalculated == withdrawalRoot,
             "withdrawalRoots do not match"
         );
 

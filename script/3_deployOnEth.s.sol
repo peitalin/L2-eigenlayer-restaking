@@ -65,6 +65,12 @@ contract DeployOnEthScript is Script {
         receiverContract.allowlistDestinationChain(ArbSepolia.ChainSelector, true);
         receiverContract.setSenderContractL2Addr(sender);
 
+        // seed the receiver contract with a bit of ETH
+        if (address(receiverContract).balance < 0.02 ether) {
+            (bool sent, ) = address(receiverContract).call{value: 0.05 ether}("");
+            require(sent, "Failed to send Ether");
+        }
+
         vm.stopBroadcast();
 
         return (
