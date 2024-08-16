@@ -12,9 +12,13 @@ import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
+import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
+import {DeployOnArbScript} from "../script/2_deployOnArb.s.sol";
+import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
+import {WhitelistCCIPContractsScript} from "../script/4_whitelistCCIPContracts.s.sol";
+
 import {FileReader, ArbSepolia, EthSepolia} from "./Addresses.sol";
 import {ScriptUtils} from "./ScriptUtils.sol";
-import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
@@ -60,6 +64,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         eigenlayerMsgEncoders = new EigenlayerMsgEncoders(); // needs ethForkId to call encodeDeposit
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
+        DeployOnEthScript deployOnEthScript = new DeployOnEthScript();
 
         (
             strategy,
@@ -71,23 +76,34 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
-        senderContract = fileReader.getSenderContract();
+        if (isTest) {
+            // if isTest, deploy SenderCCIP and ReceiverCCIP again to get the latest version
+            // or you will read the stale versions because of forkSelect
+            vm.selectFork(ethForkId);
+            (
+                receiverContract,
+                restakingConnector
+            ) = deployOnEthScript.run();
+
+            vm.selectFork(arbForkId);
+            DeployOnArbScript deployOnArbScript = new DeployOnArbScript();
+            senderContract = deployOnArbScript.run();
+
+            vm.selectFork(ethForkId);
+        } else {
+            // otherwise if running the script, read the existing contracts on Sepolia
+            senderContract = fileReader.getSenderContract();
+            (receiverContract, restakingConnector) = fileReader.getReceiverRestakingConnectorContracts();
+        }
+
+        ////////////////////////////////////////////////////////////
+        // Parameters
+        ////////////////////////////////////////////////////////////
+
         senderAddr = address(senderContract);
-
-        (receiverContract, restakingConnector) = fileReader.getReceiverRestakingConnectorContracts();
-
         ccipBnM = IERC20(address(ArbSepolia.CcipBnM)); // ArbSepolia contract
 
-        //////////////////////////////////////////////////////////
-        /// Create message and signature
-        /// In production this is done on the client/frontend
-        //////////////////////////////////////////////////////////
-
-        // First get nonce from Eigenlayer contracts in EthSepolia
-        vm.selectFork(ethForkId);
-
-        // TODO: refactor SenderCCIP to allow sending 0 tokens
-        amount = 0.00001 ether; // only sending a withdrawal message, not bridging tokens.
+        amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
         staker = deployer;
         expiry = block.timestamp + 6 hours;
 
@@ -100,8 +116,6 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         address withdrawer = address(receiverContract);
         uint256 nonce = delegationManager.cumulativeWithdrawalsQueued(staker);
         address delegatedTo = delegationManager.delegatedTo(staker);
-        uint32 startBlock = uint32(block.number); // needed to CompleteWithdrawals
-
         bytes memory signature;
         {
             bytes32 digestHash = signatureUtils.calculateQueueWithdrawalDigestHash(
@@ -155,6 +169,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         vm.startBroadcast(deployerKey);
 
         topupSenderEthBalance(senderAddr);
+
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
@@ -171,18 +186,18 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         if (isTest) {
            filePath = "test/withdrawals-queued/";
         }
-        // NOTE: Tx will still be bridging so the startBlock = block.number is incorrect.
-        // The correct startBlock needs to wait until bridging completes and calls queueWithdrawal on L1.
-        // We call getWithdrawalBlock later to get the correct startBlock for calculating withdrawalRoots
+        // NOTE: Tx will still be bridging after this script runs.
+        // startBlock is saved after bridging completes and calls queueWithdrawal on L1.
+        // Then we call getWithdrawalBlock for the correct startBlock to calculate withdrawalRoots
         fileReader.saveWithdrawalInfo(
             staker,
             delegatedTo,
             withdrawer,
             nonce,
-            0, // startBlock incorrect
+            0, // startBlock is created later
             strategiesToWithdraw,
             sharesToWithdraw,
-            bytes32(0x0), // withdrawalRoot
+            bytes32(0x0), // withdrawalRoot is created later
             filePath
         );
     }

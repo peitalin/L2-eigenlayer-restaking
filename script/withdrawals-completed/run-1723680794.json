@@ -10,11 +10,11 @@
     "shares": 5150000000000000,
     "staker": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c",
     "delegatedTo": "0x0000000000000000000000000000000000000000",
-    "startBlock": 0,
+    "startBlock": 6501788,
     "strategy": "0xe6505Ea430b4A5CCB0C71f44ff0b117B9bD40533",
     "withdrawer": "0xFcCC6216301184b174dD4c7071415CE12aC4ce37"
   },
   "outputs": {
-    "withdrawalRoot": "0x0"
+    "withdrawalRoot": "0x3f73074ade3cb519b8e188696ed8647d37d9b629e148d773d13842906882789c"
   }
 }

@@ -8,42 +8,38 @@ import {CCIPReceiver} from "@chainlink/contracts-ccip/src/v0.8/ccip/applications
 import {IERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {console} from "forge-std/Test.sol";
 
-
-/// @title - A simple messenger contract for transferring/receiving tokens and data across chains.
 contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
     using SafeERC20 for IERC20;
 
     // Custom errors to provide more descriptive revert messages.
-    error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees); // Used to make sure contract has enough balance to cover the fees.
-    error NothingToWithdraw(); // Used when trying to withdraw Ether but there's nothing to withdraw.
-    error FailedToWithdrawEth(address owner, address target, uint256 value); // Used when the withdrawal of Ether fails.
-    error DestinationChainNotAllowed(uint64 destinationChainSelector); // Used when the destination chain has not been allowlisted by the contract owner.
-    error SourceChainNotAllowed(uint64 sourceChainSelector); // Used when the source chain has not been allowlisted by the contract owner.
-    error SenderNotAllowed(address sender); // Used when the sender has not been allowlisted by the contract owner.
-    error InvalidReceiverAddress(); // Used when the receiver address is 0.
+    error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees);
+    error NothingToWithdraw();
+    error FailedToWithdrawEth(address owner, address target, uint256 value);
+    error DestinationChainNotAllowed(uint64 destinationChainSelector);
+    error SourceChainNotAllowed(uint64 sourceChainSelector);
+    error SenderNotAllowed(address sender);
+    error InvalidReceiverAddress();
 
     // Event emitted when a message is sent to another chain.
     event MessageSent(
-        bytes32 indexed messageId, // The unique ID of the CCIP message.
-        uint64 indexed destinationChainSelector, // The chain selector of the destination chain.
-        address receiver, // The address of the receiver on the destination chain.
-        string text, // The text being sent.
-        address token, // The token address that was transferred.
-        uint256 tokenAmount, // The token amount that was transferred.
-        address feeToken, // the token address used to pay CCIP fees.
-        uint256 fees // The fees paid for sending the message.
+        bytes32 indexed messageId,
+        uint64 indexed destinationChainSelector,
+        address receiver,
+        string text,
+        address token,
+        uint256 tokenAmount,
+        address feeToken,
+        uint256 fees
     );
 
-    // Event emitted when a message is received from another chain.
     event MessageReceived(
-        bytes32 indexed messageId, // The unique ID of the CCIP message.
-        uint64 indexed sourceChainSelector, // The chain selector of the source chain.
-        address sender, // The address of the sender from the source chain.
-        string text, // The text that was received.
-        address token, // The token address that was transferred.
-        uint256 tokenAmount // The token amount that was transferred.
+        bytes32 indexed messageId,
+        uint64 indexed sourceChainSelector,
+        address sender,
+        string text,
+        address token,
+        uint256 tokenAmount
     );
 
     bytes32 internal s_lastReceivedMessageId; // Store the last received messageId.
@@ -144,7 +140,6 @@ contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
         uint256 _amount
     )
         external
-        // onlyOwner // users should be able to bridge
         onlyAllowlistedDestinationChain(_destinationChainSelector)
         validateReceiver(_receiver)
         returns (bytes32 messageId)
@@ -177,7 +172,6 @@ contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
         // Send the message through the router and store the returned message ID
         messageId = router.ccipSend(_destinationChainSelector, evm2AnyMessage);
 
-        // Emit an event with message details
         emit MessageSent(
             messageId,
             _destinationChainSelector,
@@ -189,7 +183,6 @@ contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
             fees
         );
 
-        // Return the message ID
         return messageId;
     }
 
@@ -210,7 +203,6 @@ contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
         uint256 _amount
     )
         external
-        // onlyOwner // users should be able to bridge
         onlyAllowlistedDestinationChain(_destinationChainSelector)
         validateReceiver(_receiver)
         returns (bytes32 messageId)
@@ -285,7 +277,6 @@ contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
         );
     }
 
-    /// handle a received message
     function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage)
         internal
         override
@@ -293,26 +284,11 @@ contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
         onlyAllowlisted(
             any2EvmMessage.sourceChainSelector,
             abi.decode(any2EvmMessage.sender, (address))
-        ) // Make sure source chain and sender are allowlisted
-    {
-        s_lastReceivedMessageId = any2EvmMessage.messageId; // fetch the messageId
-        s_lastReceivedText = abi.decode(any2EvmMessage.data, (string)); // abi-decoding of the sent text
-        // Expect one token to be transferred at once, but you can transfer several tokens.
-        s_lastReceivedTokenAddress = any2EvmMessage.destTokenAmounts[0].token;
-        s_lastReceivedTokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
-
-        emit MessageReceived(
-            any2EvmMessage.messageId,
-            any2EvmMessage.sourceChainSelector, // fetch the source chain identifier (aka selector)
-            abi.decode(any2EvmMessage.sender, (address)), // abi-decoding of the sender address,
-            abi.decode(any2EvmMessage.data, (string)),
-            any2EvmMessage.destTokenAmounts[0].token,
-            any2EvmMessage.destTokenAmounts[0].amount
-        );
-    }
+        )
+    { }
 
     /// @notice Construct a CCIP message.
-    /// @dev This function will create an EVM2AnyMessage struct with all the necessary information for programmable tokens transfer.
+    /// @dev This function will create an EVM2AnyMessage struct with all the necessary information.
     /// @param _receiver The address of the receiver.
     /// @param _text The string data to be sent.
     /// @param _token The token to be transferred.
@@ -327,7 +303,7 @@ contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
         address _feeTokenAddress
     ) internal virtual returns (Client.EVM2AnyMessage memory) {
         // Set the token amounts
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
         tokenAmounts[0] = Client.EVMTokenAmount({
             token: _token,
             amount: _amount
@@ -335,19 +311,16 @@ contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
 
         bytes memory message = abi.encode(_text); // ABI-encoded string
         uint256 gasLimit = 600_000;
-        // increase gas limit for deposits into Eigenlayer
-        // Create an EVM2AnyMessage struct in memory with necessary information for sending a cross-chain message
+
         return
             Client.EVM2AnyMessage({
-                receiver: abi.encode(_receiver), // ABI-encoded receiver address
-                data: message, // ABI-encoded string
-                tokenAmounts: tokenAmounts, // The amount and type of token being transferred
+                receiver: abi.encode(_receiver),
+                data: message,
+                tokenAmounts: tokenAmounts,
+                feeToken: _feeTokenAddress,
                 extraArgs: Client._argsToBytes(
-                    // Additional arguments, setting gas limit
                     Client.EVMExtraArgsV1({gasLimit: gasLimit})
-                ),
-                // Set the feeToken to a feeTokenAddress, indicating specific asset will be used for fees
-                feeToken: _feeTokenAddress
+                )
             });
     }
 

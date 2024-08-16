@@ -33,7 +33,6 @@ contract DepositWithSignatureFromArbToEthScript is Script, ScriptUtils {
     IDelegationManager public delegationManager;
     IStrategy public strategy;
     IERC20 public token;
-    IERC20 public token2;
     IERC20 public ccipBnM;
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;

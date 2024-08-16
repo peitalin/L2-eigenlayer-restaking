@@ -122,20 +122,23 @@ contract DeployCCIPScriptsTest is Test, ScriptUtils {
     }
 
     function test_step2_DeployOnArbScript() public {
+        vm.chainId(31337); // sets isTest flag; script uses forkSelect()
         deployOnArbScript.run();
     }
 
     function test_step3_DeployOnEthScript() public {
+        vm.chainId(31337); // sets isTest flag; script uses forkSelect()
         vm.deal(deployer, 1 ether);
         deployOnEthScript.run();
     }
 
     function test_step4_WhitelistCCIPContractsScript() public {
+        vm.chainId(31337); // sets isTest flag; script uses forkSelect()
         whitelistCCIPContractsScript.run();
     }
 
     function test_stepx4_DepositFromArbToEthScript() public {
-        vm.chainId(31337); // localhost
+        vm.chainId(31337); // sets isTest flag; script uses forkSelect()
         depositFromArbToEthScript.run();
     }
 

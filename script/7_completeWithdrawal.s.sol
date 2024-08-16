@@ -88,8 +88,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
 
         vm.selectFork(ethForkId);
 
-        // TODO: refactor SenderCCIP to allow sending 0 tokens
-        amount = 0.00001 ether; // only sending a withdrawal message, not bridging tokens.
+        amount = 0.000001 ether; // only sending a withdrawal message, not bridging tokens.
         staker = deployer;
         expiry = block.timestamp + 6 hours;
 
@@ -98,14 +97,16 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
             "script/withdrawals-queued/"
         );
 
-        if (!isTest) {
-            // Fetch the correct withdrawal.startBlock and withdrawalRoot
-            withdrawal.startBlock = uint32(restakingConnector.getQueueWithdrawalBlock(
-                withdrawal.staker,
-                withdrawal.nonce
-            ));
-            // reverts in test because there is no pending withdrawal
+        if (isTest) {
+            // mock save a queueWithdrawalBloc
+            restakingConnector.setQueueWithdrawalBlock(withdrawal.staker, withdrawal.nonce);
         }
+
+        // Fetch the correct withdrawal.startBlock and withdrawalRoot
+        withdrawal.startBlock = uint32(restakingConnector.getQueueWithdrawalBlock(
+            withdrawal.staker,
+            withdrawal.nonce
+        ));
 
         bytes32 withdrawalRootCalculated = delegationManager.calculateWithdrawalRoot(withdrawal);
 

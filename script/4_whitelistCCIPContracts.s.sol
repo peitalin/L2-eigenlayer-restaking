@@ -48,8 +48,8 @@ contract WhitelistCCIPContractsScript is Script {
         vm.selectFork(arbForkId);
         vm.startBroadcast(deployerKey);
 
-        // allow L1 sender contract to send tokens back to L2
-        senderContract.allowlistSourceChain(EthSepolia.ChainSelector, true);
+        // allow L2 sender contract to send tokens to L1
+        senderContract.allowlistSourceChain(ArbSepolia.ChainSelector, true);
         senderContract.allowlistSender(address(receiverContract), true);
 
         vm.stopBroadcast();
@@ -61,7 +61,7 @@ contract WhitelistCCIPContractsScript is Script {
         vm.startBroadcast(deployerKey);
 
         receiverContract.allowlistSender(deployer, true);
-
+//
         // Remember to fund L1 receiver with gas and tokens in production.
 
         if (block.chainid == 11155111) {

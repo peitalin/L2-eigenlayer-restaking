@@ -165,6 +165,8 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
             // }
 
             address staker = queuedWithdrawalsWithSigParams[0].staker;
+            // queueWithdrawal uses current nonce in the withdrawalRoot, the increments after
+            // so save this nonce before dispatching queueWithdrawalsWithSignature
             uint256 nonce = delegationManager.cumulativeWithdrawalsQueued(staker);
             restakingConnector.setQueueWithdrawalBlock(staker, nonce);
 
@@ -237,33 +239,12 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
         );
     }
 
-    // bytes4 constant internal MAGICVALUE = 0x1626ba7e;
-
     // function isValidSignature(
     //     bytes32 _hash,
     //     bytes memory _signature
     // ) public pure returns (bytes4 magicValue) {
-
+    //     bytes4 constant internal MAGICVALUE = 0x1626ba7e;
     //     // implement some hash/signature scheme
-
-    //     // if (Address.isContract(signer)) {
-    //     //     require(
-    //     //         IERC1271(signer).isValidSignature(digestHash, signature) == EIP1271_MAGICVALUE,
-    //     //         "EIP1271SignatureUtils.checkSignature_EIP1271: ERC1271 signature verification failed"
-    //     //     );
-    //     // }
-    //     // address signer = ECDSA.recover(digestHash, signature);
-
-    //     // // bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _hash));
-    //     // // if (signer == address(0)) {
-    //     // //     return 0x00000000;
-    //     // // } else if (signer == msg.sender) {
-    //     // //     return 0x20c13b0b;
-    //     // // } else {
-    //     // //     return 0x00000000;
-    //     // // }
-
-    //     // IERC1271(signer).isValidSignature(digestHash, signature) == EIP1271_MAGICVALUE,
     //     return MAGICVALUE;
     // }
 

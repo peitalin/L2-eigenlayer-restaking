@@ -3,7 +3,6 @@ pragma solidity 0.8.22;
 
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
@@ -13,13 +12,11 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {ArbSepolia} from "../script/Addresses.sol";
 
 
-/// @title - Arb L2 Messenger Contract: sends Eigenlayer messages to L1,
-/// and receives responses from L1 (e.g. queueing withdrawals).
 contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsgDecoders, EigenlayerMsgEncoders {
 
     event SendingWithdrawalToStaker(address indexed, uint256 indexed, bytes32 indexed);
 
-    event MalformedMessagePayload(bytes indexed);
+    event UnknownFunctionSelector(bytes indexed);
 
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
 
@@ -38,7 +35,6 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
     mapping(bytes4 => uint256) internal gasLimitsForFunctionSelectors;
 
 
-    /// @notice Constructor initializes the contract with the router address.
     /// @param _router The address of the router contract.
     /// @param _link The address of the link contract.
     constructor(
@@ -46,19 +42,19 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
         address _link
     ) BaseMessengerCCIP(_router, _link) {
 
-        // depositIntoStrategy: [gas: 565,307]
+        // depositIntoStrategy: [gas: 565_307]
         gasLimitsForFunctionSelectors[0xf7e784ef] = 600_000;
 
-        // depositIntoStrategyWithSignature: [gas: 713,400]
+        // depositIntoStrategyWithSignature: [gas: 713_400]
         gasLimitsForFunctionSelectors[0x32e89ace] = 800_000;
 
-        // queueWithdrawals: [gas: ?]
+        // queueWithdrawals: [gas: x]
         gasLimitsForFunctionSelectors[0x0dd8dd02] = 700_000;
 
-        // queueWithdrawalsWithSignature: [gas: 603,301]
+        // queueWithdrawalsWithSignature: [gas: 603_301]
         gasLimitsForFunctionSelectors[0xa140f06e] = 800_000;
 
-        // completeQueuedWithdrawals: [gas: 645,948]
+        // completeQueuedWithdrawals: [gas: 645_948]
         gasLimitsForFunctionSelectors[0x54b2bf29] = 800_000;
     }
 
@@ -68,10 +64,7 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
         _ccipReceive(any2EvmMessage);
     }
 
-    /// handle a received message
-    function _ccipReceive(
-        Client.Any2EVMMessage memory any2EvmMessage
-    )
+    function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage)
         internal
         override
         virtual
@@ -80,18 +73,19 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
             abi.decode(any2EvmMessage.sender, (address))
         )
     {
-        s_lastReceivedMessageId = any2EvmMessage.messageId; // fetch the messageId
-        s_lastReceivedText = abi.decode(any2EvmMessage.data, (string)); // abi-decoding of the sent text
-        // Expect one token to be transferred at once, but you can transfer several tokens.
-        s_lastReceivedTokenAddress = any2EvmMessage.destTokenAmounts[0].token;
-        s_lastReceivedTokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
-
-        address token = any2EvmMessage.destTokenAmounts[0].token;
+        s_lastReceivedMessageId = any2EvmMessage.messageId;
+        s_lastReceivedText = abi.decode(any2EvmMessage.data, (string));
+        if (any2EvmMessage.destTokenAmounts.length > 0) {
+            s_lastReceivedTokenAddress = any2EvmMessage.destTokenAmounts[0].token;
+            s_lastReceivedTokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
+        } else {
+            s_lastReceivedTokenAddress = address(0);
+            s_lastReceivedTokenAmount = 0;
+        }
 
         bytes memory message = any2EvmMessage.data;
-
-        bytes4 functionSelector = decodeFunctionSelector(message);
         string memory text_msg;
+        bytes4 functionSelector = decodeFunctionSelector(message);
 
         if (functionSelector == 0x27167d10) {
             // keccak256(abi.encode("transferToStaker(bytes32)")) == 0x27167d10
@@ -108,7 +102,7 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
             address tokenDestination = withdrawalTransfer.tokenDestination;
 
             // checks-effects-interactions
-            // delete withdrawalRoot entry and mark the withdrawalRoot as "spent"
+            // delete withdrawalRoot entry and mark the withdrawalRoot as spent
             // to prevent multiple withdrawals
             delete withdrawalTransferCommittments[withdrawalRoot];
             withdrawalRootsSpent[withdrawalRoot] = true;
@@ -120,23 +114,21 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
 
         } else {
 
-            emit MalformedMessagePayload(message);
+            emit UnknownFunctionSelector(message);
             text_msg = "messaging decoding failed";
         }
 
         emit MessageReceived(
             any2EvmMessage.messageId,
-            any2EvmMessage.sourceChainSelector, // fetch the source chain identifier (aka selector)
-            abi.decode(any2EvmMessage.sender, (address)), // abi-decoding of the sender address,
+            any2EvmMessage.sourceChainSelector,
+            abi.decode(any2EvmMessage.sender, (address)),
             text_msg,
-            any2EvmMessage.destTokenAmounts[0].token,
-            any2EvmMessage.destTokenAmounts[0].amount
+            s_lastReceivedTokenAddress,
+            s_lastReceivedTokenAmount
         );
     }
 
 
-    /// @notice Construct a CCIP message.
-    /// @dev This function will create an EVM2AnyMessage struct with all the necessary information for programmable tokens transfer.
     /// @param _receiver The address of the receiver.
     /// @param _text The string data to be sent.
     /// @param _token The token to be transferred.
@@ -151,30 +143,34 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
         address _feeTokenAddress
     ) internal override returns (Client.EVM2AnyMessage memory) {
 
-        // depending on the functionSelector choose different CCIP message types
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-        tokenAmounts[0] = Client.EVMTokenAmount({
-            token: _token,
-            amount: _amount
-        });
+        Client.EVMTokenAmount[] memory tokenAmounts;
+        if (_amount == 0) {
+            // Must be an empty array as no tokens are transferred
+            // non-empty arrays with 0 amounts error with CannotSendZeroTokens() == 0x5cf04449
+            tokenAmounts = new Client.EVMTokenAmount[](0);
+        } else {
+            tokenAmounts = new Client.EVMTokenAmount[](1);
+            tokenAmounts[0] = Client.EVMTokenAmount({
+                token: _token,
+                amount: _amount
+            });
+        }
 
         bytes memory message = abi.encode(_text);
 
         bytes4 functionSelector = decodeFunctionSelector(message);
 
         if (functionSelector == 0x54b2bf29) {
-            // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)")) == 0x54b2bf29
-
             (
                 IDelegationManager.Withdrawal memory withdrawal
-                , // IERC20[] memory _tokensToWithdraw // token address on L1, not L2
-                , // uint256 _middlewareTimesIndex
-                , // bool _receiveAsTokens
+                ,
+                ,
+                ,
             ) = decodeCompleteWithdrawalMessage(message);
 
             bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
 
-            // Check for "spent" withdrawalRoots to prevent withdrawalRoot reuse
+            // Check for spent withdrawalRoots to prevent withdrawalRoot reuse
             require(
                 withdrawalRootsSpent[withdrawalRoot] == false,
                 "withdrawalRoot has already been used"
@@ -189,32 +185,24 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
             });
 
             emit WithdrawalCommitted(withdrawalRoot, withdrawal.staker, withdrawal.shares[0]);
-
         } else {
-
-            emit MalformedMessagePayload(message);
-
+            emit UnknownFunctionSelector(message);
         }
 
         uint256 gasLimit = gasLimitsForFunctionSelectors[functionSelector];
 
-        // Create an EVM2AnyMessage struct in memory with necessary information for sending a cross-chain message
         return
             Client.EVM2AnyMessage({
-                receiver: abi.encode(_receiver), // ABI-encoded receiver address
-                data: message, // ABI-encoded string
-                tokenAmounts: tokenAmounts, // The amount and type of token being transferred
+                receiver: abi.encode(_receiver),
+                data: message,
+                tokenAmounts: tokenAmounts,
+                feeToken: _feeTokenAddress,
                 extraArgs: Client._argsToBytes(
-                    // Additional arguments, setting gas limit
                     Client.EVMExtraArgsV1({ gasLimit: gasLimit })
-                ),
-                // Set the feeToken to a feeTokenAddress, indicating specific asset will be used for fees
-                feeToken: _feeTokenAddress
+                )
             });
     }
 
-    /// @notice Returns the keccak256 hash of `withdrawal`.
-    // Same as DelegateManager.sol in Eigenlayer on L1
     function calculateWithdrawalRoot(
         IDelegationManager.Withdrawal memory withdrawal
     ) public pure returns (bytes32) {

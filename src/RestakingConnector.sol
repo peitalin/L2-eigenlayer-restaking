@@ -27,6 +27,8 @@ contract RestakingConnector is IRestakingConnector, EigenlayerMsgDecoders, Admin
 
     error AddressNull();
 
+    event SetQueueWithdrawalBlock(address indexed, uint256 indexed, uint256 indexed);
+
     mapping(address => mapping(uint256 => uint256)) private _withdrawalBlock;
 
     constructor() {
@@ -41,6 +43,7 @@ contract RestakingConnector is IRestakingConnector, EigenlayerMsgDecoders, Admin
     /// create the withdrawalRoot used to completeWithdrawal.
     function setQueueWithdrawalBlock(address staker, uint256 nonce) external onlyAdminOrOwner {
         _withdrawalBlock[staker][nonce] = block.number;
+        emit SetQueueWithdrawalBlock(staker, nonce, block.number);
     }
 
     function getQueueWithdrawalBlock(address staker, uint256 nonce) public returns (uint256) {
