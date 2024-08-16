@@ -44,16 +44,11 @@ event EigenlayerQueueWithdrawalsWithSignatureParams(
 );
 
 struct TransferToStakerMessage {
-    uint256 amount;
-    address staker;
-    address token_destination;
+    bytes32 withdrawalRoot;
 }
 event TransferToStakerParams(
-    uint256 indexed amount,
-    address indexed staker,
-    address indexed token_destination
+    bytes32 indexed withdrawalRoot
 );
-
 
 interface IRestakingConnector is IEigenlayerMsgDecoders {
 
@@ -68,5 +63,9 @@ interface IRestakingConnector is IEigenlayerMsgDecoders {
         IStrategyManager _strategyManager,
         IStrategy _strategy
     ) external;
+
+    function setQueueWithdrawalBlock(address staker, uint256 nonce) external;
+
+    function getQueueWithdrawalBlock(address staker, uint256 nonce) external returns (uint256);
 
 }

@@ -18,7 +18,6 @@ import {IReceiverCCIP} from "./interfaces/IReceiverCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 
-import {Adminable} from "./utils/Adminable.sol";
 import {ArbSepolia} from "../script/Addresses.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 import {TransferToStakerMessage} from "./interfaces/IRestakingConnector.sol";
@@ -30,6 +29,8 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
     IRestakingConnector public restakingConnector;
     address public senderContractL2Addr;
 
+    error InvalidRestakingConnector(string msg);
+
     /// @notice Constructor initializes the contract with the router address.
     /// @param _router The address of the router contract.
     /// @param _link The address of the link contract.
@@ -38,10 +39,12 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
         address _router,
         address _link,
         address _restakingConnector
-        // address _senderContractL2Addr
     ) BaseMessengerCCIP(_router, _link) {
+
+        if (address(_restakingConnector) == address(0))
+            revert InvalidRestakingConnector("restakingConnector cannot be 0");
+
         restakingConnector = IRestakingConnector(_restakingConnector);
-        // senderContractL2Addr = ISenderCCIP(_senderContractL2Addr);
     }
 
     function getSenderContractL2Addr() public view returns (address) {
@@ -82,8 +85,6 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
         // Expect one token to be transferred at once, but you can transfer several tokens.
         s_lastReceivedTokenAddress = any2EvmMessage.destTokenAmounts[0].token;
         s_lastReceivedTokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
-
-        if (address(restakingConnector) == address(0)) revert("restakingConnector not set");
 
         bytes memory message = any2EvmMessage.data;
         bytes4 functionSelector = decodeFunctionSelector(message);
@@ -148,7 +149,27 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
             IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalsWithSigParams =
                 restakingConnector.decodeQueueWithdrawalsWithSignatureMessage(message);
 
-            delegationManager.queueWithdrawalsWithSignature(
+            // struct QueuedWithdrawalWithSignatureParams {
+            //     // Array of strategies that the QueuedWithdrawal contains
+            //     IStrategy[] strategies;
+            //     // Array containing the amount of shares in each Strategy in the `strategies` array
+            //     uint256[] shares;
+            //     // The address of the withdrawer
+            //     address withdrawer;
+            //     // The address of the staker
+            //     address staker;
+            //     // signature of the staker
+            //     bytes signature;
+            //     // expiration timestamp of the signature
+            //     uint256 expiry;
+            // }
+
+            address staker = queuedWithdrawalsWithSigParams[0].staker;
+            uint256 nonce = delegationManager.cumulativeWithdrawalsQueued(staker);
+            restakingConnector.setQueueWithdrawalBlock(staker, nonce);
+
+            // Call QueueWithdrawalsWithSignature on Eigenlayer
+            bytes32[] memory withdrawalRoots = delegationManager.queueWithdrawalsWithSignature(
                 queuedWithdrawalsWithSigParams
             );
 
@@ -157,19 +178,17 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
         }
 
         if (functionSelector == 0x54b2bf29) {
-            // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)")),
+            // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)")) == 0x54b2bf29
             (
                 IDelegationManager.Withdrawal memory withdrawal,
                 IERC20[] memory tokensToWithdraw,
                 uint256 middlewareTimesIndex,
                 bool receiveAsTokens
-                // TODO: add signature for bridging back to L2 staker address
             ) = restakingConnector.decodeCompleteWithdrawalMessage(message);
 
-            // TODO: check signature before completing withdrawal, to reduce griefing withdrawals
-
-            // signatureUtils.checkSignature_EIP1271(_staker, digestHash, signature);
-
+            // requires(msg.sender == withdrawal.withdrawer), so only this contract can withdraw
+            // since all queuedWithdrawals are also done through this contract.
+            // then it calculates withdrawalRoot ensuring staker/withdrawal/block is a valid withdrawal.
             delegationManager.completeQueuedWithdrawal(
                 withdrawal,
                 tokensToWithdraw,
@@ -177,24 +196,22 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
                 receiveAsTokens
             );
 
+            bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
+
             address original_staker = withdrawal.staker;
             uint256 amount = withdrawal.shares[0];
             // L2 Sender contract address
             address _senderContractL2Addr = getSenderContractL2Addr();
-
             // Approve L1 receiverContract to send ccip-BnM tokens to Router
             IERC20 token = withdrawal.strategies[0].underlyingToken();
+            // approve to send amount to router
             token.approve(address(this), amount);
 
-            address token_destination = ArbSepolia.CcipBnM;
+            // address of token on L2
+            address token_destination = ArbSepolia.BridgeToken;
 
-            // TODO: add signature for bridging back to L2 staker address
-            // signature needs to sign over digestHash made up of:
-            // amount, original_staker, token_destination, expiry, nonce.
-            //
-            // otherwise anyone can mock a CCIP message and drain funds on L2 sender contract
             string memory text_message = string(
-                encodeTransferToStakerMsg(amount, original_staker, token_destination)
+                encodeTransferToStakerMsg(withdrawalRoot)
             );
 
             /// return token to staker via bridge with message to transferToStaker
@@ -220,35 +237,35 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
         );
     }
 
-    bytes4 constant internal MAGICVALUE = 0x1626ba7e;
+    // bytes4 constant internal MAGICVALUE = 0x1626ba7e;
 
-    function isValidSignature(
-        bytes32 _hash,
-        bytes memory _signature
-    ) public pure returns (bytes4 magicValue) {
+    // function isValidSignature(
+    //     bytes32 _hash,
+    //     bytes memory _signature
+    // ) public pure returns (bytes4 magicValue) {
 
-        // implement some hash/signature scheme
+    //     // implement some hash/signature scheme
 
-        // if (Address.isContract(signer)) {
-        //     require(
-        //         IERC1271(signer).isValidSignature(digestHash, signature) == EIP1271_MAGICVALUE,
-        //         "EIP1271SignatureUtils.checkSignature_EIP1271: ERC1271 signature verification failed"
-        //     );
-        // }
-        // address signer = ECDSA.recover(digestHash, signature);
+    //     // if (Address.isContract(signer)) {
+    //     //     require(
+    //     //         IERC1271(signer).isValidSignature(digestHash, signature) == EIP1271_MAGICVALUE,
+    //     //         "EIP1271SignatureUtils.checkSignature_EIP1271: ERC1271 signature verification failed"
+    //     //     );
+    //     // }
+    //     // address signer = ECDSA.recover(digestHash, signature);
 
-        // // bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _hash));
-        // // if (signer == address(0)) {
-        // //     return 0x00000000;
-        // // } else if (signer == msg.sender) {
-        // //     return 0x20c13b0b;
-        // // } else {
-        // //     return 0x00000000;
-        // // }
+    //     // // bytes32 messageHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", _hash));
+    //     // // if (signer == address(0)) {
+    //     // //     return 0x00000000;
+    //     // // } else if (signer == msg.sender) {
+    //     // //     return 0x20c13b0b;
+    //     // // } else {
+    //     // //     return 0x00000000;
+    //     // // }
 
-        // IERC1271(signer).isValidSignature(digestHash, signature) == EIP1271_MAGICVALUE,
-        return MAGICVALUE;
-    }
+    //     // IERC1271(signer).isValidSignature(digestHash, signature) == EIP1271_MAGICVALUE,
+    //     return MAGICVALUE;
+    // }
 
 }
 

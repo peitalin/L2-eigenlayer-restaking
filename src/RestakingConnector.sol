@@ -27,8 +27,25 @@ contract RestakingConnector is IRestakingConnector, EigenlayerMsgDecoders, Admin
 
     error AddressNull();
 
+    mapping(address => mapping(uint256 => uint256)) private _withdrawalBlock;
+
     constructor() {
         __Adminable_init();
+    }
+
+    /// @dev Checkpoint the actual block.number before queueWithdrawal happens
+    /// When dispatching a L2 -> L1 message to queueWithdrawal, the block.number
+    /// varies depending on how long it takes to bridge.
+    ///
+    /// We need the block.number to in the following step to
+    /// create the withdrawalRoot used to completeWithdrawal.
+    function setQueueWithdrawalBlock(address staker, uint256 nonce) external onlyAdminOrOwner {
+        _withdrawalBlock[staker][nonce] = block.number;
+    }
+
+    function getQueueWithdrawalBlock(address staker, uint256 nonce) public returns (uint256) {
+        uint256 withdrawalBlock = _withdrawalBlock[staker][nonce];
+        return withdrawalBlock;
     }
 
     function getEigenlayerContracts() public view returns (

@@ -85,22 +85,22 @@ contract EigenlayerMsgEncoders {
     ) public pure returns (bytes memory) {
 
         // Function Signature:
-        // function completeQueuedWithdrawal(
-        //     IDelegationManager.Withdrawal withdrawal,
-        //     IERC20[] tokensToWithdraw,
-        //     uint256 middlewareTimesIndex,
-        //     bool receiveAsTokens
-        // )
-
-        // struct Withdrawal {
-        //     address staker;
-        //     address delegatedTo;
-        //     address withdrawer;
-        //     uint256 nonce;
-        //     uint32 startBlock;
-        //     IStrategy[] strategies;
-        //     uint256[] shares;
-        // }
+        //     completeQueuedWithdrawal(
+        //         IDelegationManager.Withdrawal withdrawal,
+        //         IERC20[] tokensToWithdraw,
+        //         uint256 middlewareTimesIndex,
+        //         bool receiveAsTokens
+        //     )
+        // Where:
+        //     struct Withdrawal {
+        //         address staker;
+        //         address delegatedTo;
+        //         address withdrawer;
+        //         uint256 nonce;
+        //         uint32 startBlock;
+        //         IStrategy[] strategies;
+        //         uint256[] shares;
+        //     }
 
         bytes memory message_bytes = abi.encodeWithSelector(
             bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)")),
@@ -113,16 +113,10 @@ contract EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-    function encodeTransferToStakerMsg(
-        uint256 amount,
-        address staker,
-        address tokenDestination
-    ) public pure returns (bytes memory) {
+    function encodeTransferToStakerMsg(bytes32 withdrawalRoot) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("transferToStaker(uint256,address,address)")),
-            amount,
-            staker,
-            tokenDestination
+            bytes4(keccak256("transferToStaker(bytes32)")),
+            withdrawalRoot
         );
         return message_bytes;
     }

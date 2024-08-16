@@ -94,38 +94,21 @@ contract CompleteWithdrawalWithSignatureScript is Script {
         staker = deployer;
         expiry = block.timestamp + 6 hours;
 
-        (
-            IDelegationManager.Withdrawal memory withdrawal,
-            bytes32 withdrawalRoot
-        ) = readWithdrawalRoot(staker);
+        IDelegationManager.Withdrawal memory withdrawal = fileReader.readWithdrawalInfo(
+            staker,
+            "script/withdrawals-queued/"
+        );
 
-        // bytes32 digestHash = signatureUtils.calculateQueueWithdrawalDigestHash(
-        //     staker,
-        //     strategiesToWithdraw,
-        //     sharesToWithdraw,
-        //     stakerNonce,
-        //     expiry,
-        //     address(delegationManager),
-        //     block.chainid
-        // );
-        // bytes memory signature;
-        // {
-        //     (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
-        //     signature = abi.encodePacked(r, s, v);
-        // }
-        // signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
+        // Fetch the correct withdrawal.startBlock and withdrawalRoot
+        withdrawal.startBlock = uint32(restakingConnector.getQueueWithdrawalBlock(
+            withdrawal.staker,
+            withdrawal.nonce
+        ));
 
         bytes32 withdrawalRootCalculated = delegationManager.calculateWithdrawalRoot(withdrawal);
 
-        console.log("withdrawalRoot:");
-        console.logBytes32(withdrawalRoot);
         console.log("withdrawalRootCalculated:");
         console.logBytes32(withdrawalRootCalculated);
-
-        require(
-            withdrawalRootCalculated == withdrawalRoot,
-            "withdrawalRoots do not match"
-        );
 
         IERC20[] memory tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = withdrawal.strategies[0].underlyingToken();
@@ -173,48 +156,24 @@ contract CompleteWithdrawalWithSignatureScript is Script {
             );
         }
 
+
+        fileReader.saveWithdrawalInfo(
+            withdrawal.staker,
+            withdrawal.delegatedTo,
+            withdrawal.withdrawer,
+            withdrawal.nonce,
+            withdrawal.startBlock,
+            withdrawal.strategies,
+            withdrawal.shares,
+            withdrawalRootCalculated,
+            "script/withdrawals-completed/"
+        );
+
         vm.stopBroadcast();
     }
 
 
-    function readWithdrawalRoot(
-        address stakerAddress
-    ) public returns (IDelegationManager.Withdrawal memory, bytes32) {
 
-        string memory withdrawalData = vm.readFile(
-            string(abi.encodePacked(
-                "script/withdrawals/",
-                Strings.toHexString(uint160(stakerAddress), 20),
-                "/run-latest.json"
-            ))
-        );
-        uint256 _nonce = stdJson.readUint(withdrawalData, ".inputs.nonce");
-        uint256 _shares = stdJson.readUint(withdrawalData, ".inputs.shares");
-        address _staker = stdJson.readAddress(withdrawalData, ".inputs.staker");
-        uint32 _startBlock = uint32(stdJson.readUint(withdrawalData, ".inputs.startBlock"));
-        address _strategy = stdJson.readAddress(withdrawalData, ".inputs.strategy");
-        address _withdrawer = stdJson.readAddress(withdrawalData, ".inputs.withdrawer");
-        bytes32 _withdrawalRoot = stdJson.readBytes32(withdrawalData, ".outputs.withdrawalRoot");
-
-        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
-        uint256[] memory sharesToWithdraw = new uint256[](1);
-
-        strategiesToWithdraw[0] = IStrategy(_strategy);
-        sharesToWithdraw[0] = _shares;
-
-        return (
-            IDelegationManager.Withdrawal({
-                staker: _staker,
-                delegatedTo: delegationManager.delegatedTo(_staker),
-                withdrawer: _withdrawer,
-                nonce: _nonce,
-                startBlock: _startBlock,
-                strategies: strategiesToWithdraw,
-                shares: sharesToWithdraw
-            }),
-            _withdrawalRoot
-        );
-    }
 
     function topupSenderEthBalance(address _senderAddr) public {
         if (_senderAddr.balance < 0.05 ether) {

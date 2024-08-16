@@ -19,9 +19,10 @@ import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContr
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
+import {ScriptUtils} from "./ScriptUtils.sol";
 
 
-contract DepositWithSignatureFromArbToEthScript is Script {
+contract DepositWithSignatureFromArbToEthScript is Script, ScriptUtils {
 
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
@@ -155,27 +156,6 @@ contract DepositWithSignatureFromArbToEthScript is Script {
         }
 
         vm.stopBroadcast();
-    }
-
-    function topupSenderEthBalance(address _senderAddr) public {
-        if (_senderAddr.balance < 0.02 ether) {
-            (bool sent, ) = address(_senderAddr).call{value: 0.05 ether}("");
-            require(sent, "Failed to send Ether");
-        }
-    }
-
-    function topupSenderLINKBalance(address _senderAddr, address deployerAddr) public {
-        /// Only if using sendMessagePayLINK()
-        IERC20 linkTokenOnArb = IERC20(ArbSepolia.Link);
-        // check LINK balances for sender contract
-        uint256 senderLinkBalance = linkTokenOnArb.balanceOf(_senderAddr);
-
-        if (senderLinkBalance < 2 ether) {
-            linkTokenOnArb.approve(deployerAddr, 2 ether);
-            linkTokenOnArb.transferFrom(deployerAddr, senderAddr, 2 ether);
-        }
-        //// Approve senderContract to send LINK tokens for fees
-        linkTokenOnArb.approve(address(senderContract), 2 ether);
     }
 
 }

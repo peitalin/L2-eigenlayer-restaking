@@ -675,32 +675,24 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
     ) public returns (TransferToStakerMessage memory) {
 
         // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
-        // 0000000000000000000000000000000000000000000000000000000000000064 [64] string length
-        // 2fcb6cd5                                                         [96] functionselector
-        // 00000000000000000000000000000000000000000000000000124be5d097e000 [100] amount
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] original staker
-        // 000000000000000000000000a8c0c11bf64af62cdca6f93d3769b88bdd7cb93d [164] token addr at destination
+        // 0000000000000000000000000000000000000000000000000000000000000024 [64] string length
+        // 27167d10                                                         [96] function selector
+        // 8c20d3a37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7d8ec77 [100] withdrawalRoot
         // 00000000000000000000000000000000000000000000000000000000
 
         bytes4 functionSelector;
-        uint256 amount;
-        address staker;
-        address token_destination;
+        bytes32 withdrawalRoot;
 
         assembly {
             functionSelector := mload(add(message, 96))
-            amount := mload(add(message, 100))
-            staker := mload(add(message, 132))
-            token_destination := mload(add(message, 164))
+            withdrawalRoot := mload(add(message, 100))
         }
 
         TransferToStakerMessage memory transferToStakerMessage = TransferToStakerMessage({
-            amount: amount,
-            staker: staker,
-            token_destination: token_destination
+            withdrawalRoot: withdrawalRoot
         });
 
-        emit TransferToStakerParams(amount, staker, token_destination);
+        emit TransferToStakerParams(withdrawalRoot);
 
         return transferToStakerMessage;
     }

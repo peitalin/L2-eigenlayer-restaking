@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
@@ -36,7 +36,7 @@ contract DeployOnEthScript is Script {
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
-        address sender = address(fileReader.getSenderContract());
+        address senderContractAddr = address(fileReader.getSenderContract());
 
         (
             IStrategy strategy,
@@ -61,9 +61,11 @@ contract DeployOnEthScript is Script {
         // deploy receiver contract
         receiverContract = new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link, address(restakingConnector));
         receiverContract.allowlistSourceChain(ArbSepolia.ChainSelector, true);
-        receiverContract.allowlistSender(sender, true);
+        receiverContract.allowlistSender(senderContractAddr, true);
         receiverContract.allowlistDestinationChain(ArbSepolia.ChainSelector, true);
-        receiverContract.setSenderContractL2Addr(sender);
+        receiverContract.setSenderContractL2Addr(senderContractAddr);
+
+        restakingConnector.addAdmin(address(receiverContract));
 
         // seed the receiver contract with a bit of ETH
         if (address(receiverContract).balance < 0.02 ether) {

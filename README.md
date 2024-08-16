@@ -34,9 +34,13 @@ The message makes it's way to L1 resulting in the following Eigenlayer `queueWit
 Withdrawal events can be seen on DelegationManager contract on L1:
 [https://sepolia.etherscan.io/address/0x6b78995ba97fb26de32ede9055d85f176b672af7#events](https://sepolia.etherscan.io/address/0x6b78995ba97fb26de32ede9055d85f176b672af7#events)
 
-CAUTION / NOTE: we need to track the `block.number` of when this tx lands on L1, as it's used to form the withdrawalRoot you need to completeWithdrawals in the next step.
-- We will need to listen for when the CCIP message is executed and store that offchain to use in the next step
-- currently storing withdrawalRoots in `script/withdrawals/<user_address>/run-latest.json` (but need to fix block.number as it's storing the time when we send the message on L2, not when it completes on L1)
+NOTE: we need to track the `block.number` of when this tx lands on L1, as it's used to form the withdrawalRoot you need to completeWithdrawals in the next step.
+- add a `mapping(address => mapping(uint256 => uint256)) withdrawalBlock` to the ReceiverContract;
+- then when we queueWithdrawal, we record `withdrawalBlock[staker][nonce] = block.number;`.
+- then when we dispatch `completeWithdrawal()` later, we'll read from ReceiverContract.withdrawalBlock() to get the actual block number associated with the withdrawal.
+
+Atm we store withdrawal information in `script/withdrawals-queued/<user_address>/` and `script/withdrawals-completed/<user_address>/`
+
 
 
 ### 3. Complete withdrawal from L2 and bridge back to original wallet on L2
@@ -71,14 +75,14 @@ Once we wait for the L1 -> L2 bridge back, we can see the token transferred back
         - [x] Transfer withdrawn tokens from L1 back to L2
         - [ ] Add signatures on L1 receiver contract to verify staker's intent to completeWithdrawal on L1.
         - [ ] Add signatures on L2 sender contract and CCIP Message to verify tokens are transferred to the right staker address on L2.
-        - [ ] Alternatively, we can make a withdrawalRoot => original_staker mapping, then message the withdrawalRoot back to L2 instead of needing another user signature.  We look up the staker on L2 when the L1 message payload arrives: `withdrawalRootsToOriginalStaker[withdrawalRoot] = original_staker`, then delete the withdrawalRoot.
+        - [x] Alternatively, we can make a `mapping(bytes32 withdrawalRoot => Withdrawal)` mapping, then message the withdrawalRoot back to L2 instead of needing another user signature.  We look up the original staker on L2 when the L1 withdrawalRoot message arrives.
     - [ ] `delegate`
     - [ ] `undelegate`
 - [ ] Refactor CCIP for messaging passing with no-token bridging option (currently sending 0.0001 tokens for withdrawals)
 
 - Gas optimization
     - [ ] Estimate gas limit for each of the previous operations
-    - [ ]CCIP offers manual execution in case of gas failures, need to look into this in case users get stuck transactions.
+    - [ ] CCIP offers manual execution in case of gas failures, need to look into this in case users get stuck transactions.
 
 - [ ] Have Chainlink setups a Mock MAGIC "lane" for their CCIP bridge:
     - Chainlink CCIP only supports their own CCIP-BnM token in Sepolia testnet.
