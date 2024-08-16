@@ -265,7 +265,7 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
 
         /////////////////////////////////////////////////////////////////
-        ////// Queue Withdrawals via CCIP
+        //// Queue Withdrawals via CCIP
         /////////////////////////////////////////////////////////////////
         receiverContract.mockCCIPReceive(
             makeCCIPEigenlayerMsg_QueueWithdrawalsWithSignature(
@@ -284,8 +284,10 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
             "balance should be: initialReceiverBalance - amountToStake"
         );
 
+        vm.stopBroadcast();
+
         /////////////////////////////////////////////////////////////////
-        ////// Complete Queued Withdrawals
+        //// Complete Queued Withdrawals
         /////////////////////////////////////////////////////////////////
 
         IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
@@ -304,17 +306,52 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         IERC20[] memory tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = strategiesToWithdraw[0].underlyingToken();
 
+        /////////////////////////////////////////////////////////////////
+        //// 1. [L2] Send CompleteWithdrawals message to L2 Bridge
+        /////////////////////////////////////////////////////////////////
+        vm.selectFork(arbForkId);
+        vm.startBroadcast(deployerKey);
+
+        address tokenDestination = ArbSepolia.CcipBnM; // CCIP-BnM L2 address
+        uint256 stakerBalanceOnL2Before = IERC20(tokenDestination).balanceOf(staker);
+
+        // Mock sending a completeWithdrawal tx to SenderContract on L2.
+        // This commits the withdrawalRoot with (staker, amount) which will later be
+        // read by the returning message from L1 to correctly transfer(amount, staker) on L2.
+        //
+        // Note: this prevents the oracle network from inserting withdrawalRoots with
+        // their own addresses to withdraw to (instead of the stakers).
+        senderContract.sendMessagePayNative(
+            EthSepolia.ChainSelector, // destination chain
+            address(receiverContract),
+            string(
+                eigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+                    withdrawal,
+                    tokensToWithdraw,
+                    0, // middlewareTimesIndex
+                    true // receiveAsTokens
+                )
+            ),
+            address(tokenDestination),
+            amountToStake
+        );
         vm.stopBroadcast();
 
+        /////////////////////////////////////////////////////////////////
+        //// [Offchain] CCIP relays tokens and message to L1 bridge
+        /////////////////////////////////////////////////////////////////
+
+        /////////////////////////////////////////////////////////////////
+        //// 2. [L1] Mock recieving CompleteWithdrawals message on L1 Bridge
+        /////////////////////////////////////////////////////////////////
         // need to fork ethsepolia to get: ReceiverCCIP -> Router calls to work
-        // for gas estimation, call dispatch, etc.
         vm.selectFork(ethForkId);
         vm.startBroadcast(address(receiverContract));
 
         vm.warp(block.timestamp + 120); // 120 seconds = 10 blocks (12second per block)
         vm.roll((block.timestamp + 120) / 12);
 
-        // send CCIP message to CompleteWithdrawal
+        // mock L1 bridge receiving CCIP message and calling CompleteWithdrawal on Eigenlayer
         receiverContract.mockCCIPReceive(
             makeCCIPEigenlayerMsg_CompleteWithdrawal(
                 withdrawal,
@@ -323,35 +360,29 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
                 true // receiveAsTokens
             )
         );
-        // tokens are now in the RecieverCCIP bridge contract, need to send them to the staker on L2
+        // tokens in the ReceiverCCIP bridge contract
         console.log("balanceOf(receiverContract):", token.balanceOf(address(receiverContract)));
         vm.stopBroadcast();
+
+        /////////////////////////////////////////////////////////////////
+        //// [Offchain] CCIP relays tokens and message to L2 bridge
         /////////////////////////////////////////////////////////////////
 
+        /////////////////////////////////////////////////////////////////
+        //// 3. [L2] Mock receiving CompleteWithdrawals message on L1 Bridge
+        /////////////////////////////////////////////////////////////////
         vm.selectFork(arbForkId);
         vm.startBroadcast(deployerKey);
-
-        address token_destination = ArbSepolia.CcipBnM; // CCIP-BnM L2 address, not L1 address
-        uint256 stakerBalanceOnL2Before = IERC20(token_destination).balanceOf(staker);
-
-        //// Test emitted events
-        //// (first 3 args: check indexed topics), (4th arg = true = check data)
-        // vm.expectEmit(true, true, true, true);
-        // emit Receiver.MessageSent(
-        //     amount,
-        //     0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c
-        // );
-
-        //// Mock SenderContract on L2 receiving the tokens and TransferToStaker message from L1
+        // Mock SenderContract on L2 receiving the tokens and TransferToStaker CCIP message from L1
         senderContract.mockCCIPReceive(
             makeCCIPEigenlayerMsg_TransferToStaker(
+                withdrawalRoot,
                 amountToStake,
-                staker,
-                token_destination
+                tokenDestination
             )
         );
 
-        uint256 stakerBalanceOnL2After = IERC20(token_destination).balanceOf(staker);
+        uint256 stakerBalanceOnL2After = IERC20(tokenDestination).balanceOf(staker);
         console.log("balanceOf(staker) on L2 before:", stakerBalanceOnL2Before);
         console.log("balanceOf(staker) on L2 after:", stakerBalanceOnL2After);
 
@@ -466,15 +497,16 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         return any2EvmMessage;
     }
 
+
     function makeCCIPEigenlayerMsg_TransferToStaker(
+        bytes32 _withdrawalRoot,
         uint256 _amount,
-        address _staker,
-        address _token_destination // BnM token addr on L2 destination
+        address _tokenDestination // BnM token addr on L2 destination
     ) public view returns (Client.Any2EVMMessage memory) {
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
-            token: _token_destination,
+            token: _tokenDestination,
             amount: _amount
         });
 
@@ -484,9 +516,7 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
             sender: abi.encode(deployer),
             data: abi.encode(string(
                 eigenlayerMsgEncoders.encodeTransferToStakerMsg(
-                    _amount,
-                    _staker,
-                    _token_destination
+                    _withdrawalRoot
                 )
             )), // CCIP abi.encodes a string message when sending
             destTokenAmounts: destTokenAmounts
