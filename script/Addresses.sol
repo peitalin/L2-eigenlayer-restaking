@@ -70,13 +70,13 @@ contract FileReader is Script {
         IStrategy[] memory _strategies,
         uint256[] memory _shares,
         bytes32 _withdrawalRoot,
-        string memory _filepath
+        string memory _filePath
     ) public {
 
         // { "inputs": <inputs_data>}
         /////////////////////////////////////////////////
         vm.serializeAddress("inputs" , "staker", _staker);
-        // vm.serializeAddress("inputs" , "delegatedTo", _delegatedTo);
+        vm.serializeAddress("inputs" , "delegatedTo", _delegatedTo);
         vm.serializeAddress("inputs" , "withdrawer", _withdrawer);
         vm.serializeUint("inputs" , "nonce", _nonce);
         vm.serializeUint("inputs" , "startBlock", _startBlock);
@@ -100,28 +100,27 @@ contract FileReader is Script {
         /////////////////////////////////////////////////
         // combine objects to a root object
         /////////////////////////////////////////////////
-        string memory root_object = "rootObject";
-        vm.serializeString(root_object, "chainInfo", chainInfo_data);
-        vm.serializeString(root_object, "outputs", outputs_data);
-        string memory finalJson = vm.serializeString(root_object, "inputs", inputs_data);
+        vm.serializeString("rootObject", "chainInfo", chainInfo_data);
+        vm.serializeString("rootObject", "outputs", outputs_data);
+        string memory finalJson = vm.serializeString("rootObject", "inputs", inputs_data);
 
         {
             string memory stakerAddress = Strings.toHexString(uint160(_staker), 20);
             // mkdir for user if need be.
             string[] memory mkdirForUser = new string[](2);
             mkdirForUser[0] = "mkdir";
-            mkdirForUser[1] = string(abi.encodePacked("script/withdrawals/", stakerAddress));
+            mkdirForUser[1] = string(abi.encodePacked(_filePath, stakerAddress));
             vm.ffi(mkdirForUser);
 
             string memory finalOutputPath = string(abi.encodePacked(
-                _filepath,
+                _filePath,
                 stakerAddress,
                 "/run-",
                 Strings.toString(block.timestamp),
                 ".json"
             ));
             string memory finalOutputPathLatest = string(abi.encodePacked(
-                _filepath,
+                _filePath,
                 stakerAddress,
                 "/run-latest.json"
             ));
@@ -154,8 +153,6 @@ contract FileReader is Script {
         ///// (written when bridging is initiated), instead of written after bridging is complete
         uint32 _startBlock = uint32(stdJson.readUint(withdrawalData, ".inputs.startBlock"));
         // bytes32 _withdrawalRoot = stdJson.readBytes32(withdrawalData, ".outputs.withdrawalRoot");
-
-        uint32 _timestamp = uint32(stdJson.readUint(withdrawalData, ".chainInfo.timestamp"));
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         uint256[] memory sharesToWithdraw = new uint256[](1);

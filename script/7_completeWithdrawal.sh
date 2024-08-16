@@ -1,9 +1,9 @@
 #!/bin/bash
 source .env
 
-echo forge script script/7_completeWithdrawalWithSignature.s.sol:CompleteWithdrawalWithSignature --rpc-url arbsepolia --broadcast -vvvv
+echo forge script script/7_completeWithdrawal.s.sol:CompleteWithdrawalScript --rpc-url arbsepolia --broadcast -vvvv
 
-forge script script/7_completeWithdrawalWithSignature.s.sol:CompleteWithdrawalWithSignatureScript  \
+forge script script/7_completeWithdrawal.s.sol:CompleteWithdrawalScript  \
     --rpc-url arbsepolia \
     --broadcast \
     -vvvv

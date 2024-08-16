@@ -12,8 +12,6 @@ import {TransferToStakerMessage} from "./interfaces/IRestakingConnector.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {ArbSepolia} from "../script/Addresses.sol";
 
-import {console} from "forge-std/Test.sol";
-
 
 /// @title - Arb L2 Messenger Contract: sends Eigenlayer messages to L1,
 /// and receives responses from L1 (e.g. queueing withdrawals).
@@ -25,13 +23,17 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
 
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
 
-    event WithdrawalRootCommitted(bytes32 indexed, address indexed, uint256 indexed);
+    event WithdrawalCommitted(bytes32 indexed, address indexed, uint256 indexed);
 
-    mapping(bytes32 => address) public withdrawalRootToStaker;
+    struct WithdrawalTransfer {
+        address staker;
+        uint256 amount;
+        address tokenDestination;
+    }
 
-    mapping(bytes32 => uint256) public withdrawalRootToShares;
+    mapping(bytes32 => WithdrawalTransfer) public withdrawalTransferCommittments;
 
-    mapping(bytes32 => address) public withdrawalRootToL2TokenAddr;
+    mapping(bytes32 => bool) public withdrawalRootsSpent;
 
     mapping(bytes4 => uint256) internal gasLimitsForFunctionSelectors;
 
@@ -98,14 +100,24 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
 
             bytes32 withdrawalRoot = transferToStakerMsg.withdrawalRoot;
 
-            address staker = withdrawalRootToStaker[withdrawalRoot];
-            uint256 amount = withdrawalRootToShares[withdrawalRoot];
-            address token_destination = withdrawalRootToL2TokenAddr[withdrawalRoot];
+            WithdrawalTransfer memory withdrawalTransfer;
+            withdrawalTransfer = withdrawalTransferCommittments[withdrawalRoot];
+
+            address staker = withdrawalTransfer.staker;
+            uint256 amount = withdrawalTransfer.amount;
+            address tokenDestination = withdrawalTransfer.tokenDestination;
+
+            // checks-effects-interactions
+            // delete withdrawalRoot entry and mark the withdrawalRoot as "spent"
+            // to prevent multiple withdrawals
+            delete withdrawalTransferCommittments[withdrawalRoot];
+            withdrawalRootsSpent[withdrawalRoot] = true;
 
             emit SendingWithdrawalToStaker(staker, amount, withdrawalRoot);
 
-            IERC20(token_destination).transfer(staker, amount);
+            IERC20(tokenDestination).transfer(staker, amount);
             text_msg = "completed eigenlayer withdrawal and transferred token to L2 staker";
+
         } else {
 
             emit MalformedMessagePayload(message);
@@ -152,22 +164,31 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
 
         if (functionSelector == 0x54b2bf29) {
             // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)")) == 0x54b2bf29
+
             (
                 IDelegationManager.Withdrawal memory withdrawal
                 , // IERC20[] memory _tokensToWithdraw // token address on L1, not L2
                 , // uint256 _middlewareTimesIndex
                 , // bool _receiveAsTokens
             ) = decodeCompleteWithdrawalMessage(message);
-            // before dispatching the message to L1, committ withdrawalRoot and associated data
-            bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
-            // commit to (staker, amount, token) before dispatching completeWithdrawal message:
-            // so that when the message returns with withdrawalRoot we use it to lookup who to transfer
-            // the withdrawn amounts back to
-            withdrawalRootToStaker[withdrawalRoot] = withdrawal.staker;
-            withdrawalRootToShares[withdrawalRoot] = withdrawal.shares[0];
-            withdrawalRootToL2TokenAddr[withdrawalRoot] = ArbSepolia.BridgeToken;
 
-            emit WithdrawalRootCommitted(withdrawalRoot, withdrawal.staker, withdrawal.shares[0]);
+            bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
+
+            // Check for "spent" withdrawalRoots to prevent withdrawalRoot reuse
+            require(
+                withdrawalRootsSpent[withdrawalRoot] == false,
+                "withdrawalRoot has already been used"
+            );
+            // Commit to WithdrawalTransfer(staker, amount, token) before sending completeWithdrawal message,
+            // so that when the message returns with withdrawalRoot, we use it to lookup (staker, amount)
+            // to transfer the bridged withdrawn funds to.
+            withdrawalTransferCommittments[withdrawalRoot] = WithdrawalTransfer({
+                staker: withdrawal.staker,
+                amount: withdrawal.shares[0],
+                tokenDestination: ArbSepolia.BridgeToken
+            });
+
+            emit WithdrawalCommitted(withdrawalRoot, withdrawal.staker, withdrawal.shares[0]);
 
         } else {
 

@@ -23,9 +23,3 @@ forge script script/5_depositWithSignatureFromArbToEth.s.sol:DepositWithSignatur
 ## with associated Eigenlayer deposit events:
 # https://sepolia.etherscan.io/tx/0xd5bfee9bd4786e1a7d259746ad624a70a89d536bf425cf9602d8595b3a66d8b6#eventlog
 
-
-
-# ## Example:
-# ## Restaking CCIP-BnM token from L2 into Eigenlayer example (with staker signatures)
-# https://ccip.chain.link/msg/0x5461125dca5718e09632cc40a7fc05c5d66a4a0e46e158445fed915549ecdbcf
-# ## with associated Eigenlayer deposit events:

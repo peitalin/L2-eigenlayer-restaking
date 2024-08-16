@@ -2,7 +2,6 @@
 pragma solidity 0.8.22;
 
 import {Script, console} from "forge-std/Script.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
@@ -14,13 +13,14 @@ import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {FileReader, ArbSepolia, EthSepolia} from "./Addresses.sol";
+import {ScriptUtils} from "./ScriptUtils.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 
 
-contract QueueWithdrawalWithSignatureScript is Script {
+contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
 
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
@@ -40,15 +40,13 @@ contract QueueWithdrawalWithSignatureScript is Script {
 
     uint256 public deployerKey;
     address public deployer;
-    bool public payFeeWithETH = true;
     address public staker;
     uint256 public amount;
     uint256 public expiry;
 
     function run() public {
 
-        require(block.chainid == 421614, "Must run script on Arbitrum network");
-
+        bool isTest = block.chainid == 31337;
         uint256 arbForkId = vm.createFork("arbsepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
         console.log("arbForkId:", arbForkId);
@@ -101,6 +99,7 @@ contract QueueWithdrawalWithSignatureScript is Script {
 
         address withdrawer = address(receiverContract);
         uint256 nonce = delegationManager.cumulativeWithdrawalsQueued(staker);
+        address delegatedTo = delegationManager.delegatedTo(staker);
         uint32 startBlock = uint32(block.number); // needed to CompleteWithdrawals
 
         bytes memory signature;
@@ -126,26 +125,27 @@ contract QueueWithdrawalWithSignatureScript is Script {
         ////// Setup Queue Withdrawals Params (reads from Eigenlayer contracts on L1)
         /////////////////////////////////////////////////////////////////
 
-        // Note: This test needs the queueWithdrawalWithSignature feature:
-        // https://github.com/Layr-Labs/eigenlayer-contracts/pull/676
+        bytes memory message;
+        // put the following in separate closure (stack too deep errors)
+        {
+            IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig;
+            queuedWithdrawalWithSig = IDelegationManager.QueuedWithdrawalWithSignatureParams({
+                strategies: strategiesToWithdraw,
+                shares: sharesToWithdraw,
+                withdrawer: withdrawer,
+                staker: staker,
+                signature: signature,
+                expiry: expiry
+            });
 
-        IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig;
-        queuedWithdrawalWithSig = IDelegationManager.QueuedWithdrawalWithSignatureParams({
-            strategies: strategiesToWithdraw,
-            shares: sharesToWithdraw,
-            withdrawer: withdrawer,
-            staker: staker,
-            signature: signature,
-            expiry: expiry
-        });
+            IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray;
+            queuedWithdrawalWithSigArray = new IDelegationManager.QueuedWithdrawalWithSignatureParams[](1);
+            queuedWithdrawalWithSigArray[0] = queuedWithdrawalWithSig;
 
-        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray;
-        queuedWithdrawalWithSigArray = new IDelegationManager.QueuedWithdrawalWithSignatureParams[](1);
-        queuedWithdrawalWithSigArray[0] = queuedWithdrawalWithSig;
-
-        bytes memory message = eigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
-            queuedWithdrawalWithSigArray
-        );
+            message = eigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
+                queuedWithdrawalWithSigArray
+            );
+        }
 
         /////////////////////////////////////////////////////////////////
         /////// Broadcast to Arb L2
@@ -154,66 +154,37 @@ contract QueueWithdrawalWithSignatureScript is Script {
         vm.selectFork(arbForkId);
         vm.startBroadcast(deployerKey);
 
-        if (payFeeWithETH) {
-            topupSenderEthBalance(senderAddr);
-
-            senderContract.sendMessagePayNative(
-                EthSepolia.ChainSelector, // destination chain
-                address(receiverContract),
-                string(message),
-                address(ccipBnM),
-                amount
-            );
-        } else {
-            topupSenderLINKBalance(senderAddr, deployer);
-
-            senderContract.sendMessagePayLINK(
-                EthSepolia.ChainSelector, // destination chain
-                address(receiverContract),
-                string(message),
-                address(ccipBnM),
-                amount
-            );
-        }
+        topupSenderEthBalance(senderAddr);
+        senderContract.sendMessagePayNative(
+            EthSepolia.ChainSelector, // destination chain
+            address(receiverContract),
+            string(message),
+            address(ccipBnM),
+            amount
+        );
 
         vm.stopBroadcast();
 
+        vm.selectFork(ethForkId);
+
+        string memory filePath = "script/withdrawals-queued/";
+        if (isTest) {
+           filePath = "test/withdrawals-queued/";
+        }
         // NOTE: Tx will still be bridging so the startBlock = block.number is incorrect.
         // The correct startBlock needs to wait until bridging completes and calls queueWithdrawal on L1.
         // We call getWithdrawalBlock later to get the correct startBlock for calculating withdrawalRoots
         fileReader.saveWithdrawalInfo(
             staker,
-            delegationManager.delegatedTo(staker),
+            delegatedTo,
             withdrawer,
             nonce,
             0, // startBlock incorrect
             strategiesToWithdraw,
             sharesToWithdraw,
             bytes32(0x0), // withdrawalRoot
-            "script/withdrawals-queued/"
+            filePath
         );
-    }
-
-
-    function topupSenderEthBalance(address _senderAddr) public {
-        if (_senderAddr.balance < 0.05 ether) {
-            (bool sent, ) = address(_senderAddr).call{value: 0.1 ether}("");
-            require(sent, "Failed to send Ether");
-        }
-    }
-
-    function topupSenderLINKBalance(address _senderAddr, address deployerAddr) public {
-        /// Only if using sendMessagePayLINK()
-        IERC20 linkTokenOnArb = IERC20(ArbSepolia.Link);
-        // check LINK balances for sender contract
-        uint256 senderLinkBalance = linkTokenOnArb.balanceOf(_senderAddr);
-
-        if (senderLinkBalance < 2 ether) {
-            linkTokenOnArb.approve(deployerAddr, 2 ether);
-            linkTokenOnArb.transferFrom(deployerAddr, senderAddr, 2 ether);
-        }
-        //// Approve senderContract to send LINK tokens for fees
-        linkTokenOnArb.approve(address(senderContract), 2 ether);
     }
 
 }

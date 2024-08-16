@@ -80,7 +80,8 @@ contract DeployMockEigenlayerContractsScript is Script {
         IRewardsCoordinator,
         IERC20
     ) {
-        if (block.chainid != 31337 && block.chainid != 11155111) revert("must deploy on Eth or local network");
+        if (block.chainid != 31337 && block.chainid != 11155111 && block.chainid != 17000)
+            revert("must deploy on Eth Sepolia, Holesky or local network");
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);

@@ -12,3 +12,7 @@ docs/
 
 # Dotenv file
 .env
+
+# ignore test outputs
+/test/withdrawals-completed/*
+/test/withdrawals-queued/*

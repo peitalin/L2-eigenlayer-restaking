@@ -14,13 +14,14 @@ import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {FileReader, ArbSepolia, EthSepolia} from "./Addresses.sol";
+import {ScriptUtils} from "./ScriptUtils.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 
 
-contract CompleteWithdrawalWithSignatureScript is Script {
+contract CompleteWithdrawalScript is Script, ScriptUtils {
 
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
@@ -40,7 +41,6 @@ contract CompleteWithdrawalWithSignatureScript is Script {
 
     uint256 public deployerKey;
     address public deployer;
-    bool public payFeeWithETH = true;
     address public staker;
     uint256 public amount;
     uint256 public expiry;
@@ -49,8 +49,7 @@ contract CompleteWithdrawalWithSignatureScript is Script {
 
     function run() public {
 
-        require(block.chainid == 421614, "Must run script on Arbitrum network");
-
+        bool isTest = block.chainid == 31337;
         uint256 arbForkId = vm.createFork("arbsepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
         console.log("arbForkId:", arbForkId);
@@ -99,11 +98,14 @@ contract CompleteWithdrawalWithSignatureScript is Script {
             "script/withdrawals-queued/"
         );
 
-        // Fetch the correct withdrawal.startBlock and withdrawalRoot
-        withdrawal.startBlock = uint32(restakingConnector.getQueueWithdrawalBlock(
-            withdrawal.staker,
-            withdrawal.nonce
-        ));
+        if (!isTest) {
+            // Fetch the correct withdrawal.startBlock and withdrawalRoot
+            withdrawal.startBlock = uint32(restakingConnector.getQueueWithdrawalBlock(
+                withdrawal.staker,
+                withdrawal.nonce
+            ));
+            // reverts in test because there is no pending withdrawal
+        }
 
         bytes32 withdrawalRootCalculated = delegationManager.calculateWithdrawalRoot(withdrawal);
 
@@ -134,28 +136,23 @@ contract CompleteWithdrawalWithSignatureScript is Script {
         vm.selectFork(arbForkId);
         vm.startBroadcast(deployerKey);
 
-        if (payFeeWithETH) {
-            topupSenderEthBalance(senderAddr);
+        topupSenderEthBalance(senderAddr);
+        senderContract.sendMessagePayNative(
+            EthSepolia.ChainSelector, // destination chain
+            address(receiverContract),
+            string(message),
+            address(ccipBnM),
+            amount
+        );
 
-            senderContract.sendMessagePayNative(
-                EthSepolia.ChainSelector, // destination chain
-                address(receiverContract),
-                string(message),
-                address(ccipBnM),
-                amount
-            );
-        } else {
-            topupSenderLINKBalance(senderAddr, deployer);
+        vm.stopBroadcast();
 
-            senderContract.sendMessagePayLINK(
-                EthSepolia.ChainSelector, // destination chain
-                address(receiverContract),
-                string(message),
-                address(ccipBnM),
-                amount
-            );
+
+        vm.selectFork(ethForkId);
+        string memory filePath = "script/withdrawals-completed/";
+        if (isTest) {
+           filePath = "test/withdrawals-completed/";
         }
-
 
         fileReader.saveWithdrawalInfo(
             withdrawal.staker,
@@ -166,33 +163,9 @@ contract CompleteWithdrawalWithSignatureScript is Script {
             withdrawal.strategies,
             withdrawal.shares,
             withdrawalRootCalculated,
-            "script/withdrawals-completed/"
+            filePath
         );
 
-        vm.stopBroadcast();
-    }
-
-
-
-
-    function topupSenderEthBalance(address _senderAddr) public {
-        if (_senderAddr.balance < 0.05 ether) {
-            (bool sent, ) = address(_senderAddr).call{value: 0.1 ether}("");
-            require(sent, "Failed to send Ether");
-        }
-    }
-
-    function topupSenderLINKBalance(address _senderAddr, address deployerAddr) public {
-        /// Only if using sendMessagePayLINK()
-        IERC20 linkTokenOnArb = IERC20(ArbSepolia.Link);
-        // check LINK balances for sender contract
-        uint256 senderLinkBalance = linkTokenOnArb.balanceOf(_senderAddr);
-        if (senderLinkBalance < 2 ether) {
-            linkTokenOnArb.approve(deployerAddr, 2 ether);
-            linkTokenOnArb.transferFrom(deployerAddr, senderAddr, 2 ether);
-        }
-        //// Approve senderContract to send LINK tokens for fees
-        linkTokenOnArb.approve(address(senderContract), 2 ether);
     }
 
 }

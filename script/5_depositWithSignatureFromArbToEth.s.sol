@@ -43,12 +43,10 @@ contract DepositWithSignatureFromArbToEthScript is Script, ScriptUtils {
 
     uint256 public deployerKey;
     address public deployer;
-    bool public payFeeWithETH = true;
 
     function run() public {
 
-        require(block.chainid == 421614, "Must run script on Arbitrum network");
-
+        bool isTest = block.chainid == 31337;
         uint256 arbForkId = vm.createFork("arbsepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
         console.log("arbForkId:", arbForkId);
@@ -133,27 +131,14 @@ contract DepositWithSignatureFromArbToEthScript is Script, ScriptUtils {
         // Approve L2 senderContract to send ccip-BnM tokens to Router
         ccipBnM.approve(senderAddr, amount);
 
-        if (payFeeWithETH) {
-            topupSenderEthBalance(senderAddr);
-
-            senderContract.sendMessagePayNative(
-                EthSepolia.ChainSelector, // destination chain
-                address(receiverContract),
-                string(message),
-                address(ccipBnM),
-                amount
-            );
-        } else {
-            topupSenderLINKBalance(senderAddr, deployer);
-
-            senderContract.sendMessagePayLINK(
-                EthSepolia.ChainSelector, // destination chain
-                address(receiverContract),
-                string(message),
-                address(ccipBnM),
-                amount
-            );
-        }
+        topupSenderEthBalance(senderAddr);
+        senderContract.sendMessagePayNative(
+            EthSepolia.ChainSelector, // destination chain
+            address(receiverContract),
+            string(message),
+            address(ccipBnM),
+            amount
+        );
 
         vm.stopBroadcast();
     }

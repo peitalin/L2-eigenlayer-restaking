@@ -670,6 +670,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         );
     }
 
+    /// @dev this message is dispatched from L1 -> L2 by ReceiverCCIP.sol
     function decodeTransferToStakerMessage(
         bytes memory message
     ) public returns (TransferToStakerMessage memory) {
