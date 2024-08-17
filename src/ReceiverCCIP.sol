@@ -78,13 +78,17 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
         onlyAllowlisted(
             any2EvmMessage.sourceChainSelector,
             abi.decode(any2EvmMessage.sender, (address))
-        ) // Make sure source chain and sender are allowlisted
+        )
     {
         s_lastReceivedMessageId = any2EvmMessage.messageId; // fetch the messageId
         s_lastReceivedText = abi.decode(any2EvmMessage.data, (string)); // abi-decoding of the sent text
-        // Expect one token to be transferred at once, but you can transfer several tokens.
-        s_lastReceivedTokenAddress = any2EvmMessage.destTokenAmounts[0].token;
-        s_lastReceivedTokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
+        if (any2EvmMessage.destTokenAmounts.length > 0) {
+            s_lastReceivedTokenAddress = any2EvmMessage.destTokenAmounts[0].token;
+            s_lastReceivedTokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
+        } else {
+            s_lastReceivedTokenAddress = address(0);
+            s_lastReceivedTokenAmount = 0;
+        }
 
         bytes memory message = any2EvmMessage.data;
         bytes4 functionSelector = decodeFunctionSelector(message);

@@ -109,7 +109,11 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
 
             emit SendingWithdrawalToStaker(staker, amount, withdrawalRoot);
 
-            IERC20(tokenDestination).transfer(staker, amount);
+            bool success = IERC20(tokenDestination).transfer(staker, amount);
+
+            if (!success)
+                revert("token bridged successfully but failed to transfer to staker");
+
             text_msg = "completed eigenlayer withdrawal and transferred token to L2 staker";
 
         } else {
@@ -144,7 +148,7 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
     ) internal override returns (Client.EVM2AnyMessage memory) {
 
         Client.EVMTokenAmount[] memory tokenAmounts;
-        if (_amount == 0) {
+        if (_amount <= 0) {
             // Must be an empty array as no tokens are transferred
             // non-empty arrays with 0 amounts error with CannotSendZeroTokens() == 0x5cf04449
             tokenAmounts = new Client.EVMTokenAmount[](0);

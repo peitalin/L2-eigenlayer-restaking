@@ -71,6 +71,8 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
         signatureUtils = new SignatureUtilsEIP1271();
 
+        // uint256 arbForkId = vm.createSelectFork("arbsepolia");
+        // vm.rollFork(71584765); // roll back before CCIP network entered "cursed" state
         arbForkId = vm.createFork("arbsepolia");        // 0
         ethForkId = vm.createSelectFork("ethsepolia"); // 1
         console.log("arbForkId:", arbForkId);
@@ -316,11 +318,6 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         uint256 stakerBalanceOnL2Before = IERC20(tokenDestination).balanceOf(staker);
 
         // Mock sending a completeWithdrawal tx to SenderContract on L2.
-        // This commits the withdrawalRoot with (staker, amount) which will later be
-        // read by the returning message from L1 to correctly transfer(amount, staker) on L2.
-        //
-        // Note: this prevents the oracle network from inserting withdrawalRoots with
-        // their own addresses to withdraw to (instead of the stakers).
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
@@ -342,7 +339,7 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         /////////////////////////////////////////////////////////////////
 
         /////////////////////////////////////////////////////////////////
-        //// 2. [L1] Mock recieving CompleteWithdrawals message on L1 Bridge
+        //// 2. [L1] Mock receiving CompleteWithdrawals message on L1 Bridge
         /////////////////////////////////////////////////////////////////
         // need to fork ethsepolia to get: ReceiverCCIP -> Router calls to work
         vm.selectFork(ethForkId);
@@ -464,12 +461,8 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         bool receiveAsTokens
     ) public view returns (Client.Any2EVMMessage memory) {
 
-        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
-        destTokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(0x0),
-            amount: 0 ether // just send CCIP message, no token bridging
-        });
-
+        // amount: 0 ether just send CCIP message, no token bridging
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
         bytes memory message = eigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
             withdrawal,
@@ -504,11 +497,8 @@ contract CCIP_Eigen_QueueWithdrawals is Test {
         address _tokenDestination // BnM token addr on L2 destination
     ) public view returns (Client.Any2EVMMessage memory) {
 
-        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
-        destTokenAmounts[0] = Client.EVMTokenAmount({
-            token: _tokenDestination,
-            amount: _amount
-        });
+        // Not bridging tokens, just sending message to withdraw
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),

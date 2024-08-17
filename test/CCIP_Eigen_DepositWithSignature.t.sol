@@ -61,6 +61,8 @@ contract CCIP_Eigen_DepositWithSignature is Test {
         eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
         signatureUtils = new SignatureUtilsEIP1271();
 
+        // uint256 arbForkId = vm.createSelectFork("arbsepolia");
+        // vm.rollFork(71584765); // roll back before CCIP network entered "cursed" state
         uint256 arbForkId = vm.createFork("arbsepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
 

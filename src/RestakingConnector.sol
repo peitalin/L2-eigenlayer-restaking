@@ -46,9 +46,8 @@ contract RestakingConnector is IRestakingConnector, EigenlayerMsgDecoders, Admin
         emit SetQueueWithdrawalBlock(staker, nonce, block.number);
     }
 
-    function getQueueWithdrawalBlock(address staker, uint256 nonce) public returns (uint256) {
-        uint256 withdrawalBlock = _withdrawalBlock[staker][nonce];
-        return withdrawalBlock;
+    function getQueueWithdrawalBlock(address staker, uint256 nonce) public view returns (uint256) {
+        return _withdrawalBlock[staker][nonce];
     }
 
     function getEigenlayerContracts() public view returns (

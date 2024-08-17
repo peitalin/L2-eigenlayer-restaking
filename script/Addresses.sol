@@ -134,7 +134,7 @@ contract FileReader is Script {
     function readWithdrawalInfo(
         address stakerAddress,
         string memory filePath
-    ) public returns ( IDelegationManager.Withdrawal memory) {
+    ) public view returns (IDelegationManager.Withdrawal memory) {
 
         string memory withdrawalData = vm.readFile(
             string(abi.encodePacked(
@@ -202,6 +202,10 @@ library ArbSepolia {
     address constant Link = 0xb1D4538B4571d411F07960EF2838Ce337FE1E80E;
 
     uint256 constant ChainId = 421614;
+
+    // Risk Management Network contract that curses / blesses
+    address constant RMN = 0xbcBDf0aDEDC9a33ED5338Bdb4B6F7CE664DC2e8B;
+
 }
 
 library EthSepolia {

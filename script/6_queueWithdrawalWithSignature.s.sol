@@ -52,6 +52,8 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
 
         bool isTest = block.chainid == 31337;
         uint256 arbForkId = vm.createFork("arbsepolia");
+        // uint256 arbForkId = vm.createSelectFork("arbsepolia");
+        // vm.rollFork(71584765); // roll back before CCIP network entered "cursed" state
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
         console.log("arbForkId:", arbForkId);
         console.log("ethForkId:", ethForkId);

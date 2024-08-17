@@ -23,7 +23,7 @@ forge script script/2_deployOnArb.s.sol:DeployOnArbScript \
 #     --watch \
 #     --etherscan-api-key $ARBISCAN_API_KEY \
 #     --compiler-version v0.8.22 \
-#     0x82b539F277DB9E93bd80E37f9f8AF1C0424F89A7 \
+#     0x06b72b50b23fecd190d6fec7b1b99c9f7b6a3e0f \
 #     ./src/SenderCCIP.sol:SenderCCIP
 
 
@@ -35,11 +35,11 @@ forge script script/2_deployOnArb.s.sol:DeployOnArbScript \
 #     --etherscan-api-key $ARBISCAN_API_KEY \
 #     --verifier sourcify \
 #     --compiler-version v0.8.22 \
-#     0x82b539F277DB9E93bd80E37f9f8AF1C0424F89A7 \
+#     0x06b72b50b23fecd190d6fec7b1b99c9f7b6a3e0f \
 #     ./src/SenderCCIP.sol:SenderCCIP
 
-# forge verify-check 0x82b539F277DB9E93bd80E37f9f8AF1C0424F89A7 \
+# forge verify-check 0x06b72b50b23fecd190d6fec7b1b99c9f7b6a3e0f \
 #   --chain-id 421614 \
 #   --verifier sourcify
 
-# https://sourcify.dev/#/lookup/0x82b539F277DB9E93bd80E37f9f8AF1C0424F89A7
+# https://sourcify.dev/#/lookup/0x06b72b50b23fecd190d6fec7b1b99c9f7b6a3e0f

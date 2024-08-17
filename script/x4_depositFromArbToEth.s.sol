@@ -25,8 +25,9 @@ contract DepositFromArbToEthScript is Script, ScriptUtils {
 
 
     function run() public {
-        // we are calling CCIP-BnM via an address which is only on mainnet, so fork mainnet
+        // we are calling CCIP-BnM address which is only on mainnet
         vm.createSelectFork("arbsepolia");
+        vm.rollFork(71584765); // roll back before CCIP network entered "cursed" state
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
