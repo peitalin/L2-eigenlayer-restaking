@@ -11,6 +11,8 @@ import {TransferToStakerMessage} from "./interfaces/IRestakingConnector.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {ArbSepolia} from "../script/Addresses.sol";
 
+import {console} from "forge-std/Test.sol";
+
 
 contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsgDecoders, EigenlayerMsgEncoders {
 
@@ -89,7 +91,6 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
 
         if (functionSelector == 0x27167d10) {
             // keccak256(abi.encode("transferToStaker(bytes32)")) == 0x27167d10
-
             TransferToStakerMessage memory transferToStakerMsg = decodeTransferToStakerMessage(message);
 
             bytes32 withdrawalRoot = transferToStakerMsg.withdrawalRoot;
@@ -132,7 +133,6 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
         );
     }
 
-
     /// @param _receiver The address of the receiver.
     /// @param _text The string data to be sent.
     /// @param _token The token to be transferred.
@@ -164,6 +164,7 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
 
         bytes4 functionSelector = decodeFunctionSelector(message);
 
+        // When sending a message from L2 to L1
         if (functionSelector == 0x54b2bf29) {
             (
                 IDelegationManager.Withdrawal memory withdrawal

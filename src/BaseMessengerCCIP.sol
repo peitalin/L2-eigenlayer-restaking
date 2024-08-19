@@ -302,12 +302,18 @@ contract BaseMessengerCCIP is CCIPReceiver, OwnerIsCreator {
         uint256 _amount,
         address _feeTokenAddress
     ) internal virtual returns (Client.EVM2AnyMessage memory) {
-        // Set the token amounts
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
-        tokenAmounts[0] = Client.EVMTokenAmount({
-            token: _token,
-            amount: _amount
-        });
+
+        Client.EVMTokenAmount[] memory tokenAmounts;
+
+        if (_amount <= 0) {
+            tokenAmounts = new Client.EVMTokenAmount[](0);
+        } else {
+            tokenAmounts = new Client.EVMTokenAmount[](1);
+            tokenAmounts[0] = Client.EVMTokenAmount({
+                token: _token,
+                amount: _amount
+            });
+        }
 
         bytes memory message = abi.encode(_text); // ABI-encoded string
         uint256 gasLimit = 600_000;

@@ -5,6 +5,7 @@ import {console} from "forge-std/Test.sol";
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 // Deposit
 import {
@@ -31,41 +32,13 @@ import {IEigenlayerMsgDecoders} from "../interfaces/IEigenlayerMsgDecoders.sol";
 
 contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
-    //////////////////////////////////////////////
-    // DepositIntoStrategy
-    //////////////////////////////////////////////
-
-    function decodeDepositMessage(
-        bytes memory message
-    ) public returns (EigenlayerDepositMessage memory) {
-
-        bytes32 offset;
-        bytes32 length;
-        bytes4 functionSelector;
-        uint256 amount;
-        address staker;
-
-        assembly {
-            offset := mload(add(message, 32))
-            length := mload(add(message, 64))
-            functionSelector := mload(add(message, 96))
-            amount := mload(add(message, 100))
-            staker := mload(add(message, 132))
-        }
-
-        EigenlayerDepositMessage memory eigenlayerDepositMessage = EigenlayerDepositMessage({
-            amount: amount,
-            staker: staker
-        });
-
-        emit EigenlayerDepositParams(amount, staker);
-
-        return eigenlayerDepositMessage;
-    }
-
-    //////////////////////////////////////////////
-    // DepositIntoStrategy with Signature
-    //////////////////////////////////////////////
+    /*
+     *
+     *
+     *                   Deposits
+     *
+     *
+    */
 
     function decodeDepositWithSignatureMessage(
         bytes memory message
@@ -143,9 +116,13 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         return eigenlayerDepositWithSignatureMessage;
     }
 
-    //////////////////////////////////////////////
-    // Queue Withdrawals
-    //////////////////////////////////////////////
+    /*
+     *
+     *
+     *                   Queue Withdrawals
+     *
+     *
+    */
 
     function decodeQueueWithdrawalsMessage(
         bytes memory message
@@ -455,9 +432,13 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         return queuedWithdrawalWithSigParams;
     }
 
-    //////////////////////////////////////////////
-    // Complete Withdrawals
-    //////////////////////////////////////////////
+    /*
+     *
+     *
+     *                   Complete Withdrawals
+     *
+     *
+    */
 
     function decodeCompleteWithdrawalMessage(bytes memory message) public pure returns (
         IDelegationManager.Withdrawal memory,
@@ -696,6 +677,128 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         emit TransferToStakerParams(withdrawalRoot);
 
         return transferToStakerMessage;
+    }
+
+    /*
+     *
+     *
+     *                   DelegateTo
+     *
+     *
+    */
+
+    function decodeDelegateToBySignature(
+        bytes memory message
+    ) public returns (
+        address,
+        address,
+        ISignatureUtils.SignatureWithExpiry memory,
+        ISignatureUtils.SignatureWithExpiry memory,
+        bytes32
+    ) {
+
+        // function delegateToBySignature(
+        //     address staker,
+        //     address operator,
+        //     SignatureWithExpiry memory stakerSignatureAndExpiry,
+        //     SignatureWithExpiry memory approverSignatureAndExpiry,
+        //     bytes32 approverSalt
+        // )
+
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
+        // 0000000000000000000000000000000000000000000000000000000000000164 [64]
+        // 7f548071                                                         [96]
+        // 0000000000000000000000007e5f4552091a69125d5dfcb7b8c2659029395bdf [100] staker
+        // 0000000000000000000000002b5ad5c4795c026514f8317c7a215e218dccd6cf [132] operator
+        // 00000000000000000000000000000000000000000000000000000000000000a0 [164] staker sig struct offset [5 lines]
+        // 0000000000000000000000000000000000000000000000000000000000000100 [196] approver sig struct offset [8 lines]
+        // 0000000000000000000000000000000000000000000000000000000000004444 [228] approverSalt
+        // 0000000000000000000000000000000000000000000000000000000000000040 [260] staker sig offset (bytes has a offset and length)
+        // 0000000000000000000000000000000000000000000000000000000000000005 [292] staker sig expiry
+        // 0000000000000000000000000000000000000000000000000000000000000000 [324] staker signature
+        // 0000000000000000000000000000000000000000000000000000000000000040 [356] approver sig offset
+        // 0000000000000000000000000000000000000000000000000000000000000006 [388] approver signature expiry
+        // 0000000000000000000000000000000000000000000000000000000000000000 [420] approver signature
+        // 00000000000000000000000000000000000000000000000000000000
+
+        bytes4 functionSelector;
+        bytes32 withdrawalRoot;
+        address staker;
+        address operator;
+
+        bytes32 approverSalt;
+
+        uint256 stakerExpiry;
+        bytes memory stakerSignature;
+
+        uint256 approverExpiry;
+        bytes memory approverSignature;
+
+        assembly {
+            functionSelector := mload(add(message, 96))
+            staker := mload(add(message, 100))
+            operator := mload(add(message, 132))
+
+            approverSalt := mload(add(message, 228))
+
+            stakerExpiry := mload(add(message, 292))
+            stakerSignature := mload(add(message, 324))
+
+            approverExpiry := mload(add(message, 388))
+            approverSignature := mload(add(message, 420))
+        }
+
+        // console.log('approverSalt');
+        // console.logBytes32(approverSalt);
+
+        // console.log("stakerExpiry");
+        // console.log(stakerExpiry);
+        // console.log("stakerSignature");
+        // console.logBytes(stakerSignature);
+
+        // console.log("appropverExpiry");
+        // console.log(approverExpiry);
+        // console.log("approverSignature");
+        // console.logBytes(approverSignature);
+
+        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+            signature: stakerSignature,
+            expiry: stakerExpiry
+        });
+
+        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+            signature: approverSignature,
+            expiry: approverExpiry
+        });
+
+        return (
+            staker,
+            operator,
+            stakerSignatureAndExpiry,
+            approverSignatureAndExpiry,
+            approverSalt
+        );
+    }
+
+    function decodeUndelegate(
+        bytes memory message
+    ) public returns (address) {
+
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
+        // 0000000000000000000000000000000000000000000000000000000000000224 [64]
+        // 54b2bf29                                                         [96]
+        // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d412eb [100] address
+        // 00000000000000000000000000000000000000000000000000000000
+
+        bytes4 functionSelector;
+        address staker;
+
+        assembly {
+            functionSelector := mload(add(message, 96))
+            staker := mload(add(message, 100))
+        }
+
+        return staker;
     }
 
 }

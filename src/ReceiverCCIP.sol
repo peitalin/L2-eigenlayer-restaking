@@ -22,6 +22,8 @@ import {ArbSepolia} from "../script/Addresses.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 import {TransferToStakerMessage} from "./interfaces/IRestakingConnector.sol";
 
+import {console} from "forge-std/Test.sol";
+
 
 /// ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them.
 contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsgEncoders {
@@ -101,20 +103,8 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
 
         IERC20 underlyingToken = strategy.underlyingToken();
         string memory textMsg = "no matching functionSelector";
-        uint256 amountMsg = any2EvmMessage.destTokenAmounts[0].amount;
+        uint256 amountMsg = s_lastReceivedTokenAmount;
 
-
-        if (functionSelector == 0xf7e784ef) {
-            // bytes4(keccak256("depositIntoStrategy(uint256,address)")) == 0xf7e784ef
-            EigenlayerDepositMessage memory eigenMsg;
-            eigenMsg = restakingConnector.decodeDepositMessage(message);
-            // Receiver contract approves eigenlayer StrategyManager for deposits
-            underlyingToken.approve(address(strategyManager), eigenMsg.amount);
-            // deposit into Eigenlayer
-            strategyManager.depositIntoStrategy(strategy, underlyingToken, eigenMsg.amount);
-            textMsg = "depositIntoStrategy()";
-            amountMsg = eigenMsg.amount;
-        }
 
         if (functionSelector == 0x32e89ace) {
             // bytes4(keccak256("depositIntoStrategyWithSignature(address,address,uint256,address,uint256,bytes)")) == 0x32e89ace
@@ -153,20 +143,7 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
             IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalsWithSigParams =
                 restakingConnector.decodeQueueWithdrawalsWithSignatureMessage(message);
 
-            // struct QueuedWithdrawalWithSignatureParams {
-            //     // Array of strategies that the QueuedWithdrawal contains
-            //     IStrategy[] strategies;
-            //     // Array containing the amount of shares in each Strategy in the `strategies` array
-            //     uint256[] shares;
-            //     // The address of the withdrawer
-            //     address withdrawer;
-            //     // The address of the staker
-            //     address staker;
-            //     // signature of the staker
-            //     bytes signature;
-            //     // expiration timestamp of the signature
-            //     uint256 expiry;
-            // }
+            require(queuedWithdrawalsWithSigParams.length > 0, "queuedWithdrawalsWithSigParams: length cannot be 0");
 
             address staker = queuedWithdrawalsWithSigParams[0].staker;
             // queueWithdrawal uses current nonce in the withdrawalRoot, the increments after
@@ -238,7 +215,7 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
             any2EvmMessage.sourceChainSelector, // fetch the source chain identifier (aka selector)
             abi.decode(any2EvmMessage.sender, (address)), // abi-decoding of the sender address,
             textMsg,
-            any2EvmMessage.destTokenAmounts[0].token,
+            s_lastReceivedTokenAddress,
             amountMsg
         );
     }

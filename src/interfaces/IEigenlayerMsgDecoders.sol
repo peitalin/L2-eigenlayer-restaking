@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 // Deposit
 import {
@@ -19,11 +20,6 @@ import {EigenlayerQueueWithdrawalsParams} from "../interfaces/IRestakingConnecto
 
 
 interface IEigenlayerMsgDecoders {
-
-    function decodeDepositMessage(
-        bytes calldata message
-    ) external returns (EigenlayerDepositMessage memory);
-
 
     function decodeDepositWithSignatureMessage(
         bytes memory message
@@ -51,4 +47,15 @@ interface IEigenlayerMsgDecoders {
         bool
     );
 
+    function decodeDelegateToBySignature(
+        bytes memory message
+    ) external returns (
+        address,
+        address,
+        ISignatureUtils.SignatureWithExpiry memory,
+        ISignatureUtils.SignatureWithExpiry memory,
+        bytes32
+    );
+
+    function decodeUndelegate(bytes memory message) external returns (address);
 }
