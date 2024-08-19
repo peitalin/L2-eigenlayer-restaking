@@ -90,7 +90,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
 
         vm.selectFork(ethForkId);
 
-        amount = 0.000001 ether; // only sending a withdrawal message, not bridging tokens.
+        amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
         staker = deployer;
         expiry = block.timestamp + 6 hours;
 

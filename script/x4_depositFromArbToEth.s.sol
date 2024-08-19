@@ -27,7 +27,6 @@ contract DepositFromArbToEthScript is Script, ScriptUtils {
     function run() public {
         // we are calling CCIP-BnM address which is only on mainnet
         vm.createSelectFork("arbsepolia");
-        vm.rollFork(71584765); // roll back before CCIP network entered "cursed" state
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
@@ -44,7 +43,6 @@ contract DepositFromArbToEthScript is Script, ScriptUtils {
         /////////////////////////////
         vm.startBroadcast(deployerKey);
 
-        // Note remember to vm.createSelectFork("arbsepolia");
         // check CCIP-BnM balances for sender contract if it's a lock/unlock bridge model
         if (ccipBnM.balanceOf(senderAddr) < 0.1 ether) {
             // we're sending 0.001 CCIPBnM
@@ -52,11 +50,12 @@ contract DepositFromArbToEthScript is Script, ScriptUtils {
             ccipBnM.transferFrom(deployer, senderAddr, 0.1 ether);
         }
         //// Approve senderContract to send ccip-BnM tokens
-        amountBridgedAndStaked = 0.0093 ether;
+        amountBridgedAndStaked = 0.0023 ether;
         ccipBnM.approve(senderAddr, amountBridgedAndStaked);
 
         uint64 destinationChainSelector = EthSepolia.ChainSelector;
 
+        // Note: fuctionSelector removed from SenderCCIP; use depositIntoStrategyWithSignature
         string memory message = string(abi.encodeWithSelector(
             bytes4(keccak256("depositIntoStrategy(uint256,address)")),
             amountBridgedAndStaked,

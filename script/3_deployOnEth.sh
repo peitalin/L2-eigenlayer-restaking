@@ -18,5 +18,5 @@ forge script script/3_deployOnEth.s.sol:DeployOnEthScript \
 #     --watch \
 #     --etherscan-api-key $ETHERSCAN_API_KEY \
 #     --compiler-version v0.8.22 \
-#     0x5C95b4EC7c08527F172842dB0a79127ABBf9BfD3 \
+#     0x355c6aB76aF980Bb1726eb2e652c19F81B384e5B \
 #     ./src/ReceiverCCIP.sol:ReceiverCCIP

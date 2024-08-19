@@ -73,12 +73,10 @@ Once we wait for the L1 -> L2 bridge back, we can see the token transferred back
     - [x] `queueWithdrawalsWithSignature` ([requires PR #646 to work](https://github.com/Layr-Labs/eigenlayer-contracts/pull/676/files))
     - [x] `completeQueuedWithdrawals`
         - [x] Transfer withdrawn tokens from L1 back to L2
-        - [ ] Add signatures on L1 receiver contract to verify staker's intent to completeWithdrawal on L1.
-        - [ ] Add signatures on L2 sender contract and CCIP Message to verify tokens are transferred to the right staker address on L2.
-        - [x] Alternatively, we can make a `mapping(bytes32 withdrawalRoot => Withdrawal)` mapping, then message the withdrawalRoot back to L2 instead of needing another user signature.  We look up the original staker on L2 when the L1 withdrawalRoot message arrives.
-    - [ ] `delegate`
-    - [ ] `undelegate`
-- [ ] Refactor CCIP for messaging passing with no-token bridging option (currently sending 0.0001 tokens for withdrawals)
+        - [x] Make `mapping(bytes32 withdrawalRoot => Withdrawal)` and `withdrawalRootSpend` mappings on L1 SenderCCIP bridge, so when the withdrawalRoot is messaged back from L1 we can look up the original staker on L2 to transfer to without needing another signature.
+    - [x] Refactor CCIP for messaging passing with no-token bridging option
+    - [ ] `delegateToBySignature`
+    - [ ] `undelegate` (this also withdraws the staker, so we will probably need a `undelegateWithSignature` feature as well from Eigenlayer). There is no way to directly re-delegate to another operator, a staker must undelegate + withdraw, wait 7 days, then restake and re-delegate to a new operator.
 
 - Gas optimization
     - [ ] Estimate gas limit for each of the previous operations
