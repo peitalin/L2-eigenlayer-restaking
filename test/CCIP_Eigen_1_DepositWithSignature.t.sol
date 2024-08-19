@@ -28,7 +28,7 @@ import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {EthSepolia, ArbSepolia} from "../script/Addresses.sol";
 
 
-contract CCIP_Eigen_DepositWithSignature is Test {
+contract CCIP_Eigen_DepositWithSignatureTests is Test {
 
     DeployOnEthScript public deployOnEthScript;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;

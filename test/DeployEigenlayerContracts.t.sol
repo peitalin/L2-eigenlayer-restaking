@@ -14,7 +14,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 
 
-contract DeployEigenlayerContractsTest is Test {
+contract DeployEigenlayerContractsTests is Test {
 
     uint256 public deployerKey;
     address public deployer;

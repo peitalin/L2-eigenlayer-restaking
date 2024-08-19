@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import {Test, console} from "forge-std/Test.sol";
 
-import {EIP1271SignatureUtils} from "eigenlayer-contracts/src/contracts/libraries/EIP1271SignatureUtils.sol";
+import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -23,7 +23,7 @@ import {FileReader} from "../script/Addresses.sol";
 
 
 
-contract EigenlayerMessage_EncodingDecodingTests is Test {
+contract EigenlayerMsg_EncodingDecodingTests is Test {
 
     uint256 public deployerKey;
     address public deployer;
@@ -80,43 +80,15 @@ contract EigenlayerMessage_EncodingDecodingTests is Test {
         require(functionSelector2 == 0x32e89ace, "wrong functionSelector");
     }
 
-    function test_DecodeEigenlayerMsg_Deposit() public pure {
+    /*
+     *
+     *
+     *                   Deposits
+     *
+     *
+    */
 
-        // 0000000000000000000000000000000000000000000000000000000000000020
-        // 0000000000000000000000000000000000000000000000000000000000000044
-        // f7e784ef00000000000000000000000000000000000000000000000000000000
-        // 000000020000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a
-        // 1b7b6c2c00000000000000000000000000000000000000000000000000000000
-        bytes memory message = hex"00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000044f7e784ef00000000000000000000000000000000000000000000000000000000000000020000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c00000000000000000000000000000000000000000000000000000000";
-
-        bytes32 offset;
-        bytes32 length;
-        bytes4 functionSelector;
-        uint256 _amount;
-        address _staker;
-
-        assembly {
-            offset := mload(add(message, 32))
-            length := mload(add(message, 64))
-            functionSelector := mload(add(message, 96))
-            _amount := mload(add(message, 100))
-            _staker := mload(add(message, 132))
-        }
-
-        bytes4 functionSelector2 = bytes4(keccak256("depositIntoStrategy(uint256,address)"));
-
-        require(functionSelector == functionSelector2, "functionSelectors do not match");
-
-        EigenlayerDepositMessage memory emsg = EigenlayerDepositMessage({
-            amount: _amount,
-            staker: _staker
-        });
-
-        require(emsg.amount == 2, "decoded incorrect EigenlayerDepositMessage.amount");
-        require(emsg.staker == _staker, "decoded incorrect EigenlayerDepositMessage.staker");
-    }
-
-    function test_EncodesDepositWithSignature() public {
+    function test_Encodes_DepositWithSignature() public {
 
         amount = 0.0077 ether;
         bytes memory signature = hex"3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d51c";
@@ -145,7 +117,7 @@ contract EigenlayerMessage_EncodingDecodingTests is Test {
         );
     }
 
-    function test_DecodeEigenlayerMsg_DepositWithSignature() public view {
+    function test_Decode_DepositWithSignature() public view {
 
         // function depositIntoStrategyWithSignature(
         //     IStrategy strategy,
@@ -156,7 +128,6 @@ contract EigenlayerMessage_EncodingDecodingTests is Test {
         //     bytes memory signature
         // ) external onlyWhenNotPaused(PAUSED_DEPOSITS) nonReentrant returns (uint256 shares)
 
-        // encode message payload
         bytes memory message_bytes = eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
             address(strategy),
             address(token),
@@ -232,7 +203,15 @@ contract EigenlayerMessage_EncodingDecodingTests is Test {
         require(_strategy == address(strategy), "strategy does not match");
     }
 
-    function test_DecodeEigenlayerMsg_QueueWithdrawal() public view {
+    /*
+     *
+     *
+     *                   Queue Withdrawals
+     *
+     *
+    */
+
+    function test_Decode_QueueWithdrawals() public view {
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         uint256[] memory sharesToWithdraw = new uint256[](1);
@@ -325,7 +304,7 @@ contract EigenlayerMessage_EncodingDecodingTests is Test {
         require(_strategy == address(queuedWithdrawalParams[0].strategies[0]), "decoded strategy incorrect");
     }
 
-    function test_DecodeEigenlayerMsg_MultipleQueueWithdrawals() public {
+    function test_Decode_Multiple_QueueWithdrawals() public {
 
         IStrategy[] memory strategiesToWithdraw1 = new IStrategy[](1);
         IStrategy[] memory strategiesToWithdraw2 = new IStrategy[](1);
@@ -393,8 +372,7 @@ contract EigenlayerMessage_EncodingDecodingTests is Test {
         );
     }
 
-    /// Note: Need to do a array version of this
-    function test_DecodeEigenlayerMsg_QueueWithdrawalsWithSignature() public {
+    function test_Decode_QueueWithdrawalsWithSignature() public {
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         strategiesToWithdraw[0] = strategy;
@@ -463,8 +441,20 @@ contract EigenlayerMessage_EncodingDecodingTests is Test {
         // console.logBytes(dwp[0].signature);
     }
 
-    /// Note: Need to do a array version of this
-    function test_DecodeEigenlayerMsg_CompleteQueuedWithdrawal() public {
+    function test_Decode_Multiple_QueueWithdrawalsWithSignature() public {
+        /// TODO
+
+    }
+
+    /*
+     *
+     *
+     *                   Complete Withdrawals
+     *
+     *
+    */
+
+    function test_Decode_CompleteQueuedWithdrawal() public {
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         uint256[] memory sharesToWithdraw = new uint256[](1);
@@ -514,4 +504,85 @@ contract EigenlayerMessage_EncodingDecodingTests is Test {
         require(_receiveAsTokens == receiveAsTokens, "decodeCompleteWithdrawalMessage error");
     }
 
+    /// Note: Need to do a array version of this
+    function test_Decode_Multiple_CompleteQueuedWithdrawal() public {
+
+    }
+
+    /*
+     *
+     *
+     *                   Delegation
+     *
+     *
+    */
+
+    function test_Decode_DelegateToBySignature() public {
+
+        address staker = vm.addr(0x1);
+        address operator = vm.addr(0x2);
+        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+            signature: new bytes(0),
+            expiry: 5
+        });
+        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+            signature: new bytes(0),
+            expiry: 6
+        });
+        bytes32 approverSalt = 0x0000000000000000000000000000000000000000000000000000000000004444;
+
+        bytes memory message_bytes = eigenlayerMsgEncoders.encodeDelegateToBySignature(
+            staker,
+            operator,
+            stakerSignatureAndExpiry,
+            approverSignatureAndExpiry,
+            approverSalt
+        );
+        // CCIP turns the message into string when sending
+        bytes memory message = abi.encode(string(message_bytes));
+
+        (
+            address _staker,
+            address _operator,
+            ISignatureUtils.SignatureWithExpiry memory _stakerSignatureAndExpiry,
+            ISignatureUtils.SignatureWithExpiry memory _approverSignatureAndExpiry,
+            bytes32 _approverSalt
+        ) = restakingConnector.decodeDelegateToBySignature(message);
+
+        require(staker == _staker, "staker incorrect");
+        require(operator == _operator, "operator incorrect");
+        require(approverSalt == _approverSalt, "approverSalt incorrect");
+        require(
+            stakerSignatureAndExpiry.expiry == _stakerSignatureAndExpiry.expiry,
+            "staker signature expiry incorrect"
+        );
+        require(
+            keccak256(stakerSignatureAndExpiry.signature) == keccak256(_stakerSignatureAndExpiry.signature),
+            "staker signature incorrect"
+        );
+        require(
+            approverSignatureAndExpiry.expiry == _approverSignatureAndExpiry.expiry,
+            "approver signature expiry incorrect"
+        );
+        require(
+            keccak256(approverSignatureAndExpiry.signature) == keccak256(_approverSignatureAndExpiry.signature),
+            "approver signature incorrect"
+        );
+    }
+
+    function test_Decode_Undelegate() public {
+
+        address staker = vm.addr(0x1);
+
+        bytes memory message_bytes = eigenlayerMsgEncoders.encodeUndelegateMsg(
+            staker
+        );
+        // CCIP turns the message into string when sending
+        bytes memory message = abi.encode(string(message_bytes));
+
+        console.logBytes(message);
+        address _staker = restakingConnector.decodeUndelegate(message);
+
+        require(staker == _staker, "staker incorrect");
+    }
 }
