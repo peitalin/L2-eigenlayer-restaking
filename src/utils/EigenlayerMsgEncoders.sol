@@ -9,7 +9,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract EigenlayerMsgEncoders {
 
-
     function encodeDepositIntoStrategyWithSignatureMsg(
         address strategy,
         address token,
@@ -37,7 +36,6 @@ contract EigenlayerMsgEncoders {
     function encodeQueueWithdrawalMsg(
         IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
     ) public pure returns (bytes memory) {
-
         // structs are encoded as tuples:
         // QueuedWithdrawalParams {
         //     IStrategy[] strategies;
@@ -52,13 +50,12 @@ contract EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-   function encodeQueueWithdrawalsWithSignatureMsg(
+    function encodeQueueWithdrawalsWithSignatureMsg(
         IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray
     ) public pure returns (bytes memory) {
 
         // Structs are encoded as tuples:
         // queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])
-
         bytes memory message_bytes = abi.encodeWithSelector(
             bytes4(keccak256("queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])")),
             queuedWithdrawalWithSigArray
@@ -127,8 +124,6 @@ contract EigenlayerMsgEncoders {
         //     SignatureWithExpiry memory approverSignatureAndExpiry,
         //     bytes32 approverSalt
         // )
-
-        // https://etherscan.io/tx/0x443e5e4fb8940e19d49963c6264d330d5703abd0d28f99622dcc291e93007836
 
         // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d412eb
         // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d41333

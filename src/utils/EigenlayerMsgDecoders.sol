@@ -50,16 +50,16 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
         // 0000000000000000000000000000000000000000000000000000000000000144 [64]
         // 32e89ace000000000000000000000000bd4bcb3ad20e9d85d5152ae68f45f40a [96] bytes4 truncates the right
-        // f8952159        [100] reads 32 bytes from offset [100] right-to-left up to the function selector
+        // f8952159                                                         [100] reads 32 bytes from offset [100] right-to-left up to the function selector
         // 0000000000000000000000003eef6ec7a9679e60cc57d9688e9ec0e6624d687a [132]
         // 000000000000000000000000000000000000000000000000001b5b1bf4c54000 [164] uint256 amount in hex
         // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [196]
         // 0000000000000000000000000000000000000000000000000000000000015195 [228] expiry
         // 00000000000000000000000000000000000000000000000000000000000000c0 [260] offset: 192 bytes
         // 0000000000000000000000000000000000000000000000000000000000000041 [292] length: 65 bytes
-        // 3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee [324] signature r
-        // 3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d5 [356] signature s
-        // 1c00000000000000000000000000000000000000000000000000000000000000 [388] v: uint8 = bytes1
+        // 3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee [324] signature: r
+        // 3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d5 [356] signature: s
+        // 1c00000000000000000000000000000000000000000000000000000000000000 [388] signature: v (uint8 = bytes1)
         // 00000000000000000000000000000000000000000000000000000000
 
         bytes32 offset;
@@ -72,8 +72,8 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         address staker;
         uint256 expiry;
 
-        bytes32 sig_offset;
-        bytes32 sig_length;
+        uint256 sig_offset;
+        uint256 sig_length;
         bytes32 r;
         bytes32 s;
         bytes1 v;
@@ -99,7 +99,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
         bytes memory signature = abi.encodePacked(r,s,v);
 
-        require(signature.length == 65, "invalid signature length");
+        require(sig_length == 65, "decodeDepositWithSignatureMessage: invalid signature length");
 
         EigenlayerDepositWithSignatureMessage memory eigenlayerDepositWithSignatureMessage;
         eigenlayerDepositWithSignatureMessage = EigenlayerDepositWithSignatureMessage({
@@ -216,7 +216,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         // 000000000000000000000000000000000000000000000000000c38a96a070000 [644] struct2_field2 value
         // 00000000000000000000000000000000000000000000000000000000
 
-
         // bytes32 _strOffset;
         // bytes32 _strLength;
         bytes4 functionSelector;
@@ -235,7 +234,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         /// - determine length of QueuedWithdrawalParam[] from bytes message
         /// - loop through and deserialise each element in QueuedWithdrawalParams[]
         /// with the correct offsets
-        require(arrayLength >= 1, "array cannot be zero length");
 
         uint256 offset = (arrayLength - 1) + (7 * i);
         // Every extra element in the QueueWithdrawalParams[] array adds
@@ -297,7 +295,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
         /// @dev note: Need to account for bytes message including arrays of QueuedWithdrawalParams
         /// We will need to check array length in SenderCCIP to determine gas as well.
-
         uint256 arrayLength;
         assembly {
             arrayLength := mload(add(message, 132))
@@ -313,17 +310,13 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
             IDelegationManager.QueuedWithdrawalWithSignatureParams memory wp;
             wp = _decodeSingleQueueWithdrawalsWithSignatureMessage(message, arrayLength, i);
-            // console.log("wp.shares:", wp.shares[0]);
-            // console.log("wp.withdrawer:", wp.withdrawer);
-            // console.log("staker: ", wp.staker);
-            // console.log("signature: ");
-            // console.logBytes(wp.signature);
 
             arrayQueuedWithdrawalWithSigParams[i] = wp;
         }
 
         return arrayQueuedWithdrawalWithSigParams;
     }
+
 
     function _decodeSingleQueueWithdrawalsWithSignatureMessage(
         bytes memory message,
@@ -372,40 +365,86 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         // 1c00000000000000000000000000000000000000000000000000000000000000 [612] signature v (uint8 = bytes1)
         // 00000000000000000000000000000000000000000000000000000000
 
-        bytes4 _functionSelector;
-        uint256 _arrayLength;
+        //// example with 2 elements in array
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
+        // 0000000000000000000000000000000000000000000000000000000000000404 [64]
+        // a140f06e                                                         [96] function selector
+        // 0000000000000000000000000000000000000000000000000000000000000020 [100] QueuedWithdrawWithSigParams offset
+        // 0000000000000000000000000000000000000000000000000000000000000002 [132] QWWSP[] array length
+        // 0000000000000000000000000000000000000000000000000000000000000040 [164] QWWSP[0] struct offset (2 lines)
+        // 0000000000000000000000000000000000000000000000000000000000000200 [196] QWWSP[1] struct offset (200hex = 512 bytes = 16 lines)
+        // 00000000000000000000000000000000000000000000000000000000000000c0 [228] struct1_field1 offset (6 lines)
+        // 0000000000000000000000000000000000000000000000000000000000000100 [260] struct1_field2 offset (8 lines)
+        // 0000000000000000000000007a3e017ca7ced7aaa60d5557af74063f14e64eb6 [292] struct1_field3 withdrawer (static value)
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [324] struct1_field4 staker (static value)
+        // 0000000000000000000000000000000000000000000000000000000000000140 [356] struct1_field5 signature offset (10 lines)
+        // 0000000000000000000000000000000000000000000000000000000000015195 [388] struct1_field6 value expiry (86421 seconds)
+        // 0000000000000000000000000000000000000000000000000000000000000001 [420] struct1_field1 length
+        // 000000000000000000000000bd4bcb3ad20e9d85d5152ae68f45f40af8952159 [452] struct1_field1 value (strategy)
+        // 0000000000000000000000000000000000000000000000000000000000000001 [484] struct1_field2 length
+        // 000000000000000000000000000000000000000000000000001b5b1bf4c54000 [516] struct1_field2 value (shares)
+        // 0000000000000000000000000000000000000000000000000000000000000041 [548] struct1_field5 length of signature
+        // 5f5b8a641b4ba45f31449d3e8eadb8defca6a7ae6ba0bebd4ff6118e122cd385 [580] struct1_field5 sig r
+        // 69312cb171f2d3d475d499475192ecbbe047adad1cc0e868976bc31644407159 [612] struct1_field5 sig s
+        // 1b00000000000000000000000000000000000000000000000000000000000000 [644] struct1_field5 sig v
+        // 00000000000000000000000000000000000000000000000000000000000000c0 [676] struct2_field1 offset (6 lines)
+        // 0000000000000000000000000000000000000000000000000000000000000100 [708] struct2_field2 offset (8 lines)
+        // 0000000000000000000000007a3e017ca7ced7aaa60d5557af74063f14e64eb6 [740] struct2_field3 withdrawer (static value)
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [772] struct2_field4 staker (static value)
+        // 0000000000000000000000000000000000000000000000000000000000000140 [804] struct2_field5 signature offset (10 lines)
+        // 0000000000000000000000000000000000000000000000000000000000015195 [836] struct2_field6 value expiry (86421 seconds)
+        // 0000000000000000000000000000000000000000000000000000000000000001 [868] struct2_field1 length
+        // 000000000000000000000000bd4bcb3ad20e9d85d5152ae68f45f40af8952159 [900] struct2_field1 value (strategy)
+        // 0000000000000000000000000000000000000000000000000000000000000001 [932] struct2_field2 length
+        // 000000000000000000000000000000000000000000000000001b5b1bf4c54000 [964] struct2_field2 value (shares)
+        // 0000000000000000000000000000000000000000000000000000000000000041 [996] struct2_field5 length of signature
+        // 5f5b8a641b4ba45f31449d3e8eadb8defca6a7ae6ba0bebd4ff6118e122cd385 [1028] struct2_field5 sig r
+        // 69312cb171f2d3d475d499475192ecbbe047adad1cc0e868976bc31644407159 [1060] struct2_field5 sig s
+        // 1b00000000000000000000000000000000000000000000000000000000000000 [1092] struct2_field5 sig v
+        // 00000000000000000000000000000000000000000000000000000000
+
+        // console.log("array i:", i);
+        uint256 offset = ((arrayLength - 1) + (14 * i)) * 32; // offset in 32 bytes
 
         address _withdrawer;
         address _staker;
         uint256 _expiry;
-        // uint256 _structField1ArrayLength; // strategies
         address _strategy;
-        // uint256 _structField2ArrayLength; // shares
         uint256 _sharesToWithdraw;
+        bytes memory signature;
 
-        bytes32 r;
-        bytes32 s;
-        bytes1 v;
+        {
+            uint256 sig_length;
+            bytes32 r;
+            bytes32 s;
+            bytes1 v;
 
-        assembly {
-            _functionSelector := mload(add(message, 96))
+            assembly {
+                _withdrawer := mload(add(message, add(260, offset)))
+                _staker := mload(add(message, add(292, offset)))
+                _expiry := mload(add(message, add(356, offset)))
+                _strategy := mload(add(message, add(420, offset)))
+                _sharesToWithdraw := mload(add(message, add(484, offset)))
 
-            _arrayLength := mload(add(message, 132))
-            _withdrawer := mload(add(message, 260))
-            _staker := mload(add(message, 292))
-            _expiry := mload(add(message, 356))
-            // _structField1ArrayLength := mload(add(message, 356))
-            _strategy := mload(add(message, 420))
-            // _structField2ArrayLength := mload(add(message, 356))
-            _sharesToWithdraw := mload(add(message, 484))
+                sig_length := mload(add(message, add(516, offset)))
+                r := mload(add(message, add(548, offset)))
+                s := mload(add(message, add(580, offset)))
+                v := mload(add(message, add(612, offset)))
+            }
+            // console.log("expiry");
+            // console.log(_expiry);
+            // console.log("withdrawer");
+            // console.log(_withdrawer);
+            // console.log("staker");
+            // console.log(_staker);
+            // console.log("_strategy");
+            // console.log(_strategy);
+            // console.log("_shares");
+            // console.log(_sharesToWithdraw);
 
-            r := mload(add(message, 548))
-            s := mload(add(message, 580))
-            v := mload(add(message, 612))
+            signature = abi.encodePacked(r,s,v);
+            require(sig_length == 65, "decodeQueueWithdrawalsWithSignatureMessage: invalid signature length");
         }
-
-        bytes memory signature = abi.encodePacked(r,s,v);
-        require(signature.length == 65, "invalid signature length");
 
         emit EigenlayerQueueWithdrawalsWithSignatureParams(
             _sharesToWithdraw,
@@ -413,8 +452,8 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
             signature
         );
 
-        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
-        uint256[] memory sharesToWithdraw = new uint256[](1);
+        IStrategy[] memory strategiesToWithdraw = new IStrategy[](arrayLength);
+        uint256[] memory sharesToWithdraw = new uint256[](arrayLength);
 
         strategiesToWithdraw[0] = IStrategy(_strategy);
         sharesToWithdraw[0] = _sharesToWithdraw;

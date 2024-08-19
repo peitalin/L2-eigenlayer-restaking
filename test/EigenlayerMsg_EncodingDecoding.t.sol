@@ -11,7 +11,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
     IRestakingConnector,
     EigenlayerDepositParams,
-    EigenlayerDepositMessage
+    EigenlayerDepositMessage,
+    TransferToStakerMessage
 } from "../src/interfaces/IRestakingConnector.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
@@ -19,6 +20,7 @@ import {FunctionSelectorDecoder} from "../src/FunctionSelectorDecoder.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {FileReader} from "../script/Addresses.sol";
+import {EigenlayerDepositWithSignatureMessage} from "../src/interfaces/IRestakingConnector.sol";
 
 
 
@@ -117,16 +119,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         );
     }
 
-    function test_Decode_DepositWithSignature() public view {
-
-        // function depositIntoStrategyWithSignature(
-        //     IStrategy strategy,
-        //     IERC20 token,
-        //     uint256 amount,
-        //     address staker,
-        //     uint256 expiry,
-        //     bytes memory signature
-        // ) external onlyWhenNotPaused(PAUSED_DEPOSITS) nonReentrant returns (uint256 shares)
+    function test_Decode_DepositWithSignature() public {
 
         bytes memory message_bytes = eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
             address(strategy),
@@ -135,72 +128,34 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             staker,
             expiry,
             hex"3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d51c"
-        );
-        // CCIP turns the message into string when sending
+        ); // CCIP turns the message into string when sending
         bytes memory message = abi.encode(string(message_bytes));
 
-        ////////////////////////////////////////////////////////
-        //// Message payload offsets for assembly decoding
-        ////////////////////////////////////////////////////////
+        EigenlayerDepositWithSignatureMessage memory depositMsg =
+            restakingConnector.decodeDepositWithSignatureMessage(message);
 
-        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
-        // 0000000000000000000000000000000000000000000000000000000000000144 [64]
-        // 32e89ace000000000000000000000000bd4bcb3ad20e9d85d5152ae68f45f40a [96] bytes4 truncates the right
-        // f8952159                                                         [100] reads 32 bytes from offset [100] right-to-left up to the function selector
-        // 0000000000000000000000003eef6ec7a9679e60cc57d9688e9ec0e6624d687a [132]
-        // 000000000000000000000000000000000000000000000000001b5b1bf4c54000 [164] uint256 amount in hex
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [196]
-        // 0000000000000000000000000000000000000000000000000000000000015195 [228] expiry
-        // 00000000000000000000000000000000000000000000000000000000000000c0 [260] offset: 192 bytes
-        // 0000000000000000000000000000000000000000000000000000000000000041 [292] length: 65 bytes
-        // 3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee [324] signature: r
-        // 3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d5 [356] signature: s
-        // 1c00000000000000000000000000000000000000000000000000000000000000 [388] signature: v (uint8 = bytes1)
-        // 00000000000000000000000000000000000000000000000000000000
+        require(depositMsg.signature.length == 65, "invalid signature length");
+        require(depositMsg.staker == staker, "staker does not match");
+        require(address(depositMsg.strategy) == address(strategy), "strategy does not match");
+    }
 
-        bytes32 offset;
-        bytes32 length;
+    function test_Decode_RevertBadSignature_DepositWithSignature() public {
 
-        bytes4 functionSelector;
-        address _strategy;
-        address _token;
-        uint256 _amount;
-        address _staker;
-        uint256 _expiry;
+        bytes memory signature = new bytes(0);
 
-        bytes32 _sig_offset;
-        bytes32 _sig_length;
-        bytes32 r;
-        bytes32 s;
-        bytes1 v;
+        bytes memory message_bytes = eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+            address(strategy),
+            address(token),
+            amount,
+            staker,
+            expiry,
+            signature
+        ); // CCIP turns the message into string when sending
+        bytes memory message = abi.encode(string(message_bytes));
 
-        assembly {
-            offset := mload(add(message, 32))
-            length := mload(add(message, 64))
-
-            functionSelector := mload(add(message, 96))
-            _strategy := mload(add(message, 100))
-            _token := mload(add(message, 132))
-            _amount := mload(add(message, 164))
-            _staker := mload(add(message, 196))
-            _expiry := mload(add(message, 228))
-
-            _sig_offset := mload(add(message, 260))
-            _sig_length := mload(add(message, 292))
-
-            r := mload(add(message, 324))
-            s := mload(add(message, 356))
-            v := mload(add(message, 388))
-        }
-
-        bytes memory signature = abi.encodePacked(r,s,v);
-
-        require(signature.length == 65, "invalid signature length");
-        bytes4 functionSelector2 = bytes4(keccak256("depositIntoStrategyWithSignature(address,address,uint256,address,uint256,bytes)"));
-        require(functionSelector == functionSelector2, "functionSelectors do not match");
-        require(functionSelector == 0x32e89ace, "functionSelectors do not match");
-        require(_staker == staker, "staker does not match");
-        require(_strategy == address(strategy), "strategy does not match");
+        vm.expectRevert("decodeDepositWithSignatureMessage: invalid signature length");
+        EigenlayerDepositWithSignatureMessage memory depositMsg =
+            restakingConnector.decodeDepositWithSignatureMessage(message);
     }
 
     /*
@@ -342,21 +297,20 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             withdrawer: vm.addr(0x3)
         });
 
-        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams;
-        queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](3);
+        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams3 =
+            new IDelegationManager.QueuedWithdrawalParams[](3);
+        queuedWithdrawalParams3[0] = queuedWithdrawal1;
+        queuedWithdrawalParams3[1] = queuedWithdrawal2;
+        queuedWithdrawalParams3[2] = queuedWithdrawal3;
 
-        queuedWithdrawalParams[0] = queuedWithdrawal1;
-        queuedWithdrawalParams[1] = queuedWithdrawal2;
-        queuedWithdrawalParams[2] = queuedWithdrawal3;
-
-        bytes memory message_bytes = eigenlayerMsgEncoders.encodeQueueWithdrawalMsg(
-            queuedWithdrawalParams
-        );
-        // CCIP turns the message into string when sending
-        bytes memory message = abi.encode(string(message_bytes));
+        bytes memory message3 = abi.encode(string(
+            eigenlayerMsgEncoders.encodeQueueWithdrawalMsg(
+                queuedWithdrawalParams3
+            )
+        ));
 
         IDelegationManager.QueuedWithdrawalParams[] memory decodedQueuedWithdrawals;
-        decodedQueuedWithdrawals = restakingConnector.decodeQueueWithdrawalsMessage(message);
+        decodedQueuedWithdrawals = restakingConnector.decodeQueueWithdrawalsMessage(message3);
 
         require(
             decodedQueuedWithdrawals[0].shares[0] == sharesToWithdraw1[0],
@@ -372,43 +326,56 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         );
     }
 
-    function test_Decode_QueueWithdrawalsWithSignature() public {
 
-        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
-        strategiesToWithdraw[0] = strategy;
+    function test_Decode_Multiple_QueueWithdrawalsWithSignature() public {
 
-        uint256[] memory sharesToWithdraw = new uint256[](1);
-        sharesToWithdraw[0] = amount;
+        IStrategy[] memory strategiesToWithdraw1 = new IStrategy[](1);
+        strategiesToWithdraw1[0] = strategy;
 
-        bytes32 digestHash = signatureUtils.calculateQueueWithdrawalDigestHash(
-            staker,
-            strategiesToWithdraw,
-            sharesToWithdraw,
-            0, // stakerNonce
-            expiry,
-            address(IDelegationManager(address(0x1))),
-            block.chainid
-        );
+        uint256[] memory sharesToWithdraw1 = new uint256[](1);
+        sharesToWithdraw1[0] = amount;
 
-        bytes memory signature;
+        bytes memory signature1;
+        bytes memory signature2;
+        bytes memory signature3;
         {
+            bytes32 digestHash = signatureUtils.calculateQueueWithdrawalDigestHash(
+                staker,
+                strategiesToWithdraw1,
+                sharesToWithdraw1,
+                0, // stakerNonce
+                expiry,
+                address(IDelegationManager(address(0x1))),
+                block.chainid
+            );
+
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
-            signature = abi.encodePacked(r, s, v);
+            signature1 = abi.encodePacked(r, s, v);
+            signature2 = abi.encodePacked(r, s, v);
+            signature3 = abi.encodePacked(r, s, v);
         }
 
-        IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig;
-        queuedWithdrawalWithSig = IDelegationManager.QueuedWithdrawalWithSignatureParams({
-            strategies: strategiesToWithdraw,
-            shares: sharesToWithdraw,
+        IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig1;
+        IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig2;
+        IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig3;
+
+        queuedWithdrawalWithSig1 = IDelegationManager.QueuedWithdrawalWithSignatureParams({
+            strategies: strategiesToWithdraw1,
+            shares: sharesToWithdraw1,
             withdrawer: address(receiverContract),
             staker: staker,
-            signature: signature,
+            signature: signature1,
             expiry: expiry
         });
+        queuedWithdrawalWithSig2 = queuedWithdrawalWithSig1;
+        queuedWithdrawalWithSig3 = queuedWithdrawalWithSig1;
 
         IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigParams;
-        queuedWithdrawalWithSigParams = new IDelegationManager.QueuedWithdrawalWithSignatureParams[](1);
-        queuedWithdrawalWithSigParams[0] = queuedWithdrawalWithSig;
+        // aray with 3 elements
+        queuedWithdrawalWithSigParams = new IDelegationManager.QueuedWithdrawalWithSignatureParams[](3);
+        queuedWithdrawalWithSigParams[0] = queuedWithdrawalWithSig1;
+        queuedWithdrawalWithSigParams[1] = queuedWithdrawalWithSig2;
+        queuedWithdrawalWithSigParams[2] = queuedWithdrawalWithSig3;
 
         bytes memory message = abi.encode(string(
             eigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
@@ -419,31 +386,73 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory dwp =
             restakingConnector.decodeQueueWithdrawalsWithSignatureMessage(message);
 
-        require(dwp[0].staker == deployer, "wrong _staker");
-        require(dwp[0].withdrawer == address(receiverContract), "wrong _withdrawer");
-        require(address(dwp[0].strategies[0]) == address(strategy), "wrong _strategy");
-        require(dwp[0].shares[0] == amount, "wrong _sharesToWithdraw");
-        require(keccak256(dwp[0].signature) == keccak256(signature), "wrong _signature");
+        require(dwp[0].staker == deployer, "wrong _staker[0]");
+        require(dwp[1].staker == deployer, "wrong _staker[1]");
+        require(dwp[2].staker == deployer, "wrong _staker[2]");
+
+        require(dwp[0].withdrawer == address(receiverContract), "wrong _withdrawer[0]");
+        require(dwp[1].withdrawer == address(receiverContract), "wrong _withdrawer[1]");
+        require(dwp[2].withdrawer == address(receiverContract), "wrong _withdrawer[2]");
+
+        require(address(dwp[0].strategies[0]) == address(strategy), "wrong _strategy[0]");
+        require(address(dwp[1].strategies[0]) == address(strategy), "wrong _strategy[1]");
+        require(address(dwp[2].strategies[0]) == address(strategy), "wrong _strategy[2]");
+
+        console.log(dwp[1].shares[0]);
+        console.log(dwp[2].shares[0]);
+        require(dwp[0].shares[0] == amount, "wrong _sharesToWithdraw[0]");
+        require(dwp[1].shares[0] == amount, "wrong _sharesToWithdraw[1]");
+        require(dwp[2].shares[0] == amount, "wrong _sharesToWithdraw[2]");
+
+        require(keccak256(dwp[0].signature) == keccak256(signature1), "wrong _signature[0]");
+        require(keccak256(dwp[1].signature) == keccak256(signature2), "wrong _signature[1]");
+        require(keccak256(dwp[2].signature) == keccak256(signature3), "wrong _signature[2]");
 
         // console.log("staker");
         // console.log(dwp[0].staker);
-
         // console.log("withdrawer");
         // console.log(dwp[0].withdrawer);
-
         // console.log("strategy");
         // console.log(address(dwp[0].strategies[0]));
-
         // console.log("sharesToWithdraw");
         // console.log(dwp[0].shares[0]);
-
         // console.log("sigature");
         // console.logBytes(dwp[0].signature);
     }
 
-    function test_Decode_Multiple_QueueWithdrawalsWithSignature() public {
-        /// TODO
+    function test_Decode_RevertBadSignature_QueueWithdrawalsWithSignature() public {
 
+        IStrategy[] memory strategiesToWithdraw1 = new IStrategy[](1);
+        strategiesToWithdraw1[0] = strategy;
+
+        uint256[] memory sharesToWithdraw1 = new uint256[](1);
+        sharesToWithdraw1[0] = amount;
+
+        bytes memory signature1 = new bytes(0); // bad signature length, hsould be 65 bytes
+
+        IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig1;
+        queuedWithdrawalWithSig1 = IDelegationManager.QueuedWithdrawalWithSignatureParams({
+            strategies: strategiesToWithdraw1,
+            shares: sharesToWithdraw1,
+            withdrawer: address(receiverContract),
+            staker: staker,
+            signature: signature1,
+            expiry: expiry
+        });
+
+        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigParams;
+        // aray with 3 elements
+        queuedWithdrawalWithSigParams = new IDelegationManager.QueuedWithdrawalWithSignatureParams[](1);
+        queuedWithdrawalWithSigParams[0] = queuedWithdrawalWithSig1;
+
+        bytes memory message = abi.encode(string(
+            eigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
+                queuedWithdrawalWithSigParams
+            )
+        )); // CCIP turns the message into string when sending
+
+        vm.expectRevert("decodeQueueWithdrawalsWithSignatureMessage: invalid signature length");
+        restakingConnector.decodeQueueWithdrawalsWithSignatureMessage(message);
     }
 
     /*
@@ -464,8 +473,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
         address _staker = deployer;
 
-        IDelegationManager.Withdrawal memory withdrawal;
-        withdrawal = IDelegationManager.Withdrawal({
+        IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
             staker: _staker,
             delegatedTo: address(0x0),
             withdrawer: address(receiverContract),
@@ -507,6 +515,21 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
     /// Note: Need to do a array version of this
     function test_Decode_Multiple_CompleteQueuedWithdrawal() public {
 
+    }
+
+    function test_Decode_TransferToStakerMessage() public {
+
+        bytes32 withdrawalRoot1 = 0x8c20d3a37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7d8ec77;
+
+        TransferToStakerMessage memory tts_msg = restakingConnector.decodeTransferToStakerMessage(
+            abi.encode(string(
+                eigenlayerMsgEncoders.encodeTransferToStakerMsg(
+                    withdrawalRoot1
+                )
+            ))
+        );
+
+        require(tts_msg.withdrawalRoot == withdrawalRoot1, "incorrect withdrawalRoot");
     }
 
     /*
@@ -574,14 +597,11 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
         address staker = vm.addr(0x1);
 
-        bytes memory message_bytes = eigenlayerMsgEncoders.encodeUndelegateMsg(
-            staker
+        address _staker = restakingConnector.decodeUndelegate(
+            abi.encode(string(
+                eigenlayerMsgEncoders.encodeUndelegateMsg(staker)
+            ))
         );
-        // CCIP turns the message into string when sending
-        bytes memory message = abi.encode(string(message_bytes));
-
-        console.logBytes(message);
-        address _staker = restakingConnector.decodeUndelegate(message);
 
         require(staker == _staker, "staker incorrect");
     }

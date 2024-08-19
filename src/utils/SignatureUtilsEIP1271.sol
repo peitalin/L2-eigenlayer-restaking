@@ -56,7 +56,6 @@ contract SignatureUtilsEIP1271 is Script {
         uint256 chainid = destinationChainid;
 
         return keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes("EigenLayer")), chainid, contractAddr));
-
         // Note: in calculating the domainSeparator:
         // address(this) is the StrategyManager, not this contract (SignatureUtilsEIP2172)
         // chainid is the chain Eigenlayer is deployed on (it can fork!), not the chain you are calling this function
@@ -83,14 +82,11 @@ contract SignatureUtilsEIP1271 is Script {
             expiry,
             domainSeparator
         );
-
-
         // generate ECDSA signature
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signingKey, digestHash);
         bytes memory signature = abi.encodePacked(r, s, v);
         // r,s,v packed into 65byte signature: 32 + 32 + 1.
         // the order of r,s,v differs from the above
-
         return (signature, digestHash);
     }
 
@@ -117,7 +113,6 @@ contract SignatureUtilsEIP1271 is Script {
             stakerNonce,
             expiry
         ));
-
         // calculate the digest hash
         bytes32 digestHash = keccak256(abi.encodePacked(
             "\x19\x01",

@@ -191,7 +191,7 @@ contract CCIP_Eigen_QueueWithdrawalsTests is Test {
         uint256[] memory sharesToWithdraw = new uint256[](1);
         sharesToWithdraw[0] = stakerShares;
 
-        uint256 expiry = block.timestamp + 6 hours;
+        uint256 expiry = block.timestamp + 1 hours;
         address withdrawer = address(receiverContract);
         uint256 stakerNonce = delegationManager.cumulativeWithdrawalsQueued(staker);
         // startBlock: calculated on the block when queueWithdrawals was called.
