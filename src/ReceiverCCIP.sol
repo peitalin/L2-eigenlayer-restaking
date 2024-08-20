@@ -21,6 +21,7 @@ import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 import {ArbSepolia} from "../script/Addresses.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 import {TransferToStakerMessage} from "./interfaces/IRestakingConnector.sol";
+import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 
 import {console} from "forge-std/Test.sol";
 
@@ -208,6 +209,35 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
 
             textMsg = "completeQueuedWithdrawal()";
             // amountMsg = eigenMsg.amount;
+        }
+
+        if (functionSelector == 0x7f548071) {
+            // bytes4(keccak256("delegateToBySignature(address,address,(bytes,uint256),(bytes,uint256),bytes32)")) == 0x7f548071
+            (
+                address staker,
+                address operator,
+                ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry,
+                ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
+                bytes32 approverSalt
+            ) = restakingConnector.decodeDelegateToBySignature(message);
+            console.log("staker is: ", staker);
+            console.log("delegating to: ", operator);
+
+            console.log("staker signature");
+            console.logBytes(stakerSignatureAndExpiry.signature);
+            console.log(stakerSignatureAndExpiry.expiry);
+
+            console.log("approver signature");
+            console.logBytes(approverSignatureAndExpiry.signature);
+            console.log(approverSignatureAndExpiry.expiry);
+
+            delegationManager.delegateToBySignature(
+                staker,
+                operator,
+                stakerSignatureAndExpiry,
+                approverSignatureAndExpiry,
+                approverSalt
+            );
         }
 
         emit MessageReceived(

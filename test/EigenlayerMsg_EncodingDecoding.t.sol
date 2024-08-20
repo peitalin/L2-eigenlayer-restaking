@@ -19,7 +19,7 @@ import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {FunctionSelectorDecoder} from "../src/FunctionSelectorDecoder.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
-import {FileReader} from "../script/Addresses.sol";
+import {FileReader, EthSepolia} from "../script/Addresses.sol";
 import {EigenlayerDepositWithSignatureMessage} from "../src/interfaces/IRestakingConnector.sol";
 
 
@@ -259,7 +259,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         require(_strategy == address(queuedWithdrawalParams[0].strategies[0]), "decoded strategy incorrect");
     }
 
-    function test_Decode_Multiple_QueueWithdrawals() public {
+    function test_Decode_Array_QueueWithdrawals() public {
 
         IStrategy[] memory strategiesToWithdraw1 = new IStrategy[](1);
         IStrategy[] memory strategiesToWithdraw2 = new IStrategy[](1);
@@ -327,7 +327,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
     }
 
 
-    function test_Decode_Multiple_QueueWithdrawalsWithSignature() public {
+    function test_Decode_Array_QueueWithdrawalsWithSignature() public {
 
         IStrategy[] memory strategiesToWithdraw1 = new IStrategy[](1);
         strategiesToWithdraw1[0] = strategy;
@@ -513,7 +513,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
     }
 
     /// Note: Need to do a array version of this
-    function test_Decode_Multiple_CompleteQueuedWithdrawal() public {
+    function test_Decode_Array_CompleteQueuedWithdrawal() public {
 
     }
 
@@ -540,18 +540,53 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
      *
     */
 
-    function test_Decode_DelegateToBySignature() public {
+    function test_Decode_DelegateToBySignature_BothSigned() public {
 
         address staker = vm.addr(0x1);
         address operator = vm.addr(0x2);
-        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
-            signature: new bytes(0),
-            expiry: 5
-        });
-        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
-            signature: new bytes(0),
-            expiry: 6
-        });
+        address delegationManager = vm.addr(0xde);
+
+        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry;
+        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
+
+        bytes memory signature1;
+        bytes memory signature2;
+        {
+            uint256 sig1_expiry = 5;
+            uint256 sig2_expiry = 6;
+
+            bytes32 digestHash1 = signatureUtils.calculateStakerDelegationDigestHash(
+                staker,
+                0,  // nonce
+                operator,
+                sig1_expiry,
+                delegationManager,
+                EthSepolia.ChainSelector
+            );
+            bytes32 digestHash2 = signatureUtils.calculateStakerDelegationDigestHash(
+                staker,
+                0,  // nonce
+                operator,
+                sig2_expiry,
+                delegationManager,
+                EthSepolia.ChainSelector
+            );
+
+            (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(deployerKey, digestHash1);
+            (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(deployerKey, digestHash2);
+            signature1 = abi.encodePacked(r1, s1, v1);
+            signature2 = abi.encodePacked(r2, s2, v2);
+
+            stakerSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+                signature: signature1,
+                expiry: sig1_expiry
+            });
+            approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+                signature: signature2,
+                expiry: sig2_expiry
+            });
+        }
+
         bytes32 approverSalt = 0x0000000000000000000000000000000000000000000000000000000000004444;
 
         bytes memory message_bytes = eigenlayerMsgEncoders.encodeDelegateToBySignature(
@@ -575,6 +610,229 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         require(staker == _staker, "staker incorrect");
         require(operator == _operator, "operator incorrect");
         require(approverSalt == _approverSalt, "approverSalt incorrect");
+
+        require(
+            stakerSignatureAndExpiry.expiry == _stakerSignatureAndExpiry.expiry,
+            "staker signature expiry incorrect"
+        );
+        require(
+            keccak256(stakerSignatureAndExpiry.signature) == keccak256(_stakerSignatureAndExpiry.signature),
+            "staker signature incorrect"
+        );
+        require(
+            approverSignatureAndExpiry.expiry == _approverSignatureAndExpiry.expiry,
+            "approver signature expiry incorrect"
+        );
+        require(
+            keccak256(approverSignatureAndExpiry.signature) == keccak256(_approverSignatureAndExpiry.signature),
+            "approver signature incorrect"
+        );
+    }
+
+    function test_Decode_DelegateToBySignature_Unsigned() public {
+
+        address staker = vm.addr(0x1);
+        address operator = vm.addr(0x2);
+        address delegationManager = vm.addr(0xde);
+
+        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry;
+        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
+
+        bytes memory signature1;
+        bytes memory signature2;
+
+        stakerSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+            signature: new bytes(0),
+            expiry: 5
+        });
+        approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+            signature: new bytes(0),
+            expiry: 6
+        });
+
+        bytes32 approverSalt = 0x0000000000000000000000000000000000000000000000000000000000004444;
+
+        bytes memory message_bytes = eigenlayerMsgEncoders.encodeDelegateToBySignature(
+            staker,
+            operator,
+            stakerSignatureAndExpiry,
+            approverSignatureAndExpiry,
+            approverSalt
+        );
+        // CCIP turns the message into string when sending
+        bytes memory message = abi.encode(string(message_bytes));
+
+        (
+            address _staker,
+            address _operator,
+            ISignatureUtils.SignatureWithExpiry memory _stakerSignatureAndExpiry,
+            ISignatureUtils.SignatureWithExpiry memory _approverSignatureAndExpiry,
+            bytes32 _approverSalt
+        ) = restakingConnector.decodeDelegateToBySignature(message);
+
+        require(staker == _staker, "staker incorrect");
+        require(operator == _operator, "operator incorrect");
+        require(approverSalt == _approverSalt, "approverSalt incorrect");
+        require(
+            stakerSignatureAndExpiry.expiry == _stakerSignatureAndExpiry.expiry,
+            "staker signature expiry incorrect"
+        );
+        require(
+            keccak256(stakerSignatureAndExpiry.signature) == keccak256(_stakerSignatureAndExpiry.signature),
+            "staker signature incorrect"
+        );
+        require(
+            approverSignatureAndExpiry.expiry == _approverSignatureAndExpiry.expiry,
+            "approver signature expiry incorrect"
+        );
+        require(
+            keccak256(approverSignatureAndExpiry.signature) == keccak256(_approverSignatureAndExpiry.signature),
+            "approver signature incorrect"
+        );
+    }
+
+    function test_Decode_DelegateToBySignature_StakerSigned() public {
+
+        address staker = vm.addr(0x1);
+        address operator = vm.addr(0x2);
+        address delegationManager = vm.addr(0xde);
+
+        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry;
+        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
+
+        bytes memory signature1;
+        bytes memory signature2;
+        {
+            uint256 sig1_expiry = 5;
+
+            bytes32 digestHash1 = signatureUtils.calculateStakerDelegationDigestHash(
+                staker,
+                0,  // nonce
+                operator,
+                sig1_expiry,
+                delegationManager,
+                EthSepolia.ChainSelector
+            );
+
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash1);
+            signature1 = abi.encodePacked(r, s, v);
+
+            console.logBytes(signature1);
+
+            stakerSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+                signature: signature1,
+                expiry: sig1_expiry
+            });
+            approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+                signature: new bytes(0),
+                expiry: 6
+            });
+        }
+
+        bytes32 approverSalt = 0x0000000000000000000000000000000000000000000000000000000000004444;
+
+        bytes memory message_bytes = eigenlayerMsgEncoders.encodeDelegateToBySignature(
+            staker,
+            operator,
+            stakerSignatureAndExpiry,
+            approverSignatureAndExpiry,
+            approverSalt
+        );
+        // CCIP turns the message into string when sending
+        bytes memory message = abi.encode(string(message_bytes));
+
+        (
+            address _staker,
+            address _operator,
+            ISignatureUtils.SignatureWithExpiry memory _stakerSignatureAndExpiry,
+            ISignatureUtils.SignatureWithExpiry memory _approverSignatureAndExpiry,
+            bytes32 _approverSalt
+        ) = restakingConnector.decodeDelegateToBySignature(message);
+
+        require(staker == _staker, "staker incorrect");
+        require(operator == _operator, "operator incorrect");
+        require(approverSalt == _approverSalt, "approverSalt incorrect");
+
+        require(
+            stakerSignatureAndExpiry.expiry == _stakerSignatureAndExpiry.expiry,
+            "staker signature expiry incorrect"
+        );
+        require(
+            keccak256(stakerSignatureAndExpiry.signature) == keccak256(_stakerSignatureAndExpiry.signature),
+            "staker signature incorrect"
+        );
+        require(
+            approverSignatureAndExpiry.expiry == _approverSignatureAndExpiry.expiry,
+            "approver signature expiry incorrect"
+        );
+        require(
+            keccak256(approverSignatureAndExpiry.signature) == keccak256(_approverSignatureAndExpiry.signature),
+            "approver signature incorrect"
+        );
+    }
+
+    function test_Decode_DelegateToBySignature_ApproverSigned() public {
+
+        address staker = vm.addr(0x1);
+        address operator = vm.addr(0x2);
+        address delegationManager = vm.addr(0xde);
+
+        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry;
+        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
+
+        bytes memory signature1;
+        bytes memory signature2;
+        {
+            uint256 sig1_expiry = 6;
+
+            bytes32 digestHash1 = signatureUtils.calculateStakerDelegationDigestHash(
+                staker,
+                0,  // nonce
+                operator,
+                sig1_expiry,
+                delegationManager,
+                EthSepolia.ChainSelector
+            );
+
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash1);
+            signature1 = abi.encodePacked(r, s, v);
+
+            console.logBytes(signature1);
+
+            stakerSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+                signature: new bytes(0),
+                expiry: 5
+            });
+            approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+                signature: signature1,
+                expiry: sig1_expiry
+            });
+        }
+
+        bytes32 approverSalt = 0x0000000000000000000000000000000000000000000000000000000000004444;
+
+        bytes memory message_bytes = eigenlayerMsgEncoders.encodeDelegateToBySignature(
+            staker,
+            operator,
+            stakerSignatureAndExpiry,
+            approverSignatureAndExpiry,
+            approverSalt
+        );
+        // CCIP turns the message into string when sending
+        bytes memory message = abi.encode(string(message_bytes));
+
+        (
+            address _staker,
+            address _operator,
+            ISignatureUtils.SignatureWithExpiry memory _stakerSignatureAndExpiry,
+            ISignatureUtils.SignatureWithExpiry memory _approverSignatureAndExpiry,
+            bytes32 _approverSalt
+        ) = restakingConnector.decodeDelegateToBySignature(message);
+
+        require(staker == _staker, "staker incorrect");
+        require(operator == _operator, "operator incorrect");
+        require(approverSalt == _approverSalt, "approverSalt incorrect");
+
         require(
             stakerSignatureAndExpiry.expiry == _stakerSignatureAndExpiry.expiry,
             "staker signature expiry incorrect"

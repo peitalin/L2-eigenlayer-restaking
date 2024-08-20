@@ -325,7 +325,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
     ) internal returns (
         IDelegationManager.QueuedWithdrawalWithSignatureParams memory
     ) {
-        /// @dev: expect to use this in a for-loop with i iteration variable
+        /// @dev: expect to use this in a for-loop
 
         // Function Signature:
         //     bytes5(keccak256("queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])"))
@@ -403,7 +403,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         // 1b00000000000000000000000000000000000000000000000000000000000000 [1092] struct2_field5 sig v
         // 00000000000000000000000000000000000000000000000000000000
 
-        // console.log("array i:", i);
         uint256 offset = ((arrayLength - 1) + (14 * i)) * 32; // offset in 32 bytes
 
         address _withdrawer;
@@ -485,7 +484,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         uint256,
         bool
     ) {
-
+        // Note: assumes we are withdrawing 1 token, tokensToWithdraw.length == 1
         IDelegationManager.Withdrawal memory _withdrawal = _decodeCompleteWithdrawalMessagePart1(message);
         (
             IERC20[] memory _tokensToWithdraw,
@@ -735,7 +734,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         ISignatureUtils.SignatureWithExpiry memory,
         bytes32
     ) {
-
         // function delegateToBySignature(
         //     address staker,
         //     address operator,
@@ -744,71 +742,99 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         //     bytes32 approverSalt
         // )
 
-        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
-        // 0000000000000000000000000000000000000000000000000000000000000164 [64]
-        // 7f548071                                                         [96]
+        ////// 2x ECDSA signatures, 65 length each
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
+        // 0000000000000000000000000000000000000000000000000000000000000224 [64] string length
+        // 7f548071                                                         [96] function selector
         // 0000000000000000000000007e5f4552091a69125d5dfcb7b8c2659029395bdf [100] staker
         // 0000000000000000000000002b5ad5c4795c026514f8317c7a215e218dccd6cf [132] operator
-        // 00000000000000000000000000000000000000000000000000000000000000a0 [164] staker sig struct offset [5 lines]
-        // 0000000000000000000000000000000000000000000000000000000000000100 [196] approver sig struct offset [8 lines]
-        // 0000000000000000000000000000000000000000000000000000000000004444 [228] approverSalt
-        // 0000000000000000000000000000000000000000000000000000000000000040 [260] staker sig offset (bytes has a offset and length)
-        // 0000000000000000000000000000000000000000000000000000000000000005 [292] staker sig expiry
-        // 0000000000000000000000000000000000000000000000000000000000000000 [324] staker signature
-        // 0000000000000000000000000000000000000000000000000000000000000040 [356] approver sig offset
-        // 0000000000000000000000000000000000000000000000000000000000000006 [388] approver signature expiry
-        // 0000000000000000000000000000000000000000000000000000000000000000 [420] approver signature
+        // 00000000000000000000000000000000000000000000000000000000000000a0 [164] staker_sig_struct offset [5 lines]
+        // 0000000000000000000000000000000000000000000000000000000000000160 [196] approver_sig_struct offset [11 lines]
+        // 0000000000000000000000000000000000000000000000000000000000004444 [228] approver salt
+        // 0000000000000000000000000000000000000000000000000000000000000040 [260] staker_sig offset
+        // 0000000000000000000000000000000000000000000000000000000000000005 [292] staker_sig expiry
+        // 0000000000000000000000000000000000000000000000000000000000000041 [324] staker_sig length (hex 0x41 = 65 bytes)
+        // bfb59bee8b02985b56e9c5b7cea3a900d54440b7ef0e3b41a56e6613a8bb7ead [356] staker_sig r
+        // 4e082b1bb02486715bfb87b4a7202becd6df26dd4a6addb214e6748188d5e02e [388] staker_sig s
+        // 1c00000000000000000000000000000000000000000000000000000000000000 [420] staker_sig v
+        // 0000000000000000000000000000000000000000000000000000000000000040 [452] approver_sig offset
+        // 0000000000000000000000000000000000000000000000000000000000000006 [484] approver_sig expiry
+        // 0000000000000000000000000000000000000000000000000000000000000041 [516] approver_sig length (hex 41 = 65 bytes)
+        // 71d0163eec33ce78295b1b94a3a43a2ea4db2219973c68ab02f16a2d88b94ce5 [548] approver_sig r
+        // 3c3336c813404285f90c817c830a47facefa2a826dd33f69e14c076fbdf444b7 [580] approver_sig s
+        // 1c00000000000000000000000000000000000000000000000000000000000000 [612] approver_sig v
         // 00000000000000000000000000000000000000000000000000000000
 
-        bytes4 functionSelector;
-        bytes32 withdrawalRoot;
-        address staker;
-        address operator;
-
-        bytes32 approverSalt;
-
-        uint256 stakerExpiry;
-        bytes memory stakerSignature;
-
-        uint256 approverExpiry;
-        bytes memory approverSignature;
-
+        uint256 msg_length;
+        uint256 staker_sig_offset;
+        uint256 approver_sig_offset;
         assembly {
-            functionSelector := mload(add(message, 96))
-            staker := mload(add(message, 100))
-            operator := mload(add(message, 132))
-
-            approverSalt := mload(add(message, 228))
-
-            stakerExpiry := mload(add(message, 292))
-            stakerSignature := mload(add(message, 324))
-
-            approverExpiry := mload(add(message, 388))
-            approverSignature := mload(add(message, 420))
+            msg_length := mload(add(message, 64))
+            staker_sig_offset := mload(add(message, 164))
+            approver_sig_offset := mload(add(message, 196))
         }
 
-        // console.log('approverSalt');
-        // console.logBytes32(approverSalt);
+        address staker;
+        address operator;
+        bytes32 approverSalt;
+        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry;
+        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
 
-        // console.log("stakerExpiry");
-        // console.log(stakerExpiry);
-        // console.log("stakerSignature");
-        // console.logBytes(stakerSignature);
+        assembly {
+            staker := mload(add(message, 100))
+            operator := mload(add(message, 132))
+            approverSalt := mload(add(message, 228))
+        }
+        // console.log("msglen:", msg_length);
+        // console.log("staker_sig_offset:", staker_sig_offset);
+        // console.log("approver_sig_offset:", approver_sig_offset);
+        // console.logBytes(message);
 
-        // console.log("appropverExpiry");
-        // console.log(approverExpiry);
-        // console.log("approverSignature");
-        // console.logBytes(approverSignature);
+        if (msg_length == 356) {
+            // staker_sig: 0
+            // approver_sig: 0
+            stakerSignatureAndExpiry = _getDelegationNullSignature(message, 0);
+            approverSignatureAndExpiry = _getDelegationNullSignature(message, 96);
 
-        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
-            signature: stakerSignature,
-            expiry: stakerExpiry
-        });
+        } else if (msg_length == 452 && approver_sig_offset == 352) {
+            // staker_sig: 1
+            // approver_sig: 0
 
-        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
-            signature: approverSignature,
-            expiry: approverExpiry
-        });
+            // 0000000000000000000000000000000000000000000000000000000000000020
+            // 00000000000000000000000000000000000000000000000000000000000001c4
+            // 7f548071
+            // 0000000000000000000000007e5f4552091a69125d5dfcb7b8c2659029395bdf
+            // 0000000000000000000000002b5ad5c4795c026514f8317c7a215e218dccd6cf
+            // 00000000000000000000000000000000000000000000000000000000000000a0 [164] staker_sig_struct offset [5 lines]
+            // 0000000000000000000000000000000000000000000000000000000000000160 [196] approver_sig_struct offset [11 lines]
+            // 0000000000000000000000000000000000000000000000000000000000004444 [228]
+            // 0000000000000000000000000000000000000000000000000000000000000040 [260] staker_sig offset
+            // 0000000000000000000000000000000000000000000000000000000000000005 [292]
+            // 0000000000000000000000000000000000000000000000000000000000000041 [324] staker_sig length
+            // bfb59bee8b02985b56e9c5b7cea3a900d54440b7ef0e3b41a56e6613a8bb7ead
+            // 4e082b1bb02486715bfb87b4a7202becd6df26dd4a6addb214e6748188d5e02e
+            // 1c00000000000000000000000000000000000000000000000000000000000000
+            // 0000000000000000000000000000000000000000000000000000000000000040 [452] approver_sig offset
+            // 0000000000000000000000000000000000000000000000000000000000000006
+            // 0000000000000000000000000000000000000000000000000000000000000000
+            // 00000000000000000000000000000000000000000000000000000000
+
+            stakerSignatureAndExpiry = _getDelegationSignature(message, 0);
+            approverSignatureAndExpiry = _getDelegationNullSignature(message, 192); // 96 offset more
+
+        } else if (msg_length == 452 && approver_sig_offset == 256) {
+            // staker_sig: 0
+            // approver_sig: 1
+            stakerSignatureAndExpiry = _getDelegationNullSignature(message, 0);
+            approverSignatureAndExpiry = _getDelegationSignature(message, 96);
+
+        } else if (msg_length == 548) {
+            // staker_sig: 1
+            // approver_sig: 1
+            stakerSignatureAndExpiry = _getDelegationSignature(message, 0);
+            // 192 offset for approver signature
+            approverSignatureAndExpiry = _getDelegationSignature(message, 192);
+        }
 
         return (
             staker,
@@ -818,6 +844,75 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
             approverSalt
         );
     }
+
+
+    function _getDelegationSignature(
+        bytes memory message,
+        uint256 offset
+    ) internal returns (ISignatureUtils.SignatureWithExpiry memory) {
+
+        uint256 expiry;
+        bytes memory signature;
+        bytes32 r;
+        bytes32 s;
+        bytes1 v;
+
+        assembly {
+            expiry := mload(add(message, add(292, offset)))
+            r := mload(add(message, add(356, offset)))
+            s := mload(add(message, add(388, offset)))
+            v := mload(add(message, add(420, offset)))
+        }
+
+        signature = abi.encodePacked(r, s, v);
+
+        ISignatureUtils.SignatureWithExpiry memory signatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+            signature: signature,
+            expiry: expiry
+        });
+
+        return signatureAndExpiry;
+    }
+
+
+    function _getDelegationNullSignature(
+        bytes memory message,
+        uint256 offset
+    ) internal returns (ISignatureUtils.SignatureWithExpiry memory) {
+
+        ///// Null signatures:
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
+        // 0000000000000000000000000000000000000000000000000000000000000164 [64]
+        // 7f548071                                                         [96]
+        // 0000000000000000000000007e5f4552091a69125d5dfcb7b8c2659029395bdf [100] staker
+        // 0000000000000000000000002b5ad5c4795c026514f8317c7a215e218dccd6cf [132] operator
+        // 00000000000000000000000000000000000000000000000000000000000000a0 [164] staker_sig_struct offset [5 lines]
+        // 0000000000000000000000000000000000000000000000000000000000000100 [196] approver_sig_struct offset [8 lines]
+        // 0000000000000000000000000000000000000000000000000000000000004444 [228] approverSalt
+        // 0000000000000000000000000000000000000000000000000000000000000040 [260] staker_sig offset (bytes has a offset and length)
+        // 0000000000000000000000000000000000000000000000000000000000000005 [292] staker_sig expiry
+        // 0000000000000000000000000000000000000000000000000000000000000000 [324] staker_signature
+        // 0000000000000000000000000000000000000000000000000000000000000040 [356] approver_sig offset
+        // 0000000000000000000000000000000000000000000000000000000000000006 [388] approver_sig expiry
+        // 0000000000000000000000000000000000000000000000000000000000000000 [420] approver_signature
+        // 00000000000000000000000000000000000000000000000000000000
+
+        uint256 expiry;
+        bytes memory signature;
+
+        assembly {
+            expiry := mload(add(message, add(292, offset)))
+            signature := mload(add(message, add(324, offset)))
+        }
+
+        ISignatureUtils.SignatureWithExpiry memory signatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+            signature: signature,
+            expiry: expiry
+        });
+
+        return signatureAndExpiry;
+    }
+
 
     function decodeUndelegate(
         bytes memory message

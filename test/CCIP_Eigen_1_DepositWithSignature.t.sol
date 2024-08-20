@@ -61,8 +61,6 @@ contract CCIP_Eigen_DepositWithSignatureTests is Test {
         eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
         signatureUtils = new SignatureUtilsEIP1271();
 
-        // uint256 arbForkId = vm.createSelectFork("arbsepolia");
-        // vm.rollFork(71584765); // roll back before CCIP network entered "cursed" state
         uint256 arbForkId = vm.createFork("arbsepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
 
@@ -163,8 +161,6 @@ contract CCIP_Eigen_DepositWithSignatureTests is Test {
         require(valueOfShares == amount, "valueofShares incorrect");
         require(strategyManager.stakerStrategyShares(staker, strategy) == amount, "stakerStrategyShares incorrect");
 
-        console.log("receiver balance:", receiverBalance);
-        console.log("receiver shares value:", valueOfShares);
         vm.stopBroadcast();
     }
 
@@ -193,9 +189,6 @@ contract CCIP_Eigen_DepositWithSignatureTests is Test {
             expiry,
             domainSeparator
         );
-
-        console.log("strategy:", address(strategy));
-        console.log("token:", address(token));
 
         signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
 

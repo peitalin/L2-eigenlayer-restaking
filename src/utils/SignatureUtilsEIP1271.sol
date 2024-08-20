@@ -8,6 +8,7 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 
+/// @dev Retrieve these struct hashes by calling Eigenlayer contracts, or storing the hash somewhere.
 contract SignatureUtilsEIP1271 is Script {
 
     function checkSignature_EIP1271(
@@ -120,6 +121,59 @@ contract SignatureUtilsEIP1271 is Script {
             structHash
         ));
         return digestHash;
+    }
+
+    function calculateStakerDelegationDigestHash(
+        address staker,
+        uint256 _stakerNonce,
+        address operator,
+        uint256 expiry,
+        address delegationManagerAddr,
+        uint256 destinationChainid
+    ) public view returns (bytes32) {
+
+        /// @notice The EIP-712 typehash for the `StakerDelegation` struct used by the contract
+        bytes32 STAKER_DELEGATION_TYPEHASH =
+            keccak256("StakerDelegation(address staker,address operator,uint256 nonce,uint256 expiry)");
+
+        // calculate the struct hash
+        bytes32 stakerStructHash =
+            keccak256(abi.encode(STAKER_DELEGATION_TYPEHASH, staker, operator, _stakerNonce, expiry));
+        // calculate the digest hash
+        bytes32 stakerDigestHash = keccak256(abi.encodePacked(
+            "\x19\x01",
+            getDomainSeparator(delegationManagerAddr, destinationChainid),
+            stakerStructHash
+        ));
+        return stakerDigestHash;
+    }
+
+    function calculateDelegationApprovalDigestHash(
+        address staker,
+        address operator,
+        address _delegationApprover,
+        bytes32 approverSalt,
+        uint256 expiry,
+        address delegationManagerAddr,
+        uint256 destinationChainid
+    ) public view returns (bytes32) {
+
+        /// @notice The EIP-712 typehash for the `DelegationApproval` struct used by the contract
+        bytes32 DELEGATION_APPROVAL_TYPEHASH = keccak256(
+            "DelegationApproval(address delegationApprover,address staker,address operator,bytes32 salt,uint256 expiry)"
+        );
+
+        // calculate the struct hash
+        bytes32 approverStructHash = keccak256(
+            abi.encode(DELEGATION_APPROVAL_TYPEHASH, _delegationApprover, staker, operator, approverSalt, expiry)
+        );
+        // calculate the digest hash
+        bytes32 approverDigestHash = keccak256(abi.encodePacked(
+            "\x19\x01",
+            getDomainSeparator(delegationManagerAddr, destinationChainid),
+            approverStructHash
+        ));
+        return approverDigestHash;
     }
 
 }

@@ -44,6 +44,10 @@ contract MockAdminable is Adminable {
         __Adminable_init();
     }
 
+    function mockIsOwner() public view returns (bool) {
+        return isOwner();
+    }
+
     function mockOnlyAdmin() public view onlyAdmin returns (bool) {
         return true;
     }

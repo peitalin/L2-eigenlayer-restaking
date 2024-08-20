@@ -245,7 +245,6 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
         vm.selectFork(arbForkId);
         vm.startBroadcast(deployerKey);
 
-        // address tokenDestination = ArbSepolia.CcipBnM; // CCIP-BnM L2 address
         address tokenDestination; // CCIP-BnM L2 address
         if (isTest) {
             tokenDestination = address(token);

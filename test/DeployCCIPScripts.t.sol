@@ -88,6 +88,13 @@ contract DeployCCIPScriptsTest is Test, ScriptUtils {
         vm.expectRevert("Not admin or owner");
         mockAdminable.mockOnlyAdminOrOwner();
 
+        vm.prank(bob);
+        require(mockAdminable.mockIsOwner() == false, "bob is not owner");
+
+        vm.prank(bob);
+        vm.expectRevert("Ownable: caller is not the owner");
+        mockAdminable.addAdmin(bob);
+
         vm.prank(deployer);
         mockAdminable.addAdmin(bob);
 
@@ -95,6 +102,10 @@ contract DeployCCIPScriptsTest is Test, ScriptUtils {
 
         vm.prank(bob);
         require(mockAdminable.mockOnlyAdmin(), "should pass onlyAdmin modifier");
+
+        vm.prank(bob);
+        vm.expectRevert("Ownable: caller is not the owner");
+        mockAdminable.removeAdmin(bob);
 
         vm.prank(deployer);
         mockAdminable.removeAdmin(bob);

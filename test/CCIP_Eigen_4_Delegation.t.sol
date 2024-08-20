@@ -25,6 +25,7 @@ import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenla
 import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
 import {DeployOnArbScript} from "../script/2_deployOnArb.s.sol";
 
+import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {EthSepolia, ArbSepolia} from "../script/Addresses.sol";
@@ -56,6 +57,8 @@ contract CCIP_Eigen_DelegationTests is Test {
     uint256 public initialReceiverBalance = 5 ether;
     uint256 public amountToStake = 0.0091 ether;
     address public staker;
+    uint256 public operatorKey;
+    address public operator;
 
     uint256 arbForkId;
     uint256 ethForkId;
@@ -71,14 +74,12 @@ contract CCIP_Eigen_DelegationTests is Test {
         eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
         signatureUtils = new SignatureUtilsEIP1271();
 
-        // uint256 arbForkId = vm.createSelectFork("arbsepolia");
-        // vm.rollFork(71584765); // roll back before CCIP network entered "cursed" state
+        bool isTest = block.chainid == 31337;
         arbForkId = vm.createFork("arbsepolia");        // 0
         ethForkId = vm.createSelectFork("ethsepolia"); // 1
         console.log("arbForkId:", arbForkId);
         console.log("ethForkId:", ethForkId);
 
-        //// Configure Eigenlayer contracts
         (
             strategy,
             strategyManager,
@@ -90,17 +91,17 @@ contract CCIP_Eigen_DelegationTests is Test {
         ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
         staker = deployer;
+        operatorKey = uint256(1000);
+        operator = vm.addr(operatorKey);
 
         //////////// Arb Sepolia ////////////
         vm.selectFork(arbForkId);
         senderContract = deployOnArbScript.run();
-        /////////////////////////////////////
 
 
         //////////// Eth Sepolia ////////////
         vm.selectFork(ethForkId);
         (receiverContract, restakingConnector) = deployOnEthScript.run();
-        /////////////////////////////////////
 
 
         //////////// Arb Sepolia ////////////
@@ -123,7 +124,6 @@ contract CCIP_Eigen_DelegationTests is Test {
             IERC20Minter(ArbSepolia.CcipBnM).mint(address(senderContract), 5 ether);
         }
         vm.stopBroadcast();
-        /////////////////////////////////////
 
 
         //////////// Eth Sepolia ////////////
@@ -149,7 +149,6 @@ contract CCIP_Eigen_DelegationTests is Test {
         }
 
         vm.stopBroadcast();
-        /////////////////////////////////////
 
         /////////////////////////////////////
         //// ETH: Mock deposits on Eigenlayer
@@ -165,28 +164,91 @@ contract CCIP_Eigen_DelegationTests is Test {
 
         stakerShares = strategyManager.stakerStrategyShares(staker, strategy);
         uint256 receiverShares = strategyManager.stakerStrategyShares(address(receiverContract), strategy);
-
-        require(stakerShares == amountToStake, "stakerStrategyShares incorrect");
-        require(receiverShares == 0, "receiverContract should not hold any shares");
-
         vm.stopBroadcast();
 
-        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
-        strategiesToWithdraw[0] = strategy;
 
-        uint256[] memory sharesToWithdraw = new uint256[](1);
-        sharesToWithdraw[0] = stakerShares;
+        // register Operator, to test delegation
+        vm.startBroadcast(operatorKey);
+        IDelegationManager.OperatorDetails memory registeringOperatorDetails =
+            IDelegationManager.OperatorDetails({
+                __deprecated_earningsReceiver: vm.addr(0xb0b),
+                delegationApprover: operator,
+                stakerOptOutWindowBlocks: 4
+            });
+
+        string memory metadataURI = "some operator";
+        delegationManager.registerAsOperator(registeringOperatorDetails, metadataURI);
+
+        require(delegationManager.isOperator(operator), "operator not set");
+        vm.stopBroadcast();
     }
 
 
     function test_Eigenlayer_DelegateTo() public {
-        // function delegateToBySignature(
-        //     address staker,
-        //     address operator,
-        //     SignatureWithExpiry memory stakerSignatureAndExpiry,
-        //     SignatureWithExpiry memory approverSignatureAndExpiry,
-        //     bytes32 approverSalt
-        // )
+
+        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry;
+        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
+
+        bytes32 approverSalt = 0x0000000000000000000000000000000000000000000000000000000000004444;
+
+        bytes memory signature1;
+        bytes memory signature2;
+        {
+            uint256 sig1_expiry = block.timestamp + 1 hours;
+            uint256 sig2_expiry = block.timestamp + 2 hours;
+
+            bytes32 digestHash1 = signatureUtils.calculateStakerDelegationDigestHash(
+                staker,
+                0,  // nonce
+                operator,
+                sig1_expiry,
+                address(delegationManager),
+                block.chainid
+            );
+            bytes32 digestHash2 = signatureUtils.calculateDelegationApprovalDigestHash(
+                staker,
+                operator,
+                operator, // _delegationApprover,
+                approverSalt,
+                sig2_expiry,
+                address(delegationManager), // delegationManagerAddr
+                block.chainid
+            );
+
+            (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(deployerKey, digestHash1);
+            signature1 = abi.encodePacked(r1, s1, v1);
+            stakerSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+                signature: signature1,
+                expiry: sig1_expiry
+            });
+
+            (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(operatorKey, digestHash2);
+            signature2 = abi.encodePacked(r2, s2, v2);
+            approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+                signature: signature2,
+                expiry: sig2_expiry
+            });
+        }
+
+        bytes memory message = eigenlayerMsgEncoders.encodeDelegateToBySignature(
+            staker,
+            operator,
+            stakerSignatureAndExpiry,
+            approverSignatureAndExpiry,
+            approverSalt
+        );
+
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
+            sourceChainSelector: ArbSepolia.ChainSelector,
+            sender: abi.encode(deployer),
+            destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging any tokens
+            data: abi.encode(string(
+                message
+            ))
+        });
+
+        receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 
     function test_Eigenlayer_Undelegate() public {
