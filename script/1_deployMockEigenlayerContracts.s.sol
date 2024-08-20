@@ -7,6 +7,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {IBeacon} from "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
+import {IETHPOSDeposit} from "eigenlayer-contracts/src/contracts/interfaces/IETHPOSDeposit.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategyFactory} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyFactory.sol";
@@ -20,6 +21,7 @@ import {PauserRegistry} from "eigenlayer-contracts/src/contracts/permissions/Pau
 import {StrategyManager} from  "eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
 import {DelegationManager} from "eigenlayer-contracts/src/contracts/core/DelegationManager.sol";
 import {RewardsCoordinator} from "eigenlayer-contracts/src/contracts/core/RewardsCoordinator.sol";
+import {EigenPodManager} from "eigenlayer-contracts/src/contracts/pods/EigenPodManager.sol";
 import {EmptyContract} from "eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 import {StrategyBase} from  "eigenlayer-contracts/src/contracts/strategies/StrategyBase.sol";
 import {StrategyFactory} from "eigenlayer-contracts/src/contracts/strategies/StrategyFactory.sol";
@@ -47,6 +49,7 @@ contract DeployMockEigenlayerContractsScript is Script {
     IRewardsCoordinator public rewardsCoordinator;
     IDelegationManager public delegationManager;
     ProxyAdmin public proxyAdmin;
+    EmptyContract public emptyContract;
 
     // RewardsCoordinator Parameters. TBD what they should be for Treasure chain
     uint32 public CALCULATION_INTERVAL_SECONDS = 604800; // 7 days
@@ -86,6 +89,9 @@ contract DeployMockEigenlayerContractsScript is Script {
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
         proxyAdmin = deployProxyAdmin();
+        vm.startBroadcast(deployer);
+        emptyContract = new EmptyContract();
+        vm.stopBroadcast();
 
         (
             strategyManager,
@@ -154,10 +160,8 @@ contract DeployMockEigenlayerContractsScript is Script {
         IRewardsCoordinator,
         IDelegationManager
     ) {
-        ///////////////////////////////////////////////////
+
         vm.startBroadcast(deployer);
-        ///////////////////////////////////////////////////
-        EmptyContract emptyContract = new EmptyContract();
 
         address[] memory pausers = new address[](1);
         pausers[0] = deployer;
@@ -167,28 +171,24 @@ contract DeployMockEigenlayerContractsScript is Script {
         strategyManager = StrategyManager(
             address(new TransparentUpgradeableProxy(address(emptyContract), address(_proxyAdmin), ""))
         );
-        ///////////////////////////////////////////////////
         vm.stopBroadcast();
-        ///////////////////////////////////////////////////
 
         delegationManager = IDelegationManager(address(
             _deployDelegationManager(
                 strategyManager,
                 slasher,
                 eigenPodManager,
-                _pauserRegistry
+                _pauserRegistry,
+                _proxyAdmin
             )
         ));
 
-        ///////////////////////////////////////////////////
         vm.startBroadcast(deployer);
-        ///////////////////////////////////////////////////
         StrategyManager strategyManagerImpl = new StrategyManager(
             delegationManager,
             eigenPodManager,
             slasher
         );
-
         proxyAdmin.upgradeAndCall(
             TransparentUpgradeableProxy(payable(address(strategyManager))),
             address(strategyManagerImpl),
@@ -200,9 +200,7 @@ contract DeployMockEigenlayerContractsScript is Script {
                 0 // initialPauseStaus
             )
         );
-        ///////////////////////////////////////////////////
         vm.stopBroadcast();
-        ///////////////////////////////////////////////////
 
         rewardsCoordinator = _deployRewardsCoordinator(
             strategyManager,
@@ -268,9 +266,29 @@ contract DeployMockEigenlayerContractsScript is Script {
         IStrategyManager _strategyManager,
         ISlasher _slasher,
         IEigenPodManager _eigenPodManager,
-        IPauserRegistry _pauserRegistry
+        IPauserRegistry _pauserRegistry,
+        ProxyAdmin _proxyAdmin
     ) internal returns (DelegationManager) {
         vm.startBroadcast(deployer);
+
+        // deploy first to get address for delegationManager
+        DelegationManager delegationManagerProxy = DelegationManager(
+            address(new TransparentUpgradeableProxy(address(emptyContract), address(_proxyAdmin), ""))
+        );
+
+        _eigenPodManager = new EigenPodManager(
+            IETHPOSDeposit(vm.addr(0xee01)),
+            IBeacon(vm.addr(0xee02)),
+            _strategyManager,
+            _slasher,
+            delegationManagerProxy
+            // IETHPOSDeposit _ethPOS,
+            // IBeacon _eigenPodBeacon,
+            // IStrategyManager _strategyManager,
+            // ISlasher _slasher,
+            // IDelegationManager _delegationManager
+        );
+
         // Eigenlayer disableInitialisers so they must be called via upgradeable proxy
         DelegationManager delegationManagerImpl = new DelegationManager(
             _strategyManager,
@@ -278,24 +296,34 @@ contract DeployMockEigenlayerContractsScript is Script {
             _eigenPodManager
         );
 
-        // IStrategy[] memory _strategies = new IStrategy[](0);
-        // uint256[] memory _withdrawalDelayBlocks = new uint256[](0);
-         DelegationManager delegationManagerProxy = DelegationManager(
-            address(new TransparentUpgradeableProxy(
-                address(delegationManagerImpl),
-                address(proxyAdmin),
-                abi.encodeWithSelector(
-                    DelegationManager.initialize.selector,
-                    deployer,
-                    _pauserRegistry,
-                    0, // initialPausedStatus
-                    4, // _minWithdrawalDelayBlocks: 4x15 seconds = 1 min
-                    new IStrategy[](0), // _strategies
-                    new uint256[](0) // _withdrawalDelayBlocks
-                )
-            ))
+        proxyAdmin.upgradeAndCall(
+            TransparentUpgradeableProxy(payable(address(delegationManagerProxy))),
+            address(delegationManagerImpl),
+            abi.encodeWithSelector(
+                DelegationManager.initialize.selector,
+                deployer,
+                _pauserRegistry,
+                0, // initialPausedStatus
+                4, // _minWithdrawalDelayBlocks: 4x15 seconds = 1 min
+                new IStrategy[](0), // _strategies
+                new uint256[](0) // _withdrawalDelayBlocks
+            )
         );
-
+        // delegationManagerProxy = DelegationManager(
+        //     address(new TransparentUpgradeableProxy(
+        //         address(delegationManagerImpl),
+        //         address(proxyAdmin),
+        //         abi.encodeWithSelector(
+        //             DelegationManager.initialize.selector,
+        //             deployer,
+        //             _pauserRegistry,
+        //             0, // initialPausedStatus
+        //             4, // _minWithdrawalDelayBlocks: 4x15 seconds = 1 min
+        //             new IStrategy[](0), // _strategies
+        //             new uint256[](0) // _withdrawalDelayBlocks
+        //         )
+        //     ))
+        // );
         vm.stopBroadcast();
         return delegationManagerProxy;
     }
