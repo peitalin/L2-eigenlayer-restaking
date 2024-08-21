@@ -13,11 +13,12 @@ import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
-import {DeployOnArbScript} from "../script/2_deployOnArb.s.sol";
+import {DeployOnL2Script} from "../script/2_deployOnL2.s.sol";
 import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
 import {WhitelistCCIPContractsScript} from "../script/4_whitelistCCIPContracts.s.sol";
 
-import {FileReader, ArbSepolia, EthSepolia} from "./Addresses.sol";
+import {BaseSepolia, EthSepolia} from "./Addresses.sol";
+import {FileReader} from "./FileReader.sol";
 import {ScriptUtils} from "./ScriptUtils.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
@@ -40,7 +41,6 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
     SignatureUtilsEIP1271 public signatureUtils;
-    EigenlayerMsgEncoders public eigenlayerMsgEncoders;
 
     uint256 public deployerKey;
     address public deployer;
@@ -51,11 +51,9 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
     function run() public {
 
         bool isTest = block.chainid == 31337;
-        uint256 arbForkId = vm.createFork("arbsepolia");
-        // uint256 arbForkId = vm.createSelectFork("arbsepolia");
-        // vm.rollFork(71584765); // roll back before CCIP network entered "cursed" state
+        uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
-        console.log("arbForkId:", arbForkId);
+        console.log("l2ForkId:", l2ForkId);
         console.log("ethForkId:", ethForkId);
         console.log("block.chainid", block.chainid);
 
@@ -63,7 +61,6 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         deployer = vm.addr(deployerKey);
 
         signatureUtils = new SignatureUtilsEIP1271(); // needs ethForkId to call getDomainSeparator
-        eigenlayerMsgEncoders = new EigenlayerMsgEncoders(); // needs ethForkId to call encodeDeposit
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         DeployOnEthScript deployOnEthScript = new DeployOnEthScript();
@@ -87,9 +84,9 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
                 restakingConnector
             ) = deployOnEthScript.run();
 
-            vm.selectFork(arbForkId);
-            DeployOnArbScript deployOnArbScript = new DeployOnArbScript();
-            senderContract = deployOnArbScript.run();
+            vm.selectFork(l2ForkId);
+            DeployOnL2Script deployOnL2Script = new DeployOnL2Script();
+            senderContract = deployOnL2Script.run();
 
             vm.selectFork(ethForkId);
         } else {
@@ -103,7 +100,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         ////////////////////////////////////////////////////////////
 
         senderAddr = address(senderContract);
-        ccipBnM = IERC20(address(ArbSepolia.CcipBnM)); // ArbSepolia contract
+        ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
 
         amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
         staker = deployer;
@@ -158,16 +155,16 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             queuedWithdrawalWithSigArray = new IDelegationManager.QueuedWithdrawalWithSignatureParams[](1);
             queuedWithdrawalWithSigArray[0] = queuedWithdrawalWithSig;
 
-            message = eigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
+            message = EigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
                 queuedWithdrawalWithSigArray
             );
         }
 
         /////////////////////////////////////////////////////////////////
-        /////// Broadcast to Arb L2
+        /////// Broadcast to L2
         /////////////////////////////////////////////////////////////////
 
-        vm.selectFork(arbForkId);
+        vm.selectFork(l2ForkId);
         vm.startBroadcast(deployerKey);
 
         topupSenderEthBalance(senderAddr);

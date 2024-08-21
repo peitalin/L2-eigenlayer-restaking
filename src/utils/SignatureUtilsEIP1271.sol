@@ -8,7 +8,7 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 
-/// @dev Retrieve these struct hashes by calling Eigenlayer contracts, or storing the hash somewhere.
+/// @dev Retrieve these struct hashes by calling Eigenlayer contracts, or storing the hash.
 contract SignatureUtilsEIP1271 is Script {
 
     function checkSignature_EIP1271(
@@ -130,7 +130,7 @@ contract SignatureUtilsEIP1271 is Script {
         uint256 expiry,
         address delegationManagerAddr,
         uint256 destinationChainid
-    ) public view returns (bytes32) {
+    ) public pure returns (bytes32) {
 
         /// @notice The EIP-712 typehash for the `StakerDelegation` struct used by the contract
         bytes32 STAKER_DELEGATION_TYPEHASH =
@@ -156,7 +156,7 @@ contract SignatureUtilsEIP1271 is Script {
         uint256 expiry,
         address delegationManagerAddr,
         uint256 destinationChainid
-    ) public view returns (bytes32) {
+    ) public pure returns (bytes32) {
 
         /// @notice The EIP-712 typehash for the `DelegationApproval` struct used by the contract
         bytes32 DELEGATION_APPROVAL_TYPEHASH = keccak256(

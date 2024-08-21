@@ -18,26 +18,26 @@ import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
-import {IRestakingConnector, EigenlayerDepositWithSignatureParams} from "../src/interfaces/IRestakingConnector.sol";
+import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+import {EigenlayerDepositWithSignatureParams} from "../src/interfaces/IEigenlayerMsgDecoders.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
-import {DeployOnArbScript} from "../script/2_deployOnArb.s.sol";
+import {DeployOnL2Script} from "../script/2_deployOnL2.s.sol";
 
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
-import {EthSepolia, ArbSepolia} from "../script/Addresses.sol";
+import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 
 contract CCIP_Eigen_DelegationTests is Test {
 
     DeployOnEthScript public deployOnEthScript;
-    DeployOnArbScript public deployOnArbScript;
+    DeployOnL2Script public deployOnL2Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
-    EigenlayerMsgEncoders public eigenlayerMsgEncoders;
 
     uint256 public deployerKey;
     address public deployer;
@@ -60,7 +60,7 @@ contract CCIP_Eigen_DelegationTests is Test {
     uint256 public operatorKey;
     address public operator;
 
-    uint256 arbForkId;
+    uint256 l2ForkId;
     uint256 ethForkId;
 
     function setUp() public {
@@ -69,15 +69,14 @@ contract CCIP_Eigen_DelegationTests is Test {
         deployer = vm.addr(deployerKey);
 
         deployOnEthScript = new DeployOnEthScript();
-        deployOnArbScript = new DeployOnArbScript();
+        deployOnL2Script = new DeployOnL2Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-        eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
         signatureUtils = new SignatureUtilsEIP1271();
 
         bool isTest = block.chainid == 31337;
-        arbForkId = vm.createFork("arbsepolia");        // 0
+        l2ForkId = vm.createFork("basesepolia");        // 0
         ethForkId = vm.createSelectFork("ethsepolia"); // 1
-        console.log("arbForkId:", arbForkId);
+        console.log("l2ForkId:", l2ForkId);
         console.log("ethForkId:", ethForkId);
 
         (
@@ -91,12 +90,12 @@ contract CCIP_Eigen_DelegationTests is Test {
         ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
         staker = deployer;
-        operatorKey = uint256(1000);
+        operatorKey = vm.envUint("OPERATOR_KEY");
         operator = vm.addr(operatorKey);
 
         //////////// Arb Sepolia ////////////
-        vm.selectFork(arbForkId);
-        senderContract = deployOnArbScript.run();
+        vm.selectFork(l2ForkId);
+        senderContract = deployOnL2Script.run();
 
 
         //////////// Eth Sepolia ////////////
@@ -105,7 +104,7 @@ contract CCIP_Eigen_DelegationTests is Test {
 
 
         //////////// Arb Sepolia ////////////
-        vm.selectFork(arbForkId);
+        vm.selectFork(l2ForkId);
         vm.startBroadcast(deployerKey);
         // allow L2 sender contract to receive tokens back from L1
         senderContract.allowlistSourceChain(EthSepolia.ChainSelector, true);
@@ -113,15 +112,15 @@ contract CCIP_Eigen_DelegationTests is Test {
         senderContract.allowlistSender(deployer, true);
         // fund L2 sender with gas and CCIP-BnM tokens
         vm.deal(address(senderContract), 1.333 ether); // fund for gas
-        if (block.chainid == 421614) {
+        if (block.chainid == BaseSepolia.ChainId) {
             // drip() using CCIP's BnM faucet if forking from Arb Sepolia
             for (uint256 i = 0; i < 5; ++i) {
-                IERC20_CCIPBnM(ArbSepolia.CcipBnM).drip(address(senderContract));
+                IERC20_CCIPBnM(BaseSepolia.CcipBnM).drip(address(senderContract));
                 // each drip() gives you 1e18 coin
             }
         } else {
             // mint() if we deployed our own Mock ERC20
-            IERC20Minter(ArbSepolia.CcipBnM).mint(address(senderContract), 5 ether);
+            IERC20Minter(BaseSepolia.CcipBnM).mint(address(senderContract), 5 ether);
         }
         vm.stopBroadcast();
 
@@ -189,7 +188,7 @@ contract CCIP_Eigen_DelegationTests is Test {
         ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry;
         ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
 
-        bytes32 approverSalt = 0x0000000000000000000000000000000000000000000000000000000000004444;
+        bytes32 approverSalt = bytes32(uint256(22));
 
         bytes memory signature1;
         bytes memory signature2;
@@ -230,7 +229,7 @@ contract CCIP_Eigen_DelegationTests is Test {
             });
         }
 
-        bytes memory message = eigenlayerMsgEncoders.encodeDelegateToBySignature(
+        bytes memory message = EigenlayerMsgEncoders.encodeDelegateToBySignature(
             staker,
             operator,
             stakerSignatureAndExpiry,
@@ -240,7 +239,7 @@ contract CCIP_Eigen_DelegationTests is Test {
 
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
-            sourceChainSelector: ArbSepolia.ChainSelector,
+            sourceChainSelector: BaseSepolia.ChainSelector,
             sender: abi.encode(deployer),
             destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging any tokens
             data: abi.encode(string(
@@ -289,10 +288,10 @@ contract CCIP_Eigen_DelegationTests is Test {
 
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
-            sourceChainSelector: ArbSepolia.ChainSelector, // Arb Sepolia source chain selector
+            sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
             sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
             data: abi.encode(string(
-                eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+                EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
                     address(strategy),
                     address(token),
                     _amount,

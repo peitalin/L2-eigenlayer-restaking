@@ -1,26 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
-import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
-import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
-import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
-import {TransferToStakerMessage} from "./interfaces/IRestakingConnector.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+
+import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
-import {ArbSepolia} from "../script/Addresses.sol";
 
-import {console} from "forge-std/Test.sol";
+import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
+import {TransferToStakerMessage} from "./interfaces/IEigenlayerMsgDecoders.sol";
+import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
 
 
-contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsgDecoders, EigenlayerMsgEncoders {
+contract SenderCCIP is BaseMessengerCCIP {
 
-    event SendingWithdrawalToStaker(address indexed, uint256 indexed, bytes32 indexed);
+    event SendingWithdrawalToStaker(address indexed, uint256 indexed, address indexed);
 
-    event UnknownFunctionSelector(bytes indexed);
-
-    event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
+    event MatchedFunctionSelector(bytes4 indexed, string indexed);
 
     event WithdrawalCommitted(bytes32 indexed, address indexed, uint256 indexed);
 
@@ -34,30 +30,22 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
 
     mapping(bytes32 => bool) public withdrawalRootsSpent;
 
-    mapping(bytes4 => uint256) internal gasLimitsForFunctionSelectors;
-
+    ISenderUtils internal senderUtils;
 
     /// @param _router The address of the router contract.
     /// @param _link The address of the link contract.
-    constructor(
-        address _router,
-        address _link
-    ) BaseMessengerCCIP(_router, _link) {
+    constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {}
 
-        // depositIntoStrategy: [gas: 565_307]
-        gasLimitsForFunctionSelectors[0xf7e784ef] = 600_000;
+    function initialize(ISenderUtils _senderUtils) initializer public {
 
-        // depositIntoStrategyWithSignature: [gas: 713_400]
-        gasLimitsForFunctionSelectors[0x32e89ace] = 800_000;
+        require(address(_senderUtils) != address(0), "_senderUtils cannot be address(0)");
+        senderUtils = _senderUtils;
 
-        // queueWithdrawals: [gas: x]
-        gasLimitsForFunctionSelectors[0x0dd8dd02] = 700_000;
+        BaseMessengerCCIP.__BaseMessengerCCIP_init();
+    }
 
-        // queueWithdrawalsWithSignature: [gas: 603_301]
-        gasLimitsForFunctionSelectors[0xa140f06e] = 800_000;
-
-        // completeQueuedWithdrawals: [gas: 645_948]
-        gasLimitsForFunctionSelectors[0x54b2bf29] = 800_000;
+    function setSenderUtils(ISenderUtils _senderUtils) external onlyOwner {
+        senderUtils = _senderUtils;
     }
 
     function mockCCIPReceive(
@@ -87,11 +75,11 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
 
         bytes memory message = any2EvmMessage.data;
         string memory text_msg;
-        bytes4 functionSelector = decodeFunctionSelector(message);
+        bytes4 functionSelector = senderUtils.decodeFunctionSelector(message);
 
         if (functionSelector == 0x27167d10) {
             // keccak256(abi.encode("transferToStaker(bytes32)")) == 0x27167d10
-            TransferToStakerMessage memory transferToStakerMsg = decodeTransferToStakerMessage(message);
+            TransferToStakerMessage memory transferToStakerMsg = senderUtils.decodeTransferToStakerMessage(message);
 
             bytes32 withdrawalRoot = transferToStakerMsg.withdrawalRoot;
 
@@ -105,21 +93,19 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
             // checks-effects-interactions
             // delete withdrawalRoot entry and mark the withdrawalRoot as spent
             // to prevent multiple withdrawals
-            delete withdrawalTransferCommittments[withdrawalRoot];
+            // delete withdrawalTransferCommittments[withdrawalRoot];
             withdrawalRootsSpent[withdrawalRoot] = true;
 
-            emit SendingWithdrawalToStaker(staker, amount, withdrawalRoot);
+            emit SendingWithdrawalToStaker(staker, amount, tokenDestination);
 
-            bool success = IERC20(tokenDestination).transfer(staker, amount);
-
-            if (!success)
-                revert("token bridged successfully but failed to transfer to staker");
+            IERC20(tokenDestination).approve(address(this), amount);
+            IERC20(tokenDestination).transfer(staker, amount);
 
             text_msg = "completed eigenlayer withdrawal and transferred token to L2 staker";
 
         } else {
 
-            emit UnknownFunctionSelector(message);
+            emit MatchedFunctionSelector(functionSelector, "UnknownFunctionSelector");
             text_msg = "messaging decoding failed";
         }
 
@@ -162,20 +148,22 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
 
         bytes memory message = abi.encode(_text);
 
-        bytes4 functionSelector = decodeFunctionSelector(message);
+        bytes4 functionSelector = senderUtils.decodeFunctionSelector(message);
 
-        // When sending a message from L2 to L1
+        // When User sends a message to CompleteQueuedWithdrawal from L2 to L1
         if (functionSelector == 0x54b2bf29) {
+            // 0x54b2bf29 = abi.encode(keccask256(completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)))
             (
                 IDelegationManager.Withdrawal memory withdrawal
                 ,
                 ,
                 ,
-            ) = decodeCompleteWithdrawalMessage(message);
+            ) = senderUtils.decodeCompleteWithdrawalMessage(message);
 
             bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
 
-            // Check for spent withdrawalRoots to prevent withdrawalRoot reuse
+            // Check for spent withdrawalRoots to prevent wasted CCIP message
+            // as it will fail to withdraw from Eigenlayer
             require(
                 withdrawalRootsSpent[withdrawalRoot] == false,
                 "withdrawalRoot has already been used"
@@ -186,15 +174,16 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
             withdrawalTransferCommittments[withdrawalRoot] = WithdrawalTransfer({
                 staker: withdrawal.staker,
                 amount: withdrawal.shares[0],
-                tokenDestination: ArbSepolia.BridgeToken
+                tokenDestination: _token
             });
 
             emit WithdrawalCommitted(withdrawalRoot, withdrawal.staker, withdrawal.shares[0]);
         } else {
-            emit UnknownFunctionSelector(message);
+            string memory _functionSelectorName = senderUtils.getFunctionSelectorName(functionSelector);
+            emit MatchedFunctionSelector(functionSelector, _functionSelectorName);
         }
 
-        uint256 gasLimit = gasLimitsForFunctionSelectors[functionSelector];
+        uint256 gasLimit = senderUtils.getGasLimitForFunctionSelector(functionSelector);
 
         return
             Client.EVM2AnyMessage({
@@ -208,27 +197,15 @@ contract SenderCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsg
             });
     }
 
+    function getWithdrawal(bytes32 withdrawalRoot) public view returns (WithdrawalTransfer memory) {
+        return withdrawalTransferCommittments[withdrawalRoot];
+    }
+
     function calculateWithdrawalRoot(
         IDelegationManager.Withdrawal memory withdrawal
     ) public pure returns (bytes32) {
         return keccak256(abi.encode(withdrawal));
     }
 
-    function setGasLimitForFunctionSelector(
-        bytes4[] memory functionSelectors,
-        uint256[] memory gasLimits
-    ) public onlyOwner {
-
-        require(functionSelectors.length == gasLimits.length, "input arrays must have the same length");
-
-        for (uint256 i = 0; i < gasLimits.length; ++i) {
-            gasLimitsForFunctionSelectors[functionSelectors[i]] = gasLimits[i];
-            emit SetGasLimitForFunctionSelector(functionSelectors[i], gasLimits[i]);
-        }
-    }
-
-    function getGasLimitForFunctionSelector(bytes4 functionSelector) public view returns (uint256) {
-        return gasLimitsForFunctionSelectors[functionSelector];
-    }
 }
 

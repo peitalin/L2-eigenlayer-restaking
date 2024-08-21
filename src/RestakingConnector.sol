@@ -16,10 +16,14 @@ import {Adminable} from "./utils/Adminable.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
+import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 
 
-
-contract RestakingConnector is IRestakingConnector, EigenlayerMsgDecoders, Adminable {
+contract RestakingConnector is
+    IRestakingConnector,
+    EigenlayerMsgDecoders,
+    Adminable
+{
 
     IDelegationManager public delegationManager;
     IStrategyManager public strategyManager;
@@ -35,10 +39,17 @@ contract RestakingConnector is IRestakingConnector, EigenlayerMsgDecoders, Admin
         __Adminable_init();
     }
 
+    function decodeFunctionSelector(bytes memory message) public returns (bytes4) {
+        return FunctionSelectorDecoder.decodeFunctionSelector(message);
+    }
+
+    function encodeTransferToStakerMsg(bytes32 withdrawalRoot) external returns (bytes memory) {
+        EigenlayerMsgEncoders.encodeTransferToStakerMsg(withdrawalRoot);
+    }
+
     /// @dev Checkpoint the actual block.number before queueWithdrawal happens
     /// When dispatching a L2 -> L1 message to queueWithdrawal, the block.number
     /// varies depending on how long it takes to bridge.
-    ///
     /// We need the block.number to in the following step to
     /// create the withdrawalRoot used to completeWithdrawal.
     function setQueueWithdrawalBlock(address staker, uint256 nonce) external onlyAdminOrOwner {
@@ -72,5 +83,14 @@ contract RestakingConnector is IRestakingConnector, EigenlayerMsgDecoders, Admin
         strategyManager = _strategyManager;
         strategy = _strategy;
     }
+
+    // function isValidSignature(
+    //     bytes32 _hash,
+    //     bytes memory _signature
+    // ) public pure returns (bytes4 magicValue) {
+    //     bytes4 constant internal MAGICVALUE = 0x1626ba7e;
+    //     // implement some hash/signature scheme
+    //     return MAGICVALUE;
+    // }
 
 }

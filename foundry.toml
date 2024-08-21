@@ -20,14 +20,11 @@ remappings = [
 localhost = "http://localhost:8545"
 holesky = "https://holesky.drpc.org"
 ## Note: Free RPCs may sometimes fail when deploying and verifying contracts.
-# arbsepolia = "https://sepolia-rollup.arbitrum.io/rpc"
-# arbsepolia = "https://arbitrum-sepolia.blockpi.network/v1/rpc/public"
 # ethsepolia = "https://sepolia.drpc.org"
-# ethsepolia = "https://sepolia.gateway.tenderly.co"
 ethsepolia = "https://sepolia.infura.io/v3/${INFURA_API_KEY}"
-arbsepolia = "https://arbitrum-sepolia.infura.io/v3/${INFURA_API_KEY}"
+basesepolia = "https://sepolia.base.org"
 
 [etherscan]
 holesky = { key = "${ETHERSCAN_API_KEY}" }
 ethsepolia = { key = "${ETHERSCAN_API_KEY}" }
-arbsepolia = { key = "${ARBISCAN_API_KEY}" }
+basesepolia = { key = "${BASESCAN_API_KEY}" }

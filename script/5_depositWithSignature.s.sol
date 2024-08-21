@@ -14,7 +14,8 @@ import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
-import {FileReader, ArbSepolia, EthSepolia} from "./Addresses.sol";
+import {BaseSepolia, EthSepolia} from "./Addresses.sol";
+import {FileReader} from "./FileReader.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
@@ -22,7 +23,7 @@ import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {ScriptUtils} from "./ScriptUtils.sol";
 
 
-contract DepositWithSignatureFromArbToEthScript is Script, ScriptUtils {
+contract DepositWithSignatureScript is Script, ScriptUtils {
 
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
@@ -38,7 +39,6 @@ contract DepositWithSignatureFromArbToEthScript is Script, ScriptUtils {
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
     SignatureUtilsEIP1271 public signatureUtils;
-    EigenlayerMsgEncoders public eigenlayerMsgEncoders;
 
     uint256 public deployerKey;
     address public deployer;
@@ -46,20 +46,14 @@ contract DepositWithSignatureFromArbToEthScript is Script, ScriptUtils {
     function run() public {
 
         bool isTest = block.chainid == 31337;
-        // uint256 arbForkId = vm.createFork("arbsepolia");
-        uint256 arbForkId = vm.createSelectFork("arbsepolia");
-        // uint256 arbForkId = vm.createSelectFork("arbsepolia");
-        // vm.rollFork(71584765); // roll back before CCIP network entered "cursed" state
+        uint256 l2ForkId = vm.createSelectFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
-        console.log("arbForkId:", arbForkId);
-        console.log("ethForkId:", ethForkId);
         console.log("block.chainid", block.chainid);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
         signatureUtils = new SignatureUtilsEIP1271(); // needs ethForkId to call getDomainSeparator
-        eigenlayerMsgEncoders = new EigenlayerMsgEncoders(); // needs ethForkId to call encodeDeposit
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
@@ -78,7 +72,7 @@ contract DepositWithSignatureFromArbToEthScript is Script, ScriptUtils {
 
         (receiverContract, restakingConnector) = fileReader.getReceiverRestakingConnectorContracts();
 
-        ccipBnM = IERC20(address(ArbSepolia.CcipBnM)); // ArbSepolia contract
+        ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
         token = IERC20(address(EthSepolia.BridgeToken)); // CCIPBnM on EthSepolia
 
         //////////////////////////////////////////////////////////
@@ -89,8 +83,8 @@ contract DepositWithSignatureFromArbToEthScript is Script, ScriptUtils {
         // First get nonce from StrategyManager in EthSepolia
         vm.selectFork(ethForkId);
         uint256 nonce = IStrategyManagerDomain(address(strategyManager)).nonces(deployer);
-        uint256 amount = 0.00515 ether; // bridging 0.00515 CCIPBnM
-        uint256 expiry = block.timestamp + 12 hours;
+        uint256 amount = 0.00616 ether; // bridging 0.00515 CCIPBnM
+        uint256 expiry = block.timestamp + 3 hours;
 
         bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), EthSepolia.ChainId);
         bytes32 digestHash = signatureUtils.createEigenlayerDepositDigest(
@@ -108,7 +102,7 @@ contract DepositWithSignatureFromArbToEthScript is Script, ScriptUtils {
 
         signatureUtils.checkSignature_EIP1271(deployer, digestHash, signature);
 
-        bytes memory message = eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+        bytes memory message = EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
             address(strategy),
             address(token),
             amount,
@@ -117,13 +111,15 @@ contract DepositWithSignatureFromArbToEthScript is Script, ScriptUtils {
             signature
         );
 
-        //// Make sure we are on ArbSepolia Fork to make contract calls to CCIP-BnM
-        vm.selectFork(arbForkId);
+        //// Make sure we are on BaseSepolia Fork to make contract calls to CCIP-BnM
+        vm.selectFork(l2ForkId);
 
         /////////////////////////////
         /// Begin Broadcast
         /////////////////////////////
         vm.startBroadcast(deployerKey);
+
+        topupSenderEthBalance(senderAddr);
 
         // Check L2 CCIP-BnM ETH balances for gas
         if (ccipBnM.balanceOf(senderAddr) < 0.1 ether) {
@@ -133,7 +129,6 @@ contract DepositWithSignatureFromArbToEthScript is Script, ScriptUtils {
         // Approve L2 senderContract to send ccip-BnM tokens to Router
         ccipBnM.approve(senderAddr, amount);
 
-        topupSenderEthBalance(senderAddr);
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),

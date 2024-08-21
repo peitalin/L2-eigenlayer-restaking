@@ -3,6 +3,9 @@ pragma solidity 0.8.22;
 
 import {Script, console} from "forge-std/Script.sol";
 
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
@@ -10,18 +13,19 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
+import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
-import {FileReader} from "./Addresses.sol";
-import {ArbSepolia, EthSepolia} from "./Addresses.sol";
+import {FileReader} from "./FileReader.sol";
+import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 
 
 contract DeployOnEthScript is Script {
 
     RestakingConnector public restakingConnector;
-    ReceiverCCIP public receiverContract;
+    ReceiverCCIP public receiverProxy;
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
 
@@ -36,7 +40,9 @@ contract DeployOnEthScript is Script {
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
-        address senderContractAddr = address(fileReader.getSenderContract());
+        ISenderCCIP senderProxy = fileReader.getSenderContract();
+        ISenderUtils senderUtils = ISenderUtils(fileReader.getSenderUtils());
+        ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.getSenderProxyAdmin());
 
         (
             IStrategy strategy,
@@ -59,24 +65,43 @@ contract DeployOnEthScript is Script {
         restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
 
         // deploy receiver contract
-        receiverContract = new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link, address(restakingConnector));
-        receiverContract.allowlistSourceChain(ArbSepolia.ChainSelector, true);
-        receiverContract.allowlistSender(senderContractAddr, true);
-        receiverContract.allowlistDestinationChain(ArbSepolia.ChainSelector, true);
-        receiverContract.setSenderContractL2Addr(senderContractAddr);
+        ReceiverCCIP receiverImpl = new ReceiverCCIP(
+            EthSepolia.Router,
+            EthSepolia.Link
+        );
 
-        restakingConnector.addAdmin(address(receiverContract));
+        receiverProxy = ReceiverCCIP(
+            payable(address(
+                new TransparentUpgradeableProxy(
+                    address(receiverImpl),
+                    address(proxyAdmin),
+                    abi.encodeWithSelector(
+                        ReceiverCCIP.initialize.selector,
+                        IRestakingConnector(address(restakingConnector)),
+                        senderProxy,
+                        senderUtils
+                    )
+                )
+            ))
+        );
+
+        receiverProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
+        receiverProxy.allowlistSender(address(senderProxy), true);
+        receiverProxy.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
+        receiverProxy.setSenderContractL2Addr(address(senderProxy));
+
+        restakingConnector.addAdmin(address(receiverProxy));
 
         // seed the receiver contract with a bit of ETH
-        if (address(receiverContract).balance < 0.02 ether) {
-            (bool sent, ) = address(receiverContract).call{value: 0.05 ether}("");
+        if (address(receiverProxy).balance < 0.02 ether) {
+            (bool sent, ) = address(receiverProxy).call{value: 0.05 ether}("");
             require(sent, "Failed to send Ether");
         }
 
         vm.stopBroadcast();
 
         return (
-            IReceiverCCIP(address(receiverContract)),
+            IReceiverCCIP(address(receiverProxy)),
             IRestakingConnector(address(restakingConnector))
         );
     }

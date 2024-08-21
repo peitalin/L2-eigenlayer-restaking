@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-contract FunctionSelectorDecoder {
+library FunctionSelectorDecoder {
 
     event MessengerDecodedFunctionSelector(
         bytes4 indexed functionSelector,

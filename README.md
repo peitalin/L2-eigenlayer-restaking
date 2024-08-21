@@ -4,7 +4,7 @@ Scripts in the `scripts` folder:
 - `5_depositWithSignatureFromArbToEth.sh` makes a cross-chain deposit into Eigenlayer from L2.
 - `6_queueWithdrawalWithSignature.sh` queues a withdrawal from L2.
 - `7_completeWithdrawalWithSignature.sh` completes the withdrawal and bridges the deposit back from L1 into the original staker's wallet on L2.
-- You will need to re-run scripts `2_deployOnArb.s.sol`, `3_deployOnEth.s.sol` and `4_whitelistCCIPContracts.sh` if there are changes made to either the `SenderCCIP`, `ReceiverCCIP`, or `RestakingConnector` contracts.
+- You will need to re-run scripts `2_deployOnL2.s.sol`, `3_deployOnEth.s.sol` and `4_whitelistCCIPContracts.sh` if there are changes made to either the `SenderCCIP`, `ReceiverCCIP`, or `RestakingConnector` contracts.
 
 Test run:
 ```
@@ -33,13 +33,6 @@ The message makes it's way to L1 resulting in the following Eigenlayer `queueWit
 
 Withdrawal events can be seen on DelegationManager contract on L1:
 [https://sepolia.etherscan.io/address/0x6b78995ba97fb26de32ede9055d85f176b672af7#events](https://sepolia.etherscan.io/address/0x6b78995ba97fb26de32ede9055d85f176b672af7#events)
-
-NOTE: we need to track the `block.number` of when this tx lands on L1, as it's used to form the withdrawalRoot you need to completeWithdrawals in the next step.
-- add a `mapping(address => mapping(uint256 => uint256)) withdrawalBlock` to the ReceiverContract;
-- then when we queueWithdrawal, we record `withdrawalBlock[staker][nonce] = block.number;`.
-- then when we dispatch `completeWithdrawal()` later, we'll read from ReceiverContract.withdrawalBlock() to get the actual block number associated with the withdrawal.
-
-Atm we store withdrawal information in `script/withdrawals-queued/<user_address>/` and `script/withdrawals-completed/<user_address>/`
 
 
 
@@ -73,9 +66,11 @@ Once we wait for the L1 -> L2 bridge back, we can see the token transferred back
     - [x] `queueWithdrawalsWithSignature` ([requires PR #646 to work](https://github.com/Layr-Labs/eigenlayer-contracts/pull/676/files))
     - [x] `completeQueuedWithdrawals`
         - [x] Transfer withdrawn tokens from L1 back to L2
-        - [x] Make `mapping(bytes32 withdrawalRoot => Withdrawal)` and `withdrawalRootSpend` mappings on L1 SenderCCIP bridge, so when the withdrawalRoot is messaged back from L1 we can look up the original staker on L2 to transfer to without needing another signature.
+        - [x] Make `mapping(bytes32 withdrawalRoot => Withdrawal)` and `withdrawalRootsSpent` mappings on L1 SenderCCIP bridge, so when the withdrawalRoot is messaged back from L1 we can look up the original staker on L2 to transfer to without needing another signature.
+        - [x] Add `setQueueWithdrawalBlock(staker, nonce)` and `getQueueWithdrawalBlock(staker, nonce)` to record the `block.number` needed to re-created the withdrawalRoot to `completeQueuedWithdrawal` via L2.
+Queued withdrawals are store in `script/withdrawals-queued/<user_address>/`, and completed withdrawals are recored in `script/withdrawals-completed/<user_address>/`.
     - [x] Refactor CCIP for messaging passing with no-token bridging option
-    - [ ] `delegateToBySignature`
+    - [x] `delegateToBySignature`
     - [ ] `undelegate` (this also withdraws the staker, so we will probably need a `undelegateWithSignature` feature as well from Eigenlayer). There is no way to directly re-delegate to another operator, a staker must undelegate + withdraw, wait 7 days, then restake and re-delegate to a new operator.
 
 - Gas optimization

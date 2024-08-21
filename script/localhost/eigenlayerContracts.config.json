@@ -4,12 +4,12 @@
     "PauserRegistry": "0xc6AEe513B0421e48404f8faFD38b29476a53fb0d",
     "ProxyAdmin": "0xeB7aB5A6F761072C96147A54B8a15F012e836691",
     "RewardsCoordinator": "0xe8ad6a693825fdcd128a5641d4443BEBDCd0f73C",
-    "StrategyBeacon": "0x2b9eB6C5C46f47dbD995FE2e57B32ae12eF27F2d",
-    "StrategyFactory": "0x71f655CaB647265B0f24C814644e2dD01F9b23e1",
+    "StrategyBeacon": "0xe1Ab123D238AF74F77BfD59450e2428c9214123C",
+    "StrategyFactory": "0x2b9eB6C5C46f47dbD995FE2e57B32ae12eF27F2d",
     "StrategyManager": "0x907B2ac97B073E7336D746231811BcB727594C02",
     "TokenERC20": "0x8FdFb0D901dE9055C110569Cdc08F54bd4aF7128",
     "strategies": {
-      "CCIPStrategy": "0x23562dD4793A12Ed519FAe4bf766D9007734F968"
+      "CCIPStrategy": "0x41306849382357029Ab3081fc1E02241f28aA9e0"
     }
   },
   "chainInfo": {

@@ -18,25 +18,25 @@ import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
-import {IRestakingConnector, EigenlayerDepositWithSignatureParams} from "../src/interfaces/IRestakingConnector.sol";
+import {IRestakingConnector } from "../src/interfaces/IRestakingConnector.sol";
+import {EigenlayerDepositWithSignatureParams} from "../src/interfaces/IEigenlayerMsgDecoders.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
-import {DeployOnArbScript} from "../script/2_deployOnArb.s.sol";
+import {DeployOnL2Script} from "../script/2_deployOnL2.s.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
-import {EthSepolia, ArbSepolia} from "../script/Addresses.sol";
+import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 
 contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
 
     DeployOnEthScript public deployOnEthScript;
-    DeployOnArbScript public deployOnArbScript;
+    DeployOnL2Script public deployOnL2Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
-    EigenlayerMsgEncoders public eigenlayerMsgEncoders;
 
     uint256 public deployerKey;
     address public deployer;
@@ -61,7 +61,7 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
     address public withdrawer;
     uint256 public expiry;
 
-    uint256 arbForkId;
+    uint256 l2ForkId;
     uint256 ethForkId;
     uint256 localForkId;
     bool isTest;
@@ -77,15 +77,14 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
         vm.deal(deployer, 1 ether);
 
         deployOnEthScript = new DeployOnEthScript();
-        deployOnArbScript = new DeployOnArbScript();
+        deployOnL2Script = new DeployOnL2Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-        eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
         signatureUtils = new SignatureUtilsEIP1271();
 
         bool isTest = block.chainid == 31337;
-        arbForkId = vm.createFork("arbsepolia");        // 0
+        l2ForkId = vm.createFork("basesepolia");        // 0
         ethForkId = vm.createSelectFork("ethsepolia"); // 1
-        console.log("arbForkId:", arbForkId);
+        console.log("l2ForkId:", l2ForkId);
         console.log("ethForkId:", ethForkId);
 
         (
@@ -101,15 +100,15 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
         staker = deployer;
 
         //////////// Arb Sepolia ////////////
-        vm.selectFork(arbForkId);
-        senderContract = deployOnArbScript.run();
+        vm.selectFork(l2ForkId);
+        senderContract = deployOnL2Script.run();
 
         //////////// Eth Sepolia ////////////
         vm.selectFork(ethForkId);
         (receiverContract, restakingConnector) = deployOnEthScript.run();
 
         //////////// Arb Sepolia ////////////
-        vm.selectFork(arbForkId);
+        vm.selectFork(l2ForkId);
         vm.startBroadcast(deployerKey);
         // allow L2 sender contract to receive tokens back from L1
         senderContract.allowlistSourceChain(EthSepolia.ChainSelector, true);
@@ -117,10 +116,10 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
         senderContract.allowlistSender(deployer, true);
         // fund L2 sender with CCIP-BnM tokens
         vm.deal(address(senderContract), 1.333 ether); // fund for gas
-        if (block.chainid == 421614) {
+        if (block.chainid == BaseSepolia.ChainId) {
             // drip() using CCIP's BnM faucet if forking from Arb Sepolia
             for (uint256 i = 0; i < 5; ++i) {
-                IERC20_CCIPBnM(ArbSepolia.CcipBnM).drip(address(senderContract));
+                IERC20_CCIPBnM(BaseSepolia.CcipBnM).drip(address(senderContract));
             }
         } else {
             // mint() if we deployed our own Mock ERC20
@@ -242,14 +241,14 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
         /////////////////////////////////////////////////////////////////
         //// 1. [L2] Send CompleteWithdrawals message to L2 Bridge
         /////////////////////////////////////////////////////////////////
-        vm.selectFork(arbForkId);
+        vm.selectFork(l2ForkId);
         vm.startBroadcast(deployerKey);
 
         address tokenDestination; // CCIP-BnM L2 address
         if (isTest) {
             tokenDestination = address(token);
         } else {
-            tokenDestination = ArbSepolia.CcipBnM; // CCIP-BnM L2 address
+            tokenDestination = BaseSepolia.CcipBnM; // CCIP-BnM L2 address
         }
         uint256 stakerBalanceOnL2Before = IERC20(tokenDestination).balanceOf(staker);
 
@@ -257,7 +256,7 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(
-                eigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+                EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
                     withdrawal,
                     tokensToWithdraw,
                     0, // middlewareTimesIndex
@@ -290,7 +289,7 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
                 tokensToWithdraw,
                 0, // middlewareTimesIndex
                 true, // receiveAsTokens
-                ArbSepolia.ChainSelector
+                BaseSepolia.ChainSelector
             )
         );
         // tokens in the ReceiverCCIP bridge contract
@@ -302,9 +301,9 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
         /////////////////////////////////////////////////////////////////
 
         /////////////////////////////////////////////////////////////////
-        //// 3. [L2] Mock receiving CompleteWithdrawals message on L1 Bridge
+        //// 3. [L2] Mock receiving CompleteWithdrawals message from L1
         /////////////////////////////////////////////////////////////////
-        vm.selectFork(arbForkId);
+        vm.selectFork(l2ForkId);
         vm.startBroadcast(deployerKey);
         // Mock SenderContract on L2 receiving the tokens and TransferToStaker CCIP message from L1
         senderContract.mockCCIPReceive(
@@ -363,10 +362,10 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
 
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
-            sourceChainSelector: ArbSepolia.ChainSelector, // Arb Sepolia source chain selector
+            sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
             sender: abi.encode(address(deployer)), // bytes: abi.decode(sender) if coming from an EVM chain.
             data: abi.encode(string(
-                eigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
+                EigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
                     queuedWithdrawalWithSigArray
                 )
             )), // CCIP abi.encodes a string message when sending
@@ -387,7 +386,7 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
         // amount: 0 ether just send CCIP message, no token bridging
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
 
-        bytes memory message = eigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+        bytes memory message = EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
             withdrawal,
             tokensToWithdraw,
             middlewareTimesIndex,
@@ -399,7 +398,7 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
             sourceChainSelector: sourceChainSelector,
             sender: abi.encode(deployer),
             data: abi.encode(string(
-                eigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+                EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
                     withdrawal,
                     tokensToWithdraw,
                     middlewareTimesIndex,
@@ -427,7 +426,7 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
             sourceChainSelector: EthSepolia.ChainSelector,
             sender: abi.encode(deployer),
             data: abi.encode(string(
-                eigenlayerMsgEncoders.encodeTransferToStakerMsg(
+                EigenlayerMsgEncoders.encodeTransferToStakerMsg(
                     _withdrawalRoot
                 )
             )), // CCIP abi.encodes a string message when sending
@@ -440,7 +439,7 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
     function makeCCIPEigenlayerMsg_DepositWithSignature(
         uint256 _amount,
         address _staker,
-        uint256 expiry
+        uint256 _expiry
     ) public view returns (Client.Any2EVMMessage memory) {
 
         uint256 nonce = 0; // in production retrieve on StrategyManager on L1
@@ -456,7 +455,7 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
             _amount,
             _staker,
             nonce,
-            expiry,
+            _expiry,
             domainSeparator
         );
 
@@ -470,15 +469,15 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
 
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
-            sourceChainSelector: ArbSepolia.ChainSelector, // Arb Sepolia source chain selector
+            sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
             sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
             data: abi.encode(string(
-                eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+                EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
                     address(strategy),
                     address(token),
                     _amount,
                     _staker,
-                    expiry,
+                    _expiry,
                     signature
                 )
             )), // CCIP abi.encodes a string message when sending

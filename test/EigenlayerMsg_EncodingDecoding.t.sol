@@ -8,19 +8,21 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
+import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {
-    IRestakingConnector,
     EigenlayerDepositParams,
     EigenlayerDepositMessage,
+    EigenlayerDepositWithSignatureMessage,
     TransferToStakerMessage
-} from "../src/interfaces/IRestakingConnector.sol";
-import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
+} from "../src/interfaces/IEigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {FunctionSelectorDecoder} from "../src/FunctionSelectorDecoder.sol";
+
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
-import {FileReader, EthSepolia} from "../script/Addresses.sol";
-import {EigenlayerDepositWithSignatureMessage} from "../src/interfaces/IRestakingConnector.sol";
+import {EthSepolia} from "../script/Addresses.sol";
+import {FileReader} from "../script/FileReader.sol";
 
 
 
@@ -30,8 +32,6 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
     uint256 public deployerKey;
     address public deployer;
 
-    EigenlayerMsgEncoders public eigenlayerMsgEncoders;
-    FunctionSelectorDecoder public functionSelectorDecoder;
     SignatureUtilsEIP1271 public signatureUtils;
     FileReader public fileReader;
 
@@ -47,8 +47,6 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 		deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
-        functionSelectorDecoder = new FunctionSelectorDecoder();
         restakingConnector = new RestakingConnector();
         signatureUtils = new SignatureUtilsEIP1271();
         fileReader = new FileReader();
@@ -66,7 +64,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
     function test_DecodeFunctionSelectors() public {
 
         bytes memory message1 = hex"00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000044f7e784ef00000000000000000000000000000000000000000000000000000000000000020000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c00000000000000000000000000000000000000000000000000000000";
-        bytes4 functionSelector1 = functionSelectorDecoder.decodeFunctionSelector(message1);
+        bytes4 functionSelector1 = FunctionSelectorDecoder.decodeFunctionSelector(message1);
         require(functionSelector1 == 0xf7e784ef, "wrong functionSelector");
 
         bytes memory message2 = abi.encode(string(abi.encodeWithSelector(
@@ -78,7 +76,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             staker,
             hex"3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d51c"
         )));
-        bytes4 functionSelector2 = functionSelectorDecoder.decodeFunctionSelector(message2);
+        bytes4 functionSelector2 = FunctionSelectorDecoder.decodeFunctionSelector(message2);
         require(functionSelector2 == 0x32e89ace, "wrong functionSelector");
     }
 
@@ -104,7 +102,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             expiry,
             signature
         );
-        bytes memory messageBytes2 = eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+        bytes memory messageBytes2 = EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
             address(strategy),
             address(token),
             amount,
@@ -121,7 +119,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
     function test_Decode_DepositWithSignature() public {
 
-        bytes memory message_bytes = eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+        bytes memory message_bytes = EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
             address(strategy),
             address(token),
             amount,
@@ -143,7 +141,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
         bytes memory signature = new bytes(0);
 
-        bytes memory message_bytes = eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+        bytes memory message_bytes = EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
             address(strategy),
             address(token),
             amount,
@@ -187,7 +185,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](1);
         queuedWithdrawalParams[0] = queuedWithdrawal;
 
-        bytes memory message_bytes = eigenlayerMsgEncoders.encodeQueueWithdrawalMsg(
+        bytes memory message_bytes = EigenlayerMsgEncoders.encodeQueueWithdrawalMsg(
             queuedWithdrawalParams
         );
         // CCIP turns the message into string when sending
@@ -304,7 +302,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         queuedWithdrawalParams3[2] = queuedWithdrawal3;
 
         bytes memory message3 = abi.encode(string(
-            eigenlayerMsgEncoders.encodeQueueWithdrawalMsg(
+            EigenlayerMsgEncoders.encodeQueueWithdrawalMsg(
                 queuedWithdrawalParams3
             )
         ));
@@ -378,7 +376,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         queuedWithdrawalWithSigParams[2] = queuedWithdrawalWithSig3;
 
         bytes memory message = abi.encode(string(
-            eigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
+            EigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
                 queuedWithdrawalWithSigParams
             )
         )); // CCIP turns the message into string when sending
@@ -446,7 +444,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         queuedWithdrawalWithSigParams[0] = queuedWithdrawalWithSig1;
 
         bytes memory message = abi.encode(string(
-            eigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
+            EigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
                 queuedWithdrawalWithSigParams
             )
         )); // CCIP turns the message into string when sending
@@ -488,7 +486,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         uint256 middlewareTimesIndex = 0; // not used, used when slashing is enabled;
         bool receiveAsTokens = true;
 
-        bytes memory message_bytes = eigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+        bytes memory message_bytes = EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
             withdrawal,
             tokensToWithdraw,
             middlewareTimesIndex,
@@ -523,7 +521,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
         TransferToStakerMessage memory tts_msg = restakingConnector.decodeTransferToStakerMessage(
             abi.encode(string(
-                eigenlayerMsgEncoders.encodeTransferToStakerMsg(
+                EigenlayerMsgEncoders.encodeTransferToStakerMsg(
                     withdrawalRoot1
                 )
             ))
@@ -589,7 +587,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
         bytes32 approverSalt = 0x0000000000000000000000000000000000000000000000000000000000004444;
 
-        bytes memory message_bytes = eigenlayerMsgEncoders.encodeDelegateToBySignature(
+        bytes memory message_bytes = EigenlayerMsgEncoders.encodeDelegateToBySignature(
             staker,
             operator,
             stakerSignatureAndExpiry,
@@ -652,7 +650,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
         bytes32 approverSalt = 0x0000000000000000000000000000000000000000000000000000000000004444;
 
-        bytes memory message_bytes = eigenlayerMsgEncoders.encodeDelegateToBySignature(
+        bytes memory message_bytes = EigenlayerMsgEncoders.encodeDelegateToBySignature(
             staker,
             operator,
             stakerSignatureAndExpiry,
@@ -731,7 +729,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
         bytes32 approverSalt = 0x0000000000000000000000000000000000000000000000000000000000004444;
 
-        bytes memory message_bytes = eigenlayerMsgEncoders.encodeDelegateToBySignature(
+        bytes memory message_bytes = EigenlayerMsgEncoders.encodeDelegateToBySignature(
             staker,
             operator,
             stakerSignatureAndExpiry,
@@ -811,7 +809,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
         bytes32 approverSalt = 0x0000000000000000000000000000000000000000000000000000000000004444;
 
-        bytes memory message_bytes = eigenlayerMsgEncoders.encodeDelegateToBySignature(
+        bytes memory message_bytes = EigenlayerMsgEncoders.encodeDelegateToBySignature(
             staker,
             operator,
             stakerSignatureAndExpiry,
@@ -857,7 +855,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
         address _staker = restakingConnector.decodeUndelegate(
             abi.encode(string(
-                eigenlayerMsgEncoders.encodeUndelegateMsg(staker)
+                EigenlayerMsgEncoders.encodeUndelegateMsg(staker)
             ))
         );
 

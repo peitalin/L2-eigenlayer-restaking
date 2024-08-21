@@ -8,46 +8,50 @@ import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IS
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
+import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {
     EigenlayerDepositMessage,
     EigenlayerDepositWithSignatureMessage,
-    IRestakingConnector
-} from "./interfaces/IRestakingConnector.sol";
+    TransferToStakerMessage
+} from "./interfaces/IEigenlayerMsgDecoders.sol";
 import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {IReceiverCCIP} from "./interfaces/IReceiverCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
-import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 
-import {ArbSepolia} from "../script/Addresses.sol";
-import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
-import {TransferToStakerMessage} from "./interfaces/IRestakingConnector.sol";
+import {BaseSepolia} from "../script/Addresses.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 
 import {console} from "forge-std/Test.sol";
 
 
 /// ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them.
-contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerMsgEncoders {
+contract ReceiverCCIP is BaseMessengerCCIP {
 
     IRestakingConnector public restakingConnector;
     address public senderContractL2Addr;
 
-    error InvalidRestakingConnector(string msg);
+    error InvalidContractAddress(string msg);
 
-    /// @notice Constructor initializes the contract with the router address.
     /// @param _router The address of the router contract.
     /// @param _link The address of the link contract.
-    /// @param _restakingConnector address of eigenlayer restaking middleware contract.
-    constructor(
-        address _router,
-        address _link,
-        address _restakingConnector
-    ) BaseMessengerCCIP(_router, _link) {
+    constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {
+    }
+
+    function initialize(
+        IRestakingConnector _restakingConnector,
+        ISenderCCIP _senderContractL2
+    ) initializer public {
 
         if (address(_restakingConnector) == address(0))
-            revert InvalidRestakingConnector("restakingConnector cannot be 0");
+            revert InvalidContractAddress("restakingConnector cannot be address(0)");
 
-        restakingConnector = IRestakingConnector(_restakingConnector);
+        if (address(_senderContractL2) == address(0))
+            revert InvalidContractAddress("SenderCCIP cannot be address(0)");
+
+        restakingConnector = _restakingConnector;
+        senderContractL2Addr = address(_senderContractL2);
+
+        BaseMessengerCCIP.__BaseMessengerCCIP_init();
     }
 
     function getSenderContractL2Addr() public view returns (address) {
@@ -55,8 +59,8 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
         return senderContractL2Addr;
     }
 
-    function setSenderContractL2Addr(address _senderContractL2Addr) public onlyOwner {
-        senderContractL2Addr = _senderContractL2Addr;
+    function setSenderContractL2Addr(address _senderContractL2) public onlyOwner {
+        senderContractL2Addr = _senderContractL2;
     }
 
     function getRestakingConnector() public view returns (IRestakingConnector) {
@@ -94,7 +98,7 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
         }
 
         bytes memory message = any2EvmMessage.data;
-        bytes4 functionSelector = decodeFunctionSelector(message);
+        bytes4 functionSelector = restakingConnector.decodeFunctionSelector(message);
 
         (
             IDelegationManager delegationManager,
@@ -135,7 +139,6 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
             delegationManager.queueWithdrawals(queuedWithdrawalParams);
 
             textMsg = "queueWithdrawals()";
-            // amountMsg = eigenMsg.amount;
         }
 
         if (functionSelector == 0xa140f06e) {
@@ -184,31 +187,23 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
 
             address original_staker = withdrawal.staker;
             uint256 amount = withdrawal.shares[0];
-            // L2 Sender contract address
-            address _senderContractL2Addr = getSenderContractL2Addr();
             // Approve L1 receiverContract to send ccip-BnM tokens to Router
             IERC20 token = withdrawal.strategies[0].underlyingToken();
             // approve to send amount to router
             token.approve(address(this), amount);
 
-            // address of token on L2
-            address token_destination = ArbSepolia.BridgeToken;
-
-            string memory text_message = string(
-                encodeTransferToStakerMsg(withdrawalRoot)
-            );
+            string memory text_message = string(restakingConnector.encodeTransferToStakerMsg(withdrawalRoot));
 
             /// return token to staker via bridge with message to transferToStaker
             this.sendMessagePayNative(
-                ArbSepolia.ChainSelector, // destination chain
-                _senderContractL2Addr,
+                BaseSepolia.ChainSelector, // destination chain
+                senderContractL2Addr,
                 text_message,
                 address(token), // L1 token address to burn/lock
                 amount
             );
 
             textMsg = "completeQueuedWithdrawal()";
-            // amountMsg = eigenMsg.amount;
         }
 
         if (functionSelector == 0x7f548071) {
@@ -220,16 +215,6 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
                 ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
                 bytes32 approverSalt
             ) = restakingConnector.decodeDelegateToBySignature(message);
-            console.log("staker is: ", staker);
-            console.log("delegating to: ", operator);
-
-            console.log("staker signature");
-            console.logBytes(stakerSignatureAndExpiry.signature);
-            console.log(stakerSignatureAndExpiry.expiry);
-
-            console.log("approver signature");
-            console.logBytes(approverSignatureAndExpiry.signature);
-            console.log(approverSignatureAndExpiry.expiry);
 
             delegationManager.delegateToBySignature(
                 staker,
@@ -250,14 +235,54 @@ contract ReceiverCCIP is BaseMessengerCCIP, FunctionSelectorDecoder, EigenlayerM
         );
     }
 
-    // function isValidSignature(
-    //     bytes32 _hash,
-    //     bytes memory _signature
-    // ) public pure returns (bytes4 magicValue) {
-    //     bytes4 constant internal MAGICVALUE = 0x1626ba7e;
-    //     // implement some hash/signature scheme
-    //     return MAGICVALUE;
-    // }
+    /// @param _receiver The address of the receiver.
+    /// @param _text The string data to be sent.
+    /// @param _token The token to be transferred.
+    /// @param _amount The amount of the token to be transferred.
+    /// @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
+    /// @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
+    function _buildCCIPMessage(
+        address _receiver,
+        string calldata _text,
+        address _token,
+        uint256 _amount,
+        address _feeTokenAddress
+    ) internal override returns (Client.EVM2AnyMessage memory) {
+
+        Client.EVMTokenAmount[] memory tokenAmounts;
+        if (_amount <= 0) {
+            // Must be an empty array as no tokens are transferred
+            // non-empty arrays with 0 amounts error with CannotSendZeroTokens() == 0x5cf04449
+            tokenAmounts = new Client.EVMTokenAmount[](0);
+        } else {
+            tokenAmounts = new Client.EVMTokenAmount[](1);
+            tokenAmounts[0] = Client.EVMTokenAmount({
+                token: _token,
+                amount: _amount
+            });
+        }
+
+        bytes memory message = abi.encode(_text);
+
+        bytes4 functionSelector = restakingConnector.decodeFunctionSelector(message);
+        uint256 gasLimit = 600_000;
+
+        if (functionSelector == 0x27167d10) {
+            // bytes4(keccak256("transferToStaker(bytes32)")) == 0x27167d10
+            gasLimit = 800_000;
+        }
+
+        return
+            Client.EVM2AnyMessage({
+                receiver: abi.encode(_receiver),
+                data: message,
+                tokenAmounts: tokenAmounts,
+                feeToken: _feeTokenAddress,
+                extraArgs: Client._argsToBytes(
+                    Client.EVMExtraArgsV1({ gasLimit: gasLimit })
+                )
+            });
+    }
 
 }
 

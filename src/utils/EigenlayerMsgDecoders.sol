@@ -11,22 +11,22 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
     EigenlayerDepositMessage,
     EigenlayerDepositParams
-} from "../interfaces/IRestakingConnector.sol";
+} from "../interfaces/IEigenlayerMsgDecoders.sol";
 // DepositWithSignature
 import {
     EigenlayerDepositWithSignatureMessage,
     EigenlayerDepositWithSignatureParams
-} from "../interfaces/IRestakingConnector.sol";
+} from "../interfaces/IEigenlayerMsgDecoders.sol";
 // QueueWithdrawals
 import {
     EigenlayerQueueWithdrawalsParams,
     EigenlayerQueueWithdrawalsWithSignatureParams
-} from "../interfaces/IRestakingConnector.sol";
+} from "../interfaces/IEigenlayerMsgDecoders.sol";
 // TransferToStaker
 import {
     TransferToStakerMessage,
     TransferToStakerParams
-} from "../interfaces/IRestakingConnector.sol";
+} from "../interfaces/IEigenlayerMsgDecoders.sol";
 import {IEigenlayerMsgDecoders} from "../interfaces/IEigenlayerMsgDecoders.sol";
 
 
@@ -727,7 +727,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
     function decodeDelegateToBySignature(
         bytes memory message
-    ) public returns (
+    ) public pure returns (
         address,
         address,
         ISignatureUtils.SignatureWithExpiry memory,
@@ -849,7 +849,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
     function _getDelegationSignature(
         bytes memory message,
         uint256 offset
-    ) internal returns (ISignatureUtils.SignatureWithExpiry memory) {
+    ) internal pure returns (ISignatureUtils.SignatureWithExpiry memory) {
 
         uint256 expiry;
         bytes memory signature;
@@ -878,7 +878,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
     function _getDelegationNullSignature(
         bytes memory message,
         uint256 offset
-    ) internal returns (ISignatureUtils.SignatureWithExpiry memory) {
+    ) internal pure returns (ISignatureUtils.SignatureWithExpiry memory) {
 
         ///// Null signatures:
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
@@ -916,7 +916,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
     function decodeUndelegate(
         bytes memory message
-    ) public returns (address) {
+    ) public pure returns (address) {
 
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
         // 0000000000000000000000000000000000000000000000000000000000000224 [64]

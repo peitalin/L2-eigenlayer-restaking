@@ -7,50 +7,14 @@ import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IS
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 import {IEigenlayerMsgDecoders} from "../interfaces/IEigenlayerMsgDecoders.sol";
 
-struct EigenlayerDepositMessage {
-    uint256 amount;
-    address staker;
-}
-event EigenlayerDepositParams(
-    uint256 indexed amount,
-    address indexed staker
-);
-
-struct EigenlayerDepositWithSignatureMessage {
-    uint256 expiry;
-    address strategy;
-    address token;
-    uint256 amount;
-    address staker;
-    bytes signature;
-}
-event EigenlayerDepositWithSignatureParams(
-    uint256 indexed amount,
-    address indexed staker
-);
-
-event EigenlayerQueueWithdrawalsParams(
-    uint256 indexed amount,
-    address indexed staker
-);
-
-event EigenlayerQueueWithdrawalsWithSignatureParams(
-    uint256 indexed amount,
-    address indexed staker,
-    bytes indexed signature
-);
-
-struct TransferToStakerMessage {
-    bytes32 withdrawalRoot;
-}
-event TransferToStakerParams(
-    bytes32 indexed withdrawalRoot
-);
 
 interface IRestakingConnector is IEigenlayerMsgDecoders {
+
+    function decodeFunctionSelector(bytes memory message) external returns (bytes4);
+
+    function encodeTransferToStakerMsg(bytes32 withdrawalRoot) external returns (bytes memory);
 
     function getEigenlayerContracts() external returns (
         IDelegationManager,

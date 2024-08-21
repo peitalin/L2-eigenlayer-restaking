@@ -111,6 +111,7 @@ contract DeployMockEigenlayerContractsScript is Script {
         (StrategyFactory strategyFactory, UpgradeableBeacon strategyBeacon) = _deployStrategyFactory(
             StrategyManager(address(strategyManager)),
             pauserRegistry,
+            emptyContract,
             proxyAdmin
         );
 
@@ -282,11 +283,6 @@ contract DeployMockEigenlayerContractsScript is Script {
             _strategyManager,
             _slasher,
             delegationManagerProxy
-            // IETHPOSDeposit _ethPOS,
-            // IBeacon _eigenPodBeacon,
-            // IStrategyManager _strategyManager,
-            // ISlasher _slasher,
-            // IDelegationManager _delegationManager
         );
 
         // Eigenlayer disableInitialisers so they must be called via upgradeable proxy
@@ -309,21 +305,7 @@ contract DeployMockEigenlayerContractsScript is Script {
                 new uint256[](0) // _withdrawalDelayBlocks
             )
         );
-        // delegationManagerProxy = DelegationManager(
-        //     address(new TransparentUpgradeableProxy(
-        //         address(delegationManagerImpl),
-        //         address(proxyAdmin),
-        //         abi.encodeWithSelector(
-        //             DelegationManager.initialize.selector,
-        //             deployer,
-        //             _pauserRegistry,
-        //             0, // initialPausedStatus
-        //             4, // _minWithdrawalDelayBlocks: 4x15 seconds = 1 min
-        //             new IStrategy[](0), // _strategies
-        //             new uint256[](0) // _withdrawalDelayBlocks
-        //         )
-        //     ))
-        // );
+
         vm.stopBroadcast();
         return delegationManagerProxy;
     }
@@ -331,11 +313,11 @@ contract DeployMockEigenlayerContractsScript is Script {
     function _deployStrategyFactory(
         StrategyManager _strategyManager,
         IPauserRegistry _pauserRegistry,
+        EmptyContract _emptyContract,
         ProxyAdmin _proxyAdmin
     ) internal returns (StrategyFactory, UpgradeableBeacon) {
         vm.startBroadcast(deployer);
 
-        EmptyContract emptyContract = new EmptyContract();
         // Create base strategy implementation and deploy a few strategies
         StrategyBase strategyImpl = new StrategyBase(_strategyManager);
 
@@ -343,7 +325,7 @@ contract DeployMockEigenlayerContractsScript is Script {
         UpgradeableBeacon strategyBeacon = new UpgradeableBeacon(address(strategyImpl));
 
         StrategyFactory strategyFactory = StrategyFactory(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(_proxyAdmin), ""))
+            address(new TransparentUpgradeableProxy(address(_emptyContract), address(_proxyAdmin), ""))
         );
 
         StrategyFactory strategyFactoryImplementation = new StrategyFactory(strategyManager);
@@ -456,7 +438,7 @@ contract DeployMockEigenlayerContractsScript is Script {
 
         chains[31337] = "localhost";
         chains[17000] = "holesky";
-        chains[421614] = "arbsepolia";
+        chains[84532] = "basesepolia";
         chains[11155111] = "ethsepolia";
         // Eigenlayer contract addresses are only on EthSepolia and localhost, not L2
 
@@ -558,7 +540,7 @@ contract DeployMockEigenlayerContractsScript is Script {
 
         chains[31337] = "localhost";
         chains[17000] = "holesky";
-        chains[421614] = "arbsepolia";
+        chains[84532] = "basesepolia";
         chains[11155111] = "ethsepolia";
 
         string memory finalOutputPath = string(abi.encodePacked(

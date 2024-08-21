@@ -9,7 +9,8 @@ import {IERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-sol
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
-import {FileReader, ArbSepolia, EthSepolia} from "./Addresses.sol";
+import {BaseSepolia, EthSepolia} from "./Addresses.sol";
+import {FileReader} from "./FileReader.sol";
 import {ScriptUtils} from "./ScriptUtils.sol";
 
 
@@ -25,8 +26,9 @@ contract DepositFromArbToEthScript is Script, ScriptUtils {
 
 
     function run() public {
-        // we are calling CCIP-BnM address which is only on mainnet
-        vm.createSelectFork("arbsepolia");
+
+        // calling CCIP-BnM address on sepolia
+        vm.createSelectFork("basesepolia");
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
@@ -36,7 +38,7 @@ contract DepositFromArbToEthScript is Script, ScriptUtils {
         address senderAddr = address(senderContract);
         (receiverContract, restakingConnector) = fileUtils.getReceiverRestakingConnectorContracts();
 
-        IERC20 ccipBnM = IERC20(ArbSepolia.CcipBnM);
+        IERC20 ccipBnM = IERC20(BaseSepolia.CcipBnM);
 
         /////////////////////////////
         /// Begin Broadcast

@@ -1,10 +1,10 @@
 #!/bin/bash
 source .env
 
-echo forge script script/x4_depositFromArbToEth.s.sol:DepositFromArbToEthScript --rpc-url arbsepolia --broadcast -vvvv
+echo forge script script/x4_depositFromArbToEth.s.sol:DepositFromArbToEthScript --rpc-url basesepolia --broadcast -vvvv
 
 forge script script/x4_depositFromArbToEth.s.sol:DepositFromArbToEthScript  \
-    --rpc-url arbsepolia \
+    --rpc-url basesepolia \
     --broadcast \
     -vvvv
 

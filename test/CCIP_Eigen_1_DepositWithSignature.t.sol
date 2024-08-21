@@ -18,14 +18,15 @@ import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
-import {IRestakingConnector, EigenlayerDepositWithSignatureParams} from "../src/interfaces/IRestakingConnector.sol";
+import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+import {EigenlayerDepositWithSignatureParams} from "../src/interfaces/IEigenlayerMsgDecoders.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
-import {EthSepolia, ArbSepolia} from "../script/Addresses.sol";
+import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 
 contract CCIP_Eigen_DepositWithSignatureTests is Test {
@@ -33,7 +34,6 @@ contract CCIP_Eigen_DepositWithSignatureTests is Test {
     DeployOnEthScript public deployOnEthScript;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
-    EigenlayerMsgEncoders public eigenlayerMsgEncoders;
 
     uint256 public deployerKey;
     address public deployer;
@@ -58,10 +58,9 @@ contract CCIP_Eigen_DepositWithSignatureTests is Test {
 
         deployOnEthScript = new DeployOnEthScript();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-        eigenlayerMsgEncoders = new EigenlayerMsgEncoders();
         signatureUtils = new SignatureUtilsEIP1271();
 
-        uint256 arbForkId = vm.createFork("arbsepolia");
+        uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
 
         //// Configure Eigenlayer contracts
@@ -126,10 +125,10 @@ contract CCIP_Eigen_DepositWithSignatureTests is Test {
 
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
-            sourceChainSelector: ArbSepolia.ChainSelector, // Arb Sepolia source chain selector
+            sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
             sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
             data: abi.encode(string(
-                eigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+                EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
                     address(strategy),
                     address(token),
                     amount,

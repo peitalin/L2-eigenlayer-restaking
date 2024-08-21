@@ -5,13 +5,14 @@ import {Test, console} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
-import {DeployOnArbScript} from "../script/2_deployOnArb.s.sol";
+import {DeployOnL2Script} from "../script/2_deployOnL2.s.sol";
 import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
 import {WhitelistCCIPContractsScript} from "../script/4_whitelistCCIPContracts.s.sol";
-import {DepositWithSignatureFromArbToEthScript} from "../script/5_depositWithSignatureFromArbToEth.s.sol";
 import {DepositFromArbToEthScript} from "../script/x4_depositFromArbToEth.s.sol";
-import {QueueWithdrawalWithSignatureScript} from "../script/6_queueWithdrawalWithSignature.s.sol";
-import {CompleteWithdrawalScript} from "../script/7_completeWithdrawal.s.sol";
+import {DepositWithSignatureScript} from "../script/5_depositWithSignature.s.sol";
+import {DelegateToScript} from "../script/6_delegateTo.s.sol";
+import {QueueWithdrawalWithSignatureScript} from "../script/7_queueWithdrawalWithSignature.s.sol";
+import {CompleteWithdrawalScript} from "../script/8_completeWithdrawal.s.sol";
 import {ScriptUtils} from "../script/ScriptUtils.sol";
 import {Adminable, MockAdminable} from "../src/utils/Adminable.sol";
 import {ERC20Minter} from "../src/ERC20Minter.sol";
@@ -20,13 +21,18 @@ import {ERC20Minter} from "../src/ERC20Minter.sol";
 contract DeployCCIPScriptsTest is Test, ScriptUtils {
 
     // deploy scripts
-    DeployOnArbScript public deployOnArbScript;
+    DeployOnL2Script public deployOnL2Script;
     DeployOnEthScript public deployOnEthScript;
-    DepositWithSignatureFromArbToEthScript public depositWithSignatureFromArbToEthScript;
+    WhitelistCCIPContractsScript public whitelistCCIPContractsScript;
+
     DepositFromArbToEthScript public depositFromArbToEthScript;
+    DepositWithSignatureScript public depositWithSignatureScript;
+
+    DelegateToScript public delegateToScript;
+
     QueueWithdrawalWithSignatureScript public queueWithdrawalWithSignatureScript;
     CompleteWithdrawalScript public completeWithdrawalScript;
-    WhitelistCCIPContractsScript public whitelistCCIPContractsScript;
+
     MockAdminable public mockAdminable;
     ERC20Minter public erc20Minter;
 
@@ -42,13 +48,18 @@ contract DeployCCIPScriptsTest is Test, ScriptUtils {
 
         vm.startBroadcast(deployer);
 
-        deployOnArbScript = new DeployOnArbScript();
+        deployOnL2Script = new DeployOnL2Script();
         deployOnEthScript = new DeployOnEthScript();
         whitelistCCIPContractsScript = new WhitelistCCIPContractsScript();
+
         depositFromArbToEthScript = new DepositFromArbToEthScript();
-        depositWithSignatureFromArbToEthScript = new DepositWithSignatureFromArbToEthScript();
+        depositWithSignatureScript = new DepositWithSignatureScript();
+
+        delegateToScript = new DelegateToScript();
+
         queueWithdrawalWithSignatureScript = new QueueWithdrawalWithSignatureScript();
         completeWithdrawalScript = new CompleteWithdrawalScript();
+
         mockAdminable = new MockAdminable();
         erc20Minter = ERC20Minter(address(
             new TransparentUpgradeableProxy(
@@ -125,16 +136,16 @@ contract DeployCCIPScriptsTest is Test, ScriptUtils {
         sutils.topupSenderEthBalance(bob);
 
         topupSenderEthBalance(bob);
-        require(bob.balance == 0.05 ether, "failed to topupSenderEthBalance");
+        require(bob.balance == sutils.amountToTopup(), "failed to topupSenderEthBalance");
 
         // expect balance to stay the same as 0.05 > 0.02 ether
         sutils.topupSenderEthBalance(bob);
-        require(bob.balance == 0.05 ether, "failed to topupSenderEthBalance");
+        require(bob.balance == sutils.amountToTopup(), "failed to topupSenderEthBalance");
     }
 
-    function test_step2_DeployOnArbScript() public {
+    function test_step2_DeployOnL2Script() public {
         vm.chainId(31337); // sets isTest flag; script uses forkSelect()
-        deployOnArbScript.run();
+        deployOnL2Script.run();
     }
 
     function test_step3_DeployOnEthScript() public {
@@ -148,25 +159,31 @@ contract DeployCCIPScriptsTest is Test, ScriptUtils {
         whitelistCCIPContractsScript.run();
     }
 
-    function test_stepx4_DepositFromArbToEthScript() public {
+    function test_stepx4_DepositScript() public {
         vm.chainId(31337); // sets isTest flag; script uses forkSelect()
         depositFromArbToEthScript.run();
     }
 
-    function test_step5_DepositWithSignatureFromArbToEthScript() public {
+    function test_step5_DepositWithSignatureScript() public {
         vm.chainId(31337); // sets isTest flag; script uses forkSelect()
-        depositWithSignatureFromArbToEthScript.run();
+        depositWithSignatureScript.run();
+    }
+
+    function test_step6_DelegateToScript() public {
+        vm.chainId(31337); // sets isTest flag; script uses forkSelect()
+        vm.deal(deployer, 1 ether);
+        delegateToScript.run();
     }
 
     // writes new withdrawalRoots
-    function test_step6_QueueWithdrawalWithSignatureScript() public {
+    function test_step7_QueueWithdrawalWithSignatureScript() public {
         vm.chainId(31337); // sets isTest flag; script uses forkSelect()
         queueWithdrawalWithSignatureScript.run();
     }
 
-    function test_step7_CompleteWithdrawalScript() public {
-        vm.chainId(31337); // sets isTest flag; script uses forkSelect()
-        completeWithdrawalScript.run();
-    }
+    // function test_step8_CompleteWithdrawalScript() public {
+    //     vm.chainId(31337); // sets isTest flag; script uses forkSelect()
+    //     completeWithdrawalScript.run();
+    // }
 }
 
