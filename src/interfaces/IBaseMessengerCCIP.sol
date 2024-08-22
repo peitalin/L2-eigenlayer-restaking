@@ -9,6 +9,12 @@ interface IBaseMessengerCCIP {
 
     function allowlistSender(address _sender, bool allowed) external;
 
+    function allowlistedDestinationChains(uint64 _destinationChainSelector) external returns (bool);
+
+    function allowlistedSourceChains(uint64 _sourceChainSelector) external returns (bool);
+
+    function allowlistedSenders(address _sender) external returns (bool);
+
     function sendMessagePayNative(
         uint64 _destinationChainSelector,
         address _receiver,

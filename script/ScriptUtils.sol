@@ -8,7 +8,7 @@ contract ScriptUtils is Script {
     uint256 public amountToTopup = 0.1 ether;
 
     function topupSenderEthBalance(address _senderAddr) public {
-        if (_senderAddr.balance < 0.02 ether) {
+        if (_senderAddr.balance < 0.05 ether) {
             (bool sent, ) = payable(address(_senderAddr)).call{value: amountToTopup}("");
             require(sent, "Failed to send Ether");
         }

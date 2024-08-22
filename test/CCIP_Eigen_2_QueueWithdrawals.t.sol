@@ -95,10 +95,21 @@ contract CCIP_Eigen_QueueWithdrawalsTests is Test {
         vm.startBroadcast(deployerKey);
         // allow L2 sender contract to receive tokens back from L1
         senderContract.allowlistSourceChain(EthSepolia.ChainSelector, true);
+        senderContract.allowlistDestinationChain(EthSepolia.ChainSelector, true);
         senderContract.allowlistSender(address(receiverContract), true);
         senderContract.allowlistSender(deployer, true);
         // mint() if we deployed our own Mock ERC20
         IERC20Minter(address(token)).mint(address(senderContract), 5 ether);
+
+        require(
+            senderContract.allowlistedDestinationChains(EthSepolia.ChainSelector),
+            "EthSepolia not an allowlistedDestinationChains"
+        );
+        require(
+            senderContract.allowlistedSourceChains(EthSepolia.ChainSelector),
+            "EthSepolia not an allowlistedSourceChains"
+        );
+
         vm.stopBroadcast();
 
         //////////// Eth Sepolia ////////////
