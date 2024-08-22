@@ -17,42 +17,44 @@ forge test -vvvv
 ### 1. Deposit into Eigenlayer with a user signature
 
 We bridge the token from L2 to L1, then deposit into Eigenlayer, with user signatures:
-[https://ccip.chain.link/msg/0x5461125dca5718e09632cc40a7fc05c5d66a4a0e46e158445fed915549ecdbcf](https://ccip.chain.link/msg/0x5461125dca5718e09632cc40a7fc05c5d66a4a0e46e158445fed915549ecdbcf)
+[https://sepolia.etherscan.io/tx/0x1fdcc0cb12cb332cc704996f404f8d40d00c84166d3f5887c8e9e17ad370c374](https://sepolia.etherscan.io/tx/0x1fdcc0cb12cb332cc704996f404f8d40d00c84166d3f5887c8e9e17ad370c374)
 
-On L1, we can see the corresponding Eigenlayer deposit events:
-[https://sepolia.etherscan.io/tx/0xf85b8b26f6c1873a19f5f6f5a3402e545e6d3fb7d641c37d5ef95dcc8275dae9](https://sepolia.etherscan.io/tx/0xf85b8b26f6c1873a19f5f6f5a3402e545e6d3fb7d641c37d5ef95dcc8275dae9)
+On L1, we can see the corresponding Eigenlayer deposit events in the ReceiverCCIP bridge contract:
+[https://sepolia.etherscan.io/tx/0x1fdcc0cb12cb332cc704996f404f8d40d00c84166d3f5887c8e9e17ad370c374#eventlog](https://sepolia.etherscan.io/tx/0x1fdcc0cb12cb332cc704996f404f8d40d00c84166d3f5887c8e9e17ad370c374#eventlog)
+
+and also in the Eigenlayer StrategyManager contract: [https://sepolia.etherscan.io/address/0x7d73d2641d4c68f7b8f11b1ce212645423a0e8b5#events](https://sepolia.etherscan.io/address/0x7d73d2641d4c68f7b8f11b1ce212645423a0e8b5#events)
 
 
 ### 2. Queue withdrawal from Eigenlayer with user signature
 
 We then queue withdrawal from L2 with a user signature:
-[https://ccip.chain.link/msg/0xc20f50990d8f84ca2f279ef87e80bc8e6951cdb8e37e5d10570bffd832007b17](https://ccip.chain.link/msg/0xc20f50990d8f84ca2f279ef87e80bc8e6951cdb8e37e5d10570bffd832007b17)
+[https://ccip.chain.link/msg/0x003e44447eba1797ef07561bd3c391a490770a6383f8f0de3d0a19973b5e47f3](https://ccip.chain.link/msg/0x003e44447eba1797ef07561bd3c391a490770a6383f8f0de3d0a19973b5e47f3)
 
 The message makes it's way to L1 resulting in the following Eigenlayer `queueWithdrawal` events:
-[https://sepolia.etherscan.io/tx/0xafbcdff024c23fd76e5b1dd5ce90698639df3364e37a6dfda554cca92b9a89fd#eventlog](https://sepolia.etherscan.io/tx/0xafbcdff024c23fd76e5b1dd5ce90698639df3364e37a6dfda554cca92b9a89fd#eventlog)
+[https://sepolia.etherscan.io/tx/0xc2c04b4bfbc12c2f6591aef31bf7825cde941835ca555e28fa23f9336ec804a3#eventlog](https://sepolia.etherscan.io/tx/0xc2c04b4bfbc12c2f6591aef31bf7825cde941835ca555e28fa23f9336ec804a3#eventlog)
 
 Withdrawal events can be seen on DelegationManager contract on L1:
-[https://sepolia.etherscan.io/address/0x6b78995ba97fb26de32ede9055d85f176b672af7#events](https://sepolia.etherscan.io/address/0x6b78995ba97fb26de32ede9055d85f176b672af7#events)
+[https://sepolia.etherscan.io/address/0xebbc61ccacf45396ff4b447f353cea404993de98#events](https://sepolia.etherscan.io/address/0xebbc61ccacf45396ff4b447f353cea404993de98#events)
 
 
 
 ### 3. Complete withdrawal from L2 and bridge back to original wallet on L2
 
-We dispatch a call to complete the withdrawal to our SenderCCIP contract from L2:
-[https://ccip.chain.link/msg/0x4417c1e8bd060ab8dd0276b86e4d5b8552488639c1bbc71ec3fce0079e484290](https://ccip.chain.link/msg/0x4417c1e8bd060ab8dd0276b86e4d5b8552488639c1bbc71ec3fce0079e484290)
+# We dispatch a call to complete the withdrawal to our SenderCCIP contract from L2:
+# [https://ccip.chain.link/msg/0x3a02206482f0148c74cb4b34a631b998502c754d198abc378e10ccaf6c725825](https://ccip.chain.link/msg/0x3a02206482f0148c74cb4b34a631b998502c754d198abc378e10ccaf6c725825)
 
-Which executes on L1 with the following Eigenlayer completeWithdrawal events:
-[https://sepolia.etherscan.io/tx/0x888f2c3b8b1faa9a5fdd6cc14d119ee39d1a8cc9f1c056335cf736edec891844](https://sepolia.etherscan.io/tx/0x888f2c3b8b1faa9a5fdd6cc14d119ee39d1a8cc9f1c056335cf736edec891844)
+# Which executes on L1 with the following Eigenlayer completeWithdrawal events:
+# [https://sepolia.etherscan.io/tx/0xc4e336ee410598fff9e6951b176b11e4ac6f3d0df2768eb79a986ada7e829037#eventlog](https://sepolia.etherscan.io/tx/0xc4e336ee410598fff9e6951b176b11e4ac6f3d0df2768eb79a986ada7e829037#eventlog)
 
 
-While the tokens are being bridged back, you can see the `messageId` in one of the emitted `Message Sent` event on the ReceiverCCIP contract:
-[https://sepolia.etherscan.io/address/0xfccc6216301184b174dd4c7071415ce12ac4ce37#events](https://sepolia.etherscan.io/address/0xfccc6216301184b174dd4c7071415ce12ac4ce37#events)
+# While the tokens are being bridged back, you can see the `messageId` in one of the emitted `Message Sent` event on the ReceiverCCIP contract:
+# [https://sepolia.etherscan.io/address/0x4c854b17250582413783b96e020e5606a561eddc#events](https://sepolia.etherscan.io/address/0x4c854b17250582413783b96e020e5606a561eddc#events)
 
-Copy the `messageId` (topic[1]) on this page and search for it on `https://ccip.chain.link` to view  bridging status:
-[https://ccip.chain.link/msg/0x827227a70b3efc72869847add23b9264b0fe05354cb0d6cc80ad15530657cf01](https://ccip.chain.link/msg/0x827227a70b3efc72869847add23b9264b0fe05354cb0d6cc80ad15530657cf01)
+# Copy the `messageId` (topic[1]) on this page and search for it on `https://ccip.chain.link` to view  bridging status:
+# [https://ccip.chain.link/msg/0xf6165cfb76cceaebbb93e9b49f7ac373547e51368bf9048c59c90c2d774fc42e](https://ccip.chain.link/msg/0xf6165cfb76cceaebbb93e9b49f7ac373547e51368bf9048c59c90c2d774fc42e)
 
-Once we wait for the L1 -> L2 bridge back, we can see the token transferred back to the original staker's account:
-[https://sepolia.arbiscan.io/tx/0x7eceaf0d6c6fc55c994df20baad26b25a3a65b4d9601a31c39b29279903219c5](https://sepolia.arbiscan.io/tx/0x7eceaf0d6c6fc55c994df20baad26b25a3a65b4d9601a31c39b29279903219c5)
+# Once we wait for the L1 -> L2 bridge back, we can see the token transferred back to the original staker's account:
+# [https://sepolia.basescan.org/tx/0xf4824d3fc1925a91f5cec814d6e03985092c38e7838c38f83d755a698923446c](https://sepolia.basescan.org/tx/0xf4824d3fc1925a91f5cec814d6e03985092c38e7838c38f83d755a698923446c)
 
 
 

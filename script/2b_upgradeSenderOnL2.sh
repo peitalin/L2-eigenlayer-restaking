@@ -12,7 +12,6 @@ forge script script/2b_upgradeSenderOnL2.s.sol:UpgradeSenderOnL2Script \
     -vvvv
 
 
-
 ## Verify manually if verify failed in previous step.
 # forge verify-contract \
 #     --constructor-args $(cast abi-encode "constructor(address,address)" 0xD3b06cEbF099CE7DA4AcCf578aaebFDBd6e88a93 0xE4aB69C077896252FAFBD49EFD26B5D171A32410) \
@@ -22,6 +21,7 @@ forge script script/2b_upgradeSenderOnL2.s.sol:UpgradeSenderOnL2Script \
 #     --compiler-version v0.8.22 \
 #     0x95bA1749619C81E70f3eF276Ce8A392747e32aE4 \
 #     ./src/SenderCCIP.sol:SenderCCIP
+
 
 # forge verify-contract \
 #     --chain-id 421614 \
