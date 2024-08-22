@@ -104,7 +104,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
 
         amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
         staker = deployer;
-        expiry = block.timestamp + 6 hours;
+        expiry = block.timestamp + 2 hours;
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         strategiesToWithdraw[0] = strategy;

@@ -16,13 +16,12 @@ import {FileReader} from "./FileReader.sol";
 
 contract UpgradeSenderOnL2Script is Script {
 
-    uint256 public deployerKey;
+    function run() public {
 
-    function run() public returns (ISenderCCIP) {
-        deployerKey = vm.envUint("DEPLOYER_KEY");
+        uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
 
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
-        ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.getSenderProxyAdmin());
+        ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.getL2ProxyAdmin());
         ISenderCCIP senderProxy = fileReader.getSenderContract();
 
         // Either use old implementation or deploy a new one if code differs.
@@ -44,8 +43,9 @@ contract UpgradeSenderOnL2Script is Script {
 
         // whitelist destination chain
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
-        vm.stopBroadcast();
+        senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
+        senderProxy.setSenderUtils(senderUtils);
 
-        return ISenderCCIP(address(senderProxy));
+        vm.stopBroadcast();
     }
 }

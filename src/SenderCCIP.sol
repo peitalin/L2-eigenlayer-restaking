@@ -10,13 +10,16 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {TransferToStakerMessage} from "./interfaces/IEigenlayerMsgDecoders.sol";
 import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
+import {BaseSepolia} from "../script/Addresses.sol";
 
 
 contract SenderCCIP is BaseMessengerCCIP {
 
     event SendingWithdrawalToStaker(address indexed, uint256 indexed, address indexed);
 
-    event MatchedFunctionSelector(bytes4 indexed, string indexed);
+    event MatchedReceivedFunctionSelector(bytes4 indexed, string indexed);
+
+    event MatchedSentFunctionSelector(bytes4 indexed, string indexed);
 
     event WithdrawalCommitted(bytes32 indexed, address indexed, uint256 indexed);
 
@@ -30,7 +33,7 @@ contract SenderCCIP is BaseMessengerCCIP {
 
     mapping(bytes32 => bool) public withdrawalRootsSpent;
 
-    ISenderUtils internal senderUtils;
+    ISenderUtils public senderUtils;
 
     /// @param _router The address of the router contract.
     /// @param _link The address of the link contract.
@@ -63,8 +66,7 @@ contract SenderCCIP is BaseMessengerCCIP {
             abi.decode(any2EvmMessage.sender, (address))
         )
     {
-        s_lastReceivedMessageId = any2EvmMessage.messageId;
-        s_lastReceivedText = abi.decode(any2EvmMessage.data, (string));
+
         if (any2EvmMessage.destTokenAmounts.length > 0) {
             s_lastReceivedTokenAddress = any2EvmMessage.destTokenAmounts[0].token;
             s_lastReceivedTokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
@@ -83,20 +85,20 @@ contract SenderCCIP is BaseMessengerCCIP {
 
             bytes32 withdrawalRoot = transferToStakerMsg.withdrawalRoot;
 
-            WithdrawalTransfer memory withdrawalTransfer;
-            withdrawalTransfer = withdrawalTransferCommittments[withdrawalRoot];
+            WithdrawalTransfer memory withdrawalTransfer = withdrawalTransferCommittments[withdrawalRoot];
 
             address staker = withdrawalTransfer.staker;
             uint256 amount = withdrawalTransfer.amount;
             address tokenDestination = withdrawalTransfer.tokenDestination;
+            emit SendingWithdrawalToStaker(staker, amount, tokenDestination);
+            // address tokenDestination = BaseSepolia.CcipBnM;
+            // emit SendingWithdrawalToStaker(staker, amount, tokenDestination);
 
             // checks-effects-interactions
             // delete withdrawalRoot entry and mark the withdrawalRoot as spent
             // to prevent multiple withdrawals
             // delete withdrawalTransferCommittments[withdrawalRoot];
             withdrawalRootsSpent[withdrawalRoot] = true;
-
-            emit SendingWithdrawalToStaker(staker, amount, tokenDestination);
 
             IERC20(tokenDestination).approve(address(this), amount);
             IERC20(tokenDestination).transfer(staker, amount);
@@ -105,8 +107,8 @@ contract SenderCCIP is BaseMessengerCCIP {
 
         } else {
 
-            emit MatchedFunctionSelector(functionSelector, "UnknownFunctionSelector");
-            text_msg = "messaging decoding failed";
+            emit MatchedReceivedFunctionSelector(functionSelector, "UnknownFunctionSelector");
+            text_msg = "unknown message";
         }
 
         emit MessageReceived(
@@ -114,8 +116,8 @@ contract SenderCCIP is BaseMessengerCCIP {
             any2EvmMessage.sourceChainSelector,
             abi.decode(any2EvmMessage.sender, (address)),
             text_msg,
-            s_lastReceivedTokenAddress,
-            s_lastReceivedTokenAmount
+            s_lastReceivedTokenAddress = address(0),
+            s_lastReceivedTokenAmount = 0
         );
     }
 
@@ -180,7 +182,7 @@ contract SenderCCIP is BaseMessengerCCIP {
             emit WithdrawalCommitted(withdrawalRoot, withdrawal.staker, withdrawal.shares[0]);
         } else {
             string memory _functionSelectorName = senderUtils.getFunctionSelectorName(functionSelector);
-            emit MatchedFunctionSelector(functionSelector, _functionSelectorName);
+            emit MatchedSentFunctionSelector(functionSelector, _functionSelectorName);
         }
 
         uint256 gasLimit = senderUtils.getGasLimitForFunctionSelector(functionSelector);

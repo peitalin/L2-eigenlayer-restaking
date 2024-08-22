@@ -11,6 +11,4 @@ forge script script/7_queueWithdrawalWithSignature.s.sol:QueueWithdrawalWithSign
 
 
 
-# https://ccip.chain.link/msg/0x24f0d024d70365a86229b3c1d5c6b74587a8a583588e1dcc1786c2549ed7050b
-
-# https://sepolia.etherscan.io/tx/0xafd0ea60a872ae7eddca424e9c4bb180e5b0c3b4a0696ac9fdd3e238864ed040#eventlog
+# https://ccip.chain.link/msg/0x003e44447eba1797ef07561bd3c391a490770a6383f8f0de3d0a19973b5e47f3

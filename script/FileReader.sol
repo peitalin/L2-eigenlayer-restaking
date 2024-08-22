@@ -42,12 +42,21 @@ contract FileReader is Script {
     }
 
     /// @dev hardcoded chainid for contracts. Update for prod
-    function getSenderProxyAdmin() public view returns (address) {
-
-        string memory filePath = "./broadcast/2_deployOnL2.s.sol/84532/run-latest.json";
-        string memory broadcastData = vm.readFile(filePath);
+    function getL2ProxyAdmin() public view returns (address) {
+        string memory broadcastData = vm.readFile("./broadcast/2_deployOnL2.s.sol/84532/run-latest.json");
         // Check transaction is the correct RestakingConnector deployment tx
         uint256 txNumber = _findCreateTx(broadcastData, "ProxyAdmin", 5);
+
+        string memory contractAddr = string(abi.encodePacked(".transactions[", Strings.toString(txNumber), "].contractAddress"));
+        address proxyAdmin = address(stdJson.readAddress(broadcastData, contractAddr));
+        return proxyAdmin;
+    }
+
+    /// @dev hardcoded chainid for contracts. Update for prod
+    function getL1ProxyAdmin() public view returns (address) {
+        string memory broadcastData = vm.readFile("broadcast/3_deployOnEth.s.sol/11155111/run-latest.json");
+        // Check transaction is the correct RestakingConnector deployment tx
+        uint256 txNumber = _findCreateTx(broadcastData, "ProxyAdmin", 12);
 
         string memory contractAddr = string(abi.encodePacked(".transactions[", Strings.toString(txNumber), "].contractAddress"));
         address proxyAdmin = address(stdJson.readAddress(broadcastData, contractAddr));
@@ -59,13 +68,13 @@ contract FileReader is Script {
         string memory broadcastData = vm.readFile("broadcast/3_deployOnEth.s.sol/11155111/run-latest.json");
 
         // Check transaction is the correct ReceiverCCIP deployment tx
-        uint256 txNumber = _findCreateTx(broadcastData, "TransparentUpgradeableProxy", 11);
+        uint256 txNumber = _findCreateTx(broadcastData, "TransparentUpgradeableProxy", 12);
         // TransparentUpgradeableProxy -> ReceiverCCIP
         string memory contractAddr = string(abi.encodePacked(".transactions[", Strings.toString(txNumber), "].contractAddress"));
         IReceiverCCIP _receiverContract = IReceiverCCIP(address(stdJson.readAddress(broadcastData, contractAddr)));
 
         // Check transaction is the correct RestakingConnector deployment tx
-        uint256 txNumber2 = _findCreateTx(broadcastData, "RestakingConnector", 11);
+        uint256 txNumber2 = _findCreateTx(broadcastData, "RestakingConnector", 12);
         string memory contractAddr2 = string(abi.encodePacked(".transactions[", Strings.toString(txNumber2), "].contractAddress"));
         IRestakingConnector _restakingConnector = IRestakingConnector(address(stdJson.readAddress(broadcastData, contractAddr2)));
 

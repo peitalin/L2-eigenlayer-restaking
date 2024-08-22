@@ -41,8 +41,6 @@ contract DeployOnEthScript is Script {
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
         ISenderCCIP senderProxy = fileReader.getSenderContract();
-        ISenderUtils senderUtils = ISenderUtils(fileReader.getSenderUtils());
-        ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.getSenderProxyAdmin());
 
         (
             IStrategy strategy,
@@ -58,6 +56,8 @@ contract DeployOnEthScript is Script {
         /// Begin Broadcast
         /////////////////////////////
         vm.startBroadcast(deployerKey);
+
+        ProxyAdmin proxyAdmin = new ProxyAdmin();
 
         // deploy restaking connector for Eigenlayer
         restakingConnector = new RestakingConnector();
@@ -78,16 +78,15 @@ contract DeployOnEthScript is Script {
                     abi.encodeWithSelector(
                         ReceiverCCIP.initialize.selector,
                         IRestakingConnector(address(restakingConnector)),
-                        senderProxy,
-                        senderUtils
+                        senderProxy
                     )
                 )
             ))
         );
 
         receiverProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
-        receiverProxy.allowlistSender(address(senderProxy), true);
         receiverProxy.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
+        receiverProxy.allowlistSender(address(senderProxy), true);
         receiverProxy.setSenderContractL2Addr(address(senderProxy));
 
         restakingConnector.addAdmin(address(receiverProxy));

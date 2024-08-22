@@ -1,16 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {console} from "forge-std/Test.sol";
-
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
-import {IPauserRegistry} from "eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
-import {ISlasher} from "eigenlayer-contracts/src/contracts/interfaces/ISlasher.sol";
-import {IEigenPodManager} from "eigenlayer-contracts/src/contracts/interfaces/IEigenPodManager.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {Adminable} from "./utils/Adminable.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
@@ -43,8 +36,8 @@ contract RestakingConnector is
         return FunctionSelectorDecoder.decodeFunctionSelector(message);
     }
 
-    function encodeTransferToStakerMsg(bytes32 withdrawalRoot) external returns (bytes memory) {
-        EigenlayerMsgEncoders.encodeTransferToStakerMsg(withdrawalRoot);
+    function encodeTransferToStakerMsg(bytes32 withdrawalRoot) public pure returns (bytes memory) {
+        return EigenlayerMsgEncoders.encodeTransferToStakerMsg(withdrawalRoot);
     }
 
     /// @dev Checkpoint the actual block.number before queueWithdrawal happens

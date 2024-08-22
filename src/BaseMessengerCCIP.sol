@@ -8,7 +8,7 @@ import {IERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-sol
 import {SafeERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-// import {OwnerIsCreator} from "@chainlink/contracts-ccip/src/v0.8/shared/access/OwnerIsCreator.sol";
+
 
 abstract contract BaseMessengerCCIP is Initializable, CCIPReceiver, OwnableUpgradeable {
     using SafeERC20 for IERC20;
@@ -173,12 +173,11 @@ abstract contract BaseMessengerCCIP is Initializable, CCIPReceiver, OwnableUpgra
     function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage) internal override virtual;
 
 
-    /// @dev This function will create an EVM2AnyMessage struct with all the necessary information.
-    /// @param _receiver address of the receiver.
-    /// @param _text string data to be sent.
-    /// @param _token token to be transferred.
-    /// @param _amount amount of the token to be transferred.
-    /// @param _feeTokenAddress address of the token used for fees. Set address(0) for native gas.
+    /// @param _receiver The address of the receiver.
+    /// @param _text The string data to be sent.
+    /// @param _token The token to be transferred.
+    /// @param _amount The amount of the token to be transferred.
+    /// @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
     /// @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
     function _buildCCIPMessage(
         address _receiver,
@@ -186,7 +185,35 @@ abstract contract BaseMessengerCCIP is Initializable, CCIPReceiver, OwnableUpgra
         address _token,
         uint256 _amount,
         address _feeTokenAddress
-    ) internal virtual returns (Client.EVM2AnyMessage memory);
+    ) internal virtual returns (Client.EVM2AnyMessage memory) {
+
+        Client.EVMTokenAmount[] memory tokenAmounts;
+        if (_amount <= 0) {
+            // Must be an empty array as no tokens are transferred
+            // non-empty arrays with 0 amounts error with CannotSendZeroTokens() == 0x5cf04449
+            tokenAmounts = new Client.EVMTokenAmount[](0);
+        } else {
+            tokenAmounts = new Client.EVMTokenAmount[](1);
+            tokenAmounts[0] = Client.EVMTokenAmount({
+                token: _token,
+                amount: _amount
+            });
+        }
+
+        bytes memory message = abi.encode(_text);
+        uint256 gasLimit = 600_000;
+
+        return
+            Client.EVM2AnyMessage({
+                receiver: abi.encode(_receiver),
+                data: message,
+                tokenAmounts: tokenAmounts,
+                feeToken: _feeTokenAddress,
+                extraArgs: Client._argsToBytes(
+                    Client.EVMExtraArgsV1({ gasLimit: gasLimit })
+                )
+            });
+    }
 
     /// @notice Fallback function to allow the contract to receive Ether.
     receive() external payable {}

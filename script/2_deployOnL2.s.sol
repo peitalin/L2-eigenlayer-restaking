@@ -43,8 +43,9 @@ contract DeployOnL2Script is Script {
                 )
             ))
         );
-        // whitelist destination chain
+        // whitelist both chain to receive and send messages
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
+        senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         vm.stopBroadcast();
 
         return ISenderCCIP(address(senderProxy));

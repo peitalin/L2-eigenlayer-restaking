@@ -29,19 +29,20 @@ contract SenderUtils is EigenlayerMsgDecoders, Ownable {
         functionSelectorNames[0x0dd8dd02] = "queueWithdrawals";
 
         // queueWithdrawalsWithSignature: [gas: 603_301]
-        gasLimitsForFunctionSelectors[0xa140f06e] = 800_000;
+        gasLimitsForFunctionSelectors[0xa140f06e] = 700_000;
         functionSelectorNames[0xa140f06e] = "queueWithdrawalsWithSignature";
 
         // completeQueuedWithdrawals: [gas: 645_948]
-        gasLimitsForFunctionSelectors[0x54b2bf29] = 800_000;
+        gasLimitsForFunctionSelectors[0x54b2bf29] = 750_000;
         functionSelectorNames[0x54b2bf29] = "completeQueuedWithdrawals";
 
         // delegateToBySignature: [gas: ?]
         gasLimitsForFunctionSelectors[0x7f548071] = 600_000;
         functionSelectorNames[0x7f548071] = "delegateToBySignature";
 
-        // transferToStaker: [gas: ?]
-        gasLimitsForFunctionSelectors[0x27167d10] = 800_000;
+        // transferToStaker: [gas: 268_420]
+        gasLimitsForFunctionSelectors[0x27167d10] = 400_000;
+        functionSelectorNames[0x27167d10] = "transferToStaker";
     }
 
     function decodeFunctionSelector(bytes memory message) public returns (bytes4) {

@@ -21,7 +21,6 @@ import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {BaseSepolia} from "../script/Addresses.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 
-import {console} from "forge-std/Test.sol";
 
 
 /// ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them.
@@ -34,8 +33,7 @@ contract ReceiverCCIP is BaseMessengerCCIP {
 
     /// @param _router The address of the router contract.
     /// @param _link The address of the link contract.
-    constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {
-    }
+    constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {}
 
     function initialize(
         IRestakingConnector _restakingConnector,
@@ -109,7 +107,6 @@ contract ReceiverCCIP is BaseMessengerCCIP {
         IERC20 underlyingToken = strategy.underlyingToken();
         string memory textMsg = "no matching functionSelector";
         uint256 amountMsg = s_lastReceivedTokenAmount;
-
 
         if (functionSelector == 0x32e89ace) {
             // bytes4(keccak256("depositIntoStrategyWithSignature(address,address,uint256,address,uint256,bytes)")) == 0x32e89ace
@@ -185,11 +182,10 @@ contract ReceiverCCIP is BaseMessengerCCIP {
 
             bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
 
-            address original_staker = withdrawal.staker;
+            // address original_staker = withdrawal.staker;
             uint256 amount = withdrawal.shares[0];
             // Approve L1 receiverContract to send ccip-BnM tokens to Router
             IERC20 token = withdrawal.strategies[0].underlyingToken();
-            // approve to send amount to router
             token.approve(address(this), amount);
 
             string memory text_message = string(restakingConnector.encodeTransferToStakerMsg(withdrawalRoot));
@@ -203,7 +199,8 @@ contract ReceiverCCIP is BaseMessengerCCIP {
                 amount
             );
 
-            textMsg = "completeQueuedWithdrawal()";
+            // textMsg = "completeQueuedWithdrawal()";
+            textMsg = text_message;
         }
 
         if (functionSelector == 0x7f548071) {

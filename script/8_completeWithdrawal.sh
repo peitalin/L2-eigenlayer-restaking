@@ -29,4 +29,11 @@ forge script script/8_completeWithdrawal.s.sol:CompleteWithdrawalScript  \
 
 ##### Example 2:
 
-# https://ccip.chain.link/msg/0xf4708d5b1a4ada3e2cb3daf60c0c37fe883dc9e0889f7fe26552d407f2bdd880
+#### L2 transactions
+# https://ccip.chain.link/msg/0x3a02206482f0148c74cb4b34a631b998502c754d198abc378e10ccaf6c725825
+# https://sepolia.etherscan.io/tx/0xc4e336ee410598fff9e6951b176b11e4ac6f3d0df2768eb79a986ada7e829037#eventlog
+
+#### L1 transactions
+# https://ccip.chain.link/msg/0xf6165cfb76cceaebbb93e9b49f7ac373547e51368bf9048c59c90c2d774fc42e
+# https://sepolia.basescan.org/tx/0xf4824d3fc1925a91f5cec814d6e03985092c38e7838c38f83d755a698923446c
+

@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {console} from "forge-std/Test.sol";
-
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
@@ -143,8 +141,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         for (uint256 i; i < arrayLength; i++) {
             IDelegationManager.QueuedWithdrawalParams memory wp;
             wp = decodeSingleQueueWithdrawalMessage(message, arrayLength, i);
-            // console.log("wp.shares:", wp.shares[0]);
-            // console.log("wp.withdrawer:", wp.withdrawer);
             arrayQueuedWithdrawalParams[i] = wp;
         }
 
@@ -304,8 +300,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory arrayQueuedWithdrawalWithSigParams =
             new IDelegationManager.QueuedWithdrawalWithSignatureParams[](arrayLength);
 
-        console.logBytes(message);
-
         for (uint256 i; i < arrayLength; i++) {
 
             IDelegationManager.QueuedWithdrawalWithSignatureParams memory wp;
@@ -430,16 +424,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
                 s := mload(add(message, add(580, offset)))
                 v := mload(add(message, add(612, offset)))
             }
-            // console.log("expiry");
-            // console.log(_expiry);
-            // console.log("withdrawer");
-            // console.log(_withdrawer);
-            // console.log("staker");
-            // console.log(_staker);
-            // console.log("_strategy");
-            // console.log(_strategy);
-            // console.log("_shares");
-            // console.log(_sharesToWithdraw);
 
             signature = abi.encodePacked(r,s,v);
             require(sig_length == 65, "decodeQueueWithdrawalsWithSignatureMessage: invalid signature length");
@@ -785,10 +769,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
             operator := mload(add(message, 132))
             approverSalt := mload(add(message, 228))
         }
-        // console.log("msglen:", msg_length);
-        // console.log("staker_sig_offset:", staker_sig_offset);
-        // console.log("approver_sig_offset:", approver_sig_offset);
-        // console.logBytes(message);
 
         if (msg_length == 356) {
             // staker_sig: 0
