@@ -163,7 +163,6 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
                 tokenId
             )
         ));
-        vm.deal(address(eigenAgent), 1 ether);
         vm.stopBroadcast();
         return eigenAgent;
     }
@@ -286,8 +285,6 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
         );
         signatureUtils.checkSignature_EIP1271(bob, digestHash2, signature2);
 
-        console.log("------------------------------------------------------");
-        console.log("eigenAgent:", address(eigenAgent));
         bytes memory result = eigenAgent.executeWithSignature(
             address(strategyManager), // strategyManager
             0,
@@ -331,8 +328,6 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
         );
         signatureUtils.checkSignature_EIP1271(bob, digestHash3, signature3);
 
-        console.log("------------------------------------------------------");
-        console.log("eigenAgent:", address(eigenAgent));
         result = eigenAgent.executeWithSignature(
             address(delegationManager), // delegationManager
             0,
@@ -345,7 +340,7 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
         console.logBytes32(withdrawalRoots[0]);
 
         require(
-            withdrawalRoots[0] != address(0),
+            withdrawalRoots[0] != bytes32(0),
             "no withdrawalRoot returned by EigenAgent queueWithdrawals"
         );
 
