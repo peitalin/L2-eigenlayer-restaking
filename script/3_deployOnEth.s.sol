@@ -21,6 +21,13 @@ import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContr
 import {FileReader} from "./FileReader.sol";
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 
+import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
+import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
+import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
+import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
+
+
 
 contract DeployOnEthScript is Script {
 
@@ -70,6 +77,10 @@ contract DeployOnEthScript is Script {
             EthSepolia.Link
         );
 
+        // deploy 6551 Registry and EigenAgentOwner NFT
+        ERC6551Registry registry6551 = new ERC6551Registry();
+        EigenAgentOwner721 eigenAgentOwner721 = deployEigenAgentOwnerNft("EigenAgentOwner", "EAO", proxyAdmin);
+
         receiverProxy = ReceiverCCIP(
             payable(address(
                 new TransparentUpgradeableProxy(
@@ -78,7 +89,9 @@ contract DeployOnEthScript is Script {
                     abi.encodeWithSelector(
                         ReceiverCCIP.initialize.selector,
                         IRestakingConnector(address(restakingConnector)),
-                        senderProxy
+                        senderProxy,
+                        registry6551,
+                        eigenAgentOwner721
                     )
                 )
             ))
@@ -89,6 +102,8 @@ contract DeployOnEthScript is Script {
         receiverProxy.allowlistSender(address(senderProxy), true);
         receiverProxy.setSenderContractL2Addr(address(senderProxy));
 
+        eigenAgentOwner721.addAdmin(deployer);
+        eigenAgentOwner721.addAdmin(address(receiverProxy));
         restakingConnector.addAdmin(address(receiverProxy));
 
         // seed the receiver contract with a bit of ETH
@@ -104,4 +119,25 @@ contract DeployOnEthScript is Script {
             IRestakingConnector(address(restakingConnector))
         );
     }
+
+
+    function deployEigenAgentOwnerNft(
+        string memory name,
+        string memory symbol,
+        ProxyAdmin _proxyAdmin
+    ) public returns (EigenAgentOwner721) {
+        EigenAgentOwner721 agentProxy = EigenAgentOwner721(
+            address(new TransparentUpgradeableProxy(
+                address(new EigenAgentOwner721()),
+                address(_proxyAdmin),
+                abi.encodeWithSelector(
+                    EigenAgentOwner721.initialize.selector,
+                    name,
+                    symbol
+                )
+            ))
+        );
+        return agentProxy;
+    }
+
 }

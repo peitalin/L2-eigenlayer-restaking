@@ -6,10 +6,14 @@ import {ISenderCCIP} from "./ISenderCCIP.sol";
 import {ISenderUtils} from "./ISenderUtils.sol";
 import {IRestakingConnector} from "./IRestakingConnector.sol";
 import {IBaseMessengerCCIP} from "./IBaseMessengerCCIP.sol";
+import {EigenAgent6551} from "../6551/EigenAgent6551.sol";
+
 
 interface IReceiverCCIP is IBaseMessengerCCIP {
 
     function mockCCIPReceive(Client.Any2EVMMessage memory any2EvmMessage) external;
+
+    function spawnEigenAgentOnlyOwner(address staker) external returns (EigenAgent6551);
 
     function setSenderutils(ISenderUtils _senderUtils) external;
 

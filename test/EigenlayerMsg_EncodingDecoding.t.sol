@@ -11,8 +11,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {
-    EigenlayerDepositParams,
-    EigenlayerDepositMessage,
+    EigenlayerDeposit6551Params,
+    EigenlayerDeposit6551Message,
     EigenlayerDepositWithSignatureMessage,
     TransferToStakerMessage
 } from "../src/interfaces/IEigenlayerMsgDecoders.sol";

@@ -5,10 +5,10 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-// Deposit
+// Message to 6551 to Deposit
 import {
-    EigenlayerDepositMessage,
-    EigenlayerDepositParams
+    EigenlayerDeposit6551Message,
+    EigenlayerDeposit6551Params
 } from "../interfaces/IEigenlayerMsgDecoders.sol";
 // DepositWithSignature
 import {
@@ -38,6 +38,74 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
      *
     */
 
+    function decodeDeposit6551Message(
+        bytes memory message
+    ) public returns (EigenlayerDeposit6551Message memory) {
+        ////////////////////////////////////////////////////////
+        //// Message payload offsets for assembly destructuring
+        ////////////////////////////////////////////////////////
+
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
+        // 0000000000000000000000000000000000000000000000000000000000000144 [64]
+        // 32e89ace                                                         [96] bytes4 truncates the right
+        // 000000000000000000000000bd4bcb3ad20e9d85d5152ae68f45f40af8952159 [100] reads 32 bytes from offset [100] right-to-left up to the function selector
+        // 0000000000000000000000003eef6ec7a9679e60cc57d9688e9ec0e6624d687a [132]
+        // 000000000000000000000000000000000000000000000000001b5b1bf4c54000 [164] uint256 amount in hex
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [196]
+        // 0000000000000000000000000000000000000000000000000000000000015195 [228] expiry
+        // 00000000000000000000000000000000000000000000000000000000000000c0 [260] offset: 192 bytes
+        // 0000000000000000000000000000000000000000000000000000000000000041 [292] length: 65 bytes
+        // 3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee [324] signature: r
+        // 3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d5 [356] signature: s
+        // 1c00000000000000000000000000000000000000000000000000000000000000 [388] signature: v (uint8 = bytes1)
+        // 00000000000000000000000000000000000000000000000000000000
+
+        address strategy;
+        address token;
+        uint256 amount;
+        address staker;
+        uint256 expiry;
+
+        uint256 sig_offset;
+        uint256 sig_length;
+
+        bytes32 r;
+        bytes32 s;
+        bytes1 v;
+
+        assembly {
+            strategy := mload(add(message, 100))
+            token := mload(add(message, 132))
+            amount := mload(add(message, 164))
+            staker := mload(add(message, 196))
+            expiry := mload(add(message, 228))
+
+            sig_offset := mload(add(message, 260))
+            sig_length := mload(add(message, 292))
+
+            r := mload(add(message, 324))
+            s := mload(add(message, 356))
+            v := mload(add(message, 388))
+        }
+
+        bytes memory signature = abi.encodePacked(r,s,v);
+
+        require(sig_length == 65, "decodeDepositWithSignatureMessage: invalid signature length");
+
+        EigenlayerDeposit6551Message memory message = EigenlayerDeposit6551Message({
+            strategy: strategy,
+            token: token,
+            amount: amount,
+            staker: staker,
+            expiry: expiry,
+            signature: signature
+        });
+
+        emit EigenlayerDeposit6551Params(staker, strategy, token, amount);
+
+        return message;
+    }
+
     function decodeDepositWithSignatureMessage(
         bytes memory message
     ) public returns (EigenlayerDepositWithSignatureMessage memory) {
@@ -47,8 +115,8 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
         // 0000000000000000000000000000000000000000000000000000000000000144 [64]
-        // 32e89ace000000000000000000000000bd4bcb3ad20e9d85d5152ae68f45f40a [96] bytes4 truncates the right
-        // f8952159                                                         [100] reads 32 bytes from offset [100] right-to-left up to the function selector
+        // 32e89ace                                                         [96] bytes4 truncates the right
+        // 000000000000000000000000bd4bcb3ad20e9d85d5152ae68f45f40af8952159 [100] reads 32 bytes from offset [100] right-to-left up to the function selector
         // 0000000000000000000000003eef6ec7a9679e60cc57d9688e9ec0e6624d687a [132]
         // 000000000000000000000000000000000000000000000000001b5b1bf4c54000 [164] uint256 amount in hex
         // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [196]

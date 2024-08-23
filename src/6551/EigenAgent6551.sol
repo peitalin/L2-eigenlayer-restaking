@@ -10,7 +10,9 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {IEigenAgent6551} from "./IEigenAgent6551.sol";
 import {SignatureUtilsEIP1271} from "../utils/SignatureUtilsEIP1271.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {console} from "forge-std/Test.sol";
 
@@ -72,6 +74,34 @@ contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
         if (isValidSignature(_digestHash, _signature) != IERC1271.isValidSignature.selector)
             revert SignatureNotFromNftOwner();
         _;
+    }
+
+
+    // uses the same signature verification from depositIntoStrategy
+    // since the structhash of depositIntoStrategy signature is a superset of ERC20 approve()
+    function approveStrategyManagerWithSignature(
+        address _target,
+        uint256 _value,
+        bytes calldata _data,
+        uint256 _expiry,
+        bytes memory _signature
+    ) external returns (bool) {
+
+        bytes32 _digestHash = createEigenAgentCallDigest(
+            _target,
+            _value,
+            _data,
+            execNonce,
+            block.chainid,
+            _expiry
+        );
+
+        if (isValidSignature(_digestHash, _signature) != IERC1271.isValidSignature.selector)
+            revert SignatureNotFromNftOwner();
+
+        (address token, uint256 amount) = decodeApproveERC20FromDepositMessage(_data);
+
+        return IERC20(token).approve(_target, amount);
     }
 
     function executeWithSignature(
@@ -154,6 +184,30 @@ contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
         // address(this) is the StrategyManager, not this contract (SignatureUtilsEIP2172)
         // chainid is the chain Eigenlayer is deployed on (it can fork!), not the chain you are calling this function
         // So chainid should be destination chainid in the context of L2 -> L1 restaking calls
+    }
+
+    function decodeApproveERC20FromDepositMessage(bytes memory message)
+        public
+        returns (address, uint256)
+    {
+        ////////////////////////////////////////////////////////
+        //// deserialize data from Deposit Message for approve()
+        ////////////////////////////////////////////////////////
+
+        // e7a050aa                                                         [32] function selector
+        // 0000000000000000000000000b731ce99ec04be646ecac8a7fa9a5126b44c54b [36] strategy
+        // 000000000000000000000000fd57b4ddbf88a4e07ff4e34c487b99af2fe82a05 [68] token
+        // 0000000000000000000000000000000000000000000000000009f295cd5f0000 [100] amount
+
+        address token;
+        uint256 amount;
+
+        assembly {
+            token := mload(add(message, 68))
+            amount := mload(add(message, 100))
+        }
+
+        return (token, amount);
     }
 
 }

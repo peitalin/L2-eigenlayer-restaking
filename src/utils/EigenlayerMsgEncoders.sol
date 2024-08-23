@@ -17,6 +17,28 @@ library EigenlayerMsgEncoders {
      *
     */
 
+    // msg to CCIP for EigenAgent
+    function encodeDeposit6551Msg(
+        address strategy,
+        address token,
+        uint256 amount,
+        address staker,
+        uint256 expiry,
+        bytes memory signature
+    ) public pure returns (bytes memory) {
+        // encode message payload
+        bytes memory message_bytes = abi.encodeWithSelector(
+            bytes4(keccak256("deposit6551(address,address,uint256,address,uint256,bytes)")),
+            strategy,
+            token,
+            amount,
+            staker,
+            expiry,
+            signature
+        );
+        return message_bytes;
+    }
+
     // used by EigenAgent
     function encodeDepositIntoStrategyMsg(
         address strategy,

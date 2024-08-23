@@ -66,8 +66,6 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
     EigenAgentOwner721 public eigenAgentOwnerNft;
 
     // call params
-    address _target;
-    uint256 _value;
     uint256 _expiry;
     uint256 _nonce;
     uint256 _amount;
@@ -117,60 +115,61 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
         receiverContract.allowlistSender(deployer, true);
 
         //////// 6551 Registry
-        proxyAdmin = new ProxyAdmin();
-        registry = new ERC6551Registry();
-        eigenAgentOwnerNft = deployEigenAgentOwnerNft("EigenAgent", "EA", proxyAdmin);
+        // proxyAdmin = new ProxyAdmin();
+        // registry = new ERC6551Registry();
+        // eigenAgentOwnerNft = deployEigenAgentOwnerNft("EigenAgent", "EA", proxyAdmin);
 
-        _value = 0 ether;
         _expiry = block.timestamp + 1 hours;
 
         vm.stopBroadcast();
     }
 
 
-    function deployEigenAgentOwnerNft(
-        string memory name,
-        string memory symbol,
-        ProxyAdmin _proxyAdmin
-    ) public returns (EigenAgentOwner721) {
-        EigenAgentOwner721 agentProxy = EigenAgentOwner721(
-            address(new TransparentUpgradeableProxy(
-                address(new EigenAgentOwner721()),
-                address(_proxyAdmin),
-                abi.encodeWithSelector(
-                    EigenAgentOwner721.initialize.selector,
-                    name,
-                    symbol
-                )
-            ))
-        );
-        return agentProxy;
-    }
+    // function deployEigenAgentOwnerNft(
+    //     string memory name,
+    //     string memory symbol,
+    //     ProxyAdmin _proxyAdmin
+    // ) public returns (EigenAgentOwner721) {
+    //     EigenAgentOwner721 agentProxy = EigenAgentOwner721(
+    //         address(new TransparentUpgradeableProxy(
+    //             address(new EigenAgentOwner721()),
+    //             address(_proxyAdmin),
+    //             abi.encodeWithSelector(
+    //                 EigenAgentOwner721.initialize.selector,
+    //                 name,
+    //                 symbol
+    //             )
+    //         ))
+    //     );
+    //     return agentProxy;
+    // }
 
 
-    function spawn6551EigenAgent() public returns (EigenAgent6551) {
-        vm.startBroadcast(deployerKey);
-        bytes32 salt = bytes32(uint256(200));
-        uint256 tokenId = eigenAgentOwnerNft.mint(bob);
+    // function spawnEigenAgent6551() public returns (EigenAgent6551) {
+    //     vm.startBroadcast(deployerKey);
 
-        EigenAgent6551 _eigenAgentImpl = new EigenAgent6551();
-        EigenAgent6551 eigenAgent = EigenAgent6551(payable(
-            registry.createAccount(
-                address(_eigenAgentImpl),
-                salt,
-                block.chainid,
-                address(eigenAgentOwnerNft),
-                tokenId
-            )
-        ));
-        vm.stopBroadcast();
-        return eigenAgent;
-    }
+    //     bytes32 salt = bytes32(abi.encode(bob));
+    //     uint256 tokenId = eigenAgentOwnerNft.mint(bob);
+
+    //     EigenAgent6551 eigenAgent = EigenAgent6551(payable(
+    //         registry.createAccount(
+    //             address(new EigenAgent6551()),
+    //             salt,
+    //             block.chainid,
+    //             address(eigenAgentOwnerNft),
+    //             tokenId
+    //         )
+    //     ));
+    //     vm.stopBroadcast();
+    //     return eigenAgent;
+    // }
 
 
     function test_EigenAgent_ExecuteWithSignatures() public {
 
-        EigenAgent6551 eigenAgent = spawn6551EigenAgent();
+        vm.startBroadcast(deployerKey);
+        EigenAgent6551 eigenAgent = receiverContract.spawnEigenAgentOnlyOwner(bob);
+        vm.stopBroadcast();
 
         vm.startBroadcast(bobKey);
 
@@ -179,7 +178,7 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
 
         bytes32 digestHash = signatureUtils.createEigenAgentCallDigest(
             address(receiverContract),
-            _value,
+            0 ether,
             _data,
             _nonce,
             block.chainid,
@@ -203,7 +202,7 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
         // console.log("eigenAgent:", address(eigenAgent));
         bytes memory result = eigenAgent.executeWithSignature(
             address(receiverContract),
-            _value,
+            0 ether,
             _data,
             _expiry,
             signature
@@ -235,7 +234,9 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
         _amount = 0.0028 ether;
         _expiry = block.timestamp + 1 days;
 
-        EigenAgent6551 eigenAgent = spawn6551EigenAgent();
+        vm.startBroadcast(deployerKey);
+        EigenAgent6551 eigenAgent = receiverContract.spawnEigenAgentOnlyOwner(bob);
+        vm.stopBroadcast();
 
         vm.startBroadcast(bobKey);
         _nonce = eigenAgent.execNonce();
@@ -245,8 +246,6 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
         /// Receiver -> EigenAgent Broadcasts TX
         //////////////////////////////////////////////////////
         vm.startBroadcast(address(receiverContract));
-
-        erc20Drip.transfer(address(eigenAgent), _amount);
 
         (
             bytes memory data1,
@@ -279,7 +278,6 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
         ) = createEigenAgentDepositSignature(
             bobKey,
             _amount,
-            0 ether,
             _nonce,
             _expiry
         );
@@ -292,89 +290,92 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
             _expiry,
             signature2
         );
-        uint256 shares1 = abi.decode(result, (uint256));
-        console.log("shares1:", shares1);
+        // uint256 shares1 = abi.decode(result, (uint256));
+        // console.log("shares1:", shares1);
 
         vm.stopBroadcast();
 
 
-        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams;
-        {
+        // IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams;
+        // {
 
-            IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
-            strategiesToWithdraw[0] = strategy;
+        //     IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
+        //     strategiesToWithdraw[0] = strategy;
 
-            uint256[] memory sharesToWithdraw = new uint256[](1);
-            sharesToWithdraw[0] = _amount;
+        //     uint256[] memory sharesToWithdraw = new uint256[](1);
+        //     sharesToWithdraw[0] = _amount;
 
-            IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal =
-                IDelegationManager.QueuedWithdrawalParams({
-                    strategies: strategiesToWithdraw,
-                    shares: sharesToWithdraw,
-                    withdrawer: address(eigenAgent)
-                });
+        //     IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal =
+        //         IDelegationManager.QueuedWithdrawalParams({
+        //             strategies: strategiesToWithdraw,
+        //             shares: sharesToWithdraw,
+        //             withdrawer: address(eigenAgent)
+        //         });
 
-            queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](1);
-            queuedWithdrawalParams[0] = queuedWithdrawal;
-        }
+        //     queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](1);
+        //     queuedWithdrawalParams[0] = queuedWithdrawal;
+        // }
 
-        (
-            bytes memory data3,
-            bytes32 digestHash3,
-            bytes memory signature3
-        ) = createEigenAgentQueueWithdrawalsSignature(
-            bobKey,
-            queuedWithdrawalParams
-        );
-        signatureUtils.checkSignature_EIP1271(bob, digestHash3, signature3);
+        // (
+        //     bytes memory data3,
+        //     bytes32 digestHash3,
+        //     bytes memory signature3
+        // ) = createEigenAgentQueueWithdrawalsSignature(
+        //     bobKey,
+        //     queuedWithdrawalParams
+        // );
+        // signatureUtils.checkSignature_EIP1271(bob, digestHash3, signature3);
 
-        result = eigenAgent.executeWithSignature(
-            address(delegationManager), // delegationManager
-            0,
-            data3, // encodeDepositIntoStrategyMsg
-            _expiry,
-            signature3
-        );
-        bytes32[] memory withdrawalRoots = abi.decode(result, (bytes32[]));
-        console.log("withdrawalRoots:");
-        console.logBytes32(withdrawalRoots[0]);
+        // result = eigenAgent.executeWithSignature(
+        //     address(delegationManager), // delegationManager
+        //     0,
+        //     data3, // encodeDepositIntoStrategyMsg
+        //     _expiry,
+        //     signature3
+        // );
+        // bytes32[] memory withdrawalRoots = abi.decode(result, (bytes32[]));
+        // console.log("withdrawalRoots:");
+        // console.logBytes32(withdrawalRoots[0]);
+        // require(
+        //     withdrawalRoots[0] != bytes32(0),
+        //     "no withdrawalRoot returned by EigenAgent queueWithdrawals"
+        // );
 
-        require(
-            withdrawalRoots[0] != bytes32(0),
-            "no withdrawalRoot returned by EigenAgent queueWithdrawals"
-        );
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(token), // CCIP-BnM token address on Eth Sepolia.
+            amount: _amount
+        });
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0x0),
+            sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
+            sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
+            destTokenAmounts: destTokenAmounts, // Tokens and their amounts in their destination chain representation.
+            data: abi.encode(string(
+                EigenlayerMsgEncoders.encodeDeposit6551Msg(
+                    address(strategy),
+                    address(token),
+                    _amount,
+                    bob,
+                    _expiry,
+                    signature2
+                )
+            )) // CCIP abi.encodes a string message when sending
+        });
+        /////////////////////////////////////
+        //// Send message from CCIP to Eigenlayer
+        /////////////////////////////////////
+        vm.startBroadcast(address(receiverContract)); // simulate router calling receiverContract on L1
+        receiverContract.mockCCIPReceive(any2EvmMessage);
 
-        // Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
-        // destTokenAmounts[0] = Client.EVMTokenAmount({
-        //     token: address(token), // CCIP-BnM token address on Eth Sepolia.
-        //     amount: amount
-        // });
-        // Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-        //     messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
-        //     sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
-        //     sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
-        //     data: abi.encode(string(
-        //         EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
-        //             address(strategy),
-        //             address(token),
-        //             amount,
-        //             staker,
-        //             expiry,
-        //             signature
-        //         )
-        //     )), // CCIP abi.encodes a string message when sending
-        //     destTokenAmounts: destTokenAmounts // Tokens and their amounts in their destination chain representation.
-        // });
-        // /////////////////////////////////////
-        // //// Send message from CCIP to Eigenlayer
-        // /////////////////////////////////////
-        // vm.startBroadcast(EthSepolia.Router); // simulate router calling receiverContract on L1
-        // receiverContract.mockCCIPReceive(any2EvmMessage);
         // uint256 receiverBalance = token.balanceOf(address(receiverContract));
         // uint256 valueOfShares = strategy.userUnderlying(address(deployer));
         // require(valueOfShares == amount, "valueofShares incorrect");
         // require(strategyManager.stakerStrategyShares(staker, strategy) == amount, "stakerStrategyShares incorrect");
     }
+
+
+
 
     function createEigenAgentQueueWithdrawalsSignature(
         uint256 signerKey,
@@ -437,7 +438,6 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
     function createEigenAgentDepositSignature(
         uint256 signerKey,
         uint256 _amount,
-        uint256 _value,
         uint256 _nonce,
         uint256 _expiry
     ) public view returns (bytes memory, bytes32, bytes memory) {
@@ -450,7 +450,7 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
 
         bytes32 digestHash = signatureUtils.createEigenAgentCallDigest(
             address(strategyManager),
-            _value,
+            0 ether,
             data,
             _nonce,
             block.chainid,

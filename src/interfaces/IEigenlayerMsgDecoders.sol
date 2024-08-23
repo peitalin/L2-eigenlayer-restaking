@@ -6,15 +6,31 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-
-struct EigenlayerDepositMessage {
+struct EigenlayerDeposit6551Message {
+    address strategy;
+    address token;
     uint256 amount;
     address staker;
+    uint256 expiry;
+    bytes signature;
 }
-event EigenlayerDepositParams(
-    uint256 indexed amount,
-    address indexed staker
+event EigenlayerDeposit6551Params(
+    address indexed staker,
+    address indexed strategy,
+    address token,
+    uint256 indexed amount
 );
+
+// struct EigenlayerDepositMessage {
+//     address strategy;
+//     address token;
+//     uint256 amount;
+// }
+// event EigenlayerDepositParams(
+//     address indexed strategy,
+//     address indexed token,
+//     uint256 indexed amount
+// );
 
 struct EigenlayerDepositWithSignatureMessage {
     uint256 expiry;
@@ -49,6 +65,11 @@ event TransferToStakerParams(
 
 
 interface IEigenlayerMsgDecoders {
+
+    function decodeDeposit6551Message(
+        bytes memory message
+    ) external returns (EigenlayerDeposit6551Message memory);
+
 
     function decodeDepositWithSignatureMessage(
         bytes memory message
