@@ -185,7 +185,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](1);
         queuedWithdrawalParams[0] = queuedWithdrawal;
 
-        bytes memory message_bytes = EigenlayerMsgEncoders.encodeQueueWithdrawalMsg(
+        bytes memory message_bytes = EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
             queuedWithdrawalParams
         );
         // CCIP turns the message into string when sending
@@ -302,7 +302,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         queuedWithdrawalParams3[2] = queuedWithdrawal3;
 
         bytes memory message3 = abi.encode(string(
-            EigenlayerMsgEncoders.encodeQueueWithdrawalMsg(
+            EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
                 queuedWithdrawalParams3
             )
         ));

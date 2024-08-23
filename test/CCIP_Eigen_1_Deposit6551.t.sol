@@ -253,7 +253,7 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
             bytes memory data1,
             bytes32 digestHash1,
             bytes memory signature1
-        ) = createERC20ApproveSignature(
+        ) = createEigenAgentERC20ApproveSignature(
             bobKey,
             address(erc20Drip),
             address(strategyManager),
@@ -277,7 +277,7 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
             bytes memory data2,
             bytes32 digestHash2,
             bytes memory signature2
-        ) = createEigenAgentSignature(
+        ) = createEigenAgentDepositSignature(
             bobKey,
             _amount,
             0 ether,
@@ -300,6 +300,54 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
 
         vm.stopBroadcast();
 
+
+        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams;
+        {
+
+            IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
+            strategiesToWithdraw[0] = strategy;
+
+            uint256[] memory sharesToWithdraw = new uint256[](1);
+            sharesToWithdraw[0] = _amount;
+
+            IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal =
+                IDelegationManager.QueuedWithdrawalParams({
+                    strategies: strategiesToWithdraw,
+                    shares: sharesToWithdraw,
+                    withdrawer: address(eigenAgent)
+                });
+
+            queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](1);
+            queuedWithdrawalParams[0] = queuedWithdrawal;
+        }
+
+        (
+            bytes memory data3,
+            bytes32 digestHash3,
+            bytes memory signature3
+        ) = createEigenAgentQueueWithdrawalsSignature(
+            bobKey,
+            queuedWithdrawalParams
+        );
+        signatureUtils.checkSignature_EIP1271(bob, digestHash3, signature3);
+
+        console.log("------------------------------------------------------");
+        console.log("eigenAgent:", address(eigenAgent));
+        result = eigenAgent.executeWithSignature(
+            address(delegationManager), // delegationManager
+            0,
+            data3, // encodeDepositIntoStrategyMsg
+            _expiry,
+            signature3
+        );
+        bytes32[] memory withdrawalRoots = abi.decode(result, (bytes32[]));
+        console.log("withdrawalRoots:");
+        console.logBytes32(withdrawalRoots[0]);
+
+        require(
+            withdrawalRoots[0] != address(0),
+            "no withdrawalRoot returned by EigenAgent queueWithdrawals"
+        );
 
         // Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         // destTokenAmounts[0] = Client.EVMTokenAmount({
@@ -333,7 +381,35 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
         // require(strategyManager.stakerStrategyShares(staker, strategy) == amount, "stakerStrategyShares incorrect");
     }
 
-    function createERC20ApproveSignature(
+    function createEigenAgentQueueWithdrawalsSignature(
+        uint256 signerKey,
+        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
+    ) public view returns (bytes memory, bytes32, bytes memory) {
+
+        bytes memory data = EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
+            queuedWithdrawalParams
+        );
+
+        bytes32 digestHash = signatureUtils.createEigenAgentCallDigest(
+            address(delegationManager), // target to call
+            0 ether,
+            data,
+            _nonce,
+            block.chainid,
+            _expiry
+        );
+
+        bytes memory signature;
+        {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
+            signature = abi.encodePacked(r, s, v);
+        }
+
+        return (data, digestHash, signature);
+    }
+
+
+    function createEigenAgentERC20ApproveSignature(
         uint256 signerKey,
         address _token,
         address _to,
@@ -363,7 +439,7 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
         return (data, digestHash, signature);
     }
 
-    function createEigenAgentSignature(
+    function createEigenAgentDepositSignature(
         uint256 signerKey,
         uint256 _amount,
         uint256 _value,

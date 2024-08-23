@@ -10,6 +10,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 library EigenlayerMsgEncoders {
 
+    /*
+     *
+     *         EigenAgent Messages
+     *
+     *
+    */
+
     // used by EigenAgent
     function encodeDepositIntoStrategyMsg(
         address strategy,
@@ -41,6 +48,31 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
+    function encodeQueueWithdrawalsMsg(
+        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
+    ) public pure returns (bytes memory) {
+        // structs are encoded as tuples:
+        // QueuedWithdrawalParams {
+        //     IStrategy[] strategies;
+        //     uint256[] shares;
+        //     address withdrawer;
+        // }
+        bytes memory message_bytes = abi.encodeWithSelector(
+            bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
+            queuedWithdrawalParams
+        );
+
+        return message_bytes;
+    }
+
+
+    /*
+     *
+     *         Standard Messages
+     *
+     *
+    */
+
     function encodeDepositIntoStrategyWithSignatureMsg(
         address strategy,
         address token,
@@ -62,23 +94,6 @@ library EigenlayerMsgEncoders {
         );
         // CCIP turns the message into string when sending
         // bytes memory message = abi.encode(string(message_bytes));
-        return message_bytes;
-    }
-
-    function encodeQueueWithdrawalMsg(
-        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
-    ) public pure returns (bytes memory) {
-        // structs are encoded as tuples:
-        // QueuedWithdrawalParams {
-        //     IStrategy[] strategies;
-        //     uint256[] shares;
-        //     address withdrawer;
-        // }
-        bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
-            queuedWithdrawalParams
-        );
-
         return message_bytes;
     }
 

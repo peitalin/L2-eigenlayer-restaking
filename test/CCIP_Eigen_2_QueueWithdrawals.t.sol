@@ -173,7 +173,7 @@ contract CCIP_Eigen_QueueWithdrawalsTests is Test {
             sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
             sender: abi.encode(address(deployer)), // bytes: abi.decode(sender) if coming from an EVM chain.
             data: abi.encode(string(
-                EigenlayerMsgEncoders.encodeQueueWithdrawalMsg(
+                EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
                     queuedWithdrawalParams
                 )
             )), // CCIP abi.encodes a string message when sending
