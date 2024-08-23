@@ -113,7 +113,7 @@ contract DelegateToScript is Script, ScriptUtils {
         ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry;
         ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
 
-        bytes32 approverSalt = bytes32(uint256(22)); // generate some random number/salt
+        bytes32 approverSalt = bytes32(uint256(24)); // generate some random number/salt
 
         bytes memory signature1;
         bytes memory signature2;

@@ -8,12 +8,14 @@ fs_permissions = [
 ]
 
 remappings = [
-  '@chainlink/local/=lib/chainlink-local/',
-  '@chainlink/contracts-ccip/=lib/chainlink-local/lib/ccip/contracts/',
-  'forge-std/=lib/forge-std/src/',
+  "@chainlink/local/=lib/chainlink-local/",
+  "@chainlink/contracts-ccip/=lib/chainlink-local/lib/ccip/contracts/",
+  "forge-std/=lib/forge-std/src/",
+  "@6551/=lib/reference/src/",
   ### NOTE: use eigenlayer's openzeppelin dependencies
-  '@openzeppelin/contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts',
-  '@openzeppelin/contracts-upgradeable/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable/contracts'
+  "@openzeppelin/contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts",
+  "@openzeppelin/contracts-upgradeable/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable/contracts"
+
 ]
 
 [rpc_endpoints]

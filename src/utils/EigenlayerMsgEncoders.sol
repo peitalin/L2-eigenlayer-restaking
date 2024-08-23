@@ -4,10 +4,42 @@ pragma solidity 0.8.22;
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 
 library EigenlayerMsgEncoders {
+
+    // used by EigenAgent
+    function encodeDepositIntoStrategyMsg(
+        address strategy,
+        address token,
+        uint256 amount
+    ) public pure returns (bytes memory) {
+        // encode message payload
+        bytes memory message_bytes = abi.encodeWithSelector(
+            // bytes4(keccak256("depositIntoStrategy(address,address,uint256)")),
+            IStrategyManager.depositIntoStrategy.selector,
+            strategy,
+            token,
+            amount
+        );
+        return message_bytes;
+    }
+
+    function encodeERC20ApproveMsg(
+        address to,
+        uint256 amount
+    ) public pure returns (bytes memory) {
+        // encode message payload
+        bytes memory message_bytes = abi.encodeWithSelector(
+            // bytes4(keccak256("approve(address,uint256)")),
+            IERC20.approve.selector,
+            to,
+            amount
+        );
+        return message_bytes;
+    }
 
     function encodeDepositIntoStrategyWithSignatureMsg(
         address strategy,

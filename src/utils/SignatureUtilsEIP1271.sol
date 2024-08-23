@@ -11,6 +11,24 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 /// @dev Retrieve these struct hashes by calling Eigenlayer contracts, or storing the hash.
 contract SignatureUtilsEIP1271 is Script {
 
+    /*
+     *
+     *            Constants
+     *
+     */
+
+    /// @notice The EIP-712 typehash for the deposit struct used by the contract
+    bytes32 public constant EIGEN_AGENT_EXEC_TYPEHASH = keccak256("ExecuteWithSignature(address target, uint256 value, bytes data, uint256 expiry)");
+
+    /// @notice The EIP-712 typehash for the contract's domain
+    bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
+
+    /*
+     *
+     *            Functions
+     *
+     */
+
     function checkSignature_EIP1271(
         address signer,
         bytes32 digestHash,
@@ -43,16 +61,6 @@ contract SignatureUtilsEIP1271 is Script {
         address contractAddr, // strategyManagerAddr, or delegationManagerAddr
         uint256 destinationChainid
     ) public pure returns (bytes32) {
-        return calculateDomainSeparator(contractAddr, destinationChainid);
-    }
-
-    function calculateDomainSeparator(
-        address contractAddr, // strategyManagerAddr, or delegationManagerAddr
-        uint256 destinationChainid
-    ) public pure returns (bytes32) {
-
-        /// @notice The EIP-712 typehash for the contract's domain
-        bytes32 DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
         uint256 chainid = destinationChainid;
 
@@ -175,5 +183,34 @@ contract SignatureUtilsEIP1271 is Script {
         ));
         return approverDigestHash;
     }
+
+    function createEigenAgentCallDigest(
+        address _target,
+        uint256 _value,
+        bytes calldata _data,
+        uint256 _nonce,
+        uint256 _chainid,
+        uint256 _expiry
+    ) public view returns (bytes32) {
+
+        bytes32 structHash = keccak256(abi.encode(
+            EIGEN_AGENT_EXEC_TYPEHASH,
+            _target,
+            _value,
+            _data,
+            _nonce,
+            _chainid,
+            _expiry
+        ));
+        // calculate the digest hash
+        bytes32 digestHash = keccak256(abi.encodePacked(
+            "\x19\x01",
+            getDomainSeparator(_target, _chainid),
+            structHash
+        ));
+
+        return digestHash;
+    }
+
 
 }

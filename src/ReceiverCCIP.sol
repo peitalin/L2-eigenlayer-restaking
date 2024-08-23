@@ -22,6 +22,8 @@ import {BaseSepolia} from "../script/Addresses.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 
 
+import {console} from "forge-std/Test.sol";
+
 
 /// ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them.
 contract ReceiverCCIP is BaseMessengerCCIP {
@@ -54,6 +56,7 @@ contract ReceiverCCIP is BaseMessengerCCIP {
 
     function getSenderContractL2Addr() public view returns (address) {
         // address, contract only exists on L2
+        console.log("msg.sender:", msg.sender);
         return senderContractL2Addr;
     }
 
