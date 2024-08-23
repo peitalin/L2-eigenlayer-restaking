@@ -26,6 +26,8 @@ import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {IBeacon} from "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 
 
 
@@ -47,7 +49,7 @@ contract DeployOnEthScript is Script {
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
-        ISenderCCIP senderProxy = fileReader.getSenderContract();
+        ISenderCCIP senderContract = fileReader.getSenderContract();
 
         (
             IStrategy strategy,
@@ -79,7 +81,11 @@ contract DeployOnEthScript is Script {
 
         // deploy 6551 Registry and EigenAgentOwner NFT
         ERC6551Registry registry6551 = new ERC6551Registry();
-        EigenAgentOwner721 eigenAgentOwner721 = deployEigenAgentOwnerNft("EigenAgentOwner", "EAO", proxyAdmin);
+        EigenAgentOwner721 eigenAgentOwner721 = deployEigenAgentOwnerNft(
+            "EigenAgentOwner",
+            "EAO",
+            proxyAdmin
+        );
 
         receiverProxy = ReceiverCCIP(
             payable(address(
@@ -89,7 +95,7 @@ contract DeployOnEthScript is Script {
                     abi.encodeWithSelector(
                         ReceiverCCIP.initialize.selector,
                         IRestakingConnector(address(restakingConnector)),
-                        senderProxy,
+                        senderContract,
                         registry6551,
                         eigenAgentOwner721
                     )
@@ -99,11 +105,14 @@ contract DeployOnEthScript is Script {
 
         receiverProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
         receiverProxy.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
-        receiverProxy.allowlistSender(address(senderProxy), true);
-        receiverProxy.setSenderContractL2Addr(address(senderProxy));
+        receiverProxy.allowlistSender(address(senderContract), true);
+        receiverProxy.setSenderContractL2Addr(address(senderContract));
+
 
         eigenAgentOwner721.addAdmin(deployer);
         eigenAgentOwner721.addAdmin(address(receiverProxy));
+        eigenAgentOwner721.setReceiverContract(IReceiverCCIP(address(receiverProxy)));
+
         restakingConnector.addAdmin(address(receiverProxy));
 
         // seed the receiver contract with a bit of ETH

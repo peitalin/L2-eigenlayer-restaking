@@ -20,6 +20,7 @@ import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {EigenlayerDepositWithSignatureParams} from "../src/interfaces/IEigenlayerMsgDecoders.sol";
+import {QueuedWithdrawalWithSignatureParams} from "../src/interfaces/IEigenlayerMsgDecoders.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
@@ -141,55 +142,6 @@ contract CCIP_Eigen_QueueWithdrawalsTests is Test {
     }
 
 
-    function test_Eigenlayer_Revert_QueueWithdrawal() public {
-
-        vm.startBroadcast(deployerKey);
-
-        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
-        strategiesToWithdraw[0] = strategy;
-
-        uint256[] memory sharesToWithdraw = new uint256[](1);
-        sharesToWithdraw[0] = stakerShares;
-
-        IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal =
-            IDelegationManager.QueuedWithdrawalParams({
-                strategies: strategiesToWithdraw,
-                shares: sharesToWithdraw,
-                withdrawer: msg.sender
-            });
-
-        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams =
-            new IDelegationManager.QueuedWithdrawalParams[](1);
-        queuedWithdrawalParams[0] = queuedWithdrawal;
-
-        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
-        destTokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(token),
-            amount: amountToStake
-        });
-
-        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
-            sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
-            sender: abi.encode(address(deployer)), // bytes: abi.decode(sender) if coming from an EVM chain.
-            data: abi.encode(string(
-                EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
-                    queuedWithdrawalParams
-                )
-            )), // CCIP abi.encodes a string message when sending
-            destTokenAmounts: destTokenAmounts // Tokens and their amounts in their destination chain representation.
-        });
-
-        // msg.sender must be staker, so it's impossible for the CCIP bridge contract to conduct
-        // third party queueWithdrawals for a staker.
-        // We would need a queueWithdrawalWithSignature feature:
-        // https://github.com/Layr-Labs/eigenlayer-contracts/pull/676
-        vm.expectRevert("DelegationManager.queueWithdrawal: withdrawer must be staker");
-        receiverContract.mockCCIPReceive(any2EvmMessage);
-
-        vm.stopBroadcast();
-    }
-
 
     function test_Eigenlayer_QueueWithdrawalsWithSignature() public {
 
@@ -204,8 +156,6 @@ contract CCIP_Eigen_QueueWithdrawalsTests is Test {
         uint256 expiry = block.timestamp + 1 hours;
         address withdrawer = address(receiverContract);
         uint256 stakerNonce = delegationManager.cumulativeWithdrawalsQueued(staker);
-        // startBlock: calculated on the block when queueWithdrawals was called.
-        uint32 startBlock = uint32(block.number); // needed to CompleteWithdrawals
 
         bytes32 digestHash = signatureUtils.calculateQueueWithdrawalDigestHash(
             staker,
@@ -258,8 +208,8 @@ contract CCIP_Eigen_QueueWithdrawalsTests is Test {
             uint256 _expiry
     ) public view returns (Client.Any2EVMMessage memory) {
 
-        IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig;
-        queuedWithdrawalWithSig = IDelegationManager.QueuedWithdrawalWithSignatureParams({
+        QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig;
+        queuedWithdrawalWithSig = QueuedWithdrawalWithSignatureParams({
             strategies: _strategiesToWithdraw,
             shares: _sharesToWithdraw,
             withdrawer: _withdrawer,
@@ -268,8 +218,8 @@ contract CCIP_Eigen_QueueWithdrawalsTests is Test {
             expiry: _expiry
         });
 
-        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray;
-        queuedWithdrawalWithSigArray = new IDelegationManager.QueuedWithdrawalWithSignatureParams[](1);
+        QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray;
+        queuedWithdrawalWithSigArray = new QueuedWithdrawalWithSignatureParams[](1);
         queuedWithdrawalWithSigArray[0] = queuedWithdrawalWithSig;
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);

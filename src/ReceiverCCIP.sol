@@ -12,7 +12,8 @@ import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {
     EigenlayerDeposit6551Message,
     EigenlayerDepositWithSignatureMessage,
-    TransferToStakerMessage
+    TransferToStakerMessage,
+    QueuedWithdrawalWithSignatureParams
 } from "./interfaces/IEigenlayerMsgDecoders.sol";
 import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {IReceiverCCIP} from "./interfaces/IReceiverCCIP.sol";
@@ -23,8 +24,10 @@ import {BaseSepolia} from "../script/Addresses.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
+import {ERC6551AccountProxy} from "@6551/examples/upgradeable/ERC6551AccountProxy.sol";
 
 import {console} from "forge-std/Test.sol";
 
@@ -38,8 +41,10 @@ contract ReceiverCCIP is BaseMessengerCCIP {
     IERC6551Registry public erc6551Registry;
     EigenAgentOwner721 public eigenAgentOwner721;
 
-    mapping(address => uint256) public userToEigenAgentOwnerTokenIds;
-    mapping(address => address) public userToEigenAgents;
+    mapping(address => uint256) public userToEigenAgentTokenIds;
+    mapping(uint256 => address) public tokenIdToEigenAgents;
+
+    event EigenAgentOwnerUpdated(address indexed, address indexed, uint256 indexed);
 
     error InvalidContractAddress(string msg);
 
@@ -78,22 +83,23 @@ contract ReceiverCCIP is BaseMessengerCCIP {
     /// Mints an NFT and creates a 6551 account for it
     function _spawnEigenAgent6551(address staker) internal returns (EigenAgent6551) {
         require(
-            userToEigenAgentOwnerTokenIds[staker] == 0,
+            getEigenAgentOwnerTokenId(staker) == 0,
             "staker already has an EigenAgentOwner NFT"
         );
         require(
-            userToEigenAgents[staker] == address(0),
+            getEigenAgent(staker) == address(0),
             "staker already has an EigenAgent account"
         );
 
         bytes32 salt = bytes32(abi.encode(staker));
         uint256 tokenId = eigenAgentOwner721.mint(staker);
 
-        EigenAgent6551 eigenAgentImpl = new EigenAgent6551();
+        EigenAgent6551 eigenAgentImplementation = new EigenAgent6551();
+        ERC6551AccountProxy eigenAgentProxy = new ERC6551AccountProxy(address(eigenAgentImplementation));
 
         EigenAgent6551 eigenAgent = EigenAgent6551(payable(
             erc6551Registry.createAccount(
-                address(eigenAgentImpl),
+                address(eigenAgentProxy),
                 salt,
                 block.chainid,
                 address(eigenAgentOwner721),
@@ -101,18 +107,48 @@ contract ReceiverCCIP is BaseMessengerCCIP {
             )
         ));
 
-        userToEigenAgentOwnerTokenIds[staker] == tokenId;
-        userToEigenAgents[staker] = address(eigenAgent);
+        userToEigenAgentTokenIds[staker] = tokenId;
+        tokenIdToEigenAgents[tokenId] = address(eigenAgent);
 
         return eigenAgent;
+    }
+
+    function get6551Registry() public view returns (IERC6551Registry) {
+        return erc6551Registry;
+    }
+
+    function getEigenAgentOwner721() public view returns (EigenAgentOwner721) {
+        return eigenAgentOwner721;
+    }
+
+    function updateEigenAgentOwnerTokenId(
+        address from,
+        address to,
+        uint256 tokenId
+    ) external returns (uint256) {
+        require(
+            msg.sender == address(eigenAgentOwner721),
+            "ReceiverCCIP.updateEigenAgentOwnerTokenId: only EigenAgentOwner721 can update"
+        );
+        userToEigenAgentTokenIds[from] = 0;
+        userToEigenAgentTokenIds[to] = tokenId;
+        emit EigenAgentOwnerUpdated(from, to, tokenId);
+    }
+
+    function getEigenAgentOwnerTokenId(address staker) public view returns (uint256) {
+        return userToEigenAgentTokenIds[staker];
+    }
+
+    function getEigenAgent(address staker) public view returns (address) {
+        return tokenIdToEigenAgents[userToEigenAgentTokenIds[staker]];
     }
 
     function spawnEigenAgentOnlyOwner(address staker) external onlyOwner returns (EigenAgent6551) {
         return _spawnEigenAgent6551(staker);
     }
 
-    function _getEigenAgent(address staker) internal returns (EigenAgent6551) {
-        EigenAgent6551 eigenAgent = EigenAgent6551(payable(userToEigenAgents[staker]));
+    function _tryGetEigenAgentOrSpawn(address staker) internal returns (EigenAgent6551) {
+        EigenAgent6551 eigenAgent = EigenAgent6551(payable(getEigenAgent(staker)));
         if (address(eigenAgent) == address(0)) {
             return _spawnEigenAgent6551(staker);
         }
@@ -175,14 +211,14 @@ contract ReceiverCCIP is BaseMessengerCCIP {
         uint256 amountMsg = s_lastReceivedTokenAmount;
 
 
-        if (functionSelector == 0x76fa57a5) {
-            // bytes4(keccak256("deposit6551(address,address,uint256,address,uint256,bytes)")) == 0x76fa57a5
-            EigenlayerDeposit6551Message memory eigenMsg = restakingConnector.decodeDeposit6551Message(message);
-            EigenAgent6551 eigenAgent = _getEigenAgent(eigenMsg.staker);
-            // console.log("eigenAgent:", address(eigenAgent));
-            // console.log("strategy:", address(eigenMsg.strategy));
-            // console.log("amount:", eigenMsg.amount);
-            // console.logBytes(eigenMsg.signature);
+        //////////////////////////////////
+        // Deposit Into Strategy
+        //////////////////////////////////
+        if (functionSelector == 0x65bf44a9) {
+            // bytes4(keccak256("depositWithSignature6551(address,address,uint256,address,uint256,bytes)")) == 0x76fa57a5
+
+            EigenlayerDeposit6551Message memory eigenMsg = restakingConnector.decodeDepositWithSignature6551Msg(message);
+            EigenAgent6551 eigenAgent = _tryGetEigenAgentOrSpawn(eigenMsg.staker);
 
             address token = any2EvmMessage.destTokenAmounts[0].token; // CCIP-BnM token on L1
 
@@ -195,7 +231,7 @@ contract ReceiverCCIP is BaseMessengerCCIP {
             // eigenAgent approves StrategyManager using DepositIntoStrategy signature
             eigenAgent.approveStrategyManagerWithSignature(
                 address(strategyManager), // strategyManager
-                0,
+                0 ether,
                 data2, // encodeDepositIntoStrategyMsg
                 eigenMsg.expiry,
                 eigenMsg.signature
@@ -205,69 +241,88 @@ contract ReceiverCCIP is BaseMessengerCCIP {
 
             bytes memory result = eigenAgent.executeWithSignature(
                 address(strategyManager), // strategyManager
-                0,
+                0 ether,
                 data2, // encodeDepositIntoStrategyMsg
                 eigenMsg.expiry,
                 eigenMsg.signature
             );
 
-            textMsg = "approve and deposited via 6551 agent";
+            textMsg = "approved and deposited by EigenAgent";
         }
 
-        if (functionSelector == 0x32e89ace) {
-            // bytes4(keccak256("depositIntoStrategyWithSignature(address,address,uint256,address,uint256,bytes)")) == 0x32e89ace
-            EigenlayerDepositWithSignatureMessage memory eigenMsg;
-            eigenMsg = restakingConnector.decodeDepositWithSignatureMessage(message);
 
-            IERC20 underlyingToken = strategy.underlyingToken();
-            // Receiver contract approves eigenlayer StrategyManager for deposits
-            underlyingToken.approve(address(strategyManager), eigenMsg.amount);
-            // deposit into Eigenlayer with user signature
-            strategyManager.depositIntoStrategyWithSignature(
-                IStrategy(eigenMsg.strategy),
-                IERC20(eigenMsg.token),
-                eigenMsg.amount,
-                eigenMsg.staker,
-                eigenMsg.expiry,
-                eigenMsg.signature
-            );
-            textMsg = "depositIntoStrategyWithSignature()";
-            amountMsg = eigenMsg.amount;
-        }
-
+        //////////////////////////////////
+        // Queue Withdrawals
+        //////////////////////////////////
         if (functionSelector == 0x0dd8dd02) {
-            // bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
+            // cast sig "queueWithdrawals((address[],uint256[],address)[])"
+            (
+                IDelegationManager.QueuedWithdrawalParams[] memory QWPArray,
+                uint256 expiry,
+                bytes memory signature
+            ) = restakingConnector.decodeQueueWithdrawalsMessage(message);
 
-            IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams =
-                restakingConnector.decodeQueueWithdrawalsMessage(message);
+            /// @note: DelegationManager.queueWithdrawals requires:
+            /// msg.sender == withdrawer == staker
+            /// EigenAgent is all three.
+            EigenAgent6551 eigenAgent = EigenAgent6551(payable(QWPArray[0].withdrawer));
 
-            delegationManager.queueWithdrawals(queuedWithdrawalParams);
-
-            textMsg = "queueWithdrawals()";
-        }
-
-        if (functionSelector == 0xa140f06e) {
-            // bytes4(keccak256("queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])")),
-
-            IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalsWithSigParams =
-                restakingConnector.decodeQueueWithdrawalsWithSignatureMessage(message);
-
-            require(queuedWithdrawalsWithSigParams.length > 0, "queuedWithdrawalsWithSigParams: length cannot be 0");
-
-            address staker = queuedWithdrawalsWithSigParams[0].staker;
-            // queueWithdrawal uses current nonce in the withdrawalRoot, the increments after
-            // so save this nonce before dispatching queueWithdrawalsWithSignature
-            uint256 nonce = delegationManager.cumulativeWithdrawalsQueued(staker);
-            restakingConnector.setQueueWithdrawalBlock(staker, nonce);
-
-            // Call QueueWithdrawalsWithSignature on Eigenlayer
-            bytes32[] memory withdrawalRoots = delegationManager.queueWithdrawalsWithSignature(
-                queuedWithdrawalsWithSigParams
+            bytes memory result = eigenAgent.executeWithSignature(
+                address(delegationManager),
+                0 ether,
+                nlayerMsgEncoders.encodeQueueWithdrawalsMsg(QWPArray);
+                expiry,
+                signature
             );
 
-            textMsg = "queueWithdrawalsWithSignature()";
-            amountMsg = queuedWithdrawalsWithSigParams[0].shares[0];
+            textMsg = "withdrawal queued by EigenAgent";
         }
+
+
+        // if (functionSelector == 0x32e89ace) {
+        //     // bytes4(keccak256("depositIntoStrategyWithSignature(address,address,uint256,address,uint256,bytes)")) == 0x32e89ace
+        //     EigenlayerDepositWithSignatureMessage memory eigenMsg;
+        //     eigenMsg = restakingConnector.decodeDepositWithSignatureMsg(message);
+
+        //     IERC20 underlyingToken = strategy.underlyingToken();
+        //     // Receiver contract approves eigenlayer StrategyManager for deposits
+        //     underlyingToken.approve(address(strategyManager), eigenMsg.amount);
+        //     // deposit into Eigenlayer with user signature
+        //     strategyManager.depositIntoStrategyWithSignature(
+        //         IStrategy(eigenMsg.strategy),
+        //         IERC20(eigenMsg.token),
+        //         eigenMsg.amount,
+        //         eigenMsg.staker,
+        //         eigenMsg.expiry,
+        //         eigenMsg.signature
+        //     );
+        //     textMsg = "depositIntoStrategyWithSignature()";
+        //     amountMsg = eigenMsg.amount;
+        // }
+
+        // if (functionSelector == 0xa140f06e) {
+        //     // bytes4(keccak256("queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])")),
+
+        //     QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalsWithSigParams =
+        //         restakingConnector.decodeQueueWithdrawalsWithSignatureMessage(message);
+
+        //     require(queuedWithdrawalsWithSigParams.length > 0, "queuedWithdrawalsWithSigParams: length cannot be 0");
+
+        //     address staker = queuedWithdrawalsWithSigParams[0].staker;
+        //     // queueWithdrawal uses current nonce in the withdrawalRoot, the increments after
+        //     // so save this nonce before dispatching queueWithdrawalsWithSignature
+        //     uint256 nonce = delegationManager.cumulativeWithdrawalsQueued(staker);
+        //     restakingConnector.setQueueWithdrawalBlock(staker, nonce);
+
+        //     //////////// Broken as we refactor to EigenAgents architecture
+        //     // bytes32[] memory withdrawalRoots = delegationManager.queueWithdrawalsWithSignature(
+        //     //     queuedWithdrawalsWithSigParams
+        //     // );
+
+        //     textMsg = "queueWithdrawalsWithSignature()";
+        //     amountMsg = queuedWithdrawalsWithSigParams[0].shares[0];
+        // }
+
 
         if (functionSelector == 0x54b2bf29) {
             // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)")) == 0x54b2bf29

@@ -184,7 +184,7 @@ contract SignatureUtilsEIP1271 is Script {
         return approverDigestHash;
     }
 
-    function createEigenAgentCallDigest(
+    function createEigenAgentCallDigestHash(
         address _target,
         uint256 _value,
         bytes calldata _data,

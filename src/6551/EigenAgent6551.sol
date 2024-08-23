@@ -11,13 +11,14 @@ import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {IEigenAgent6551} from "./IEigenAgent6551.sol";
 import {SignatureUtilsEIP1271} from "../utils/SignatureUtilsEIP1271.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {console} from "forge-std/Test.sol";
 
 
-contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
+contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent6551 {
 
     /*
      *
@@ -42,6 +43,12 @@ contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
      *            Functions
      *
      */
+
+    function initialize() initializer public {}
+
+    function agentImplVersion() public virtual override returns (uint256) {
+        return 1;
+    }
 
     function beforeExecute(bytes calldata data) public override virtual returns (bytes4) {
         return IEigenAgent6551.beforeExecute.selector;
@@ -87,7 +94,7 @@ contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
         bytes memory _signature
     ) external returns (bool) {
 
-        bytes32 _digestHash = createEigenAgentCallDigest(
+        bytes32 _digestHash = createEigenAgentCallDigestHash(
             _target,
             _value,
             _data,
@@ -118,7 +125,7 @@ contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
     {
         // no longer need msg.sender == nftOwner constraint
         // if (!_isValidSigner(msg.sender)) revert CallerIsNotOwner();
-        bytes32 _digestHash = createEigenAgentCallDigest(
+        bytes32 _digestHash = createEigenAgentCallDigestHash(
             _target,
             _value,
             _data,
@@ -133,6 +140,7 @@ contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
         ++state;
         bool success;
 
+        console.log("eigenAgent msg.sender:", msg.sender);
         beforeExecute(_data);
         {
             // solhint-disable-next-line avoid-low-level-calls
@@ -144,7 +152,7 @@ contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
         return _result;
     }
 
-    function createEigenAgentCallDigest(
+    function createEigenAgentCallDigestHash(
         address _target,
         uint256 _value,
         bytes calldata _data,

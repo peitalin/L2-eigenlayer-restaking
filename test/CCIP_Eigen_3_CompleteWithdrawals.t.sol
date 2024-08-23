@@ -21,6 +21,7 @@ import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector } from "../src/interfaces/IRestakingConnector.sol";
 import {EigenlayerDepositWithSignatureParams} from "../src/interfaces/IEigenlayerMsgDecoders.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
+import {QueuedWithdrawalWithSignatureParams} from "../src/interfaces/IEigenlayerMsgDecoders.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
@@ -340,8 +341,8 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
             uint256 _expiry
     ) public view returns (Client.Any2EVMMessage memory) {
 
-        IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig;
-        queuedWithdrawalWithSig = IDelegationManager.QueuedWithdrawalWithSignatureParams({
+        QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig;
+        queuedWithdrawalWithSig = QueuedWithdrawalWithSignatureParams({
             strategies: _strategiesToWithdraw,
             shares: _sharesToWithdraw,
             withdrawer: _withdrawer,
@@ -350,8 +351,8 @@ contract CCIP_Eigen_CompleteWithdrawalsTests is Test {
             expiry: _expiry
         });
 
-        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray;
-        queuedWithdrawalWithSigArray = new IDelegationManager.QueuedWithdrawalWithSignatureParams[](1);
+        QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray;
+        queuedWithdrawalWithSigArray = new QueuedWithdrawalWithSignatureParams[](1);
         queuedWithdrawalWithSigArray[0] = queuedWithdrawalWithSig;
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);

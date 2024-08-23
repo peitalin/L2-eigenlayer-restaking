@@ -8,7 +8,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 // Message to 6551 to Deposit
 import {
     EigenlayerDeposit6551Message,
-    EigenlayerDeposit6551Params
+    EigenlayerDeposit6551Params,
+    QueuedWithdrawalWithSignatureParams
 } from "../interfaces/IEigenlayerMsgDecoders.sol";
 // DepositWithSignature
 import {
@@ -27,6 +28,8 @@ import {
 } from "../interfaces/IEigenlayerMsgDecoders.sol";
 import {IEigenlayerMsgDecoders} from "../interfaces/IEigenlayerMsgDecoders.sol";
 
+import {console} from "forge-std/Test.sol";
+
 
 contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
@@ -38,7 +41,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
      *
     */
 
-    function decodeDeposit6551Message(
+    function decodeDepositWithSignature6551Msg(
         bytes memory message
     ) public returns (EigenlayerDeposit6551Message memory) {
         ////////////////////////////////////////////////////////
@@ -90,7 +93,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
         bytes memory signature = abi.encodePacked(r,s,v);
 
-        require(sig_length == 65, "decodeDepositWithSignatureMessage: invalid signature length");
+        require(sig_length == 65, "decodeDepositWithSignatureMsg: invalid signature length");
 
         EigenlayerDeposit6551Message memory message = EigenlayerDeposit6551Message({
             strategy: strategy,
@@ -106,7 +109,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         return message;
     }
 
-    function decodeDepositWithSignatureMessage(
+    function decodeDepositWithSignatureMsg(
         bytes memory message
     ) public returns (EigenlayerDepositWithSignatureMessage memory) {
         ////////////////////////////////////////////////////////
@@ -165,7 +168,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
         bytes memory signature = abi.encodePacked(r,s,v);
 
-        require(sig_length == 65, "decodeDepositWithSignatureMessage: invalid signature length");
+        require(sig_length == 65, "decodeDepositWithSignatureMsg: invalid signature length");
 
         EigenlayerDepositWithSignatureMessage memory eigenlayerDepositWithSignatureMessage;
         eigenlayerDepositWithSignatureMessage = EigenlayerDepositWithSignatureMessage({
@@ -192,30 +195,73 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
     function decodeQueueWithdrawalsMessage(
         bytes memory message
-    ) public returns (IDelegationManager.QueuedWithdrawalParams[] memory) {
-
+    ) public returns (
+        IDelegationManager.QueuedWithdrawalParams[] memory,
+        uint256 expiry,
+        bytes memory signature
+    ) {
         /// @dev note: Need to account for bytes message including arrays of QueuedWithdrawalParams
         /// We will need to check array length in SenderCCIP to determine gas as well.
 
-        uint256 arrayLength;
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
+        // 00000000000000000000000000000000000000000000000000000000000001a5 [64] string length
+        // 0dd8dd02                                                         [96] function selector
+        // 0000000000000000000000000000000000000000000000000000000000000020 [100] array offset
+        // 0000000000000000000000000000000000000000000000000000000000000001 [132] array length
+        // 0000000000000000000000000000000000000000000000000000000000000020 [164] struct1 offset
+        // 0000000000000000000000000000000000000000000000000000000000000060 [196] struct1_field1 offset (strategies)
+        // 00000000000000000000000000000000000000000000000000000000000000a0 [228] struct1_field2 offset (shares)
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [260] struct1_field3 (withdrawer)
+        // 0000000000000000000000000000000000000000000000000000000000000001 [292] struct1_field1 length
+        // 000000000000000000000000b111111ad20e9d85d5152ae68f45f40a11111111 [324] struct1_field1 value (strategies[0])
+        // 0000000000000000000000000000000000000000000000000000000000000001 [356] struct1_field2 length
+        // 0000000000000000000000000000000000000000000000000023e2ce54e05000 [388] struct1_field2 value (shares[0])
+        // 00000000000000000000000000000000000000000000000000000000424b2a0e [420] expiry
+        // 1f7c77a6b0940a7ce34edf2821d323701213db8e237c46fdf8b7bedc8f295359 [452] signature r
+        // 1b82b0bd80af2140d658af1312ba94049de6c699533bca58da0f29d659cdf61a [484] signature s
+        // 1c000000000000000000000000000000000000000000000000000000         [516] signature v
 
+        uint256 arrayLength;
         assembly {
             arrayLength := mload(add(message, 132))
         }
+
+        require(arrayLength >= 1, "decodeQueueWithdrawalsMessage: arrayLength must be at least 1");
 
         IDelegationManager.QueuedWithdrawalParams[] memory arrayQueuedWithdrawalParams =
             new IDelegationManager.QueuedWithdrawalParams[](arrayLength);
 
         for (uint256 i; i < arrayLength; i++) {
             IDelegationManager.QueuedWithdrawalParams memory wp;
-            wp = decodeSingleQueueWithdrawalMessage(message, arrayLength, i);
+            wp = _decodeSingleQueueWithdrawalMessage(message, arrayLength, i);
             arrayQueuedWithdrawalParams[i] = wp;
         }
 
-        return arrayQueuedWithdrawalParams;
+        uint256 expiry;
+        bytes32 r;
+        bytes32 s;
+        bytes1 v;
+
+        // note: Each extra QueuedWithdrawalParam element adds 1x offset and 7 lines:
+        // So when reading the signature, increase offset by 7 * i:
+        //      1 element:  offset = (1 - 1) * (1 + 7) = 0
+        //      2 elements: offset = (2 - 1) * (1 + 7) = 8
+        //      3 elements: offset = (3 - 1) * (1 + 7) = 16
+        uint256 offset = (arrayLength - 1) * (1 + 7) * 32; // 32 bytes per line
+
+        assembly {
+            expiry := mload(add(message, add(420, offset)))
+            r := mload(add(message, add(452, offset)))
+            s := mload(add(message, add(484, offset)))
+            v := mload(add(message, add(516, offset)))
+        }
+
+        bytes memory signature = abi.encodePacked(r,s,v);
+
+        return (arrayQueuedWithdrawalParams, expiry, signature);
     }
 
-    function decodeSingleQueueWithdrawalMessage(
+    function _decodeSingleQueueWithdrawalMessage(
         bytes memory message,
         uint256 arrayLength,
         uint256 i
@@ -235,24 +281,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         //     shares: sharesToWithdraw,
         //     withdrawer: withdrawer
         // });
-
-        ////////////////////////////////////////////////////////////////////////
-        //// An example with 1 element in QueuedWithdrawalParams[]
-        ////////////////////////////////////////////////////////////////////////
-        // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
-        // 0000000000000000000000000000000000000000000000000000000000000144 [64] string length
-        // 0dd8dd02                                                         [96] function selector
-        // 0000000000000000000000000000000000000000000000000000000000000020 [100] array offset
-        // 0000000000000000000000000000000000000000000000000000000000000001 [132] array length
-        // 0000000000000000000000000000000000000000000000000000000000000020 [164] struct offset: QueuedWithdrawalParams (3 fields)
-        // 0000000000000000000000000000000000000000000000000000000000000060 [196] - 1st field offset: 96 bytes (3 rows down)
-        // 00000000000000000000000000000000000000000000000000000000000000a0 [228] - 2nd field offset: 160 bytes (5 rows down)
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [260] - 3rd field is static: withdrawer address
-        // 0000000000000000000000000000000000000000000000000000000000000001 [292] - 1st field `strategies` is dynamic array of length: 1
-        // 000000000000000000000000bd4bcb3ad20e9d85d5152ae68f45f40af8952159 [324]     - value of strategies[0]
-        // 0000000000000000000000000000000000000000000000000000000000000001 [356] - 2nd field `shares` is dynamic array of length: 1
-        // 00000000000000000000000000000000000000000000000000045eadb112e000 [388]     - value of shares[0]
-        // 00000000000000000000000000000000000000000000000000000000
 
         ////////////////////////////////////////////////////////////////////////
         //// An example with 2 elements in QueuedWithdrawalParams[]
@@ -280,31 +308,16 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         // 000000000000000000000000000000000000000000000000000c38a96a070000 [644] struct2_field2 value
         // 00000000000000000000000000000000000000000000000000000000
 
-        // bytes32 _strOffset;
-        // bytes32 _strLength;
         bytes4 functionSelector;
-        // bytes32 _arrayOffset;
-        // bytes32 _arrayLength;
-        // bytes32 _structOffset;
-        // bytes32 _structField1Offset;
-        // bytes32 _structField2Offset;
         address _withdrawer;
-        // bytes32 _structField1ArrayLength;
         address _strategy;
-        // bytes32 _structField2ArrayLength;
         uint256 _sharesToWithdraw;
 
-        /// @dev note: Need to account for arrays of QueuedWithdrawalParams.
-        /// - determine length of QueuedWithdrawalParam[] from bytes message
-        /// - loop through and deserialise each element in QueuedWithdrawalParams[]
-        /// with the correct offsets
-
-        uint256 offset = (arrayLength - 1) + (7 * i);
         // Every extra element in the QueueWithdrawalParams[] array adds
-        // one extra struct offset 32byte word (1 line), so shift everything down by (arrayLength - 1).
-        //
-        // Each QueueWithdrawalParams takes 7 lines, so when reading the ith element,
-        // increase offset by 7 * i:
+        // 1x struct offset (1 line) and (7 lines), so shift everything down by:
+        uint256 offset = (arrayLength - 1) + (7 * i);
+
+        // So when reading the ith element, increase offset by 7 * i:
         //      1 element:  offset = (1 - 1) + (7 * 0) = 0
         //      2 elements: offset = (2 - 1) + (7 * 1) = 8
         //      3 elements: offset = (3 - 1) + (7 * 2) = 16
@@ -314,8 +327,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         uint256 sharesToWithdrawOffset = 388 + offset * 32;
 
         assembly {
-            // _strOffset := mload(add(message, 32))
-            // _strLength := mload(add(message, 64))
             functionSelector := mload(add(message, 96))
             // _arrayOffset := mload(add(message, 100))
             // _arrayLength := mload(add(message, 132))
@@ -353,10 +364,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
     function decodeQueueWithdrawalsWithSignatureMessage(
         bytes memory message
-    ) public returns (
-        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory
-    ) {
-
+    ) public returns (QueuedWithdrawalWithSignatureParams[] memory) {
         /// @dev note: Need to account for bytes message including arrays of QueuedWithdrawalParams
         /// We will need to check array length in SenderCCIP to determine gas as well.
         uint256 arrayLength;
@@ -365,14 +373,12 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
             // check correct length for QueuedWithdrawalWithSignatureParams[] array
         }
 
-        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory arrayQueuedWithdrawalWithSigParams =
-            new IDelegationManager.QueuedWithdrawalWithSignatureParams[](arrayLength);
+        QueuedWithdrawalWithSignatureParams[] memory arrayQueuedWithdrawalWithSigParams =
+            new QueuedWithdrawalWithSignatureParams[](arrayLength);
 
         for (uint256 i; i < arrayLength; i++) {
-
-            IDelegationManager.QueuedWithdrawalWithSignatureParams memory wp;
+            QueuedWithdrawalWithSignatureParams memory wp;
             wp = _decodeSingleQueueWithdrawalsWithSignatureMessage(message, arrayLength, i);
-
             arrayQueuedWithdrawalWithSigParams[i] = wp;
         }
 
@@ -385,14 +391,14 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         uint256 arrayLength,
         uint256 i
     ) internal returns (
-        IDelegationManager.QueuedWithdrawalWithSignatureParams memory
+        QueuedWithdrawalWithSignatureParams memory
     ) {
         /// @dev: expect to use this in a for-loop
 
         // Function Signature:
         //     bytes5(keccak256("queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])"))
         // Params:
-        //     queuedWithdrawalWithSig = IDelegationManager.QueuedWithdrawalWithSignatureParams({
+        //     queuedWithdrawalWithSig = QueuedWithdrawalWithSignatureParams({
         //         IStrategy[] strategies,
         //         uint256[] shares,
         //         address withdrawer,
@@ -404,28 +410,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         ////////////////////////////////////////////////////////
         //// Message payload offsets for assembly decoding
         ////////////////////////////////////////////////////////
-
-        // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
-        // 0000000000000000000000000000000000000000000000000000000000000224 [64] string length
-        // a140f06e                                                         [96] function selector
-        // 0000000000000000000000000000000000000000000000000000000000000020 [100] QueuedWithdrawWithSigParams offset
-        // 0000000000000000000000000000000000000000000000000000000000000001 [132] QWWSP[] array length
-        // 0000000000000000000000000000000000000000000000000000000000000020 [164] QWWSP[0] struct offset
-        // 00000000000000000000000000000000000000000000000000000000000000c0 [196] struct_field_1 offset (192 bytes = 6 lines)
-        // 0000000000000000000000000000000000000000000000000000000000000100 [228] struct_field_2 offset (256 bytes = 8 lines)
-        // 0000000000000000000000005bf6756a91c2ce08c74fd2c50df5829ce5349317 [260] struct_field_3 withdrawer (static value)
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [292] struct_field_4 staker (static value)
-        // 0000000000000000000000000000000000000000000000000000000000000140 [324] struct_field_5 signature offset (320 bytes = 10 lines)
-        // 0000000000000000000000000000000000000000000000000000000000005461 [356] struct_field_6 expiry
-        // 0000000000000000000000000000000000000000000000000000000000000001 [388] struct_field_1 length
-        // 000000000000000000000000bd4bcb3ad20e9d85d5152ae68f45f40af8952159 [420] struct_field_1 value (strategy)
-        // 0000000000000000000000000000000000000000000000000000000000000001 [452] struct_field_2 length
-        // 00000000000000000000000000000000000000000000000000045eadb112e000 [484] struct_field_2 value (shares)
-        // 0000000000000000000000000000000000000000000000000000000000000041 [516] signature length (hex 41 = 65 bytes)
-        // 64e763caedbddd9837d970a9ba7d6d32ed81065e6974fbd5c25a042d05155549 [548] signature r
-        // 014b117b4e37bddb7e5804cb809193d3a69d57233025728413e6c4a94208ca4a [580] signature s
-        // 1c00000000000000000000000000000000000000000000000000000000000000 [612] signature v (uint8 = bytes1)
-        // 00000000000000000000000000000000000000000000000000000000
 
         //// example with 2 elements in array
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
@@ -509,8 +493,8 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         strategiesToWithdraw[0] = IStrategy(_strategy);
         sharesToWithdraw[0] = _sharesToWithdraw;
 
-        IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSigParams;
-        queuedWithdrawalWithSigParams = IDelegationManager.QueuedWithdrawalWithSignatureParams({
+        QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSigParams;
+        queuedWithdrawalWithSigParams = QueuedWithdrawalWithSignatureParams({
             strategies: strategiesToWithdraw,
             shares: sharesToWithdraw,
             withdrawer: _withdrawer,

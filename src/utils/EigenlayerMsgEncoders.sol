@@ -6,6 +6,7 @@ import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISi
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {QueuedWithdrawalWithSignatureParams} from "../interfaces/IEigenlayerMsgDecoders.sol";
 
 
 library EigenlayerMsgEncoders {
@@ -18,7 +19,7 @@ library EigenlayerMsgEncoders {
     */
 
     // msg to CCIP for EigenAgent
-    function encodeDeposit6551Msg(
+    function encodeDepositWithSignature6551Msg(
         address strategy,
         address token,
         uint256 amount,
@@ -28,7 +29,7 @@ library EigenlayerMsgEncoders {
     ) public pure returns (bytes memory) {
         // encode message payload
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("deposit6551(address,address,uint256,address,uint256,bytes)")),
+            bytes4(keccak256("depositWithSignature6551(address,address,uint256,address,uint256,bytes)")),
             strategy,
             token,
             amount,
@@ -56,20 +57,6 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-    function encodeERC20ApproveMsg(
-        address to,
-        uint256 amount
-    ) public pure returns (bytes memory) {
-        // encode message payload
-        bytes memory message_bytes = abi.encodeWithSelector(
-            // bytes4(keccak256("approve(address,uint256)")),
-            IERC20.approve.selector,
-            to,
-            amount
-        );
-        return message_bytes;
-    }
-
     function encodeQueueWithdrawalsMsg(
         IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
     ) public pure returns (bytes memory) {
@@ -86,7 +73,6 @@ library EigenlayerMsgEncoders {
 
         return message_bytes;
     }
-
 
     /*
      *
@@ -120,7 +106,7 @@ library EigenlayerMsgEncoders {
     }
 
     function encodeQueueWithdrawalsWithSignatureMsg(
-        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray
+        QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray
     ) public pure returns (bytes memory) {
 
         // Structs are encoded as tuples:
