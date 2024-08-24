@@ -8,7 +8,6 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IStrategyManagerDomain} from "../src/interfaces/IStrategyManagerDomain.sol";
 
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
@@ -21,6 +20,7 @@ import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContr
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {ScriptUtils} from "./ScriptUtils.sol";
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
 
 contract DepositWithSignatureScript is Script, ScriptUtils {
@@ -80,29 +80,49 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         /// In production this is done on the client/frontend
         //////////////////////////////////////////////////////////
 
-        // First get nonce from StrategyManager in EthSepolia
+        // First get EigenAgent from EthSepolia
         vm.selectFork(ethForkId);
-        uint256 nonce = IStrategyManagerDomain(address(strategyManager)).nonces(deployer);
-        uint256 amount = 0.00616 ether; // bridging 0.00515 CCIPBnM
+
+        vm.startBroadcast(deployerKey);
+
+        uint256 nonce = 0;
+        /// ReceiverCCIP will spawn a EigenAgent when CCIP message reaches L1 if user
+        /// does not already have a EigenAgent NFT on L1.
+        /// Nonce is then 0.
+        // address eigenAgent = receiverContract.getEigenAgent(deployer);
+        // if (eigenAgent != address(0)) {
+        //     // Otherwise if the user already has a EigenAgent, fetch current execution Nonce
+        //     nonce = IEigenAgent6551(eigenAgent).getExecNonce();
+        // }
+        vm.stopBroadcast();
+
+        uint256 amount = 0.00717 ether;
         uint256 expiry = block.timestamp + 3 hours;
 
-        bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), EthSepolia.ChainId);
-        bytes32 digestHash = signatureUtils.createEigenlayerDepositDigest(
-            strategy,
-            token,
-            amount,
-            deployer,
-            nonce,
-            expiry, // expiry
-            domainSeparator
+        bytes memory data = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
+            address(strategy),
+            address(token),
+            amount
         );
-        // generate ECDSA signature
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
-        bytes memory signature = abi.encodePacked(r, s, v);
+
+        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
+            address(strategyManager),
+            0 ether,
+            data,
+            nonce,
+            EthSepolia.ChainId, // destination chainid where EigenAgent lives
+            expiry
+        );
+
+        bytes memory signature;
+        {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
+            signature = abi.encodePacked(r, s, v);
+        }
 
         signatureUtils.checkSignature_EIP1271(deployer, digestHash, signature);
 
-        bytes memory message = EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
+        bytes memory message = EigenlayerMsgEncoders.encodeDepositWithSignature6551Msg(
             address(strategy),
             address(token),
             amount,
@@ -111,12 +131,11 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
             signature
         );
 
+        //////////////////////////////////////////////////////
+        /// ReceiverCCIP -> EigenAgent -> Eigenlayer
+        //////////////////////////////////////////////////////
         //// Make sure we are on BaseSepolia Fork to make contract calls to CCIP-BnM
         vm.selectFork(l2ForkId);
-
-        /////////////////////////////
-        /// Begin Broadcast
-        /////////////////////////////
         vm.startBroadcast(deployerKey);
 
         topupSenderEthBalance(senderAddr);

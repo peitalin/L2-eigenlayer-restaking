@@ -8,21 +8,11 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
-import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
-import {IPauserRegistry} from "eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {StrategyManager} from "eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
 
-import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
-import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
-import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
-import {
-    EigenlayerDepositWithSignatureParams,
-    QueuedWithdrawalWithSignatureParams
-} from "../src/interfaces/IEigenlayerMsgDecoders.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
@@ -33,7 +23,6 @@ import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 // 6551 accounts
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
@@ -43,7 +32,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 
 
 
-contract CCIP_Eigen_Deposit6551Tests is Test {
+contract CCIP_Eigen_QueueWithdrawal_6551Tests is Test {
 
     DeployOnEthScript public deployOnEthScript;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
@@ -63,8 +52,6 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
     IDelegationManager public delegationManager;
     IStrategy public strategy;
     ProxyAdmin public proxyAdmin;
-
-    uint256 public initialReceiverBalance = 5 ether;
 
     ERC6551Registry public registry;
     EigenAgentOwner721 public eigenAgentOwnerNft;
@@ -101,157 +88,34 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
             token
         ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
-        //// Configure CCIP contracts
+        //// Configure CCIP contracts and 6551 EigenAgent
         (
             receiverContract,
             restakingConnector
         ) = deployOnEthScript.run();
 
-        erc20Drip = IERC20_CCIPBnM(address(token));
-
-        //// Configure CCIP contracts
+        //// allowlist deployer and mint initial balances
         vm.startBroadcast(deployerKey);
+
+        receiverContract.allowlistSender(deployer, true);
         restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
-        erc20Drip.drip(address(receiverContract));
+
+        erc20Drip = IERC20_CCIPBnM(address(token));
         erc20Drip.drip(address(receiverContract));
         erc20Drip.drip(address(bob));
-        receiverContract.allowlistSender(deployer, true);
+        vm.stopBroadcast();
 
         _amount = 0.0028 ether;
         _expiry = block.timestamp + 1 days;
-
-        vm.stopBroadcast();
     }
 
-
-    function test_EigenAgent_ExecuteWithSignatures() public {
-
-        vm.startBroadcast(deployerKey);
-        EigenAgent6551 eigenAgent = receiverContract.spawnEigenAgentOnlyOwner(bob);
-        vm.stopBroadcast();
-
-        vm.startBroadcast(bobKey);
-
-        _nonce = eigenAgent.execNonce();
-        bytes memory data = abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector);
-
-        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
-            address(receiverContract),
-            0 ether,
-            data,
-            _nonce,
-            block.chainid,
-            _expiry
-        );
-        bytes memory signature;
-        {
-            // generate ECDSA signature
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(bobKey, digestHash);
-            signature = abi.encodePacked(r, s, v);
-        }
-        signatureUtils.checkSignature_EIP1271(bob, digestHash, signature);
-        vm.stopBroadcast();
-
-        //////////////////////////////////////////////////////
-        /// Receiver Broadcasts TX
-        //////////////////////////////////////////////////////
-        vm.startBroadcast(address(receiverContract));
-
-        // console.log("------------------------------------------------------");
-        // console.log("eigenAgent:", address(eigenAgent));
-        bytes memory result = eigenAgent.executeWithSignature(
-            address(receiverContract),
-            0 ether,
-            data,
-            _expiry,
-            signature
-        );
-        // console.log("------------------------------------------------------");
-        // console.log("receiver  :", address(receiverContract));
-        address senderTargetAddr = receiverContract.getSenderContractL2Addr();
-        address sender1 = abi.decode(result, (address));
-        // console.log("eigenAgent.execute:");
-        // console.log(sender1);
-        require(sender1 == senderTargetAddr, "call did not return the same address");
-        vm.stopBroadcast();
-
-        // should fail if anyone else tries to call with Bob's EigenAgent
-        vm.startBroadcast(address(receiverContract));
-        vm.expectRevert("Caller is not owner");
-        eigenAgent.execute(
-            address(receiverContract),
-            0 ether,
-            abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector),
-            0 // operation: call = 0
-        );
-
-        vm.stopBroadcast();
-    }
-
-
-
-    function test_CCIP_Eigenlayer_DepositIntoStrategy6551() public {
-
-        vm.startBroadcast(deployerKey);
-        EigenAgent6551 eigenAgent = receiverContract.spawnEigenAgentOnlyOwner(bob);
-        vm.stopBroadcast();
-
-        vm.startBroadcast(bobKey);
-        _nonce = eigenAgent.execNonce();
-        vm.stopBroadcast();
-
-        //////////////////////////////////////////////////////
-        /// Receiver -> EigenAgent -> Eigenlayer
-        //////////////////////////////////////////////////////
-        (
-            bytes memory data,
-            bytes32 digestHash,
-            bytes memory signature
-        ) = createEigenAgentDepositSignature(
-            bobKey,
-            _amount,
-            _nonce,
-            _expiry
-        );
-        signatureUtils.checkSignature_EIP1271(bob, digestHash, signature);
-
-        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
-        destTokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(token), // CCIP-BnM token address on Eth Sepolia.
-            amount: _amount
-        });
-        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: bytes32(0x0),
-            sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
-            sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
-            destTokenAmounts: destTokenAmounts, // Tokens and their amounts in their destination chain representation.
-            data: abi.encode(string(
-                EigenlayerMsgEncoders.encodeDepositWithSignature6551Msg(
-                    address(strategy),
-                    address(token),
-                    _amount,
-                    bob,
-                    _expiry,
-                    signature
-                )
-            )) // CCIP abi.encodes a string message when sending
-        });
-
-        /////////////////////////////////////
-        //// Mock send message to CCIP -> EigenAgent -> Eigenlayer
-        /////////////////////////////////////
-        vm.startBroadcast(deployerKey);
-        receiverContract.mockCCIPReceive(any2EvmMessage);
-
-        uint256 valueOfShares = strategy.userUnderlying(address(eigenAgent));
-        require(_amount == valueOfShares, "valueofShares incorrect");
-        require(
-            _amount == strategyManager.stakerStrategyShares(address(eigenAgent), strategy),
-            "Bob's EigenAgent stakerStrategyShares should equal deposited _amount"
-        );
-        vm.stopBroadcast();
-    }
-
+    /*
+     *
+     *
+     *             Tests
+     *
+     *
+     */
 
     function test_CCIP_Eigenlayer_QueueWithdrawal6551() public {
 
@@ -341,7 +205,7 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
         bytes memory dataWithSignature = abi.encodePacked(data2, _expiry, signature2);
 
         Client.Any2EVMMessage memory any2EvmMessageQueueWithdrawal = Client.Any2EVMMessage({
-            messageId: bytes32(uint256(999)),
+            messageId: bytes32(uint256(9999)),
             sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
             sender: abi.encode(address(deployer)), // bytes: abi.decode(sender) if coming from an EVM chain.
             destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging coins, just sending msg
@@ -357,8 +221,15 @@ contract CCIP_Eigen_Deposit6551Tests is Test {
         vm.stopBroadcast();
     }
 
+    /*
+     *
+     *
+     *             Functions
+     *
+     *
+     */
 
-   function createEigenAgentQueueWithdrawalsSignature(
+    function createEigenAgentQueueWithdrawalsSignature(
         uint256 signerKey,
         uint256 nonce,
         uint256 expiry,

@@ -19,7 +19,6 @@ import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
-import {EigenlayerDepositWithSignatureParams} from "../src/interfaces/IEigenlayerMsgDecoders.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
@@ -149,21 +148,10 @@ contract CCIP_Eigen_DelegationTests is Test {
 
         vm.stopBroadcast();
 
-        /////////////////////////////////////
-        //// ETH: Mock deposits on Eigenlayer
-        vm.selectFork(ethForkId);
-        /////////////////////////////////////
-        vm.startBroadcast(address(receiverContract)); // simulate router sending receiver message on L1
-        Client.Any2EVMMessage memory any2EvmMessage = makeCCIPEigenlayerMsg_DepositWithSignature(
-            amountToStake,
-            staker,
-            block.timestamp + 1 hours
-        );
-        receiverContract.mockCCIPReceive(any2EvmMessage);
-
-        stakerShares = strategyManager.stakerStrategyShares(staker, strategy);
-        uint256 receiverShares = strategyManager.stakerStrategyShares(address(receiverContract), strategy);
-        vm.stopBroadcast();
+        // /////////////////////////////////////
+        // //// ETH: Mock deposits on Eigenlayer
+        // vm.selectFork(ethForkId);
+        // /////////////////////////////////////
 
 
         // register Operator, to test delegation
@@ -238,7 +226,7 @@ contract CCIP_Eigen_DelegationTests is Test {
         );
 
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
+            messageId: bytes32(uint256(9999)),
             sourceChainSelector: BaseSepolia.ChainSelector,
             sender: abi.encode(deployer),
             destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging any tokens
@@ -254,56 +242,5 @@ contract CCIP_Eigen_DelegationTests is Test {
         // DelegationManager.undelegate
     }
 
-
-    function makeCCIPEigenlayerMsg_DepositWithSignature(
-        uint256 _amount,
-        address _staker,
-        uint256 expiry
-    ) public view returns (Client.Any2EVMMessage memory) {
-
-        uint256 nonce = 0; // in production retrieve on StrategyManager on L1
-        bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), block.chainid);
-
-        (
-            bytes memory signature,
-            bytes32 digestHash
-        ) = signatureUtils.createEigenlayerDepositSignature(
-            deployerKey,
-            strategy,
-            token,
-            _amount,
-            _staker,
-            nonce,
-            expiry,
-            domainSeparator
-        );
-
-        signatureUtils.checkSignature_EIP1271(_staker, digestHash, signature);
-
-        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
-        destTokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(token),
-            amount: _amount
-        });
-
-        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
-            sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
-            sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
-            data: abi.encode(string(
-                EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
-                    address(strategy),
-                    address(token),
-                    _amount,
-                    _staker,
-                    expiry,
-                    signature
-                )
-            )), // CCIP abi.encodes a string message when sending
-            destTokenAmounts: destTokenAmounts // Tokens and their amounts in their destination chain representation.
-        });
-
-        return any2EvmMessage;
-    }
 
 }

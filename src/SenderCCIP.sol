@@ -157,9 +157,11 @@ contract SenderCCIP is BaseMessengerCCIP {
             // 0x54b2bf29 = abi.encode(keccask256(completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)))
             (
                 IDelegationManager.Withdrawal memory withdrawal
-                ,
-                ,
-                ,
+                , // tokensToWithdraw,
+                , // middlewareTimesIndex
+                , // receiveAsTokens
+                , // expiry
+                , // signature
             ) = senderUtils.decodeCompleteWithdrawalMessage(message);
 
             bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);

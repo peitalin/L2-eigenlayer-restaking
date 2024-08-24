@@ -11,9 +11,7 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {
     EigenlayerDeposit6551Message,
-    EigenlayerDepositWithSignatureMessage,
-    TransferToStakerMessage,
-    QueuedWithdrawalWithSignatureParams
+    TransferToStakerMessage
 } from "./interfaces/IEigenlayerMsgDecoders.sol";
 import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {IReceiverCCIP} from "./interfaces/IReceiverCCIP.sol";
@@ -29,7 +27,7 @@ import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {ERC6551AccountProxy} from "@6551/examples/upgradeable/ERC6551AccountProxy.sol";
 
-import {console} from "forge-std/Test.sol";
+// import {console} from "forge-std/Test.sol";
 
 
 /// ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them.
@@ -232,7 +230,7 @@ contract ReceiverCCIP is BaseMessengerCCIP {
             eigenAgent.approveStrategyManagerWithSignature(
                 address(strategyManager), // strategyManager
                 0 ether,
-                data2, // encodeDepositIntoStrategyMsg
+                data2,
                 eigenMsg.expiry,
                 eigenMsg.signature
             );
@@ -270,7 +268,7 @@ contract ReceiverCCIP is BaseMessengerCCIP {
             bytes memory result = eigenAgent.executeWithSignature(
                 address(delegationManager),
                 0 ether,
-                nlayerMsgEncoders.encodeQueueWithdrawalsMsg(QWPArray);
+                EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(QWPArray),
                 expiry,
                 signature
             );
@@ -279,69 +277,38 @@ contract ReceiverCCIP is BaseMessengerCCIP {
         }
 
 
-        // if (functionSelector == 0x32e89ace) {
-        //     // bytes4(keccak256("depositIntoStrategyWithSignature(address,address,uint256,address,uint256,bytes)")) == 0x32e89ace
-        //     EigenlayerDepositWithSignatureMessage memory eigenMsg;
-        //     eigenMsg = restakingConnector.decodeDepositWithSignatureMsg(message);
+        //////////////////////////////////
+        // Complete Withdrawals
+        //////////////////////////////////
+        if (functionSelector == 0x60d7faed) {
+            // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)")) == 0x60d7faed
 
-        //     IERC20 underlyingToken = strategy.underlyingToken();
-        //     // Receiver contract approves eigenlayer StrategyManager for deposits
-        //     underlyingToken.approve(address(strategyManager), eigenMsg.amount);
-        //     // deposit into Eigenlayer with user signature
-        //     strategyManager.depositIntoStrategyWithSignature(
-        //         IStrategy(eigenMsg.strategy),
-        //         IERC20(eigenMsg.token),
-        //         eigenMsg.amount,
-        //         eigenMsg.staker,
-        //         eigenMsg.expiry,
-        //         eigenMsg.signature
-        //     );
-        //     textMsg = "depositIntoStrategyWithSignature()";
-        //     amountMsg = eigenMsg.amount;
-        // }
-
-        // if (functionSelector == 0xa140f06e) {
-        //     // bytes4(keccak256("queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])")),
-
-        //     QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalsWithSigParams =
-        //         restakingConnector.decodeQueueWithdrawalsWithSignatureMessage(message);
-
-        //     require(queuedWithdrawalsWithSigParams.length > 0, "queuedWithdrawalsWithSigParams: length cannot be 0");
-
-        //     address staker = queuedWithdrawalsWithSigParams[0].staker;
-        //     // queueWithdrawal uses current nonce in the withdrawalRoot, the increments after
-        //     // so save this nonce before dispatching queueWithdrawalsWithSignature
-        //     uint256 nonce = delegationManager.cumulativeWithdrawalsQueued(staker);
-        //     restakingConnector.setQueueWithdrawalBlock(staker, nonce);
-
-        //     //////////// Broken as we refactor to EigenAgents architecture
-        //     // bytes32[] memory withdrawalRoots = delegationManager.queueWithdrawalsWithSignature(
-        //     //     queuedWithdrawalsWithSigParams
-        //     // );
-
-        //     textMsg = "queueWithdrawalsWithSignature()";
-        //     amountMsg = queuedWithdrawalsWithSigParams[0].shares[0];
-        // }
-
-
-        if (functionSelector == 0x54b2bf29) {
-            // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)")) == 0x54b2bf29
             (
                 IDelegationManager.Withdrawal memory withdrawal,
                 IERC20[] memory tokensToWithdraw,
                 uint256 middlewareTimesIndex,
-                bool receiveAsTokens
+                bool receiveAsTokens,
+                uint256 expiry,
+                bytes memory signature
             ) = restakingConnector.decodeCompleteWithdrawalMessage(message);
 
-            // requires(msg.sender == withdrawal.withdrawer), so only this contract can withdraw
-            // since all queuedWithdrawals are also done through this contract.
-            // then it calculates withdrawalRoot ensuring staker/withdrawal/block is a valid withdrawal.
-            delegationManager.completeQueuedWithdrawal(
-                withdrawal,
-                tokensToWithdraw,
-                middlewareTimesIndex,
-                receiveAsTokens
+            EigenAgent6551 eigenAgent = EigenAgent6551(payable(withdrawal.withdrawer));
+
+            bytes memory result = eigenAgent.executeWithSignature(
+                address(delegationManager),
+                0 ether,
+                EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+                    withdrawal,
+                    tokensToWithdraw,
+                    middlewareTimesIndex,
+                    receiveAsTokens
+                ),
+                expiry,
+                signature
             );
+
+            // requires(msg.sender == withdrawal.withdrawer), so only EigenAgent can withdraw.
+            // then it calculates withdrawalRoot ensuring staker/withdrawal/block is a valid withdrawal.
 
             bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
 
@@ -362,10 +329,12 @@ contract ReceiverCCIP is BaseMessengerCCIP {
                 amount
             );
 
-            // textMsg = "completeQueuedWithdrawal()";
-            textMsg = text_message;
+            textMsg = "completeQueuedWithdrawal()";
         }
 
+        //////////////////////////////////
+        // delegateTo
+        //////////////////////////////////
         if (functionSelector == 0x7f548071) {
             // bytes4(keccak256("delegateToBySignature(address,address,(bytes,uint256),(bytes,uint256),bytes32)")) == 0x7f548071
             (

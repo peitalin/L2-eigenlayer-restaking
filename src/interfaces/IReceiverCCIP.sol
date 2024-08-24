@@ -21,7 +21,7 @@ interface IReceiverCCIP is IBaseMessengerCCIP {
 
     function getEigenAgentOwnerTokenId(address staker) external view returns (uint256);
 
-    function getEigenAgent(address staker) external view returns (uint256);
+    function getEigenAgent(address staker) external view returns (address);
 
     function updateEigenAgentOwnerTokenId(
         address from,

@@ -11,7 +11,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
-import {QueuedWithdrawalWithSignatureParams} from "../src/interfaces/IEigenlayerMsgDecoders.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 import {DeployOnL2Script} from "../script/2_deployOnL2.s.sol";
@@ -142,22 +141,19 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         bytes memory message;
         // put the following in separate closure (stack too deep errors)
         {
-            QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig;
-            queuedWithdrawalWithSig = QueuedWithdrawalWithSignatureParams({
+            IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal;
+            queuedWithdrawal = IDelegationManager.QueuedWithdrawalParams({
                 strategies: strategiesToWithdraw,
                 shares: sharesToWithdraw,
-                withdrawer: withdrawer,
-                staker: staker,
-                signature: signature,
-                expiry: expiry
+                withdrawer: withdrawer
             });
 
-            QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray;
-            queuedWithdrawalWithSigArray = new QueuedWithdrawalWithSignatureParams[](1);
-            queuedWithdrawalWithSigArray[0] = queuedWithdrawalWithSig;
+            IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalArray;
+            queuedWithdrawalArray = new IDelegationManager.QueuedWithdrawalParams[](1);
+            queuedWithdrawalArray[0] = queuedWithdrawal;
 
-            message = EigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
-                queuedWithdrawalWithSigArray
+            message = EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
+                queuedWithdrawalArray
             );
         }
 

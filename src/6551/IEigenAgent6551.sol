@@ -5,6 +5,8 @@ interface IEigenAgent6551 {
 
     function agentImplVersion() external returns (uint256);
 
+    function getExecNonce() external view returns (uint256);
+
     function beforeExecute(bytes calldata data) external returns (bytes4);
 
     function afterExecute(

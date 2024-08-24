@@ -37,22 +37,3 @@ contract Adminable is OwnableUpgradeable {
         return owner() == msg.sender;
     }
 }
-
-contract MockAdminable is Adminable {
-
-    constructor() {
-        __Adminable_init();
-    }
-
-    function mockIsOwner() public view returns (bool) {
-        return isOwner();
-    }
-
-    function mockOnlyAdmin() public view onlyAdmin returns (bool) {
-        return true;
-    }
-
-    function mockOnlyAdminOrOwner() public view onlyAdminOrOwner returns (bool) {
-        return true;
-    }
-}

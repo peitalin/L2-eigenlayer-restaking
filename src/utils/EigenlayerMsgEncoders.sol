@@ -6,19 +6,11 @@ import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISi
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {QueuedWithdrawalWithSignatureParams} from "../interfaces/IEigenlayerMsgDecoders.sol";
 
 
 library EigenlayerMsgEncoders {
 
-    /*
-     *
-     *         EigenAgent Messages
-     *
-     *
-    */
-
-    // msg to CCIP for EigenAgent
+    // used by CCIP -> EigenAgent
     function encodeDepositWithSignature6551Msg(
         address strategy,
         address token,
@@ -27,7 +19,7 @@ library EigenlayerMsgEncoders {
         uint256 expiry,
         bytes memory signature
     ) public pure returns (bytes memory) {
-        // encode message payload
+
         bytes memory message_bytes = abi.encodeWithSelector(
             bytes4(keccak256("depositWithSignature6551(address,address,uint256,address,uint256,bytes)")),
             strategy,
@@ -40,13 +32,13 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-    // used by EigenAgent
+    // used by EigenAgent -> Eigenlayer
     function encodeDepositIntoStrategyMsg(
         address strategy,
         address token,
         uint256 amount
     ) public pure returns (bytes memory) {
-        // encode message payload
+
         bytes memory message_bytes = abi.encodeWithSelector(
             // bytes4(keccak256("depositIntoStrategy(address,address,uint256)")),
             IStrategyManager.depositIntoStrategy.selector,
@@ -60,14 +52,10 @@ library EigenlayerMsgEncoders {
     function encodeQueueWithdrawalsMsg(
         IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
     ) public pure returns (bytes memory) {
-        // structs are encoded as tuples:
-        // QueuedWithdrawalParams {
-        //     IStrategy[] strategies;
-        //     uint256[] shares;
-        //     address withdrawer;
-        // }
+
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
+            // bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
+            IDelegationManager.queueWithdrawals.selector,
             queuedWithdrawalParams
         );
 
@@ -80,44 +68,6 @@ library EigenlayerMsgEncoders {
      *
      *
     */
-
-    function encodeDepositIntoStrategyWithSignatureMsg(
-        address strategy,
-        address token,
-        uint256 amount,
-        address staker,
-        uint256 expiry,
-        bytes memory signature
-    ) public pure returns (bytes memory) {
-
-        // encode message payload
-        bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("depositIntoStrategyWithSignature(address,address,uint256,address,uint256,bytes)")),
-            strategy,
-            token,
-            amount,
-            staker,
-            expiry,
-            signature
-        );
-        // CCIP turns the message into string when sending
-        // bytes memory message = abi.encode(string(message_bytes));
-        return message_bytes;
-    }
-
-    function encodeQueueWithdrawalsWithSignatureMsg(
-        QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray
-    ) public pure returns (bytes memory) {
-
-        // Structs are encoded as tuples:
-        // queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])
-        bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])")),
-            queuedWithdrawalWithSigArray
-        );
-
-        return message_bytes;
-    }
 
     function encodeCompleteWithdrawalMsg(
         IDelegationManager.Withdrawal memory withdrawal,
@@ -144,8 +94,9 @@ library EigenlayerMsgEncoders {
         //         uint256[] shares;
         //     }
 
+
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)")),
+            bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)")),
             withdrawal,
             tokensToWithdraw,
             middlewareTimesIndex,

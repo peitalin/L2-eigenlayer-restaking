@@ -5,11 +5,11 @@ import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {ScriptUtils} from "../script/ScriptUtils.sol";
-import {MockAdminable} from "../src/utils/Adminable.sol";
+import {MockAdminable} from "./mocks/MockAdminable.sol";
 import {ERC20Minter} from "../src/ERC20Minter.sol";
 
 
-contract UtilsUnitTests is Test, ScriptUtils {
+contract UtilsTests is Test, ScriptUtils {
 
     MockAdminable public mockAdminable;
     ERC20Minter public erc20Minter;

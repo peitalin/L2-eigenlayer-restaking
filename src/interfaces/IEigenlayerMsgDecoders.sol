@@ -21,19 +21,6 @@ event EigenlayerDeposit6551Params(
     uint256 indexed amount
 );
 
-struct EigenlayerDepositWithSignatureMessage {
-    uint256 expiry;
-    address strategy;
-    address token;
-    uint256 amount;
-    address staker;
-    bytes signature;
-}
-event EigenlayerDepositWithSignatureParams(
-    uint256 indexed amount,
-    address indexed staker
-);
-
 event EigenlayerQueueWithdrawalsParams(
     uint256 indexed amount,
     address indexed staker
@@ -52,32 +39,11 @@ event TransferToStakerParams(
     bytes32 indexed withdrawalRoot
 );
 
-struct QueuedWithdrawalWithSignatureParams {
-    // Array of strategies that the QueuedWithdrawal contains
-    IStrategy[] strategies;
-    // Array containing the amount of shares in each Strategy in the `strategies` array
-    uint256[] shares;
-    // The address of the withdrawer
-    address withdrawer;
-    // The address of the staker
-    address staker;
-    // signature of the staker
-    bytes signature;
-    // expiration timestamp of the signature
-    uint256 expiry;
-}
-
-
 interface IEigenlayerMsgDecoders {
 
     function decodeDepositWithSignature6551Msg(
         bytes memory message
     ) external returns (EigenlayerDeposit6551Message memory);
-
-
-    function decodeDepositWithSignatureMsg(
-        bytes memory message
-    ) external returns (EigenlayerDepositWithSignatureMessage memory);
 
 
     function decodeQueueWithdrawalsMessage(
@@ -89,20 +55,15 @@ interface IEigenlayerMsgDecoders {
     );
 
 
-    function decodeQueueWithdrawalsWithSignatureMessage(
-        bytes memory message
-    ) external returns (
-        QueuedWithdrawalWithSignatureParams[] memory
-    );
-
-
     function decodeCompleteWithdrawalMessage(
         bytes memory message
     ) external returns (
         IDelegationManager.Withdrawal memory,
         IERC20[] memory,
         uint256,
-        bool
+        bool,
+        uint256,
+        bytes memory
     );
 
     function decodeTransferToStakerMessage(bytes memory message) external returns (

@@ -108,7 +108,6 @@ contract DeployOnEthScript is Script {
         receiverProxy.allowlistSender(address(senderContract), true);
         receiverProxy.setSenderContractL2Addr(address(senderContract));
 
-
         eigenAgentOwner721.addAdmin(deployer);
         eigenAgentOwner721.addAdmin(address(receiverProxy));
         eigenAgentOwner721.setReceiverContract(IReceiverCCIP(address(receiverProxy)));

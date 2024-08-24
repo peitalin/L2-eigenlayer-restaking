@@ -15,7 +15,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {console} from "forge-std/Test.sol";
+// import {console} from "forge-std/Test.sol";
 
 
 contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent6551 {
@@ -45,6 +45,10 @@ contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent
      */
 
     function initialize() initializer public {}
+
+    function getExecNonce() public view returns (uint256) {
+        return execNonce;
+    }
 
     function agentImplVersion() public virtual override returns (uint256) {
         return 1;
@@ -140,7 +144,7 @@ contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent
         ++state;
         bool success;
 
-        console.log("eigenAgent msg.sender:", msg.sender);
+        // console.log("eigenAgent msg.sender:", msg.sender);
         beforeExecute(_data);
         {
             // solhint-disable-next-line avoid-low-level-calls

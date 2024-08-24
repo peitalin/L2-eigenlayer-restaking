@@ -52,13 +52,10 @@ contract CCIP_EigenAgentTests is Test {
     IStrategy public strategy;
     ProxyAdmin public proxyAdmin;
 
-    uint256 public initialReceiverBalance = 5 ether;
-
     // call params
     uint256 _expiry;
     uint256 _nonce;
     uint256 _amount;
-    bytes _data;
 
     function setUp() public {
 
@@ -108,6 +105,8 @@ contract CCIP_EigenAgentTests is Test {
         receiverContract.allowlistSender(deployer, true);
 
         _expiry = block.timestamp + 1 hours;
+        _nonce = 0;
+        _amount = 0.0013 ether;
 
         vm.stopBroadcast();
     }
@@ -123,12 +122,12 @@ contract CCIP_EigenAgentTests is Test {
         _nonce = eigenAgent.execNonce();
 
         // encode a simple getSenderContractL2Addr call
-        _data = abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector);
+        bytes memory data = abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector);
 
         bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
             address(receiverContract),
             0 ether,
-            _data,
+            data,
             _nonce,
             block.chainid,
             _expiry
@@ -151,7 +150,7 @@ contract CCIP_EigenAgentTests is Test {
         bytes memory result = eigenAgent.executeWithSignature(
             address(receiverContract),
             0 ether,
-            _data,
+            data,
             _expiry,
             signature
         );
@@ -216,10 +215,11 @@ contract CCIP_EigenAgentTests is Test {
     }
 
 
-    function test_CCIP_EigenAgent_ApproveDepositWithdraw() public {
+    function test_CCIP_EigenAgent_DepositTransferThenWithdraw() public {
 
-        _amount = 0.0013 ether;
-        _expiry = block.timestamp + 1 days;
+        //////////////////////////////////////////////////////
+        /// Receiver -> EigenAgent -> Eigenlayer calls
+        //////////////////////////////////////////////////////
 
         vm.startBroadcast(deployerKey);
         EigenAgent6551 eigenAgent = receiverContract.spawnEigenAgentOnlyOwner(bob);
@@ -230,88 +230,92 @@ contract CCIP_EigenAgentTests is Test {
         vm.stopBroadcast();
 
         //////////////////////////////////////////////////////
-        /// Receiver -> EigenAgent -> Eigenlayer calls
-        //////////////////////////////////////////////////////
-        vm.startBroadcast(address(receiverContract));
-
-        //////////////////////////////////////////////////////
         //// 1) EigenAgent approves StrategyManager to transfer tokens
         //////////////////////////////////////////////////////
-        (
-            bytes memory data1,
-            bytes32 digestHash1,
-            bytes memory signature1
-        ) = createEigenAgentERC20ApproveSignature(
-            bobKey,
-            address(erc20Drip),
-            address(strategyManager),
-            _amount,
-            _expiry,
-            _nonce
-        );
-        signatureUtils.checkSignature_EIP1271(bob, digestHash1, signature1);
+        {
+            vm.startBroadcast(address(receiverContract));
+            (
+                bytes memory data1,
+                bytes32 digestHash1,
+                bytes memory signature1
+            ) = createEigenAgentERC20ApproveSignature(
+                bobKey,
+                address(erc20Drip),
+                address(strategyManager),
+                _amount,
+                _expiry
+            );
+            signatureUtils.checkSignature_EIP1271(bob, digestHash1, signature1);
 
-        eigenAgent.executeWithSignature(
-            address(erc20Drip), // CCIP-BnM token
-            0 ether, // value
-            data1,
-            _expiry,
-            signature1
-        );
+            eigenAgent.executeWithSignature(
+                address(erc20Drip), // CCIP-BnM token
+                0 ether, // value
+                data1,
+                _expiry,
+                signature1
+            );
 
-        // receiver sends eigenAgent tokens
-        erc20Drip.transfer(address(eigenAgent), _amount);
+            // receiver sends eigenAgent tokens
+            erc20Drip.transfer(address(eigenAgent), _amount);
+            vm.stopBroadcast();
+        }
 
         //////////////////////////////////////////////////////
         //// 2) EigenAgent Deposits into StrategyManager
         //////////////////////////////////////////////////////
-        (
-            bytes memory data2,
-            bytes32 digestHash2,
-            bytes memory signature2
-        ) = createEigenAgentDepositSignature(
-            bobKey,
-            _amount,
-            _nonce,
-            _expiry
-        );
-        signatureUtils.checkSignature_EIP1271(bob, digestHash2, signature2);
+        {
+            vm.startBroadcast(address(receiverContract));
 
-        bytes memory result = eigenAgent.executeWithSignature(
-            address(strategyManager), // strategyManager
-            0,
-            data2, // encodeDepositIntoStrategyMsg
-            _expiry,
-            signature2
-        );
-        vm.stopBroadcast();
+            (
+                bytes memory data2,
+                bytes32 digestHash2,
+                bytes memory signature2
+            ) = createEigenAgentDepositSignature(
+                bobKey,
+                _amount,
+                _nonce,
+                _expiry
+            );
+            signatureUtils.checkSignature_EIP1271(bob, digestHash2, signature2);
+
+            eigenAgent.executeWithSignature(
+                address(strategyManager), // strategyManager
+                0,
+                data2, // encodeDepositIntoStrategyMsg
+                _expiry,
+                signature2
+            );
+            vm.stopBroadcast();
+        }
 
         //////////////////////////////////////////////////////
         //// 3) Transfer EigenAgentOwner NFT to Alice
         //////////////////////////////////////////////////////
-        vm.startBroadcast(bob);
+        {
+            vm.startBroadcast(bob);
 
-        uint256 transferredTokenId = receiverContract.getEigenAgentOwnerTokenId(bob);
-        EigenAgentOwner721 eigenAgentOwnerNft = receiverContract.getEigenAgentOwner721();
-        eigenAgentOwnerNft.approve(alice, transferredTokenId);
+            uint256 transferredTokenId = receiverContract.getEigenAgentOwnerTokenId(bob);
+            EigenAgentOwner721 eigenAgentOwnerNft = receiverContract.getEigenAgentOwner721();
+            eigenAgentOwnerNft.approve(alice, transferredTokenId);
 
-        vm.expectEmit(true, true, true, true);
-        emit ReceiverCCIP.EigenAgentOwnerUpdated(bob, alice, transferredTokenId);
-        eigenAgentOwnerNft.safeTransferFrom(bob, alice, transferredTokenId);
+            vm.expectEmit(true, true, true, true);
+            emit ReceiverCCIP.EigenAgentOwnerUpdated(bob, alice, transferredTokenId);
+            eigenAgentOwnerNft.safeTransferFrom(bob, alice, transferredTokenId);
 
-        require(
-            eigenAgentOwnerNft.ownerOf(transferredTokenId) == alice,
-            "alice should be owner of the token"
-        );
-        vm.stopBroadcast();
+            require(
+                eigenAgentOwnerNft.ownerOf(transferredTokenId) == alice,
+                "alice should be owner of the token"
+            );
+            vm.stopBroadcast();
+        }
 
         //////////////////////////////////////////////////////
         //// 4) Alice -> EigenAgent Queues Withdrawal from Eigenlayer
         //////////////////////////////////////////////////////
-        vm.startBroadcast(address(receiverContract));
-
-        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams;
         {
+            vm.startBroadcast(address(receiverContract));
+
+            IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams;
 
             IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
             strategiesToWithdraw[0] = strategy;
@@ -328,34 +332,35 @@ contract CCIP_EigenAgentTests is Test {
 
             queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](1);
             queuedWithdrawalParams[0] = queuedWithdrawal;
+
+            (
+                bytes memory data3,
+                bytes32 digestHash3,
+                bytes memory signature3
+            ) = createEigenAgentQueueWithdrawalsSignature(
+                aliceKey,
+                queuedWithdrawalParams
+            );
+            signatureUtils.checkSignature_EIP1271(alice, digestHash3, signature3);
+
+            bytes memory result = eigenAgent.executeWithSignature(
+                address(delegationManager), // delegationManager
+                0,
+                data3, // encodeQueueWithdrawals
+                _expiry,
+                signature3
+            );
+
+            bytes32[] memory withdrawalRoots = abi.decode(result, (bytes32[]));
+            require(
+                withdrawalRoots[0] != bytes32(0),
+                "no withdrawalRoot returned by EigenAgent queueWithdrawals"
+            );
+
+            vm.stopBroadcast();
         }
-
-        (
-            bytes memory data3,
-            bytes32 digestHash3,
-            bytes memory signature3
-        ) = createEigenAgentQueueWithdrawalsSignature(
-            aliceKey,
-            queuedWithdrawalParams
-        );
-        signatureUtils.checkSignature_EIP1271(alice, digestHash3, signature3);
-
-        result = eigenAgent.executeWithSignature(
-            address(delegationManager), // delegationManager
-            0,
-            data3, // encodeQueueWithdrawals
-            _expiry,
-            signature3
-        );
-
-        vm.stopBroadcast();
-
-        bytes32[] memory withdrawalRoots = abi.decode(result, (bytes32[]));
-        require(
-            withdrawalRoots[0] != bytes32(0),
-            "no withdrawalRoot returned by EigenAgent queueWithdrawals"
-        );
     }
+
 
     function createEigenAgentQueueWithdrawalsSignature(
         uint256 signerKey,
@@ -390,8 +395,7 @@ contract CCIP_EigenAgentTests is Test {
         address targetToken,
         address to,
         uint256 amount,
-        uint256 expiry,
-        uint256 nonce
+        uint256 expiry
     ) public view returns (bytes memory, bytes32, bytes memory) {
 
         bytes memory data = abi.encodeWithSelector(
@@ -405,7 +409,7 @@ contract CCIP_EigenAgentTests is Test {
             targetToken, // CCIP-BnM token
             0 ether,
             data,
-            nonce,
+            _nonce,
             block.chainid,
             expiry
         );
