@@ -12,6 +12,10 @@ import {TransferToStakerMessage} from "./interfaces/IEigenlayerMsgDecoders.sol";
 import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
 import {BaseSepolia} from "../script/Addresses.sol";
 
+import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
+
+
+
 
 contract SenderCCIP is BaseMessengerCCIP {
 
@@ -35,14 +39,22 @@ contract SenderCCIP is BaseMessengerCCIP {
 
     ISenderUtils public senderUtils;
 
+    // IERC6551Registry public erc6551Registry;
+
     /// @param _router The address of the router contract.
     /// @param _link The address of the link contract.
     constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {}
 
-    function initialize(ISenderUtils _senderUtils) initializer public {
+    function initialize(
+        ISenderUtils _senderUtils
+        // IERC6551Registry _erc6551Registry
+    ) initializer public {
 
         require(address(_senderUtils) != address(0), "_senderUtils cannot be address(0)");
+        // require(address(_erc6551Registry) != address(0), "_erc6551Registry cannot be address(0)");
+
         senderUtils = _senderUtils;
+        // erc6551Registry =  _erc6551Registry;
 
         BaseMessengerCCIP.__BaseMessengerCCIP_init();
     }
@@ -153,8 +165,8 @@ contract SenderCCIP is BaseMessengerCCIP {
         bytes4 functionSelector = senderUtils.decodeFunctionSelector(message);
 
         // When User sends a message to CompleteQueuedWithdrawal from L2 to L1
-        if (functionSelector == 0x54b2bf29) {
-            // 0x54b2bf29 = abi.encode(keccask256(completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)))
+        if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
+            // 0x60d7faed = abi.encode(keccask256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)"))
             (
                 IDelegationManager.Withdrawal memory withdrawal
                 , // tokensToWithdraw,
@@ -172,6 +184,31 @@ contract SenderCCIP is BaseMessengerCCIP {
                 withdrawalRootsSpent[withdrawalRoot] == false,
                 "withdrawalRoot has already been used"
             );
+
+            // TODO: need a way to link withdrawalRoot to original staker (bob)
+            // either have L1 EigenAgent look up it's owner() and hash a payload:
+            // struct{ withdrawalRoot, original_staker: owner() }
+            // or:
+            // or use 6551Registry.account(staker) to see if the L2 EigenAgent
+            // address == withdrawer.staker (EigenAgent on L1)
+
+            // erc6551Registry.account(
+            // )
+            // bytes32 salt = bytes32(abi.encode(staker));
+            // uint256 tokenId = eigenAgentOwner721.mint(staker);
+            // EigenAgent6551 eigenAgentImplementation = new EigenAgent6551();
+            // ERC6551AccountProxy eigenAgentProxy = new ERC6551AccountProxy(address(eigenAgentImplementation));
+            // EigenAgent6551 eigenAgent = EigenAgent6551(payable(
+            //     erc6551Registry.createAccount(
+            //         address(eigenAgentProxy),
+            //         salt,
+            //         block.chainid,
+            //         address(eigenAgentOwner721),
+            //         tokenId
+            //     )
+            // ));
+
+
             // Commit to WithdrawalTransfer(staker, amount, token) before sending completeWithdrawal message,
             // so that when the message returns with withdrawalRoot, we use it to lookup (staker, amount)
             // to transfer the bridged withdrawn funds to.

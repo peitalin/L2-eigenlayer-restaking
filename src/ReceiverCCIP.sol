@@ -252,8 +252,8 @@ contract ReceiverCCIP is BaseMessengerCCIP {
         //////////////////////////////////
         // Queue Withdrawals
         //////////////////////////////////
-        if (functionSelector == 0x0dd8dd02) {
-            // cast sig "queueWithdrawals((address[],uint256[],address)[])"
+        if (functionSelector == IDelegationManager.queueWithdrawals.selector) {
+            // cast sig "queueWithdrawals((address[],uint256[],address)[])" == 0x0dd8dd02
             (
                 IDelegationManager.QueuedWithdrawalParams[] memory QWPArray,
                 uint256 expiry,
@@ -280,7 +280,7 @@ contract ReceiverCCIP is BaseMessengerCCIP {
         //////////////////////////////////
         // Complete Withdrawals
         //////////////////////////////////
-        if (functionSelector == 0x60d7faed) {
+        if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
             // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)")) == 0x60d7faed
 
             (
@@ -335,8 +335,7 @@ contract ReceiverCCIP is BaseMessengerCCIP {
         //////////////////////////////////
         // delegateTo
         //////////////////////////////////
-        if (functionSelector == 0x7f548071) {
-            // bytes4(keccak256("delegateToBySignature(address,address,(bytes,uint256),(bytes,uint256),bytes32)")) == 0x7f548071
+        if (functionSelector == IDelegationManager.delegateTo.selector) {
             (
                 address staker,
                 address operator,

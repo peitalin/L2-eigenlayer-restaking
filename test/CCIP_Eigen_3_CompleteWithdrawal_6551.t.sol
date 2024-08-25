@@ -325,7 +325,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         signatureUtils.checkSignature_EIP1271(bob, digestHash, signature);
 
         bytes memory dataWithSignature = abi.encodePacked(data, _expiry, signature);
-        console.log("sigg1");
+        console.log("sig1");
         console.logBytes(signature);
 
         senderContract.sendMessagePayNative(
@@ -351,9 +351,6 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         vm.warp(block.timestamp + 120); // 120 seconds = 10 blocks (12second per block)
         vm.roll((block.timestamp + 120) / 12);
 
-        console.log("sig11");
-        console.logBytes(signature);
-
         uint256 _numWithdrawals = delegationManager.cumulativeWithdrawalsQueued(address(eigenAgent));
         require(_numWithdrawals > 0, "must queueWithdrawals first before completeWithdrawals");
         console.log("eigenAgent withdrawals queued:", _numWithdrawals);
@@ -378,26 +375,26 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         //// [Offchain] CCIP relays tokens and message to L2 bridge
         /////////////////////////////////////////////////////////////////
 
-        // /////////////////////////////////////////////////////////////////
-        // //// 3. [L2] Mock receiving CompleteWithdrawals message from L1
-        // /////////////////////////////////////////////////////////////////
-        // vm.selectFork(l2ForkId);
-        // vm.startBroadcast(deployerKey);
-        // // Mock SenderContract on L2 receiving the tokens and TransferToStaker CCIP message from L1
-        // senderContract.mockCCIPReceive(
-        //     makeCCIPEigenlayerMsg_TransferToStaker(withdrawalRoot)
-        // );
+        /////////////////////////////////////////////////////////////////
+        //// 3. [L2] Mock receiving CompleteWithdrawals message from L1
+        /////////////////////////////////////////////////////////////////
+        vm.selectFork(l2ForkId);
+        vm.startBroadcast(deployerKey);
+        // Mock SenderContract on L2 receiving the tokens and TransferToStaker CCIP message from L1
+        senderContract.mockCCIPReceive(
+            makeCCIPEigenlayerMsg_TransferToStaker(withdrawalRoot)
+        );
 
-        // uint256 stakerBalanceOnL2After = IERC20(tokenDestination).balanceOf(bob);
-        // console.log("balanceOf(bob) on L2 before:", stakerBalanceOnL2Before);
-        // console.log("balanceOf(bob) on L2 after:", stakerBalanceOnL2After);
+        uint256 stakerBalanceOnL2After = IERC20(tokenDestination).balanceOf(address(eigenAgent));
+        console.log("balanceOf(bob) on L2 before:", stakerBalanceOnL2Before);
+        console.log("balanceOf(eigenAgent) on L2 after:", stakerBalanceOnL2After);
 
-        // require(
-        //     (stakerBalanceOnL2Before + _amount) == stakerBalanceOnL2After,
-        //     "balanceOf(bob) on L2 should increase by _amount after L2 -> L2 withdrawal"
-        // );
+        require(
+            (stakerBalanceOnL2Before + _amount) == stakerBalanceOnL2After,
+            "balanceOf(bob) on L2 should increase by _amount after L2 -> L2 withdrawal"
+        );
 
-        // vm.stopBroadcast();
+        vm.stopBroadcast();
     }
 
     /*

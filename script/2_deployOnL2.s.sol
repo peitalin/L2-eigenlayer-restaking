@@ -11,6 +11,8 @@ import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {SenderUtils} from "../src/SenderUtils.sol";
 import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
+// import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
+
 
 contract DeployOnL2Script is Script {
 
@@ -31,6 +33,8 @@ contract DeployOnL2Script is Script {
         // deploy sender
         SenderCCIP senderImpl = new SenderCCIP(BaseSepolia.Router, BaseSepolia.Link);
 
+        // erc6551Registry = new ERC6551Registry();
+
         SenderCCIP senderProxy = SenderCCIP(
             payable(address(
                 new TransparentUpgradeableProxy(
@@ -39,6 +43,7 @@ contract DeployOnL2Script is Script {
                     abi.encodeWithSelector(
                         SenderCCIP.initialize.selector,
                         ISenderUtils(address(senderUtils))
+                        // erc6551Registry
                     )
                 )
             ))

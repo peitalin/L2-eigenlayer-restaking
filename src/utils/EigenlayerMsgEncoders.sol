@@ -94,9 +94,9 @@ library EigenlayerMsgEncoders {
         //         uint256[] shares;
         //     }
 
-
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)")),
+            // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)")),
+            IDelegationManager.completeQueuedWithdrawal.selector,
             withdrawal,
             tokensToWithdraw,
             middlewareTimesIndex,
@@ -114,6 +114,42 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
+
+    function encodeDelegateTo(
+        address operator,
+        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
+        bytes32 approverSalt
+    ) public pure returns (bytes memory) {
+
+        // function delegateTo(
+        //     address operator,
+        //     SignatureWithExpiry memory approverSignatureAndExpiry,
+        //     bytes32 approverSalt
+        // )
+
+        // 0000000000000000000000000000000000000000000000000000000000000020
+        // 0000000000000000000000000000000000000000000000000000000000000164
+        // 0xeea9064b                                                       [96] function selector
+        // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d412eb
+        // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d41333
+        // 00000000000000000000000000000000000000000000000000000000000000a0
+        // 0000000000000000000000000000000000000000000000000000000000000100
+        // 0000000000000000000000000000000000000000000000000000000000004444
+        // 0000000000000000000000000000000000000000000000000000000000000040
+        // 0000000000000000000000000000000000000000000000000000000000000000
+        // 0000000000000000000000000000000000000000000000000000000000000000
+        // 0000000000000000000000000000000000000000000000000000000000000040
+        // 0000000000000000000000000000000000000000000000000000000000000001
+        // 0000000000000000000000000000000000000000000000000000000000000000
+
+        bytes memory message_bytes = abi.encodeWithSelector(
+            IDelegationManager.delegateTo.selector,
+            operator,
+            approverSignatureAndExpiry,
+            approverSalt
+        );
+        return message_bytes;
+    }
 
     function encodeDelegateToBySignature(
         address staker,
@@ -133,7 +169,7 @@ library EigenlayerMsgEncoders {
 
         // 0000000000000000000000000000000000000000000000000000000000000020
         // 0000000000000000000000000000000000000000000000000000000000000164
-        // 7f548071                                                         [96] function selector
+        // 0xeea9064b                                                       [96] function selector
         // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d412eb
         // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d41333
         // 00000000000000000000000000000000000000000000000000000000000000a0
@@ -146,9 +182,8 @@ library EigenlayerMsgEncoders {
         // 0000000000000000000000000000000000000000000000000000000000000001
         // 0000000000000000000000000000000000000000000000000000000000000000
 
-        // 0x7f548071
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("delegateToBySignature(address,address,(bytes,uint256),(bytes,uint256),bytes32)")),
+            IDelegationManager.delegateToBySignature.selector,
             staker,
             operator,
             stakerSignatureAndExpiry,
@@ -160,7 +195,8 @@ library EigenlayerMsgEncoders {
 
     function encodeUndelegateMsg(address staker) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("undelegate(address)")),
+            // bytes4(keccak256("undelegate(address)")),
+            IDelegationManager.undelegate.selector,
             staker
         );
         return message_bytes;
