@@ -9,10 +9,7 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
-import {
-    EigenlayerDeposit6551Message,
-    TransferToStakerMessage
-} from "./interfaces/IEigenlayerMsgDecoders.sol";
+import {EigenlayerDeposit6551Msg} from "./interfaces/IEigenlayerMsgDecoders.sol";
 import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {IReceiverCCIP} from "./interfaces/IReceiverCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
@@ -215,7 +212,7 @@ contract ReceiverCCIP is BaseMessengerCCIP {
         if (functionSelector == 0x65bf44a9) {
             // bytes4(keccak256("depositWithSignature6551(address,address,uint256,address,uint256,bytes)")) == 0x76fa57a5
 
-            EigenlayerDeposit6551Message memory eigenMsg = restakingConnector.decodeDepositWithSignature6551Msg(message);
+            EigenlayerDeposit6551Msg memory eigenMsg = restakingConnector.decodeDepositWithSignature6551Msg(message);
             EigenAgent6551 eigenAgent = _tryGetEigenAgentOrSpawn(eigenMsg.staker);
 
             address token = any2EvmMessage.destTokenAmounts[0].token; // CCIP-BnM token on L1
@@ -258,7 +255,7 @@ contract ReceiverCCIP is BaseMessengerCCIP {
                 IDelegationManager.QueuedWithdrawalParams[] memory QWPArray,
                 uint256 expiry,
                 bytes memory signature
-            ) = restakingConnector.decodeQueueWithdrawalsMessage(message);
+            ) = restakingConnector.decodeQueueWithdrawalsMsg(message);
 
             /// @note: DelegationManager.queueWithdrawals requires:
             /// msg.sender == withdrawer == staker
@@ -290,9 +287,11 @@ contract ReceiverCCIP is BaseMessengerCCIP {
                 bool receiveAsTokens,
                 uint256 expiry,
                 bytes memory signature
-            ) = restakingConnector.decodeCompleteWithdrawalMessage(message);
+            ) = restakingConnector.decodeCompleteWithdrawalMsg(message);
 
+            // eigenAgent == withdrawer == staker == msg.sender (in Eigenlayer)
             EigenAgent6551 eigenAgent = EigenAgent6551(payable(withdrawal.withdrawer));
+            address agentOwner = eigenAgent.owner();
 
             bytes memory result = eigenAgent.executeWithSignature(
                 address(delegationManager),
@@ -307,9 +306,8 @@ contract ReceiverCCIP is BaseMessengerCCIP {
                 signature
             );
 
-            // requires(msg.sender == withdrawal.withdrawer), so only EigenAgent can withdraw.
+            // DelegationManager requires(msg.sender == withdrawal.withdrawer), so only EigenAgent can withdraw.
             // then it calculates withdrawalRoot ensuring staker/withdrawal/block is a valid withdrawal.
-
             bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
 
             // address original_staker = withdrawal.staker;
@@ -318,14 +316,16 @@ contract ReceiverCCIP is BaseMessengerCCIP {
             IERC20 token = withdrawal.strategies[0].underlyingToken();
             token.approve(address(this), amount);
 
-            string memory text_message = string(restakingConnector.encodeTransferToStakerMsg(withdrawalRoot));
-
-            /// return token to staker via bridge with message to transferToStaker
+            string memory text_message = string(restakingConnector.encodeCheckTransferToAgentOwnerMsg(
+                withdrawalRoot,
+                agentOwner
+            ));
+            /// return token to staker via bridge with a message to transferToAgentOwner
             this.sendMessagePayNative(
                 BaseSepolia.ChainSelector, // destination chain
                 senderContractL2Addr,
                 text_message,
-                address(token), // L1 token address to burn/lock
+                address(token), // L1 token to burn/lock
                 amount
             );
 
@@ -342,7 +342,7 @@ contract ReceiverCCIP is BaseMessengerCCIP {
                 ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry,
                 ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
                 bytes32 approverSalt
-            ) = restakingConnector.decodeDelegateToBySignature(message);
+            ) = restakingConnector.decodeDelegateToBySignatureMsg(message);
 
             delegationManager.delegateToBySignature(
                 staker,
@@ -395,8 +395,8 @@ contract ReceiverCCIP is BaseMessengerCCIP {
         bytes4 functionSelector = restakingConnector.decodeFunctionSelector(message);
         uint256 gasLimit = 600_000;
 
-        if (functionSelector == 0x27167d10) {
-            // bytes4(keccak256("transferToStaker(bytes32)")) == 0x27167d10
+        if (functionSelector == 0xa5e25f6f) {
+            // bytes4(keccak256("transferToAgentOwner(bytes32,address,bytes32)")) == 0xa5e25f6f
             gasLimit = 800_000;
         }
 

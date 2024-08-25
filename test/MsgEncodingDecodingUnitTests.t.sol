@@ -12,8 +12,8 @@ import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {
     EigenlayerDeposit6551Params,
-    EigenlayerDeposit6551Message,
-    TransferToStakerMessage
+    EigenlayerDeposit6551Msg,
+    TransferToAgentOwnerMsg
 } from "../src/interfaces/IEigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {FunctionSelectorDecoder} from "../src/FunctionSelectorDecoder.sol";
@@ -128,7 +128,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         ); // CCIP turns the message into string when sending
         bytes memory message = abi.encode(string(message_bytes));
 
-        EigenlayerDeposit6551Message memory depositMsg =
+        EigenlayerDeposit6551Msg memory depositMsg =
             restakingConnector.decodeDepositWithSignature6551Msg(message);
 
         require(depositMsg.signature.length == 65, "invalid signature length");
@@ -151,7 +151,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         bytes memory message = abi.encode(string(message_bytes));
 
         vm.expectRevert("decodeDepositWithSignature6551Msg: invalid signature length");
-        EigenlayerDeposit6551Message memory depositMsg =
+        EigenlayerDeposit6551Msg memory depositMsg =
             restakingConnector.decodeDepositWithSignature6551Msg(message);
     }
 
@@ -191,7 +191,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         bytes memory message = abi.encode(string(message_bytes));
 
         ////////////////////////////////////////////////////////
-        //// Message payload offsets for assembly decoding
+        //// Msg payload offsets for assembly decoding
         ////////////////////////////////////////////////////////
         // Function Signature:
         //     bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
@@ -320,7 +320,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             IDelegationManager.QueuedWithdrawalParams[] memory decodedQueuedWithdrawals,
             uint256 _expiry,
             bytes memory _signature
-        ) = restakingConnector.decodeQueueWithdrawalsMessage(message4);
+        ) = restakingConnector.decodeQueueWithdrawalsMsg(message4);
 
         // console.log("[0].strategies[0]");
         // console.log(address(decodedQueuedWithdrawals[0].strategies[0]));
@@ -346,31 +346,31 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         // signature
         require(
             keccak256(_signature) == keccak256(signature),
-            "incorrect decoding: decodeQueueWithdrawalsMessage: signature"
+            "incorrect decoding: decodeQueueWithdrawalsMsg: signature"
         );
         // expiry
         require(
             _expiry == expiry,
-            "incorrect decoding: decodeQueueWithdrawalsMessage: expiry"
+            "incorrect decoding: decodeQueueWithdrawalsMsg: expiry"
         );
         // strategies
         require(
             decodedQueuedWithdrawals[2].strategies[0] == strategiesToWithdraw3[0],
-            "incorrect decoding: decodeQueueWithdrawalsMessage: strategies"
+            "incorrect decoding: decodeQueueWithdrawalsMsg: strategies"
         );
         // shares
         require(
             decodedQueuedWithdrawals[0].shares[0] == sharesToWithdraw1[0],
-            "incorrect decoding: decodeQueueWithdrawalsMessage: shares"
+            "incorrect decoding: decodeQueueWithdrawalsMsg: shares"
         );
         require(
             decodedQueuedWithdrawals[1].shares[0] == sharesToWithdraw2[0],
-            "incorrect decoding: decodeQueueWithdrawalsMessage: shares"
+            "incorrect decoding: decodeQueueWithdrawalsMsg: shares"
         );
         // withdrawers
         require(
             decodedQueuedWithdrawals[0].withdrawer == queuedWithdrawal1.withdrawer,
-            "incorrect decoding: decodeQueueWithdrawalsMessage: withdrawer"
+            "incorrect decoding: decodeQueueWithdrawalsMsg: withdrawer"
         );
     }
 
@@ -439,13 +439,13 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             bool _receiveAsTokens,
             uint256 _expiry,
             bytes memory _signature
-        ) = restakingConnector.decodeCompleteWithdrawalMessage(message);
+        ) = restakingConnector.decodeCompleteWithdrawalMsg(message);
 
-        require(_withdrawal.shares[0] == withdrawal.shares[0], "decodeCompleteWithdrawalMessage shares error");
-        require(_withdrawal.staker == withdrawal.staker, "decodeCompleteWithdrawalMessage staker error");
-        require(_withdrawal.withdrawer == withdrawal.withdrawer, "decodeCompleteWithdrawalMessage withdrawer error");
-        require(address(_tokensToWithdraw[0]) == address(tokensToWithdraw[0]), "decodeCompleteWithdrawalMessage tokensToWithdraw error");
-        require(_receiveAsTokens == receiveAsTokens, "decodeCompleteWithdrawalMessage error");
+        require(_withdrawal.shares[0] == withdrawal.shares[0], "decodeCompleteWithdrawalMsg shares error");
+        require(_withdrawal.staker == withdrawal.staker, "decodeCompleteWithdrawalMsg staker error");
+        require(_withdrawal.withdrawer == withdrawal.withdrawer, "decodeCompleteWithdrawalMsg withdrawer error");
+        require(address(_tokensToWithdraw[0]) == address(tokensToWithdraw[0]), "decodeCompleteWithdrawalMsg tokensToWithdraw error");
+        require(_receiveAsTokens == receiveAsTokens, "decodeCompleteWithdrawalMsg error");
     }
 
     /// Note: Need to do a array version of this
@@ -453,14 +453,16 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
     }
 
-    function test_Decode_TransferToStakerMessage() public {
+    function test_Decode_TransferToAgentOwnerMsg() public {
 
         bytes32 withdrawalRoot1 = 0x8c20d3a37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7d8ec77;
+        address agentOwner = vm.addr(0x02);
 
-        TransferToStakerMessage memory tts_msg = restakingConnector.decodeTransferToStakerMessage(
+        TransferToAgentOwnerMsg memory tts_msg = restakingConnector.decodeTransferToAgentOwnerMsg(
             abi.encode(string(
-                EigenlayerMsgEncoders.encodeTransferToStakerMsg(
-                    withdrawalRoot1
+                EigenlayerMsgEncoders.encodeCheckTransferToAgentOwnerMsg(
+                    withdrawalRoot1,
+                    agentOwner
                 )
             ))
         );
@@ -541,7 +543,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             ISignatureUtils.SignatureWithExpiry memory _stakerSignatureAndExpiry,
             ISignatureUtils.SignatureWithExpiry memory _approverSignatureAndExpiry,
             bytes32 _approverSalt
-        ) = restakingConnector.decodeDelegateToBySignature(message);
+        ) = restakingConnector.decodeDelegateToBySignatureMsg(message);
 
         require(staker1 == _staker, "staker incorrect");
         require(operator == _operator, "operator incorrect");
@@ -604,7 +606,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             ISignatureUtils.SignatureWithExpiry memory _stakerSignatureAndExpiry,
             ISignatureUtils.SignatureWithExpiry memory _approverSignatureAndExpiry,
             bytes32 _approverSalt
-        ) = restakingConnector.decodeDelegateToBySignature(message);
+        ) = restakingConnector.decodeDelegateToBySignatureMsg(message);
 
         require(staker1 == _staker, "staker incorrect");
         require(operator == _operator, "operator incorrect");
@@ -683,7 +685,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             ISignatureUtils.SignatureWithExpiry memory _stakerSignatureAndExpiry,
             ISignatureUtils.SignatureWithExpiry memory _approverSignatureAndExpiry,
             bytes32 _approverSalt
-        ) = restakingConnector.decodeDelegateToBySignature(message);
+        ) = restakingConnector.decodeDelegateToBySignatureMsg(message);
 
         require(staker1 == _staker, "staker incorrect");
         require(operator == _operator, "operator incorrect");
@@ -763,7 +765,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             ISignatureUtils.SignatureWithExpiry memory _stakerSignatureAndExpiry,
             ISignatureUtils.SignatureWithExpiry memory _approverSignatureAndExpiry,
             bytes32 _approverSalt
-        ) = restakingConnector.decodeDelegateToBySignature(message);
+        ) = restakingConnector.decodeDelegateToBySignatureMsg(message);
 
         require(staker1 == _staker, "staker incorrect");
         require(operator == _operator, "operator incorrect");
@@ -791,7 +793,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
         address staker1 = vm.addr(0x1);
 
-        address _staker = restakingConnector.decodeUndelegate(
+        address _staker = restakingConnector.decodeUndelegateMsg(
             abi.encode(string(
                 EigenlayerMsgEncoders.encodeUndelegateMsg(staker1)
             ))

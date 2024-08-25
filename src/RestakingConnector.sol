@@ -36,8 +36,11 @@ contract RestakingConnector is
         return FunctionSelectorDecoder.decodeFunctionSelector(message);
     }
 
-    function encodeTransferToStakerMsg(bytes32 withdrawalRoot) public pure returns (bytes memory) {
-        return EigenlayerMsgEncoders.encodeTransferToStakerMsg(withdrawalRoot);
+    function encodeCheckTransferToAgentOwnerMsg(
+        bytes32 withdrawalRoot,
+        address agentOwner
+    ) public pure returns (bytes memory) {
+        return EigenlayerMsgEncoders.encodeCheckTransferToAgentOwnerMsg(withdrawalRoot, agentOwner);
     }
 
     /// @dev Checkpoint the actual block.number before queueWithdrawal happens

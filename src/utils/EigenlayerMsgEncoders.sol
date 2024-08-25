@@ -3,9 +3,9 @@ pragma solidity 0.8.22;
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
-import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ISenderUtils} from "../interfaces/ISenderUtils.sol";
 
 
 library EigenlayerMsgEncoders {
@@ -106,10 +106,16 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-    function encodeTransferToStakerMsg(bytes32 withdrawalRoot) public pure returns (bytes memory) {
+    function encodeCheckTransferToAgentOwnerMsg(
+        bytes32 withdrawalRoot,
+        address agentOwner
+    ) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("transferToStaker(bytes32)")),
-            withdrawalRoot
+            // bytes4(keccak256("handleTransferToAgentOwner(bytes32,address,bytes32)")),
+            ISenderUtils.handleTransferToAgentOwner.selector,
+            withdrawalRoot,
+            agentOwner,
+            calculateAgentOwnerRoot(withdrawalRoot, agentOwner)
         );
         return message_bytes;
     }
@@ -200,5 +206,12 @@ library EigenlayerMsgEncoders {
             staker
         );
         return message_bytes;
+    }
+
+    function calculateAgentOwnerRoot(
+        bytes32 withdrawalRoot,
+        address agentOwner
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(withdrawalRoot, agentOwner));
     }
 }

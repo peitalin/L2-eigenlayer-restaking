@@ -6,7 +6,7 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-struct EigenlayerDeposit6551Message {
+struct EigenlayerDeposit6551Msg {
     address strategy;
     address token;
     uint256 amount;
@@ -26,27 +26,25 @@ event EigenlayerQueueWithdrawalsParams(
     address indexed staker
 );
 
-event EigenlayerQueueWithdrawalsWithSignatureParams(
-    uint256 indexed amount,
-    address indexed staker,
-    bytes indexed signature
-);
-
-struct TransferToStakerMessage {
+struct TransferToAgentOwnerMsg {
     bytes32 withdrawalRoot;
+    address agentOwner;
+    bytes32 agentOwnerRoot;
 }
-event TransferToStakerParams(
-    bytes32 indexed withdrawalRoot
+event TransferToAgentOwnerParams(
+    bytes32 indexed withdrawalRoot,
+    address indexed agentOwner,
+    bytes32 indexed agentOwnerRoot
 );
 
 interface IEigenlayerMsgDecoders {
 
     function decodeDepositWithSignature6551Msg(
         bytes memory message
-    ) external returns (EigenlayerDeposit6551Message memory);
+    ) external returns (EigenlayerDeposit6551Msg memory);
 
 
-    function decodeQueueWithdrawalsMessage(
+    function decodeQueueWithdrawalsMsg(
         bytes memory message
     ) external returns (
         IDelegationManager.QueuedWithdrawalParams[] memory,
@@ -55,7 +53,7 @@ interface IEigenlayerMsgDecoders {
     );
 
 
-    function decodeCompleteWithdrawalMessage(
+    function decodeCompleteWithdrawalMsg(
         bytes memory message
     ) external returns (
         IDelegationManager.Withdrawal memory,
@@ -66,11 +64,11 @@ interface IEigenlayerMsgDecoders {
         bytes memory
     );
 
-    function decodeTransferToStakerMessage(bytes memory message) external returns (
-        TransferToStakerMessage memory
+    function decodeTransferToAgentOwnerMsg(bytes memory message) external returns (
+        TransferToAgentOwnerMsg memory
     );
 
-    function decodeDelegateToBySignature(
+    function decodeDelegateToBySignatureMsg(
         bytes memory message
     ) external returns (
         address,
@@ -80,5 +78,5 @@ interface IEigenlayerMsgDecoders {
         bytes32
     );
 
-    function decodeUndelegate(bytes memory message) external returns (address);
+    function decodeUndelegateMsg(bytes memory message) external returns (address);
 }

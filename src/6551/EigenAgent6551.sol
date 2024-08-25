@@ -110,7 +110,7 @@ contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent
         if (isValidSignature(_digestHash, _signature) != IERC1271.isValidSignature.selector)
             revert SignatureNotFromNftOwner();
 
-        (address token, uint256 amount) = decodeApproveERC20FromDepositMessage(_data);
+        (address token, uint256 amount) = decodeApproveERC20FromDepositMsg(_data);
 
         return IERC20(token).approve(_target, amount);
     }
@@ -198,12 +198,12 @@ contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent
         // So chainid should be destination chainid in the context of L2 -> L1 restaking calls
     }
 
-    function decodeApproveERC20FromDepositMessage(bytes memory message)
+    function decodeApproveERC20FromDepositMsg(bytes memory message)
         public
         returns (address, uint256)
     {
         ////////////////////////////////////////////////////////
-        //// deserialize data from Deposit Message for approve()
+        //// deserialize data from Deposit Msg for approve()
         ////////////////////////////////////////////////////////
 
         // e7a050aa                                                         [32] function selector

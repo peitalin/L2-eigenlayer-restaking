@@ -11,7 +11,10 @@ interface IRestakingConnector is IEigenlayerMsgDecoders {
 
     function decodeFunctionSelector(bytes memory message) external returns (bytes4);
 
-    function encodeTransferToStakerMsg(bytes32 withdrawalRoot) external returns (bytes memory);
+    function encodeCheckTransferToAgentOwnerMsg(
+        bytes32 withdrawalRoot,
+        address agentOwner
+    ) external returns (bytes memory);
 
     function getEigenlayerContracts() external returns (
         IDelegationManager,

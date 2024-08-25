@@ -380,12 +380,12 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
         vm.startBroadcast(deployerKey);
-        // Mock SenderContract on L2 receiving the tokens and TransferToStaker CCIP message from L1
+        // Mock SenderContract on L2 receiving the tokens and TransferToAgentOwner CCIP message from L1
         senderContract.mockCCIPReceive(
-            makeCCIPEigenlayerMsg_TransferToStaker(withdrawalRoot)
+            makeCCIPEigenlayerMsg_TransferToAgentOwner(withdrawalRoot, bob)
         );
 
-        uint256 stakerBalanceOnL2After = IERC20(tokenDestination).balanceOf(address(eigenAgent));
+        uint256 stakerBalanceOnL2After = IERC20(tokenDestination).balanceOf(address(bob));
         console.log("balanceOf(bob) on L2 before:", stakerBalanceOnL2Before);
         console.log("balanceOf(eigenAgent) on L2 after:", stakerBalanceOnL2After);
 
@@ -499,8 +499,9 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
     }
 
 
-    function makeCCIPEigenlayerMsg_TransferToStaker(
-        bytes32 withdrawalRoot
+    function makeCCIPEigenlayerMsg_TransferToAgentOwner(
+        bytes32 withdrawalRoot,
+        address agentOwner
     ) public view returns (Client.Any2EVMMessage memory) {
 
         // Not bridging tokens, just sending message to withdraw
@@ -511,8 +512,9 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             sourceChainSelector: EthSepolia.ChainSelector,
             sender: abi.encode(deployer),
             data: abi.encode(string(
-                EigenlayerMsgEncoders.encodeTransferToStakerMsg(
-                    withdrawalRoot
+                EigenlayerMsgEncoders.encodeCheckTransferToAgentOwnerMsg(
+                    withdrawalRoot,
+                    agentOwner
                 )
             )), // CCIP abi.encodes a string message when sending
             destTokenAmounts: destTokenAmounts

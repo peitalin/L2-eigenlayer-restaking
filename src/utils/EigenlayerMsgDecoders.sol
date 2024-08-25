@@ -5,22 +5,22 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-// Message to 6551 to Deposit
+// Msg to 6551 to Deposit
 import {
-    EigenlayerDeposit6551Message,
+    EigenlayerDeposit6551Msg,
     EigenlayerDeposit6551Params
 } from "../interfaces/IEigenlayerMsgDecoders.sol";
 // QueueWithdrawals
 import {
-    EigenlayerQueueWithdrawalsParams,
-    EigenlayerQueueWithdrawalsWithSignatureParams
+    EigenlayerQueueWithdrawalsParams
 } from "../interfaces/IEigenlayerMsgDecoders.sol";
-// TransferToStaker
+// TransferToAgentOwner
 import {
-    TransferToStakerMessage,
-    TransferToStakerParams
+    TransferToAgentOwnerMsg,
+    TransferToAgentOwnerParams
 } from "../interfaces/IEigenlayerMsgDecoders.sol";
 import {IEigenlayerMsgDecoders} from "../interfaces/IEigenlayerMsgDecoders.sol";
+import {EigenlayerMsgEncoders} from "./EigenlayerMsgEncoders.sol";
 
 import {console} from "forge-std/Test.sol";
 
@@ -35,11 +35,12 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
      *
     */
 
-    function decodeDepositWithSignature6551Msg(
-        bytes memory message
-    ) public returns (EigenlayerDeposit6551Message memory) {
+    function decodeDepositWithSignature6551Msg(bytes memory message)
+        public
+        returns (EigenlayerDeposit6551Msg memory)
+    {
         ////////////////////////////////////////////////////////
-        //// Message payload offsets for assembly destructuring
+        //// Msg payload offsets for assembly destructuring
         ////////////////////////////////////////////////////////
 
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
@@ -91,7 +92,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
         emit EigenlayerDeposit6551Params(staker, strategy, token, amount);
 
-        return EigenlayerDeposit6551Message({
+        return EigenlayerDeposit6551Msg({
             strategy: strategy,
             token: token,
             amount: amount,
@@ -110,13 +111,14 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
      *
     */
 
-    function decodeQueueWithdrawalsMessage(
-        bytes memory message
-    ) public returns (
-        IDelegationManager.QueuedWithdrawalParams[] memory,
-        uint256,
-        bytes memory
-    ) {
+    function decodeQueueWithdrawalsMsg(bytes memory message)
+        public
+        returns (
+            IDelegationManager.QueuedWithdrawalParams[] memory,
+            uint256,
+            bytes memory
+        )
+    {
         /// @dev note: Need to account for bytes message including arrays of QueuedWithdrawalParams
         /// We will need to check array length in SenderCCIP to determine gas as well.
 
@@ -143,14 +145,14 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
             arrayLength := mload(add(message, 132))
         }
 
-        require(arrayLength >= 1, "decodeQueueWithdrawalsMessage: arrayLength must be at least 1");
+        require(arrayLength >= 1, "decodeQueueWithdrawalsMsg: arrayLength must be at least 1");
 
         IDelegationManager.QueuedWithdrawalParams[] memory arrayQueuedWithdrawalParams =
             new IDelegationManager.QueuedWithdrawalParams[](arrayLength);
 
         for (uint256 i; i < arrayLength; i++) {
             IDelegationManager.QueuedWithdrawalParams memory wp;
-            wp = _decodeSingleQueueWithdrawalMessage(message, arrayLength, i);
+            wp = _decodeSingleQueueWithdrawalMsg(message, arrayLength, i);
             arrayQueuedWithdrawalParams[i] = wp;
         }
 
@@ -178,7 +180,7 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         return (arrayQueuedWithdrawalParams, expiry, signature);
     }
 
-    function _decodeSingleQueueWithdrawalMessage(
+    function _decodeSingleQueueWithdrawalMsg(
         bytes memory message,
         uint256 arrayLength,
         uint256 i
@@ -287,23 +289,27 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
      *
     */
 
-    function decodeCompleteWithdrawalMessage(bytes memory message) public pure returns (
-        IDelegationManager.Withdrawal memory,
-        IERC20[] memory,
-        uint256,
-        bool,
-        uint256,
-        bytes memory
-    ) {
+    function decodeCompleteWithdrawalMsg(bytes memory message)
+        public
+        pure
+        returns (
+            IDelegationManager.Withdrawal memory,
+            IERC20[] memory,
+            uint256,
+            bool,
+            uint256,
+            bytes memory
+        )
+    {
         // Note: assumes we are withdrawing 1 token, tokensToWithdraw.length == 1
-        IDelegationManager.Withdrawal memory _withdrawal = _decodeCompleteWithdrawalMessagePart1(message);
+        IDelegationManager.Withdrawal memory _withdrawal = _decodeCompleteWithdrawalMsgPart1(message);
         (
             IERC20[] memory _tokensToWithdraw,
             uint256 _middlewareTimesIndex,
             bool _receiveAsTokens,
             uint256 _expiry,
             bytes memory _signature
-        ) = _decodeCompleteWithdrawalMessagePart2(message);
+        ) = _decodeCompleteWithdrawalMsgPart2(message);
 
         return (
             _withdrawal,
@@ -315,10 +321,11 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         );
     }
 
-    function _decodeCompleteWithdrawalMessagePart1(bytes memory message) internal pure returns (
-        IDelegationManager.Withdrawal memory
-    ) {
-        /// @note decodes the first half of the CompleteWithdrawalMessage as we run into
+    function _decodeCompleteWithdrawalMsgPart1(bytes memory message)
+        internal pure
+        returns (IDelegationManager.Withdrawal memory)
+    {
+        /// @note decodes the first half of the CompleteWithdrawalMsg as we run into
         /// a "stack to deep" error with more than 16 variables in the function.
 
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
@@ -425,14 +432,17 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         return withdrawal;
     }
 
-    function _decodeCompleteWithdrawalMessagePart2(bytes memory message) internal pure returns (
-        IERC20[] memory,
-        uint256,
-        bool,
-        uint256,
-        bytes memory
-    ) {
-        /// @note decodes the second half of the CompleteWithdrawalMessage as we run into
+    function _decodeCompleteWithdrawalMsgPart2(bytes memory message)
+        internal pure
+        returns (
+            IERC20[] memory,
+            uint256,
+            bool,
+            uint256,
+            bytes memory
+        )
+    {
+        /// @note decodes the second half of the CompleteWithdrawalMsg as we run into
         /// a "stack to deep" error with more than 16 variables in the function.
 
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
@@ -536,31 +546,38 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
 
 
     /// @dev this message is dispatched from L1 -> L2 by ReceiverCCIP.sol
-    function decodeTransferToStakerMessage(
-        bytes memory message
-    ) public returns (TransferToStakerMessage memory) {
-
+    function decodeTransferToAgentOwnerMsg(bytes memory message)
+        public
+        returns (TransferToAgentOwnerMsg memory)
+    {
         // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
         // 0000000000000000000000000000000000000000000000000000000000000024 [64] string length
         // 27167d10                                                         [96] function selector
         // 8c20d3a37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7d8ec77 [100] withdrawalRoot
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] agent owner
         // 00000000000000000000000000000000000000000000000000000000
 
         bytes4 functionSelector;
         bytes32 withdrawalRoot;
+        address agentOwner;
 
         assembly {
             functionSelector := mload(add(message, 96))
             withdrawalRoot := mload(add(message, 100))
+            agentOwner := mload(add(message, 132))
         }
 
-        TransferToStakerMessage memory transferToStakerMessage = TransferToStakerMessage({
-            withdrawalRoot: withdrawalRoot
+        bytes32 agentOwnerRoot = EigenlayerMsgEncoders.calculateAgentOwnerRoot(withdrawalRoot, agentOwner);
+
+        TransferToAgentOwnerMsg memory toAgentOwnerMsg = TransferToAgentOwnerMsg({
+            withdrawalRoot: withdrawalRoot,
+            agentOwner: agentOwner,
+            agentOwnerRoot: agentOwnerRoot
         });
 
-        emit TransferToStakerParams(withdrawalRoot);
+        emit TransferToAgentOwnerParams(withdrawalRoot, agentOwner, agentOwnerRoot);
 
-        return transferToStakerMessage;
+        return toAgentOwnerMsg;
     }
 
     /*
@@ -571,15 +588,16 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
      *
     */
 
-    function decodeDelegateToBySignature(
-        bytes memory message
-    ) public pure returns (
-        address,
-        address,
-        ISignatureUtils.SignatureWithExpiry memory,
-        ISignatureUtils.SignatureWithExpiry memory,
-        bytes32
-    ) {
+    function decodeDelegateToBySignatureMsg(bytes memory message)
+        public pure
+        returns (
+            address,
+            address,
+            ISignatureUtils.SignatureWithExpiry memory,
+            ISignatureUtils.SignatureWithExpiry memory,
+            bytes32
+        )
+    {
         // function delegateToBySignature(
         //     address staker,
         //     address operator,
@@ -688,10 +706,10 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
     }
 
 
-    function _getDelegationSignature(
-        bytes memory message,
-        uint256 offset
-    ) internal pure returns (ISignatureUtils.SignatureWithExpiry memory) {
+    function _getDelegationSignature(bytes memory message, uint256 offset)
+        internal pure
+        returns (ISignatureUtils.SignatureWithExpiry memory)
+    {
 
         uint256 expiry;
         bytes memory signature;
@@ -717,10 +735,10 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
     }
 
 
-    function _getDelegationNullSignature(
-        bytes memory message,
-        uint256 offset
-    ) internal pure returns (ISignatureUtils.SignatureWithExpiry memory) {
+    function _getDelegationNullSignature(bytes memory message, uint256 offset)
+        internal pure
+        returns (ISignatureUtils.SignatureWithExpiry memory)
+    {
 
         ///// Null signatures:
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
@@ -756,10 +774,10 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
     }
 
 
-    function decodeUndelegate(
-        bytes memory message
-    ) public pure returns (address) {
-
+    function decodeUndelegateMsg(bytes memory message)
+        public pure
+        returns (address)
+    {
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
         // 0000000000000000000000000000000000000000000000000000000000000224 [64]
         // 54b2bf29                                                         [96]
