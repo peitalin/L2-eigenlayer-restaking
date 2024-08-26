@@ -5,26 +5,42 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-// Msg to 6551 to Deposit
-import {
-    EigenlayerDeposit6551Msg,
-    EigenlayerDeposit6551Params
-} from "../interfaces/IEigenlayerMsgDecoders.sol";
-// QueueWithdrawals
-import {
-    EigenlayerQueueWithdrawalsParams
-} from "../interfaces/IEigenlayerMsgDecoders.sol";
-// TransferToAgentOwner
-import {
-    TransferToAgentOwnerMsg,
-    TransferToAgentOwnerParams
-} from "../interfaces/IEigenlayerMsgDecoders.sol";
-import {IEigenlayerMsgDecoders} from "../interfaces/IEigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "./EigenlayerMsgEncoders.sol";
 
 
+struct EigenlayerDeposit6551Msg {
+    address strategy;
+    address token;
+    uint256 amount;
+    address staker;
+    uint256 expiry;
+    bytes signature;
+}
+event EigenlayerDeposit6551Params(
+    address indexed staker,
+    address indexed strategy,
+    address token,
+    uint256 indexed amount
+);
 
-contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
+event EigenlayerQueueWithdrawalsParams(
+    uint256 indexed amount,
+    address indexed staker
+);
+
+struct TransferToAgentOwnerMsg {
+    bytes32 withdrawalRoot;
+    address agentOwner;
+    bytes32 agentOwnerRoot;
+}
+event TransferToAgentOwnerParams(
+    bytes32 indexed withdrawalRoot,
+    address indexed agentOwner,
+    bytes32 indexed agentOwnerRoot
+);
+
+
+library EigenlayerMsgDecoders {
 
     /*
      *
@@ -88,8 +104,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         bytes memory signature = abi.encodePacked(r,s,v);
 
         require(sig_length == 65, "decodeDepositWithSignature6551Msg: invalid signature length");
-
-        emit EigenlayerDeposit6551Params(staker, strategy, token, amount);
 
         return EigenlayerDeposit6551Msg({
             strategy: strategy,
@@ -270,8 +284,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
             shares: sharesToWithdraw,
             withdrawer: _withdrawer
         });
-
-        emit EigenlayerQueueWithdrawalsParams(_sharesToWithdraw, _withdrawer);
 
         return queuedWithdrawalParams;
     }
@@ -566,8 +578,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
             agentOwner: agentOwner,
             agentOwnerRoot: agentOwnerRoot
         });
-
-        emit TransferToAgentOwnerParams(withdrawalRoot, agentOwner, agentOwnerRoot);
 
         return toAgentOwnerMsg;
     }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
@@ -26,17 +26,16 @@ import {FileReader} from "./FileReader.sol";
 
 contract UpgradeReceiverOnL1Script is Script {
 
-    function run() public {
+    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+    address deployer = vm.addr(deployerKey);
 
-        uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
-        address deployer = vm.addr(deployerKey);
+    function run() public {
 
         vm.createSelectFork("ethsepolia");
 
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL1());
         ISenderCCIP senderProxy = fileReader.readSenderContract();
-        RestakingConnector restakingConnector;
 
         DeployMockEigenlayerContractsScript deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         (
@@ -54,26 +53,29 @@ contract UpgradeReceiverOnL1Script is Script {
         /////////////////////////////
         vm.startBroadcast(deployerKey);
 
-        // Either use old implementation or deploy a new one if code differs.
-        restakingConnector = new RestakingConnector();
-        restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
-        restakingConnector.addAdmin(deployer);
         (
             IReceiverCCIP receiverProxy,
-            // restakingConnector
+            IRestakingConnector restakingConnectorProxy
         ) = fileReader.readReceiverRestakingConnector();
 
-        // deploy receiver contract
-        ReceiverCCIP receiverImpl = new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link);
+        // Deploy new RestakingConnector implementation + upgrade proxy
+        RestakingConnector restakingConnectorImpl = new RestakingConnector();
+        proxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(restakingConnectorProxy))),
+            address(restakingConnectorImpl)
+        );
 
+        // Deploy new ReceiverCCIP implementation + upgrade proxy
+        ReceiverCCIP receiverImpl = new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link);
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(receiverProxy))),
             address(receiverImpl)
         );
-        // no need to upgradeAndCall: already initialized
-
-        receiverProxy.setSenderContractL2Addr(address(senderProxy));
-        receiverProxy.setRestakingConnector(IRestakingConnector(address(restakingConnector)));
+        // No need to upgradeAndCall:
+        // restakingProxy.setEigenlayerContracts(delegationManager, strategyManager, strategy);
+        // restakingProxy.addAdmin(deployer);
+        // receiverProxy.setSenderContractL2Addr(address(senderProxy));
+        // receiverProxy.setRestakingConnector(IRestakingConnector(address(restakingConnector)));
 
         vm.stopBroadcast();
     }

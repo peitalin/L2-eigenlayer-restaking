@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
+import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
 import {SenderUtils} from "./SenderUtils.sol";
@@ -62,7 +63,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
         bytes memory message = any2EvmMessage.data;
         string memory text_msg;
-        bytes4 functionSelector = senderUtils.decodeFunctionSelector(message);
+        bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
         if (functionSelector == ISenderUtils.handleTransferToAgentOwner.selector) {
             // bytes4(keccak256("handleTransferToAgentOwner(bytes32,address,bytes32)")) == 0x17f23aea
@@ -123,7 +124,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
         bytes memory message = abi.encode(_text);
 
-        bytes4 functionSelector = senderUtils.decodeFunctionSelector(message);
+        bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
         // When User sends a message to CompleteQueuedWithdrawal from L2 to L1
         if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {

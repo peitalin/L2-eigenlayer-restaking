@@ -39,21 +39,19 @@ contract DeployReceiverOnL1Script is Script {
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
 
-    uint256 public deployerKey;
-    address public deployer;
+    uint256 public deployerKey = vm.envUint("DEPLOYER_KEY");
+    address public deployer = vm.addr(deployerKey);
 
     function run() public returns (IReceiverCCIP, IRestakingConnector) {
         return _run(false);
     }
 
     function testrun() public returns (IReceiverCCIP, IRestakingConnector) {
+        vm.deal(deployer, 1 ether);
         return _run(true);
     }
 
     function _run(bool isTest) internal returns (IReceiverCCIP, IRestakingConnector) {
-
-        deployerKey = vm.envUint("DEPLOYER_KEY");
-        deployer = vm.addr(deployerKey);
 
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
@@ -109,7 +107,7 @@ contract DeployReceiverOnL1Script is Script {
 
         // deploy real receiver implementation and upgradeAndCall initializer
         ReceiverCCIP receiverImpl = new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link);
-        ReceiverCCIP receiverProxy = ReceiverCCIP(
+        receiverProxy = ReceiverCCIP(
             payable(address(
                 new TransparentUpgradeableProxy(
                     address(receiverImpl),

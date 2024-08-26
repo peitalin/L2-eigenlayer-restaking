@@ -4,23 +4,14 @@ pragma solidity 0.8.22;
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-
-import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
-import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
+import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
-import {IReceiverCCIP} from "./interfaces/IReceiverCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
-import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 
 import {BaseSepolia} from "../script/Addresses.sol";
-
-import {EigenlayerDeposit6551Msg} from "./interfaces/IEigenlayerMsgDecoders.sol";
-import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
-import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
-import {ERC6551AccountProxy} from "@6551/examples/upgradeable/ERC6551AccountProxy.sol";
 
 
 /// @title ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them
@@ -94,24 +85,18 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         }
 
         bytes memory message = any2EvmMessage.data;
-        bytes4 functionSelector = restakingConnector.decodeFunctionSelector(message);
+        bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
         address token = s_lastReceivedTokenAddress;
         uint256 amount = s_lastReceivedTokenAmount;
         string memory textMsg = "no matching functionSelector";
-
-        (
-            IDelegationManager delegationManager,
-            IStrategyManager strategyManager,
-            IStrategy strategy
-        ) = restakingConnector.getEigenlayerContracts();
-
 
         //////////////////////////////////
         // Deposit Into Strategy
         //////////////////////////////////
         if (functionSelector == 0xaac4ec88) {
             // cast sig "depositWithEigenAgent(bytes,address,uint256)" == 0xaac4ec88
+            IERC20(token).approve(address(restakingConnector), amount);
             restakingConnector.depositWithEigenAgent(message, token, amount);
             textMsg = "approved and deposited by EigenAgent";
         }
@@ -131,22 +116,20 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
             // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
             (
-                IDelegationManager.Withdrawal memory withdrawal,
+                uint256 withdrawalAmount,
+                address withdrawalToken,
                 string memory messageForL2
             ) = restakingConnector.completeWithdrawalWithEigenAgent(message, token, amount);
 
-            // address original_staker = withdrawal.staker;
-            uint256 amount = withdrawal.shares[0];
             // Approve L1 receiverContract to send ccip-BnM tokens to Router
-            IERC20 token = withdrawal.strategies[0].underlyingToken();
-            token.approve(address(this), amount);
+            IERC20(withdrawalToken).approve(address(this), withdrawalAmount);
 
             /// Call bridge with a message to handleTransferToAgentOwner to bridge tokens back to L2
             this.sendMessagePayNative(
                 BaseSepolia.ChainSelector, // destination chain
                 senderContractL2Addr,
                 messageForL2,
-                address(token), // L1 token to burn/lock
+                address(withdrawalToken), // L1 token to burn/lock
                 amount
             );
             textMsg = "completeQueuedWithdrawal()";
@@ -156,6 +139,8 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         // delegateTo
         //////////////////////////////////
         if (functionSelector == IDelegationManager.delegateTo.selector) {
+
+            restakingConnector.delegateToWithEigenAgent(message, token, amount);
         }
 
         emit MessageReceived(
@@ -197,7 +182,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
         bytes memory message = abi.encode(_text);
 
-        bytes4 functionSelector = restakingConnector.decodeFunctionSelector(message);
+        bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
         uint256 gasLimit = restakingConnector.getGasLimitForFunctionSelector(functionSelector);
 
         return

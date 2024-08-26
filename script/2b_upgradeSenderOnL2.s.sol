@@ -4,7 +4,7 @@ pragma solidity 0.8.22;
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
 import {SenderUtils} from "../src/SenderUtils.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
@@ -24,6 +24,8 @@ contract UpgradeSenderOnL2Script is Script {
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL2());
         ISenderCCIP senderProxy = fileReader.readSenderContract();
+
+        // console.log("proxyAdminl2:", address(proxyAdmin));
 
 
         /// Either use old implementation or deploy a new one if code differs.

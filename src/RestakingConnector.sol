@@ -7,15 +7,14 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-
-import {Adminable} from "./utils/Adminable.sol";
-import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
-import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
-import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
-import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 
-import {EigenlayerDeposit6551Msg} from "./interfaces/IEigenlayerMsgDecoders.sol";
+import {Adminable} from "./utils/Adminable.sol";
+import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
+import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
+import {EigenlayerDeposit6551Msg} from "./utils/EigenlayerMsgDecoders.sol";
+import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
+
 import {ERC6551AccountProxy} from "@6551/examples/upgradeable/ERC6551AccountProxy.sol";
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
@@ -27,7 +26,6 @@ import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 contract RestakingConnector is
     Initializable,
     IRestakingConnector,
-    EigenlayerMsgDecoders,
     Adminable
 {
 
@@ -197,7 +195,7 @@ contract RestakingConnector is
         uint256 amount
     ) public onlyReceiverCCIP {
 
-        EigenlayerDeposit6551Msg memory eigenMsg = decodeDepositWithSignature6551Msg(message);
+        EigenlayerDeposit6551Msg memory eigenMsg = EigenlayerMsgDecoders.decodeDepositWithSignature6551Msg(message);
         IEigenAgent6551 eigenAgent = _tryGetEigenAgentOrSpawn(eigenMsg.staker);
 
         bytes memory depositData = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
@@ -217,7 +215,12 @@ contract RestakingConnector is
             eigenMsg.signature
         );
 
-        IERC20(token).transfer(address(eigenAgent), eigenMsg.amount);
+        // ReceiverCCIP approves, restaking connector transfers to eigenAgent
+        IERC20(token).transferFrom(
+            _receiverCCIP,
+            address(eigenAgent),
+            eigenMsg.amount
+        );
 
         bytes memory result = eigenAgent.executeWithSignature(
             address(strategyManager), // strategyManager
@@ -238,7 +241,7 @@ contract RestakingConnector is
             IDelegationManager.QueuedWithdrawalParams[] memory QWPArray,
             uint256 expiry,
             bytes memory signature
-        ) = decodeQueueWithdrawalsMsg(message);
+        ) = EigenlayerMsgDecoders.decodeQueueWithdrawalsMsg(message);
 
         /// @note: DelegationManager.queueWithdrawals requires:
         /// msg.sender == withdrawer == staker
@@ -259,7 +262,8 @@ contract RestakingConnector is
         address token,
         uint256 amount
     ) public onlyReceiverCCIP returns (
-        IDelegationManager.Withdrawal memory,
+        uint256,
+        address,
         string memory
     ) {
 
@@ -270,7 +274,7 @@ contract RestakingConnector is
             bool receiveAsTokens,
             uint256 expiry,
             bytes memory signature
-        ) = decodeCompleteWithdrawalMsg(message);
+        ) = EigenlayerMsgDecoders.decodeCompleteWithdrawalMsg(message);
 
         // eigenAgent == withdrawer == staker == msg.sender (in Eigenlayer)
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawal.withdrawer));
@@ -293,11 +297,8 @@ contract RestakingConnector is
         // then it calculates withdrawalRoot ensuring staker/withdrawal/block is a valid withdrawal.
         bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
 
-        // address original_staker = withdrawal.staker;
-        uint256 amount = withdrawal.shares[0];
-        // Approve L1 receiverContract to send ccip-BnM tokens to Router
-        IERC20 token = withdrawal.strategies[0].underlyingToken();
-        token.approve(address(this), amount);
+        uint256 withdrawalAmount = withdrawal.shares[0];
+        IERC20 withdrawalToken = withdrawal.strategies[0].underlyingToken();
 
         string memory messageForL2 = string(encodeHandleTransferToAgentOwnerMsg(
             withdrawalRoot,
@@ -305,7 +306,8 @@ contract RestakingConnector is
         ));
 
         return (
-            withdrawal,
+            withdrawalAmount,
+            address(withdrawalToken),
             messageForL2
         );
     }
@@ -321,7 +323,7 @@ contract RestakingConnector is
             ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry,
             ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
             bytes32 approverSalt
-        ) = decodeDelegateToBySignatureMsg(message);
+        ) = EigenlayerMsgDecoders.decodeDelegateToBySignatureMsg(message);
 
         delegationManager.delegateToBySignature(
             staker,
@@ -338,10 +340,6 @@ contract RestakingConnector is
      *
      *
     */
-
-    function decodeFunctionSelector(bytes memory message) public returns (bytes4) {
-        return FunctionSelectorDecoder.decodeFunctionSelector(message);
-    }
 
     function encodeHandleTransferToAgentOwnerMsg(
         bytes32 withdrawalRoot,

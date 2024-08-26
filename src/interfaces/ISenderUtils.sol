@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {IEigenlayerMsgDecoders} from "./IEigenlayerMsgDecoders.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
-interface ISenderUtils is IEigenlayerMsgDecoders {
+interface ISenderUtils {
 
     struct WithdrawalTransfer {
         address withdrawer;
         uint256 amount;
         address tokenDestination;
     }
-
-    function decodeFunctionSelector(bytes memory message) external returns (bytes4);
 
     function handleTransferToAgentOwner(bytes memory message) external returns (
         address agentOwner,

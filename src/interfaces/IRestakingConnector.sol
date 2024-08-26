@@ -4,15 +4,13 @@ pragma solidity 0.8.22;
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {IEigenlayerMsgDecoders} from "../interfaces/IEigenlayerMsgDecoders.sol";
 
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgent6551} from "../../src/6551/IEigenAgent6551.sol";
 import {EigenAgentOwner721} from "../../src/6551/EigenAgentOwner721.sol";
-import {ERC6551AccountProxy} from "@6551/examples/upgradeable/ERC6551AccountProxy.sol";
 
 
-interface IRestakingConnector is IEigenlayerMsgDecoders {
+interface IRestakingConnector {
 
     /*
      *
@@ -65,7 +63,8 @@ interface IRestakingConnector is IEigenlayerMsgDecoders {
         address token,
         uint256 amount
     ) external returns (
-        IDelegationManager.Withdrawal memory,
+        uint256,
+        address,
         string memory // CCIP message for transferToAgentOwner on L2
     );
 
@@ -93,8 +92,6 @@ interface IRestakingConnector is IEigenlayerMsgDecoders {
     function setQueueWithdrawalBlock(address staker, uint256 nonce) external;
 
     function getQueueWithdrawalBlock(address staker, uint256 nonce) external returns (uint256);
-
-    function decodeFunctionSelector(bytes memory message) external returns (bytes4);
 
     function setFunctionSelectorName(
         bytes4 functionSelector,

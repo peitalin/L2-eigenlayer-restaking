@@ -1,0 +1,14 @@
+{
+  "chainInfo": {
+    "block": 6576105,
+    "chainid": 11155111,
+    "timestamp": 1724692200
+  },
+  "contracts": {
+    "eigenAgentOwner721": "0x4A74Bb5021E1124623bbf632ec4c41944e240951",
+    "proxyAdminL1": "0x424C12493C8bE02Bc653470F000F62c47d43d318",
+    "receiverCCIP": "0x1689aD770c571004fA7F3896F64e49bfc61B564F",
+    "registry6551": "0x8c3c3Fccb5627AAdcA9026f2E923bAfC039D3f9a",
+    "restakingConnector": "0xc779610c50ACa748F29530EaCc72bd23E3941326"
+  }
+}

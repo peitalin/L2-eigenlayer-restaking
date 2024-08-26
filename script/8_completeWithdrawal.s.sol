@@ -52,9 +52,6 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         bool isTest = block.chainid == 31337;
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
-        console.log("l2ForkId:", l2ForkId);
-        console.log("ethForkId:", ethForkId);
-        console.log("block.chainid", block.chainid);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);

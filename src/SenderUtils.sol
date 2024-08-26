@@ -4,14 +4,13 @@ pragma solidity 0.8.22;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
-import {TransferToAgentOwnerMsg} from "./interfaces/IEigenlayerMsgDecoders.sol";
+import {TransferToAgentOwnerMsg} from "./utils/EigenlayerMsgDecoders.sol";
 import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
-import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 
 
-contract SenderUtils is EigenlayerMsgDecoders, Ownable {
+contract SenderUtils is Ownable {
 
     event SendingWithdrawalToAgentOwner(address indexed, uint256 indexed, address indexed);
     event WithdrawalCommitted(bytes32 indexed, address indexed, uint256 indexed);
@@ -54,17 +53,13 @@ contract SenderUtils is EigenlayerMsgDecoders, Ownable {
         _functionSelectorNames[0x27167d10] = "transferToStaker";
     }
 
-    function decodeFunctionSelector(bytes memory message) public returns (bytes4) {
-        return FunctionSelectorDecoder.decodeFunctionSelector(message);
-    }
-
     function handleTransferToAgentOwner(bytes memory message) public returns (
         address,
         uint256,
         address
     ) {
 
-        TransferToAgentOwnerMsg memory transferToAgentOwnerMsg = decodeTransferToAgentOwnerMsg(message);
+        TransferToAgentOwnerMsg memory transferToAgentOwnerMsg = EigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(message);
 
         bytes32 withdrawalRoot = transferToAgentOwnerMsg.withdrawalRoot;
         address agentOwner = transferToAgentOwnerMsg.agentOwner;
@@ -120,7 +115,7 @@ contract SenderUtils is EigenlayerMsgDecoders, Ownable {
                 , // receiveAsTokens
                 , // expiry
                 , // signature
-            ) = decodeCompleteWithdrawalMsg(message);
+            ) = EigenlayerMsgDecoders.decodeCompleteWithdrawalMsg(message);
 
             bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
 
