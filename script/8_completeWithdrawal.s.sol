@@ -73,10 +73,10 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
             // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
-        senderContract = fileReader.getSenderContract();
+        senderContract = fileReader.readSenderContract();
         senderAddr = address(senderContract);
 
-        (receiverContract, restakingConnector) = fileReader.getReceiverRestakingConnectorContracts();
+        (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
 
         ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
 

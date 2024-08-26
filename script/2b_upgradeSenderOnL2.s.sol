@@ -4,7 +4,7 @@ pragma solidity 0.8.22;
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
-import {Script, console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
 import {SenderUtils} from "../src/SenderUtils.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
@@ -19,14 +19,16 @@ contract UpgradeSenderOnL2Script is Script {
     function run() public {
 
         uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+        vm.createSelectFork("basesepolia");
 
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
-        ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.getL2ProxyAdmin());
-        ISenderCCIP senderProxy = fileReader.getSenderContract();
+        ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL2());
+        ISenderCCIP senderProxy = fileReader.readSenderContract();
 
-        // Either use old implementation or deploy a new one if code differs.
-        ISenderUtils senderUtils = ISenderUtils(fileReader.getSenderUtils());
-        // SenderUtils senderUtils = new SenderUtils();
+
+        /// Either use old implementation or deploy a new one if code differs.
+        /// ISenderUtils senderUtils = ISenderUtils(fileReader.readSenderUtils());
+        ISenderUtils senderUtils = ISenderUtils(address(new SenderUtils()));
 
         /////////////////////////////
         /// Begin Broadcast
@@ -39,9 +41,9 @@ contract UpgradeSenderOnL2Script is Script {
             TransparentUpgradeableProxy(payable(address(senderProxy))),
             address(senderImpl)
         );
-        // no need to upgradeAndCall: already initialized
+        /// no need to upgradeAndCall: already initialized
 
-        // whitelist destination chain
+        /// whitelist destination chain
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         senderProxy.setSenderUtils(senderUtils);

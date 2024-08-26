@@ -63,7 +63,6 @@ contract SenderCCIP is BaseMessengerCCIP {
 
         if (functionSelector == ISenderUtils.handleTransferToAgentOwner.selector) {
             // bytes4(keccak256("handleTransferToAgentOwner(bytes32,address,bytes32)")) == 0x17f23aea
-
             (
                 address agentOwner,
                 uint256 amount,

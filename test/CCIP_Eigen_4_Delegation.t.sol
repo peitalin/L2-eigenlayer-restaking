@@ -22,8 +22,8 @@ import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
-import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
-import {DeployOnL2Script} from "../script/2_deployOnL2.s.sol";
+import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
+import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
 
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
@@ -33,8 +33,8 @@ import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 contract CCIP_Eigen_DelegationTests is Test {
 
-    DeployOnEthScript public deployOnEthScript;
-    DeployOnL2Script public deployOnL2Script;
+    DeployReceiverOnL1Script public deployOnEthScript;
+    DeploySenderOnL2Script public deployOnL2Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
 
@@ -67,8 +67,8 @@ contract CCIP_Eigen_DelegationTests is Test {
 		deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        deployOnEthScript = new DeployOnEthScript();
-        deployOnL2Script = new DeployOnL2Script();
+        deployOnEthScript = new DeployReceiverOnL1Script();
+        deployOnL2Script = new DeploySenderOnL2Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         signatureUtils = new SignatureUtilsEIP1271();
 

@@ -50,7 +50,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         signatureUtils = new SignatureUtilsEIP1271();
         fileReader = new FileReader();
 
-        (receiverContract,) = fileReader.getReceiverRestakingConnectorContracts();
+        (receiverContract,) = fileReader.readReceiverRestakingConnector();
 
         // just for deserializing, not calling these contracts
         strategy = IStrategy(0xBd4bcb3AD20E9d85D5152aE68F45f40aF8952159);
@@ -460,7 +460,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
         TransferToAgentOwnerMsg memory tts_msg = restakingConnector.decodeTransferToAgentOwnerMsg(
             abi.encode(string(
-                EigenlayerMsgEncoders.encodeCheckTransferToAgentOwnerMsg(
+                EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
                     withdrawalRoot1,
                     agentOwner
                 )

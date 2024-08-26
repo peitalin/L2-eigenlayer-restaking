@@ -13,18 +13,14 @@ import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 
 contract SenderUtils is EigenlayerMsgDecoders, Ownable {
 
+    event SendingWithdrawalToAgentOwner(address indexed, uint256 indexed, address indexed);
+    event WithdrawalCommitted(bytes32 indexed, address indexed, uint256 indexed);
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
 
-    event SendingWithdrawalToAgentOwner(address indexed, uint256 indexed, address indexed);
-
-    event WithdrawalCommitted(bytes32 indexed, address indexed, uint256 indexed);
-
     mapping(bytes32 => ISenderUtils.WithdrawalTransfer) public withdrawalTransferCommittments;
-
     mapping(bytes32 => bool) public withdrawalRootsSpent;
 
     mapping(bytes4 => uint256) internal _gasLimitsForFunctionSelectors;
-
     mapping(bytes4 => string) internal _functionSelectorNames;
 
     constructor() {
@@ -60,17 +56,6 @@ contract SenderUtils is EigenlayerMsgDecoders, Ownable {
 
     function decodeFunctionSelector(bytes memory message) public returns (bytes4) {
         return FunctionSelectorDecoder.decodeFunctionSelector(message);
-    }
-
-    function setFunctionSelectorName(
-        bytes4 functionSelector,
-        string memory _name
-    ) public onlyOwner returns (string memory) {
-        return _functionSelectorNames[functionSelector] = _name;
-    }
-
-    function getFunctionSelectorName(bytes4 functionSelector) public view returns (string memory) {
-        return _functionSelectorNames[functionSelector];
     }
 
     function handleTransferToAgentOwner(bytes memory message) public returns (
@@ -111,6 +96,19 @@ contract SenderUtils is EigenlayerMsgDecoders, Ownable {
         );
     }
 
+    function getWithdrawal(bytes32 withdrawalRoot)
+        public view
+        returns (ISenderUtils.WithdrawalTransfer memory)
+    {
+        return withdrawalTransferCommittments[withdrawalRoot];
+    }
+
+    function calculateWithdrawalRoot(
+        IDelegationManager.Withdrawal memory withdrawal
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encode(withdrawal));
+    }
+
     function commitWithdrawalRootInfo(
         bytes memory message,
         address tokenDestination
@@ -145,13 +143,22 @@ contract SenderUtils is EigenlayerMsgDecoders, Ownable {
             emit WithdrawalCommitted(withdrawalRoot, withdrawal.withdrawer, withdrawal.shares[0]);
     }
 
+    function setFunctionSelectorName(
+        bytes4 functionSelector,
+        string memory _name
+    ) public onlyOwner returns (string memory) {
+        return _functionSelectorNames[functionSelector] = _name;
+    }
+
+    function getFunctionSelectorName(bytes4 functionSelector) public view returns (string memory) {
+        return _functionSelectorNames[functionSelector];
+    }
+
     function setGasLimitsForFunctionSelectors(
         bytes4[] memory functionSelectors,
         uint256[] memory gasLimits
     ) public onlyOwner {
-
         require(functionSelectors.length == gasLimits.length, "input arrays must have the same length");
-
         for (uint256 i = 0; i < gasLimits.length; ++i) {
             _gasLimitsForFunctionSelectors[functionSelectors[i]] = gasLimits[i];
             emit SetGasLimitForFunctionSelector(functionSelectors[i], gasLimits[i]);
@@ -159,21 +166,13 @@ contract SenderUtils is EigenlayerMsgDecoders, Ownable {
     }
 
     function getGasLimitForFunctionSelector(bytes4 functionSelector) public view returns (uint256) {
-        return _gasLimitsForFunctionSelectors[functionSelector];
+        uint256 gasLimit = _gasLimitsForFunctionSelectors[functionSelector];
+        if (gasLimit != 0) {
+            return gasLimit;
+        } else {
+            // default gasLimit
+            return 400_000;
+        }
     }
-
-    function getWithdrawal(bytes32 withdrawalRoot)
-        public view
-        returns (ISenderUtils.WithdrawalTransfer memory)
-    {
-        return withdrawalTransferCommittments[withdrawalRoot];
-    }
-
-    function calculateWithdrawalRoot(
-        IDelegationManager.Withdrawal memory withdrawal
-    ) public pure returns (bytes32) {
-        return keccak256(abi.encode(withdrawal));
-    }
-
 }
 

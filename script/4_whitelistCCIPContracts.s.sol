@@ -36,8 +36,8 @@ contract WhitelistCCIPContractsScript is Script {
         console.log("block.chainid", block.chainid);
 
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
-        senderContract = fileReader.getSenderContract();
-        (receiverContract, restakingConnector) = fileReader.getReceiverRestakingConnectorContracts();
+        senderContract = fileReader.readSenderContract();
+        (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
 
         require(address(receiverContract) != address(0), "receiverContract cannot be 0");
         require(address(restakingConnector) != address(0), "restakingConnector cannot be 0");

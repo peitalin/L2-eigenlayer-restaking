@@ -5,99 +5,145 @@ import {Script, stdJson, console} from "forge-std/Script.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
+import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {EthSepolia, BaseSepolia} from "./Addresses.sol";
+import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
+import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 
 contract FileReader is Script {
 
-    /// @dev hardcoded chainid for contracts. Update for prod
-    function getSenderContract() public view returns (ISenderCCIP) {
+    /////////////////////////////////////////////////
+    // L2 Contracts
+    /////////////////////////////////////////////////
 
-        string memory filePath = "./broadcast/2_deployOnL2.s.sol/84532/run-latest.json";
-        string memory broadcastData = vm.readFile(filePath);
-        // Check transaction is the correct RestakingConnector deployment tx
-        uint256 txNumber = _findCreateTx(broadcastData, "TransparentUpgradeableProxy", 5);
-        // TransparentUpgradeableProxy -> SenderCCIP
-
-        string memory contractAddr = string(abi.encodePacked(".transactions[", Strings.toString(txNumber), "].contractAddress"));
-        address senderAddr = address(stdJson.readAddress(broadcastData, contractAddr));
+    function readSenderContract() public view returns (ISenderCCIP) {
+        string memory addrData = vm.readFile("script/basesepolia/bridgeContractsL2.config.json");
+        address senderAddr = stdJson.readAddress(addrData, ".contracts.senderCCIP");
         return ISenderCCIP(senderAddr);
     }
 
-    /// @dev hardcoded chainid for contracts. Update for prod
-    function getSenderUtils() public view returns (address) {
+    function readSenderUtils() public view returns (ISenderUtils) {
+        string memory addrData = vm.readFile("script/basesepolia/bridgeContractsL2.config.json");
+        address senderUtilsAddr = stdJson.readAddress(addrData, ".contracts.senderUtils");
+        return ISenderUtils(senderUtilsAddr);
+    }
 
-        string memory filePath = "./broadcast/2_deployOnL2.s.sol/84532/run-latest.json";
-        string memory broadcastData = vm.readFile(filePath);
-        // Check transaction is the correct RestakingConnector deployment tx
-        uint256 txNumber = _findCreateTx(broadcastData, "SenderUtils", 5);
-
-        string memory contractAddr = string(abi.encodePacked(".transactions[", Strings.toString(txNumber), "].contractAddress"));
-        address senderUtils = address(stdJson.readAddress(broadcastData, contractAddr));
-        return senderUtils;
+    function readProxyAdminL2() public view returns (address) {
+        string memory addrData = vm.readFile("script/basesepolia/bridgeContractsL2.config.json");
+        address proxyAdminL2Addr = stdJson.readAddress(addrData, ".contracts.proxyAdminL2");
+        return proxyAdminL2Addr;
     }
 
     /// @dev hardcoded chainid for contracts. Update for prod
-    function getL2ProxyAdmin() public view returns (address) {
-        string memory broadcastData = vm.readFile("./broadcast/2_deployOnL2.s.sol/84532/run-latest.json");
-        // Check transaction is the correct RestakingConnector deployment tx
-        uint256 txNumber = _findCreateTx(broadcastData, "ProxyAdmin", 5);
+    function saveSenderBridgeContracts(
+        address senderCCIP,
+        address senderUtils,
+        address proxyAdminL2
+    ) public {
+        // { "inputs": <inputs_data>}
+        /////////////////////////////////////////////////
+        vm.serializeAddress("contracts" , "senderCCIP", senderCCIP);
+        vm.serializeAddress("contracts" , "senderUtils", senderUtils);
+        string memory inputs_data = vm.serializeAddress("contracts" , "proxyAdminL2", proxyAdminL2);
 
-        string memory contractAddr = string(abi.encodePacked(".transactions[", Strings.toString(txNumber), "].contractAddress"));
-        address proxyAdmin = address(stdJson.readAddress(broadcastData, contractAddr));
-        return proxyAdmin;
-    }
+        /////////////////////////////////////////////////
+        // { "chainInfo": <chain_info_data>}
+        /////////////////////////////////////////////////
+        vm.serializeUint("chainInfo", "block", block.number);
+        vm.serializeUint("chainInfo", "timestamp", block.timestamp);
+        string memory chainInfo_data = vm.serializeUint("chainInfo", "chainid", block.chainid);
 
-    /// @dev hardcoded chainid for contracts. Update for prod
-    function getL1ProxyAdmin() public view returns (address) {
-        string memory broadcastData = vm.readFile("broadcast/3_deployOnEth.s.sol/11155111/run-latest.json");
-        // Check transaction is the correct RestakingConnector deployment tx
-        uint256 txNumber = _findCreateTx(broadcastData, "ProxyAdmin", 12);
+        /////////////////////////////////////////////////
+        // combine objects to a root object
+        /////////////////////////////////////////////////
+        vm.serializeString("rootObject", "chainInfo", chainInfo_data);
+        string memory finalJson = vm.serializeString("rootObject", "contracts", inputs_data);
 
-        string memory contractAddr = string(abi.encodePacked(".transactions[", Strings.toString(txNumber), "].contractAddress"));
-        address proxyAdmin = address(stdJson.readAddress(broadcastData, contractAddr));
-        return proxyAdmin;
-    }
-
-    /// @dev hardcoded chainid for eigenlayer contracts. Update for prod
-    function getReceiverRestakingConnectorContracts() public view returns (IReceiverCCIP, IRestakingConnector) {
-        string memory broadcastData = vm.readFile("broadcast/3_deployOnEth.s.sol/11155111/run-latest.json");
-
-        // Check transaction is the correct ReceiverCCIP deployment tx
-        uint256 txNumber = _findCreateTx(broadcastData, "TransparentUpgradeableProxy", 12);
-        // TransparentUpgradeableProxy -> ReceiverCCIP
-        string memory contractAddr = string(abi.encodePacked(".transactions[", Strings.toString(txNumber), "].contractAddress"));
-        IReceiverCCIP _receiverContract = IReceiverCCIP(address(stdJson.readAddress(broadcastData, contractAddr)));
-
-        // Check transaction is the correct RestakingConnector deployment tx
-        uint256 txNumber2 = _findCreateTx(broadcastData, "RestakingConnector", 12);
-        string memory contractAddr2 = string(abi.encodePacked(".transactions[", Strings.toString(txNumber2), "].contractAddress"));
-        IRestakingConnector _restakingConnector = IRestakingConnector(address(stdJson.readAddress(broadcastData, contractAddr2)));
-
-        return (_receiverContract, _restakingConnector);
-    }
-
-    function _findCreateTx(string memory broadcastData, string memory _contractName, uint256 len) internal pure returns (uint256) {
-        for (uint256 i; i < len; i++) {
-            string memory contractName = stdJson.readString(broadcastData, string(abi.encodePacked(".transactions[", Strings.toString(i), "].contractName")));
-            string memory transactionType = stdJson.readString(broadcastData, string(abi.encodePacked(".transactions[", Strings.toString(i), "].transactionType")));
-            if (
-                keccak256(abi.encodePacked(contractName)) == keccak256(abi.encodePacked(_contractName)) &&
-                keccak256(abi.encodePacked(transactionType)) == keccak256(abi.encodePacked("CREATE"))
-            ) {
-                return i;
-            }
-        }
-        console.log(_contractName);
-        revert("CREATE deployment TX not found in <script>.s.sol/<chainid>/run-latest.json");
+        // chains[31337] = "localhost";
+        // chains[17000] = "holesky";
+        // chains[84532] = "basesepolia";
+        // chains[11155111] = "ethsepolia";
+        string memory finalOutputPath = string(abi.encodePacked(
+            "script/basesepolia/bridgeContractsL2.config.json"
+        ));
+        vm.writeJson(finalJson, finalOutputPath);
     }
 
     /////////////////////////////////////////////////
-    // Withdrawals
+    // L1 Contracts
+    /////////////////////////////////////////////////
+
+    function readReceiverRestakingConnector() public view returns (IReceiverCCIP, IRestakingConnector) {
+        string memory addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
+        address receiverAddr = stdJson.readAddress(addrData, ".contracts.receiverCCIP");
+        address restakingConnectorAddr = stdJson.readAddress(addrData, ".contracts.restakingConnector");
+        return (
+            IReceiverCCIP(receiverAddr),
+            IRestakingConnector(restakingConnectorAddr)
+        );
+    }
+
+    function readEigenAgent6551Registry() public view returns (ERC6551Registry, EigenAgentOwner721) {
+        string memory addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
+        address registry6551 = stdJson.readAddress(addrData, ".contracts.registry6551");
+        address eigenAgentOwner721 = stdJson.readAddress(addrData, ".contracts.eigenAgentOwner721");
+        return (
+            ERC6551Registry(registry6551),
+            EigenAgentOwner721(eigenAgentOwner721)
+        );
+    }
+
+    function readProxyAdminL1() public view returns (address) {
+        string memory addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
+        address proxyAdminL1Addr = stdJson.readAddress(addrData, ".contracts.proxyAdminL1");
+        return proxyAdminL1Addr;
+    }
+
+    function saveReceiverBridgeContracts(
+        address receiverCCIP,
+        address restakingConnector,
+        address registry6551,
+        address eigenAgentOwner721,
+        address proxyAdminL1
+    ) public {
+        // { "inputs": <inputs_data>}
+        /////////////////////////////////////////////////
+        vm.serializeAddress("contracts" , "receiverCCIP", receiverCCIP);
+        vm.serializeAddress("contracts" , "restakingConnector", restakingConnector);
+        vm.serializeAddress("contracts" , "registry6551", registry6551);
+        vm.serializeAddress("contracts" , "eigenAgentOwner721", eigenAgentOwner721);
+        string memory inputs_data = vm.serializeAddress("contracts" , "proxyAdminL1", proxyAdminL1);
+
+        /////////////////////////////////////////////////
+        // { "chainInfo": <chain_info_data>}
+        /////////////////////////////////////////////////
+        vm.serializeUint("chainInfo", "block", block.number);
+        vm.serializeUint("chainInfo", "timestamp", block.timestamp);
+        string memory chainInfo_data = vm.serializeUint("chainInfo", "chainid", block.chainid);
+
+        /////////////////////////////////////////////////
+        // combine objects to a root object
+        /////////////////////////////////////////////////
+        vm.serializeString("rootObject", "chainInfo", chainInfo_data);
+        string memory finalJson = vm.serializeString("rootObject", "contracts", inputs_data);
+
+        // chains[31337] = "localhost";
+        // chains[17000] = "holesky";
+        // chains[84532] = "basesepolia";
+        // chains[11155111] = "ethsepolia";
+        string memory finalOutputPath = string(abi.encodePacked(
+            "script/ethsepolia/bridgeContractsL1.config.json"
+        ));
+        vm.writeJson(finalJson, finalOutputPath);
+    }
+
+    /////////////////////////////////////////////////
+    // Withdrawal Roots
     /////////////////////////////////////////////////
 
     function saveWithdrawalInfo(

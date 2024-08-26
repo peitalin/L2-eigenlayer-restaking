@@ -15,7 +15,7 @@ import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
-import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
+import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
@@ -31,7 +31,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 
 contract CCIP_EigenAgentTests is Test {
 
-    DeployOnEthScript public deployOnEthScript;
+    DeployReceiverOnL1Script public deployOnEthScript;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
 
@@ -70,7 +70,7 @@ contract CCIP_EigenAgentTests is Test {
         alice = vm.addr(aliceKey);
         vm.deal(alice, 1 ether);
 
-        deployOnEthScript = new DeployOnEthScript();
+        deployOnEthScript = new DeployReceiverOnL1Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         signatureUtils = new SignatureUtilsEIP1271();
 
@@ -121,8 +121,8 @@ contract CCIP_EigenAgentTests is Test {
 
         _nonce = eigenAgent.execNonce();
 
-        // encode a simple getSenderContractL2Addr call
-        bytes memory data = abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector);
+        // encode a simple readSenderContractL2Addr call
+        bytes memory data = abi.encodeWithSelector(receiverContract.readSenderContractL2Addr.selector);
 
         bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
             address(receiverContract),
@@ -156,7 +156,7 @@ contract CCIP_EigenAgentTests is Test {
         );
 
         // msg.sender = ReceiverContract's address
-        address senderTargetAddr = receiverContract.getSenderContractL2Addr();
+        address senderTargetAddr = receiverContract.readSenderContractL2Addr();
         address sender1 = abi.decode(result, (address));
 
         require(sender1 == senderTargetAddr, "call did not return the same address");
@@ -168,7 +168,7 @@ contract CCIP_EigenAgentTests is Test {
         eigenAgent.execute(
             address(receiverContract),
             0 ether,
-            abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector),
+            abi.encodeWithSelector(receiverContract.readSenderContractL2Addr.selector),
             0
         );
 

@@ -5,36 +5,29 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {EmptyContract} from "eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
+import {FileReader} from "./FileReader.sol";
 import {Script} from "forge-std/Script.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {SenderUtils} from "../src/SenderUtils.sol";
 import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
-// import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 
 
-contract DeployOnL2Script is Script {
+contract DeploySenderOnL2Script is Script {
 
     function run() public returns (ISenderCCIP) {
 
         uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+        FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
 
-        /////////////////////////////
-        /// Begin Broadcast
-        /////////////////////////////
         vm.startBroadcast(deployerKey);
 
         ProxyAdmin proxyAdmin = new ProxyAdmin();
-
         // deploy sender utils
         SenderUtils senderUtils = new SenderUtils();
-
         // deploy sender
         SenderCCIP senderImpl = new SenderCCIP(BaseSepolia.Router, BaseSepolia.Link);
-
-        // erc6551Registry = new ERC6551Registry();
-
         SenderCCIP senderProxy = SenderCCIP(
             payable(address(
                 new TransparentUpgradeableProxy(
@@ -43,7 +36,6 @@ contract DeployOnL2Script is Script {
                     abi.encodeWithSelector(
                         SenderCCIP.initialize.selector,
                         ISenderUtils(address(senderUtils))
-                        // erc6551Registry
                     )
                 )
             ))
@@ -52,6 +44,12 @@ contract DeployOnL2Script is Script {
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         vm.stopBroadcast();
+
+        fileReader.saveSenderBridgeContracts(
+            address(senderProxy),
+            address(senderUtils),
+            address(proxyAdmin)
+        );
 
         return ISenderCCIP(address(senderProxy));
     }

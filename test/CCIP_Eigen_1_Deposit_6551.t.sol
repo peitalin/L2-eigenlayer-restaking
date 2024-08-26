@@ -15,7 +15,7 @@ import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
-import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
+import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
@@ -31,7 +31,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 
 contract CCIP_Eigen_Deposit_6551Tests is Test {
 
-    DeployOnEthScript public deployOnEthScript;
+    DeployReceiverOnL1Script public deployOnEthScript;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
 
@@ -67,7 +67,7 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
         bob = vm.addr(bobKey);
         vm.deal(bob, 1 ether);
 
-        deployOnEthScript = new DeployOnEthScript();
+        deployOnEthScript = new DeployReceiverOnL1Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         signatureUtils = new SignatureUtilsEIP1271();
 

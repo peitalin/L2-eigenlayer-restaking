@@ -1,9 +1,9 @@
 #!/bin/bash
 source .env
 
-echo forge script script/2_deployOnL2.s.sol:DeployOnL2Script --rpc-url basesepolia --broadcast --verify -vvvv
+echo forge script script/2_deploySenderOnL2.s.sol:DeploySenderOnL2Script --rpc-url basesepolia --broadcast --verify -vvvv
 
-forge script script/2_deployOnL2.s.sol:DeployOnL2Script \
+forge script script/2_deploySenderOnL2.s.sol:DeploySenderOnL2Script \
     --rpc-url basesepolia \
     --broadcast \
     --verify \

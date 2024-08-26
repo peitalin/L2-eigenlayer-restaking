@@ -17,8 +17,8 @@ import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
-import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
-import {DeployOnL2Script} from "../script/2_deployOnL2.s.sol";
+import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
+import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
@@ -37,8 +37,8 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 
 contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
 
-    DeployOnEthScript public deployOnEthScript;
-    DeployOnL2Script public deployOnL2Script;
+    DeployReceiverOnL1Script public deployOnEthScript;
+    DeploySenderOnL2Script public deployOnL2Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
 
@@ -85,8 +85,8 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         bob = vm.addr(bobKey);
         vm.deal(bob, 1 ether);
 
-        deployOnL2Script = new DeployOnL2Script();
-        deployOnEthScript = new DeployOnEthScript();
+        deployOnL2Script = new DeploySenderOnL2Script();
+        deployOnEthScript = new DeployReceiverOnL1Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         signatureUtils = new SignatureUtilsEIP1271();
 
@@ -512,7 +512,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             sourceChainSelector: EthSepolia.ChainSelector,
             sender: abi.encode(deployer),
             data: abi.encode(string(
-                EigenlayerMsgEncoders.encodeCheckTransferToAgentOwnerMsg(
+                EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
                     withdrawalRoot,
                     agentOwner
                 )

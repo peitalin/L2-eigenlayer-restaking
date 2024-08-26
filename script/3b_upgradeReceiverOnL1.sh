@@ -1,7 +1,7 @@
 #!/bin/bash
 source .env
 
-echo forge script script/3b_upgradeReceiverOnL1.s.sol:DeployOnL2Script --rpc-url ethsepolia --broadcast --verify -vvvv
+echo forge script script/3b_upgradeReceiverOnL1.s.sol:DeployReceiverOnL2Script --rpc-url ethsepolia --broadcast --verify -vvvv
 
 forge script script/3b_upgradeReceiverOnL1.s.sol:UpgradeReceiverOnL1Script \
     --rpc-url ethsepolia \

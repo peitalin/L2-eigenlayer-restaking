@@ -14,27 +14,30 @@ interface ISenderUtils is IEigenlayerMsgDecoders {
 
     function decodeFunctionSelector(bytes memory message) external returns (bytes4);
 
-    function setFunctionSelectorName(bytes4 functionSelector, string memory _name) external;
-
-    function getFunctionSelectorName(bytes4 functionSelector) external returns (string memory);
-
     function handleTransferToAgentOwner(bytes memory message) external returns (
         address agentOwner,
         uint256 amount,
         address tokenL2Address
     );
 
-    function commitWithdrawalRootInfo(bytes memory message, address tokenDestination) external;
-
-    function setGasLimitsForFunctionSelectors(bytes4 functionSelector, uint256 gasLimit) external;
-
-    function getGasLimitForFunctionSelector(bytes4 functionSelector) external returns (uint256);
-
     function getWithdrawal(bytes32 withdrawalRoot) external view returns (WithdrawalTransfer memory);
 
     function calculateWithdrawalRoot(
         IDelegationManager.Withdrawal memory withdrawal
     ) external pure returns (bytes32);
+
+    function commitWithdrawalRootInfo(bytes memory message, address tokenDestination) external;
+
+    function setFunctionSelectorName(bytes4 functionSelector, string memory _name) external;
+
+    function getFunctionSelectorName(bytes4 functionSelector) external returns (string memory);
+
+    function setGasLimitsForFunctionSelectors(
+        bytes4[] memory functionSelectors,
+        uint256[] memory gasLimits
+    ) external;
+
+    function getGasLimitForFunctionSelector(bytes4 functionSelector) external returns (uint256);
 }
 
 

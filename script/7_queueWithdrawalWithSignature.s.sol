@@ -13,8 +13,8 @@ import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
-import {DeployOnL2Script} from "../script/2_deployOnL2.s.sol";
-import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
+import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
+import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
 import {WhitelistCCIPContractsScript} from "../script/4_whitelistCCIPContracts.s.sol";
 
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
@@ -63,7 +63,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         signatureUtils = new SignatureUtilsEIP1271(); // needs ethForkId to call getDomainSeparator
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-        DeployOnEthScript deployOnEthScript = new DeployOnEthScript();
+        DeployReceiverOnL1Script deployOnEthScript = new DeployReceiverOnL1Script();
 
         (
             strategy,
@@ -85,14 +85,14 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             ) = deployOnEthScript.run();
 
             vm.selectFork(l2ForkId);
-            DeployOnL2Script deployOnL2Script = new DeployOnL2Script();
+            DeploySenderOnL2Script deployOnL2Script = new DeploySenderOnL2Script();
             senderContract = deployOnL2Script.run();
 
             vm.selectFork(ethForkId);
         } else {
             // otherwise if running the script, read the existing contracts on Sepolia
-            senderContract = fileReader.getSenderContract();
-            (receiverContract, restakingConnector) = fileReader.getReceiverRestakingConnectorContracts();
+            senderContract = fileReader.readSenderContract();
+            (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
         }
 
         ////////////////////////////////////////////////////////////

@@ -11,7 +11,7 @@ interface IRestakingConnector is IEigenlayerMsgDecoders {
 
     function decodeFunctionSelector(bytes memory message) external returns (bytes4);
 
-    function encodeCheckTransferToAgentOwnerMsg(
+    function encodeHandleTransferToAgentOwnerMsg(
         bytes32 withdrawalRoot,
         address agentOwner
     ) external returns (bytes memory);
@@ -32,4 +32,17 @@ interface IRestakingConnector is IEigenlayerMsgDecoders {
 
     function getQueueWithdrawalBlock(address staker, uint256 nonce) external returns (uint256);
 
+    function setFunctionSelectorName(
+        bytes4 functionSelector,
+        string memory _name
+    ) external returns (string memory);
+
+    function getFunctionSelectorName(bytes4 functionSelector) external returns (string memory);
+
+    function setGasLimitsForFunctionSelectors(
+        bytes4[] memory functionSelectors,
+        uint256[] memory gasLimits
+    ) external;
+
+    function getGasLimitForFunctionSelector(bytes4 functionSelector) external returns (uint256);
 }

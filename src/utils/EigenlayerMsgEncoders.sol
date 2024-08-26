@@ -106,7 +106,7 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-    function encodeCheckTransferToAgentOwnerMsg(
+    function encodeHandleTransferToAgentOwnerMsg(
         bytes32 withdrawalRoot,
         address agentOwner
     ) public pure returns (bytes memory) {

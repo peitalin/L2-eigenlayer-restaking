@@ -4,7 +4,7 @@ Scripts in the `scripts` folder:
 - `5_depositWithSignatureFromArbToEth.sh` makes a cross-chain deposit into Eigenlayer from L2.
 - `6_queueWithdrawalWithSignature.sh` queues a withdrawal from L2.
 - `7_completeWithdrawalWithSignature.sh` completes the withdrawal and bridges the deposit back from L1 into the original staker's wallet on L2.
-- You will need to re-run scripts `2_deployOnL2.s.sol`, `3_deployOnEth.s.sol` and `4_whitelistCCIPContracts.sh` if there are changes made to either the `SenderCCIP`, `ReceiverCCIP`, or `RestakingConnector` contracts.
+- You will need to re-run scripts `2_deploySenderOnL2.s.sol`, `3_deployReceiverOnL1.s.sol` and `4_whitelistCCIPContracts.sh` if there are changes made to either the `SenderCCIP`, `ReceiverCCIP`, or `RestakingConnector` contracts.
 
 Test run:
 ```

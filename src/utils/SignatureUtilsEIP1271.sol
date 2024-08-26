@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP1271SignatureUtils} from "eigenlayer-contracts/src/contracts/libraries/EIP1271SignatureUtils.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
@@ -191,7 +191,7 @@ contract SignatureUtilsEIP1271 is Script {
         uint256 _nonce,
         uint256 _chainid,
         uint256 _expiry
-    ) public view returns (bytes32) {
+    ) public pure returns (bytes32) {
 
         bytes32 structHash = keccak256(abi.encode(
             EIGEN_AGENT_EXEC_TYPEHASH,

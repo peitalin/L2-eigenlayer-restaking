@@ -15,8 +15,6 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-// import {console} from "forge-std/Test.sol";
-
 
 contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent6551 {
 
@@ -87,9 +85,8 @@ contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent
         _;
     }
 
-
-    // uses the same signature verification from depositIntoStrategy
-    // since the structhash of depositIntoStrategy signature is a superset of ERC20 approve()
+    // Uses the signature that signed the depositIntoStrategy struct,
+    // as depositIntoStrategy struct contains (token, amount) fields used in ERC20 approve()
     function approveStrategyManagerWithSignature(
         address _target,
         uint256 _value,
@@ -144,7 +141,6 @@ contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent
         ++state;
         bool success;
 
-        // console.log("eigenAgent msg.sender:", msg.sender);
         beforeExecute(_data);
         {
             // solhint-disable-next-line avoid-low-level-calls
@@ -187,7 +183,7 @@ contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent
     function getDomainSeparator(
         address contractAddr, // strategyManagerAddr, or delegationManagerAddr
         uint256 destinationChainid
-    ) public view returns (bytes32) {
+    ) public pure returns (bytes32) {
 
         uint256 chainid = destinationChainid;
 
@@ -199,7 +195,7 @@ contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent
     }
 
     function decodeApproveERC20FromDepositMsg(bytes memory message)
-        public
+        public pure
         returns (address, uint256)
     {
         ////////////////////////////////////////////////////////
@@ -222,4 +218,22 @@ contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent
         return (token, amount);
     }
 
+    /*
+     *
+     *            EIP-1271 Smart Contract Signature
+     *
+     */
+
+    // function isValidSignature(
+    //     bytes32 _hash,
+    //     bytes memory _signature
+    // ) public pure returns (bytes4 magicValue) {
+    //     bytes4 constant internal MAGICVALUE = 0x1626ba7e;
+    //     // implement some hash/signature scheme that checks:
+    //     // (bool success, bytes memory result) = EigenAgent6551.staticcall(
+    //     //     abi.encodeWithSelector(IERC1271.isValidSignature.selector, hash, signature)
+    //     // );
+    //     // abi.decode(result, (bytes32)) == bytes32(IERC1271.isValidSignature.selector));
+    //     return MAGICVALUE;
+    // }
 }

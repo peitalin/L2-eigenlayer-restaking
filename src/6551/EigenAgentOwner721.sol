@@ -57,7 +57,7 @@ contract EigenAgentOwner721 is Initializable, IERC721Receiver, ERC721URIStorageU
         return IERC721Receiver.onERC721Received.selector;
     }
 
-    function _baseURI() internal view override returns (string memory) {
+    function _baseURI() internal pure override returns (string memory) {
         return "ipfs://";
     }
 

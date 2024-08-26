@@ -26,12 +26,12 @@ import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
-import {IBeacon} from "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
+// import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+// import {IBeacon} from "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 
 
 
-contract DeployOnEthScript is Script {
+contract DeployReceiverOnL1Script is Script {
 
     RestakingConnector public restakingConnector;
     ReceiverCCIP public receiverProxy;
@@ -49,7 +49,7 @@ contract DeployOnEthScript is Script {
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
-        ISenderCCIP senderContract = fileReader.getSenderContract();
+        ISenderCCIP senderContract = fileReader.readSenderContract();
 
         (
             IStrategy strategy,
@@ -61,32 +61,46 @@ contract DeployOnEthScript is Script {
             // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
-        /////////////////////////////
-        /// Begin Broadcast
-        /////////////////////////////
         vm.startBroadcast(deployerKey);
 
         ProxyAdmin proxyAdmin = new ProxyAdmin();
 
         // deploy restaking connector for Eigenlayer
-        restakingConnector = new RestakingConnector();
+        RestakingConnector restakingConnectorImpl = new RestakingConnector();
+        restakingConnector = RestakingConnector(
+            payable(address(
+                new TransparentUpgradeableProxy(
+                    address(restakingConnectorImpl),
+                    address(proxyAdmin),
+                    abi.encodeWithSelector(
+                        RestakingConnector.initialize.selector
+                    )
+                )
+            ))
+        );
         restakingConnector.addAdmin(deployer);
         restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
+
+        // deploy 6551 Registry
+        ERC6551Registry registry6551 = new ERC6551Registry();
+        // deploy 6551 EigenAgentOwner NFT
+        EigenAgentOwner721 eigenAgentOwner721 = EigenAgentOwner721(
+            address(new TransparentUpgradeableProxy(
+                address(new EigenAgentOwner721()),
+                address(proxyAdmin),
+                abi.encodeWithSelector(
+                    EigenAgentOwner721.initialize.selector,
+                    "EigenAgentOwner",
+                    "EAO"
+                )
+            ))
+        );
 
         // deploy receiver contract
         ReceiverCCIP receiverImpl = new ReceiverCCIP(
             EthSepolia.Router,
             EthSepolia.Link
         );
-
-        // deploy 6551 Registry and EigenAgentOwner NFT
-        ERC6551Registry registry6551 = new ERC6551Registry();
-        EigenAgentOwner721 eigenAgentOwner721 = deployEigenAgentOwnerNft(
-            "EigenAgentOwner",
-            "EAO",
-            proxyAdmin
-        );
-
         receiverProxy = ReceiverCCIP(
             payable(address(
                 new TransparentUpgradeableProxy(
@@ -122,30 +136,17 @@ contract DeployOnEthScript is Script {
 
         vm.stopBroadcast();
 
+        fileReader.saveReceiverBridgeContracts(
+            address(receiverProxy),
+            address(restakingConnector),
+            address(registry6551),
+            address(eigenAgentOwner721),
+            address(proxyAdmin)
+        );
+
         return (
             IReceiverCCIP(address(receiverProxy)),
             IRestakingConnector(address(restakingConnector))
         );
     }
-
-
-    function deployEigenAgentOwnerNft(
-        string memory name,
-        string memory symbol,
-        ProxyAdmin _proxyAdmin
-    ) public returns (EigenAgentOwner721) {
-        EigenAgentOwner721 agentProxy = EigenAgentOwner721(
-            address(new TransparentUpgradeableProxy(
-                address(new EigenAgentOwner721()),
-                address(_proxyAdmin),
-                abi.encodeWithSelector(
-                    EigenAgentOwner721.initialize.selector,
-                    name,
-                    symbol
-                )
-            ))
-        );
-        return agentProxy;
-    }
-
 }

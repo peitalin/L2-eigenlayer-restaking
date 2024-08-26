@@ -24,10 +24,8 @@ import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {ERC6551AccountProxy} from "@6551/examples/upgradeable/ERC6551AccountProxy.sol";
 
-// import {console} from "forge-std/Test.sol";
 
-
-/// ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them.
+/// @title ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them
 contract ReceiverCCIP is BaseMessengerCCIP {
 
     IRestakingConnector public restakingConnector;
@@ -151,7 +149,6 @@ contract ReceiverCCIP is BaseMessengerCCIP {
     }
 
     function getSenderContractL2Addr() public view returns (address) {
-        // address, contract only exists on L2
         return senderContractL2Addr;
     }
 
@@ -217,7 +214,7 @@ contract ReceiverCCIP is BaseMessengerCCIP {
 
             address token = any2EvmMessage.destTokenAmounts[0].token; // CCIP-BnM token on L1
 
-            bytes memory data2 = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
+            bytes memory depositData = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
                 address(strategy),
                 token,
                 eigenMsg.amount
@@ -227,7 +224,7 @@ contract ReceiverCCIP is BaseMessengerCCIP {
             eigenAgent.approveStrategyManagerWithSignature(
                 address(strategyManager), // strategyManager
                 0 ether,
-                data2,
+                depositData,
                 eigenMsg.expiry,
                 eigenMsg.signature
             );
@@ -237,7 +234,7 @@ contract ReceiverCCIP is BaseMessengerCCIP {
             bytes memory result = eigenAgent.executeWithSignature(
                 address(strategyManager), // strategyManager
                 0 ether,
-                data2, // encodeDepositIntoStrategyMsg
+                depositData, // encodeDepositIntoStrategyMsg
                 eigenMsg.expiry,
                 eigenMsg.signature
             );
@@ -316,11 +313,11 @@ contract ReceiverCCIP is BaseMessengerCCIP {
             IERC20 token = withdrawal.strategies[0].underlyingToken();
             token.approve(address(this), amount);
 
-            string memory text_message = string(restakingConnector.encodeCheckTransferToAgentOwnerMsg(
+            string memory text_message = string(restakingConnector.encodeHandleTransferToAgentOwnerMsg(
                 withdrawalRoot,
                 agentOwner
             ));
-            /// return token to staker via bridge with a message to transferToAgentOwner
+            /// return token to staker via bridge with a message to handleTransferToAgentOwner
             this.sendMessagePayNative(
                 BaseSepolia.ChainSelector, // destination chain
                 senderContractL2Addr,
@@ -393,12 +390,7 @@ contract ReceiverCCIP is BaseMessengerCCIP {
         bytes memory message = abi.encode(_text);
 
         bytes4 functionSelector = restakingConnector.decodeFunctionSelector(message);
-        uint256 gasLimit = 600_000;
-
-        if (functionSelector == 0xa5e25f6f) {
-            // bytes4(keccak256("transferToAgentOwner(bytes32,address,bytes32)")) == 0xa5e25f6f
-            gasLimit = 800_000;
-        }
+        uint256 gasLimit = restakingConnector.getGasLimitForFunctionSelector(functionSelector);
 
         return
             Client.EVM2AnyMessage({

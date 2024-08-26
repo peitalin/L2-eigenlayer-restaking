@@ -22,7 +22,6 @@ import {
 import {IEigenlayerMsgDecoders} from "../interfaces/IEigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "./EigenlayerMsgEncoders.sol";
 
-import {console} from "forge-std/Test.sol";
 
 
 contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
@@ -414,11 +413,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         strategies[0] = strategy0;
         shares[0] = share0;
 
-        // console.log("withdrawer: ", withdrawer);
-        // console.log("nonce: ", nonce);
-        // console.log("shares[0]:", shares[0]);
-        // console.log("strategies[0]:", address(strategies[0]));
-
         IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
             staker: staker,
             delegatedTo: delegatedTo,
@@ -529,8 +523,6 @@ contract EigenlayerMsgDecoders is IEigenlayerMsgDecoders {
         }
 
         bytes memory signature = abi.encodePacked(r,s,v);
-        // console.log("expiry", expiry);
-        // console.logBytes(signature);
 
         IERC20[] memory tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = IERC20(tokensToWithdraw0);

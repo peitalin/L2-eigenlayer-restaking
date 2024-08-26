@@ -31,9 +31,11 @@ contract UpgradeReceiverOnL1Script is Script {
         uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
         address deployer = vm.addr(deployerKey);
 
+        vm.createSelectFork("ethsepolia");
+
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
-        ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.getL1ProxyAdmin());
-        ISenderCCIP senderProxy = fileReader.getSenderContract();
+        ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL1());
+        ISenderCCIP senderProxy = fileReader.readSenderContract();
         RestakingConnector restakingConnector;
 
         DeployMockEigenlayerContractsScript deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
@@ -59,7 +61,7 @@ contract UpgradeReceiverOnL1Script is Script {
         (
             IReceiverCCIP receiverProxy,
             // restakingConnector
-        ) = fileReader.getReceiverRestakingConnectorContracts();
+        ) = fileReader.readReceiverRestakingConnector();
 
         // deploy receiver contract
         ReceiverCCIP receiverImpl = new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link);

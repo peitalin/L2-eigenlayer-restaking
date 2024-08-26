@@ -68,7 +68,7 @@ contract DelegateToScript is Script, ScriptUtils {
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
         senderContract = fileReader.getSenderContract();
-        (receiverContract, restakingConnector) = fileReader.getReceiverRestakingConnectorContracts();
+        (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
         ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
 
         //////////////////////////////////////////////////////////
