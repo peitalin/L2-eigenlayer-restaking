@@ -21,19 +21,25 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
     ISenderUtils public senderUtils;
 
-    /// @param _router The address of the router contract.
-    /// @param _link The address of the link contract.
-    constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {
+    /// @param _router address of the router contract.
+    /// @param _link address of the link contract.
+    /// @param _senderUtils address of the SenderUtils contract.
+    constructor(
+        address _router,
+        address _link,
+        address _senderUtils
+    ) BaseMessengerCCIP(_router, _link) {
+        require(address(_senderUtils) != address(0), "_senderUtils cannot be address(0)");
+        senderUtils = ISenderUtils(_senderUtils);
         _disableInitializers();
     }
 
-    function initialize(ISenderUtils _senderUtils) initializer public {
-        require(address(_senderUtils) != address(0), "_senderUtils cannot be address(0)");
-        senderUtils = _senderUtils;
+    function initialize() initializer public {
         BaseMessengerCCIP.__BaseMessengerCCIP_init();
     }
 
     function setSenderUtils(ISenderUtils _senderUtils) external onlyOwner {
+        require(address(_senderUtils) != address(0), "_senderUtils cannot be address(0)");
         senderUtils = _senderUtils;
     }
 

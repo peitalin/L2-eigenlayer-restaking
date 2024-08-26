@@ -35,16 +35,18 @@ contract DeploySenderOnL2Script is Script {
         // deploy sender utils
         SenderUtils senderUtils = new SenderUtils();
         // deploy sender
-        SenderCCIP senderImpl = new SenderCCIP(BaseSepolia.Router, BaseSepolia.Link);
+        SenderCCIP senderImpl = new SenderCCIP(
+            BaseSepolia.Router,
+            BaseSepolia.Link,
+            address(senderUtils)
+        );
+
         SenderCCIP senderProxy = SenderCCIP(
             payable(address(
                 new TransparentUpgradeableProxy(
                     address(senderImpl),
                     address(proxyAdmin),
-                    abi.encodeWithSelector(
-                        SenderCCIP.initialize.selector,
-                        ISenderUtils(address(senderUtils))
-                    )
+                    abi.encodeWithSelector(SenderCCIP.initialize.selector)
                 )
             ))
         );

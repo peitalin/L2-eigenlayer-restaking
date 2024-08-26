@@ -17,8 +17,8 @@ import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 contract WhitelistCCIPContractsScript is Script {
 
     IRestakingConnector public restakingConnector;
-    IReceiverCCIP public receiverContract;
-    ISenderCCIP public senderContract;
+    IReceiverCCIP public receiverProxy;
+    ISenderCCIP public senderProxy;
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     FileReader public fileReader;
@@ -36,10 +36,10 @@ contract WhitelistCCIPContractsScript is Script {
         console.log("block.chainid", block.chainid);
 
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
-        senderContract = fileReader.readSenderContract();
-        (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
+        senderProxy = fileReader.readSenderContract();
+        (receiverProxy, restakingConnector) = fileReader.readReceiverRestakingConnector();
 
-        require(address(receiverContract) != address(0), "receiverContract cannot be 0");
+        require(address(receiverProxy) != address(0), "receiverProxy cannot be 0");
         require(address(restakingConnector) != address(0), "restakingConnector cannot be 0");
 
         address tokenL1 = EthSepolia.CcipBnM;
@@ -50,8 +50,10 @@ contract WhitelistCCIPContractsScript is Script {
         vm.startBroadcast(deployerKey);
 
         // allow L2 sender contract to send tokens to L1
-        senderContract.allowlistSourceChain(BaseSepolia.ChainSelector, true);
-        senderContract.allowlistSender(address(receiverContract), true);
+        senderProxy.allowlistSender(address(receiverProxy), true);
+        senderProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
+        senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
+
         IERC20_CCIPBnM(tokenL2).drip(deployer);
         vm.stopBroadcast();
 
@@ -60,16 +62,18 @@ contract WhitelistCCIPContractsScript is Script {
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployerKey);
 
-        receiverContract.allowlistSender(deployer, true);
+        receiverProxy.allowlistSender(address(senderProxy), true);
+        receiverProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
+        receiverProxy.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
         // Remember to fund L1 receiver with gas and tokens in production.
 
         if (block.chainid == 11155111) {
             // drip() using CCIP's BnM faucet if forking from ETH sepolia
-            IERC20_CCIPBnM(tokenL1).drip(address(receiverContract));
+            IERC20_CCIPBnM(tokenL1).drip(address(receiverProxy));
             // each drip() gives you 1e18 coin
         } else {
             // mint() if we deployed our own Mock ERC20
-            IERC20Minter(tokenL1).mint(address(receiverContract), 3 ether);
+            IERC20Minter(tokenL1).mint(address(receiverProxy), 3 ether);
         }
 
         vm.stopBroadcast();

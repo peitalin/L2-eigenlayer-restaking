@@ -23,6 +23,14 @@ forge script script/3_deployReceiverOnL1.s.sol:DeployReceiverOnL1Script \
 #     0x1689aD770c571004fA7F3896F64e49bfc61B564F \
 #     ./src/ReceiverCCIP.sol:ReceiverCCIP
 
+# forge verify-contract \
+#     --watch \
+#     --rpc-url ethsepolia \
+#     --etherscan-api-key $ETHERSCAN_API_KEY \
+#     --compiler-version v0.8.22 \
+#     0x033351244Ac8E03b484CF06a6A03bBE84352615D \
+#     lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol:ProxyAdmin
+
 
 # forge verify-contract \
 #     --watch \
@@ -34,8 +42,9 @@ forge script script/3_deployReceiverOnL1.s.sol:DeployReceiverOnL1Script \
 
 
 # forge verify-contract \
+#     --watch \
 #     --rpc-url ethsepolia \
 #     --etherscan-api-key $ETHERSCAN_API_KEY \
 #     --compiler-version v0.8.22 \
-#     0x3a0b5a2Ef18e49B8Fb5baF1d2629CC1409f956Cb \
-#     ./src/RestakingConnector.sol:RestakingConnector
+#     0xeb72aa06bbec8e83b73e97fb06495a6305564882 \
+#     ./src/6551/EigenAgentOwner721.sol:EigenAgentOwner721
