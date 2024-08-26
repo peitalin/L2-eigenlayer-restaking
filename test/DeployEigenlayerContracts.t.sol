@@ -28,7 +28,7 @@ contract DeployEigenlayerContractsTests is Test {
     }
 
     function test_DeployEigenlayerContractsScript() public {
-        vm.chainId(31337); // localhost
+        vm.chainId(31337); // isTest
         (
             IStrategy strategy,
             IStrategyManager strategyManager,

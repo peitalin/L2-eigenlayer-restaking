@@ -43,12 +43,8 @@ contract DelegateToScript is Script, ScriptUtils {
 
     function run() public {
 
-        bool isTest = block.chainid == 31337;
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
-        console.log("l2ForkId:", l2ForkId);
-        console.log("ethForkId:", ethForkId);
-        console.log("block.chainid", block.chainid);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
@@ -67,7 +63,7 @@ contract DelegateToScript is Script, ScriptUtils {
               // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
-        senderContract = fileReader.getSenderContract();
+        senderContract = fileReader.readSenderContract();
         (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
         ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
 

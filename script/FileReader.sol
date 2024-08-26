@@ -22,25 +22,29 @@ contract FileReader is Script {
     /////////////////////////////////////////////////
 
     function readSenderContract() public view returns (ISenderCCIP) {
-        string memory addrData = vm.readFile("script/basesepolia/bridgeContractsL2.config.json");
+        string memory addrData;
+        addrData = vm.readFile("script/basesepolia/bridgeContractsL2.config.json");
         address senderAddr = stdJson.readAddress(addrData, ".contracts.senderCCIP");
         return ISenderCCIP(senderAddr);
     }
 
     function readSenderUtils() public view returns (ISenderUtils) {
-        string memory addrData = vm.readFile("script/basesepolia/bridgeContractsL2.config.json");
+        string memory addrData;
+        addrData = vm.readFile("script/basesepolia/bridgeContractsL2.config.json");
         address senderUtilsAddr = stdJson.readAddress(addrData, ".contracts.senderUtils");
         return ISenderUtils(senderUtilsAddr);
     }
 
     function readProxyAdminL2() public view returns (address) {
-        string memory addrData = vm.readFile("script/basesepolia/bridgeContractsL2.config.json");
+        string memory addrData;
+        addrData = vm.readFile("script/basesepolia/bridgeContractsL2.config.json");
         address proxyAdminL2Addr = stdJson.readAddress(addrData, ".contracts.proxyAdminL2");
         return proxyAdminL2Addr;
     }
 
     /// @dev hardcoded chainid for contracts. Update for prod
     function saveSenderBridgeContracts(
+        bool isTest,
         address senderCCIP,
         address senderUtils,
         address proxyAdminL2
@@ -62,16 +66,23 @@ contract FileReader is Script {
         // combine objects to a root object
         /////////////////////////////////////////////////
         vm.serializeString("rootObject", "chainInfo", chainInfo_data);
-        string memory finalJson = vm.serializeString("rootObject", "contracts", inputs_data);
+        string memory finalJson2 = vm.serializeString("rootObject", "contracts", inputs_data);
 
         // chains[31337] = "localhost";
         // chains[17000] = "holesky";
         // chains[84532] = "basesepolia";
         // chains[11155111] = "ethsepolia";
-        string memory finalOutputPath = string(abi.encodePacked(
-            "script/basesepolia/bridgeContractsL2.config.json"
-        ));
-        vm.writeJson(finalJson, finalOutputPath);
+        if (isTest) {
+            string memory finalOutputPath2 = string(abi.encodePacked(
+                "script/localhost/bridgeContractsL2.config.json"
+            ));
+            vm.writeJson(finalJson2, finalOutputPath2);
+        } else {
+            string memory finalOutputPath2 = string(abi.encodePacked(
+                "script/basesepolia/bridgeContractsL2.config.json"
+            ));
+            vm.writeJson(finalJson2, finalOutputPath2);
+        }
     }
 
     /////////////////////////////////////////////////
@@ -79,7 +90,8 @@ contract FileReader is Script {
     /////////////////////////////////////////////////
 
     function readReceiverRestakingConnector() public view returns (IReceiverCCIP, IRestakingConnector) {
-        string memory addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
+        string memory addrData;
+        addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
         address receiverAddr = stdJson.readAddress(addrData, ".contracts.receiverCCIP");
         address restakingConnectorAddr = stdJson.readAddress(addrData, ".contracts.restakingConnector");
         return (
@@ -89,7 +101,8 @@ contract FileReader is Script {
     }
 
     function readEigenAgent6551Registry() public view returns (ERC6551Registry, EigenAgentOwner721) {
-        string memory addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
+        string memory addrData;
+        addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
         address registry6551 = stdJson.readAddress(addrData, ".contracts.registry6551");
         address eigenAgentOwner721 = stdJson.readAddress(addrData, ".contracts.eigenAgentOwner721");
         return (
@@ -99,12 +112,14 @@ contract FileReader is Script {
     }
 
     function readProxyAdminL1() public view returns (address) {
-        string memory addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
+        string memory addrData;
+        addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
         address proxyAdminL1Addr = stdJson.readAddress(addrData, ".contracts.proxyAdminL1");
         return proxyAdminL1Addr;
     }
 
     function saveReceiverBridgeContracts(
+        bool isTest,
         address receiverCCIP,
         address restakingConnector,
         address registry6551,
@@ -130,16 +145,23 @@ contract FileReader is Script {
         // combine objects to a root object
         /////////////////////////////////////////////////
         vm.serializeString("rootObject", "chainInfo", chainInfo_data);
-        string memory finalJson = vm.serializeString("rootObject", "contracts", inputs_data);
+        string memory finalJson1 = vm.serializeString("rootObject", "contracts", inputs_data);
 
         // chains[31337] = "localhost";
         // chains[17000] = "holesky";
         // chains[84532] = "basesepolia";
         // chains[11155111] = "ethsepolia";
-        string memory finalOutputPath = string(abi.encodePacked(
-            "script/ethsepolia/bridgeContractsL1.config.json"
-        ));
-        vm.writeJson(finalJson, finalOutputPath);
+        if (isTest) {
+            string memory finalOutputPath1 = string(abi.encodePacked(
+                "script/localhost/bridgeContractsL1.config.json"
+            ));
+            vm.writeJson(finalJson1, finalOutputPath1);
+        } else {
+            string memory finalOutputPath1 = string(abi.encodePacked(
+                "script/ethsepolia/bridgeContractsL1.config.json"
+            ));
+            vm.writeJson(finalJson1, finalOutputPath1);
+        }
     }
 
     /////////////////////////////////////////////////

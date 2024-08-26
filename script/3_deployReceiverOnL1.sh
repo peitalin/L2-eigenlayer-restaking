@@ -19,7 +19,7 @@ forge script script/3_deployReceiverOnL1.s.sol:DeployReceiverOnL1Script \
 #     --rpc-url ethsepolia \
 #     --etherscan-api-key $ETHERSCAN_API_KEY \
 #     --compiler-version v0.8.22 \
-#     0x11f2c38fa69df51ccaf444cb37ccb102561bb778 \
+#     0x89832518b5043d5B31d1a797A06E2717e5EcAFdF \
 #     ./src/ReceiverCCIP.sol:ReceiverCCIP
 
 

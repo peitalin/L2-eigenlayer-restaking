@@ -15,6 +15,14 @@ interface IEigenAgent6551 {
         bytes memory result
     ) external returns (bytes4);
 
+    function executeWithSignature(
+        address _target,
+        uint256 _value,
+        bytes calldata _data,
+        uint256 _expiry,
+        bytes memory _signature
+    ) external payable returns (bytes memory _result);
+
     function approveStrategyManagerWithSignature(
         address _target,
         uint256 _value,
@@ -22,4 +30,7 @@ interface IEigenAgent6551 {
         uint256 _expiry,
         bytes memory _signature
     ) external returns (bool);
+
+    function getAgentOwner() external view returns (address);
+
 }

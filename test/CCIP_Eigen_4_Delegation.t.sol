@@ -33,7 +33,7 @@ import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 contract CCIP_Eigen_DelegationTests is Test {
 
-    DeployReceiverOnL1Script public deployOnEthScript;
+    DeployReceiverOnL1Script public deployReceiverOnL1Script;
     DeploySenderOnL2Script public deployOnL2Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
@@ -67,12 +67,11 @@ contract CCIP_Eigen_DelegationTests is Test {
 		deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        deployOnEthScript = new DeployReceiverOnL1Script();
+        deployReceiverOnL1Script = new DeployReceiverOnL1Script();
         deployOnL2Script = new DeploySenderOnL2Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         signatureUtils = new SignatureUtilsEIP1271();
 
-        bool isTest = block.chainid == 31337;
         l2ForkId = vm.createFork("basesepolia");        // 0
         ethForkId = vm.createSelectFork("ethsepolia"); // 1
         console.log("l2ForkId:", l2ForkId);
@@ -94,12 +93,12 @@ contract CCIP_Eigen_DelegationTests is Test {
 
         //////////// Arb Sepolia ////////////
         vm.selectFork(l2ForkId);
-        senderContract = deployOnL2Script.run();
+        senderContract = deployOnL2Script.testrun();
 
 
         //////////// Eth Sepolia ////////////
         vm.selectFork(ethForkId);
-        (receiverContract, restakingConnector) = deployOnEthScript.run();
+        (receiverContract, restakingConnector) = deployReceiverOnL1Script.testrun();
 
 
         //////////// Arb Sepolia ////////////

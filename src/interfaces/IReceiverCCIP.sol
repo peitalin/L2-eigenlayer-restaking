@@ -11,25 +11,10 @@ import {EigenAgentOwner721} from "../6551/EigenAgentOwner721.sol";
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 
 
+
 interface IReceiverCCIP is IBaseMessengerCCIP {
 
     function mockCCIPReceive(Client.Any2EVMMessage memory any2EvmMessage) external;
-
-    function get6551Registry() external view returns (IERC6551Registry);
-
-    function getEigenAgentOwner721() external view returns (EigenAgentOwner721);
-
-    function getEigenAgentOwnerTokenId(address staker) external view returns (uint256);
-
-    function getEigenAgent(address staker) external view returns (address);
-
-    function updateEigenAgentOwnerTokenId(
-        address from,
-        address to,
-        uint256 tokenId
-    ) external returns (uint256);
-
-    function spawnEigenAgentOnlyOwner(address staker) external returns (EigenAgent6551);
 
     function setSenderutils(ISenderUtils _senderUtils) external;
 

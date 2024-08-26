@@ -41,7 +41,6 @@ contract UpgradeSenderOnL2Script is Script {
             TransparentUpgradeableProxy(payable(address(senderProxy))),
             address(senderImpl)
         );
-        /// no need to upgradeAndCall: already initialized
 
         /// whitelist destination chain
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);

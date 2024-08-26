@@ -34,7 +34,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 
 contract CCIP_Eigen_QueueWithdrawal_6551Tests is Test {
 
-    DeployReceiverOnL1Script public deployOnEthScript;
+    DeployReceiverOnL1Script public deployReceiverOnL1Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
 
@@ -70,7 +70,7 @@ contract CCIP_Eigen_QueueWithdrawal_6551Tests is Test {
         bob = vm.addr(bobKey);
         vm.deal(bob, 1 ether);
 
-        deployOnEthScript = new DeployReceiverOnL1Script();
+        deployReceiverOnL1Script = new DeployReceiverOnL1Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         signatureUtils = new SignatureUtilsEIP1271();
 
@@ -92,7 +92,7 @@ contract CCIP_Eigen_QueueWithdrawal_6551Tests is Test {
         (
             receiverContract,
             restakingConnector
-        ) = deployOnEthScript.run();
+        ) = deployReceiverOnL1Script.testrun();
 
         //// allowlist deployer and mint initial balances
         vm.startBroadcast(deployerKey);
@@ -120,11 +120,11 @@ contract CCIP_Eigen_QueueWithdrawal_6551Tests is Test {
     function test_CCIP_Eigenlayer_QueueWithdrawal6551() public {
 
         vm.startBroadcast(deployerKey);
-        EigenAgent6551 eigenAgent = receiverContract.spawnEigenAgentOnlyOwner(bob);
+        IEigenAgent6551 eigenAgent = restakingConnector.spawnEigenAgentOnlyOwner(bob);
         vm.stopBroadcast();
 
         vm.startBroadcast(bobKey);
-        _nonce = eigenAgent.execNonce();
+        _nonce = eigenAgent.getExecNonce();
         vm.stopBroadcast();
 
         //////////////////////////////////////////////////////

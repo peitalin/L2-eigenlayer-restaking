@@ -93,7 +93,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         bytes memory signature = hex"3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d51c";
 
         bytes memory messageBytes = abi.encodeWithSelector(
-            bytes4(keccak256("depositWithSignature6551(address,address,uint256,address,uint256,bytes)")),
+            IRestakingConnector.depositWithEigenAgent.selector,
             address(strategy),
             address(token),
             amount,

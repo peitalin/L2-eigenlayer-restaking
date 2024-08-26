@@ -63,7 +63,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         signatureUtils = new SignatureUtilsEIP1271(); // needs ethForkId to call getDomainSeparator
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-        DeployReceiverOnL1Script deployOnEthScript = new DeployReceiverOnL1Script();
+        DeployReceiverOnL1Script deployReceiverOnL1Script = new DeployReceiverOnL1Script();
 
         (
             strategy,
@@ -82,7 +82,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             (
                 receiverContract,
                 restakingConnector
-            ) = deployOnEthScript.run();
+            ) = deployReceiverOnL1Script.run();
 
             vm.selectFork(l2ForkId);
             DeploySenderOnL2Script deployOnL2Script = new DeploySenderOnL2Script();

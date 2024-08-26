@@ -37,7 +37,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 
 contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
 
-    DeployReceiverOnL1Script public deployOnEthScript;
+    DeployReceiverOnL1Script public deployReceiverOnL1Script;
     DeploySenderOnL2Script public deployOnL2Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
@@ -64,7 +64,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
 
     ERC6551Registry public registry;
     EigenAgentOwner721 public eigenAgentOwnerNft;
-    EigenAgent6551 public eigenAgent;
+    IEigenAgent6551 public eigenAgent;
 
     // call params
     uint256 _expiry;
@@ -86,7 +86,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         vm.deal(bob, 1 ether);
 
         deployOnL2Script = new DeploySenderOnL2Script();
-        deployOnEthScript = new DeployReceiverOnL1Script();
+        deployReceiverOnL1Script = new DeployReceiverOnL1Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         signatureUtils = new SignatureUtilsEIP1271();
 
@@ -110,7 +110,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
         //// Setup L1 CCIP contracts and 6551 EigenAgent
-        (receiverContract, restakingConnector) = deployOnEthScript.run();
+        (receiverContract, restakingConnector) = deployReceiverOnL1Script.testrun();
         vm.deal(address(receiverContract), 1 ether);
 
         vm.startBroadcast(deployerKey);
@@ -124,7 +124,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             erc20DripL1.drip(address(bob));
 
             /// Spawn EigenAgent for Bob
-            eigenAgent = receiverContract.spawnEigenAgentOnlyOwner(bob);
+            eigenAgent = restakingConnector.spawnEigenAgentOnlyOwner(bob);
         }
         vm.stopBroadcast();
 
@@ -133,7 +133,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         //// Setup L2 CCIP contracts
         /////////////////////////////////////////
         vm.selectFork(l2ForkId);
-        senderContract = deployOnL2Script.run();
+        senderContract = deployOnL2Script.testrun();
         vm.deal(address(senderContract), 1 ether);
 
         vm.startBroadcast(deployerKey);
@@ -163,7 +163,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         _expiry = block.timestamp + 1 days;
 
         vm.startBroadcast(bobKey);
-        _nonce = eigenAgent.execNonce();
+        _nonce = eigenAgent.getExecNonce();
         vm.stopBroadcast();
 
         /////////////////////////////////////

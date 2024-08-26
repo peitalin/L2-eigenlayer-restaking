@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
@@ -9,6 +9,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {EmptyContract} from "eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
@@ -42,6 +43,14 @@ contract DeployReceiverOnL1Script is Script {
     address public deployer;
 
     function run() public returns (IReceiverCCIP, IRestakingConnector) {
+        return _run(false);
+    }
+
+    function testrun() public returns (IReceiverCCIP, IRestakingConnector) {
+        return _run(true);
+    }
+
+    function _run(bool isTest) internal returns (IReceiverCCIP, IRestakingConnector) {
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
@@ -65,22 +74,6 @@ contract DeployReceiverOnL1Script is Script {
 
         ProxyAdmin proxyAdmin = new ProxyAdmin();
 
-        // deploy restaking connector for Eigenlayer
-        RestakingConnector restakingConnectorImpl = new RestakingConnector();
-        restakingConnector = RestakingConnector(
-            payable(address(
-                new TransparentUpgradeableProxy(
-                    address(restakingConnectorImpl),
-                    address(proxyAdmin),
-                    abi.encodeWithSelector(
-                        RestakingConnector.initialize.selector
-                    )
-                )
-            ))
-        );
-        restakingConnector.addAdmin(deployer);
-        restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
-
         // deploy 6551 Registry
         ERC6551Registry registry6551 = new ERC6551Registry();
         // deploy 6551 EigenAgentOwner NFT
@@ -96,12 +89,27 @@ contract DeployReceiverOnL1Script is Script {
             ))
         );
 
-        // deploy receiver contract
-        ReceiverCCIP receiverImpl = new ReceiverCCIP(
-            EthSepolia.Router,
-            EthSepolia.Link
+        // deploy restaking connector for Eigenlayer
+        RestakingConnector restakingConnectorImpl = new RestakingConnector();
+        restakingConnector = RestakingConnector(
+            payable(address(
+                new TransparentUpgradeableProxy(
+                    address(restakingConnectorImpl),
+                    address(proxyAdmin),
+                    abi.encodeWithSelector(
+                        RestakingConnector.initialize.selector,
+                        registry6551,
+                        eigenAgentOwner721
+                    )
+                )
+            ))
         );
-        receiverProxy = ReceiverCCIP(
+        restakingConnector.addAdmin(deployer);
+        restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
+
+        // deploy real receiver implementation and upgradeAndCall initializer
+        ReceiverCCIP receiverImpl = new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link);
+        ReceiverCCIP receiverProxy = ReceiverCCIP(
             payable(address(
                 new TransparentUpgradeableProxy(
                     address(receiverImpl),
@@ -109,9 +117,7 @@ contract DeployReceiverOnL1Script is Script {
                     abi.encodeWithSelector(
                         ReceiverCCIP.initialize.selector,
                         IRestakingConnector(address(restakingConnector)),
-                        senderContract,
-                        registry6551,
-                        eigenAgentOwner721
+                        senderContract
                     )
                 )
             ))
@@ -123,10 +129,10 @@ contract DeployReceiverOnL1Script is Script {
         receiverProxy.setSenderContractL2Addr(address(senderContract));
 
         eigenAgentOwner721.addAdmin(deployer);
-        eigenAgentOwner721.addAdmin(address(receiverProxy));
-        eigenAgentOwner721.setReceiverContract(IReceiverCCIP(address(receiverProxy)));
+        eigenAgentOwner721.addAdmin(address(restakingConnector));
+        eigenAgentOwner721.setRestakingConnector(IRestakingConnector(address(restakingConnector)));
 
-        restakingConnector.addAdmin(address(receiverProxy));
+        restakingConnector.setReceiverCCIP(address(receiverProxy));
 
         // seed the receiver contract with a bit of ETH
         if (address(receiverProxy).balance < 0.02 ether) {
@@ -137,6 +143,7 @@ contract DeployReceiverOnL1Script is Script {
         vm.stopBroadcast();
 
         fileReader.saveReceiverBridgeContracts(
+            isTest,
             address(receiverProxy),
             address(restakingConnector),
             address(registry6551),

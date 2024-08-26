@@ -48,6 +48,10 @@ contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent
         return execNonce;
     }
 
+    function getAgentOwner() public view returns (address) {
+        return owner();
+    }
+
     function agentImplVersion() public virtual override returns (uint256) {
         return 1;
     }

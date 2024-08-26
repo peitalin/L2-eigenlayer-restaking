@@ -6,6 +6,7 @@ import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISi
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ISenderUtils} from "../interfaces/ISenderUtils.sol";
+import {IRestakingConnector} from "../interfaces/IRestakingConnector.sol";
 
 
 library EigenlayerMsgEncoders {
@@ -21,7 +22,8 @@ library EigenlayerMsgEncoders {
     ) public pure returns (bytes memory) {
 
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("depositWithSignature6551(address,address,uint256,address,uint256,bytes)")),
+            // cast sig "depositWithEigenAgent(bytes,address,uint256)" == 0xaac4ec88
+            IRestakingConnector.depositWithEigenAgent.selector,
             strategy,
             token,
             amount,

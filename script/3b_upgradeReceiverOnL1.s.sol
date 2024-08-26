@@ -56,8 +56,8 @@ contract UpgradeReceiverOnL1Script is Script {
 
         // Either use old implementation or deploy a new one if code differs.
         restakingConnector = new RestakingConnector();
-        restakingConnector.addAdmin(deployer);
         restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
+        restakingConnector.addAdmin(deployer);
         (
             IReceiverCCIP receiverProxy,
             // restakingConnector

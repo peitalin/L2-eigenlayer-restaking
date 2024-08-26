@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
@@ -11,7 +12,7 @@ import {SenderUtils} from "./SenderUtils.sol";
 
 
 
-contract SenderCCIP is BaseMessengerCCIP {
+contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
     event MatchedReceivedFunctionSelector(bytes4 indexed, string indexed);
 
@@ -21,7 +22,9 @@ contract SenderCCIP is BaseMessengerCCIP {
 
     /// @param _router The address of the router contract.
     /// @param _link The address of the link contract.
-    constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {}
+    constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {
+        _disableInitializers();
+    }
 
     function initialize(ISenderUtils _senderUtils) initializer public {
         require(address(_senderUtils) != address(0), "_senderUtils cannot be address(0)");

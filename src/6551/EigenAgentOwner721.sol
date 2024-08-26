@@ -8,13 +8,13 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {Adminable} from "../utils/Adminable.sol";
-import {IReceiverCCIP} from "../interfaces/IReceiverCCIP.sol";
+import {IRestakingConnector} from "../interfaces/IRestakingConnector.sol";
 
 
 contract EigenAgentOwner721 is Initializable, IERC721Receiver, ERC721URIStorageUpgradeable, Adminable {
 
     uint256 private _tokenIdCounter;
-    IReceiverCCIP private _receiverContract;
+    IRestakingConnector public restakingConnector;
 
     function initialize(
         string memory name,
@@ -27,9 +27,9 @@ contract EigenAgentOwner721 is Initializable, IERC721Receiver, ERC721URIStorageU
         _tokenIdCounter = 1;
     }
 
-    function setReceiverContract(IReceiverCCIP receiverContract) public onlyAdminOrOwner() {
-        require(address(receiverContract) != address(0), "cannot set address(0)");
-        _receiverContract = receiverContract;
+    function setRestakingConnector(IRestakingConnector _restakingConnector) public onlyAdminOrOwner() {
+        require(address(_restakingConnector) != address(0), "cannot set address(0)");
+        restakingConnector = _restakingConnector;
     }
 
     function mint(address user) public onlyAdminOrOwner returns (uint256) {
@@ -45,7 +45,7 @@ contract EigenAgentOwner721 is Initializable, IERC721Receiver, ERC721URIStorageU
         address to,
         uint256 tokenId
     ) internal override virtual {
-        _receiverContract.updateEigenAgentOwnerTokenId(from, to, tokenId);
+        restakingConnector.updateEigenAgentOwnerTokenId(from, to, tokenId);
     }
 
     function onERC721Received(

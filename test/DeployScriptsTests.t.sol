@@ -21,7 +21,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
     DeploySenderOnL2Script public deploySenderOnL2Script;
     UpgradeSenderOnL2Script public upgradeSenderOnL2Script;
 
-    DeployReceiverOnL1Script public deployOnEthScript;
+    DeployReceiverOnL1Script public deployReceiverOnL1Script;
     UpgradeReceiverOnL1Script public upgradeReceiverOnL1Script;
 
     WhitelistCCIPContractsScript public whitelistCCIPContractsScript;
@@ -42,7 +42,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
         deploySenderOnL2Script = new DeploySenderOnL2Script();
         upgradeSenderOnL2Script = new UpgradeSenderOnL2Script();
 
-        deployOnEthScript = new DeployReceiverOnL1Script();
+        deployReceiverOnL1Script = new DeployReceiverOnL1Script();
         upgradeReceiverOnL1Script = new UpgradeReceiverOnL1Script();
 
         whitelistCCIPContractsScript = new WhitelistCCIPContractsScript();
@@ -59,7 +59,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
     }
 
     function test_step2_DeploySenderOnL2Script() public {
-        deploySenderOnL2Script.run();
+        deploySenderOnL2Script.testrun();
     }
 
     function test_step2b_UpgradeSenderOnL2Script() public {
@@ -67,7 +67,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
     }
 
     function test_step3_DeployReceiverOnL1Script() public {
-        deployOnEthScript.run();
+        deployReceiverOnL1Script.testrun();
     }
 
     function test_step3b_UpgradeReceiverOnL1Script() public {

@@ -17,6 +17,14 @@ import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 contract DeploySenderOnL2Script is Script {
 
     function run() public returns (ISenderCCIP) {
+        return _run(false);
+    }
+
+    function testrun() public returns (ISenderCCIP) {
+        return _run(true);
+    }
+
+    function _run(bool isTest) internal returns (ISenderCCIP) {
 
         uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
@@ -46,6 +54,7 @@ contract DeploySenderOnL2Script is Script {
         vm.stopBroadcast();
 
         fileReader.saveSenderBridgeContracts(
+            isTest,
             address(senderProxy),
             address(senderUtils),
             address(proxyAdmin)

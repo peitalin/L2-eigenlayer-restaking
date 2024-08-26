@@ -24,6 +24,7 @@ import {BaseSepolia} from "../script/Addresses.sol";
 // 6551 accounts
 import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
@@ -31,7 +32,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 
 contract CCIP_Eigen_Deposit_6551Tests is Test {
 
-    DeployReceiverOnL1Script public deployOnEthScript;
+    DeployReceiverOnL1Script public deployReceiverOnL1Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
 
@@ -67,7 +68,7 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
         bob = vm.addr(bobKey);
         vm.deal(bob, 1 ether);
 
-        deployOnEthScript = new DeployReceiverOnL1Script();
+        deployReceiverOnL1Script = new DeployReceiverOnL1Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         signatureUtils = new SignatureUtilsEIP1271();
 
@@ -89,7 +90,7 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
         (
             receiverContract,
             restakingConnector
-        ) = deployOnEthScript.run();
+        ) = deployReceiverOnL1Script.testrun();
 
         //// allowlist deployer and mint initial balances
         vm.startBroadcast(deployerKey);
@@ -117,12 +118,12 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
     function test_EigenAgent_ExecuteWithSignatures() public {
 
         vm.startBroadcast(deployerKey);
-        EigenAgent6551 eigenAgent = receiverContract.spawnEigenAgentOnlyOwner(bob);
+        IEigenAgent6551 eigenAgent = restakingConnector.spawnEigenAgentOnlyOwner(bob);
         vm.stopBroadcast();
 
         vm.startBroadcast(bobKey);
 
-        _nonce = eigenAgent.execNonce();
+        _nonce = eigenAgent.getExecNonce();
         bytes memory data = abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector);
 
         bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
@@ -160,7 +161,7 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
         // should fail if anyone else tries to call with Bob's EigenAgent
         vm.startBroadcast(address(receiverContract));
         vm.expectRevert("Caller is not owner");
-        eigenAgent.execute(
+        EigenAgent6551(payable(address(eigenAgent))).execute(
             address(receiverContract),
             0 ether,
             abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector),
@@ -174,11 +175,11 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
     function test_CCIP_Eigenlayer_DepositIntoStrategy6551() public {
 
         vm.startBroadcast(deployerKey);
-        EigenAgent6551 eigenAgent = receiverContract.spawnEigenAgentOnlyOwner(bob);
+        IEigenAgent6551 eigenAgent = restakingConnector.spawnEigenAgentOnlyOwner(bob);
         vm.stopBroadcast();
 
         vm.startBroadcast(bobKey);
-        _nonce = eigenAgent.execNonce();
+        _nonce = eigenAgent.getExecNonce();
         vm.stopBroadcast();
 
         //////////////////////////////////////////////////////

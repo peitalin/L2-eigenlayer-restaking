@@ -23,18 +23,21 @@ import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 // 6551 accounts
 import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {EigenAgent6551TestUpgrade} from "./mocks/EigenAgent6551TestUpgrade.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {RestakingConnector} from "../src/RestakingConnector.sol";
 
 
 
 contract CCIP_EigenAgentTests is Test {
 
-    DeployReceiverOnL1Script public deployOnEthScript;
+    DeployReceiverOnL1Script public deployReceiverOnL1Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
 
+    bool isTest = block.chainid == 31337;
     uint256 public deployerKey;
     address public deployer;
     uint256 public bobKey;
@@ -70,7 +73,7 @@ contract CCIP_EigenAgentTests is Test {
         alice = vm.addr(aliceKey);
         vm.deal(alice, 1 ether);
 
-        deployOnEthScript = new DeployReceiverOnL1Script();
+        deployReceiverOnL1Script = new DeployReceiverOnL1Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         signatureUtils = new SignatureUtilsEIP1271();
 
@@ -92,7 +95,7 @@ contract CCIP_EigenAgentTests is Test {
         (
             receiverContract,
             restakingConnector
-        ) = deployOnEthScript.run();
+        ) = deployReceiverOnL1Script.testrun();
 
         erc20Drip = IERC20_CCIPBnM(address(token));
 
@@ -114,15 +117,15 @@ contract CCIP_EigenAgentTests is Test {
     function test_EigenAgent_ExecuteWithSignatures() public {
 
         vm.startBroadcast(deployerKey);
-        EigenAgent6551 eigenAgent = receiverContract.spawnEigenAgentOnlyOwner(bob);
+        IEigenAgent6551 eigenAgent = restakingConnector.spawnEigenAgentOnlyOwner(bob);
         vm.stopBroadcast();
 
         vm.startBroadcast(bobKey);
 
-        _nonce = eigenAgent.execNonce();
+        _nonce = eigenAgent.getExecNonce();
 
-        // encode a simple readSenderContractL2Addr call
-        bytes memory data = abi.encodeWithSelector(receiverContract.readSenderContractL2Addr.selector);
+        // encode a simple getSenderContractL2Addr call
+        bytes memory data = abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector);
 
         bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
             address(receiverContract),
@@ -156,7 +159,7 @@ contract CCIP_EigenAgentTests is Test {
         );
 
         // msg.sender = ReceiverContract's address
-        address senderTargetAddr = receiverContract.readSenderContractL2Addr();
+        address senderTargetAddr = receiverContract.getSenderContractL2Addr();
         address sender1 = abi.decode(result, (address));
 
         require(sender1 == senderTargetAddr, "call did not return the same address");
@@ -165,10 +168,10 @@ contract CCIP_EigenAgentTests is Test {
         // should fail if anyone else tries to call with Bob's EigenAgent without Bob's signature
         vm.startBroadcast(address(receiverContract));
         vm.expectRevert("Caller is not owner");
-        eigenAgent.execute(
+        EigenAgent6551(payable(address(eigenAgent))).execute(
             address(receiverContract),
             0 ether,
-            abi.encodeWithSelector(receiverContract.readSenderContractL2Addr.selector),
+            abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector),
             0
         );
 
@@ -191,8 +194,12 @@ contract CCIP_EigenAgentTests is Test {
 
         vm.startBroadcast(deployerKey);
 
-        EigenAgent6551 eigenAgentBob = receiverContract.spawnEigenAgentOnlyOwner(bob);
-        EigenAgent6551 eigenAgentDeployer = receiverContract.spawnEigenAgentOnlyOwner(deployer);
+        EigenAgent6551 eigenAgentBob = EigenAgent6551(payable(address(
+            restakingConnector.spawnEigenAgentOnlyOwner(bob)
+        )));
+        EigenAgent6551 eigenAgentDeployer = EigenAgent6551(payable(address(
+            restakingConnector.spawnEigenAgentOnlyOwner(deployer)
+        )));
 
         ///// create new implementation and upgrade
         EigenAgent6551TestUpgrade eigenAgentUpgradedImpl = new EigenAgent6551TestUpgrade();
@@ -222,11 +229,11 @@ contract CCIP_EigenAgentTests is Test {
         //////////////////////////////////////////////////////
 
         vm.startBroadcast(deployerKey);
-        EigenAgent6551 eigenAgent = receiverContract.spawnEigenAgentOnlyOwner(bob);
+        IEigenAgent6551 eigenAgent = restakingConnector.spawnEigenAgentOnlyOwner(bob);
         vm.stopBroadcast();
 
         vm.startBroadcast(bobKey);
-        _nonce = eigenAgent.execNonce();
+        _nonce = eigenAgent.getExecNonce();
         vm.stopBroadcast();
 
         //////////////////////////////////////////////////////
@@ -294,12 +301,12 @@ contract CCIP_EigenAgentTests is Test {
         {
             vm.startBroadcast(bob);
 
-            uint256 transferredTokenId = receiverContract.getEigenAgentOwnerTokenId(bob);
-            EigenAgentOwner721 eigenAgentOwnerNft = receiverContract.getEigenAgentOwner721();
+            uint256 transferredTokenId = restakingConnector.getEigenAgentOwnerTokenId(bob);
+            EigenAgentOwner721 eigenAgentOwnerNft = restakingConnector.getEigenAgentOwner721();
             eigenAgentOwnerNft.approve(alice, transferredTokenId);
 
             vm.expectEmit(true, true, true, true);
-            emit ReceiverCCIP.EigenAgentOwnerUpdated(bob, alice, transferredTokenId);
+            emit RestakingConnector.EigenAgentOwnerUpdated(bob, alice, transferredTokenId);
             eigenAgentOwnerNft.safeTransferFrom(bob, alice, transferredTokenId);
 
             require(

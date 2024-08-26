@@ -6,11 +6,10 @@ import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.s
 import {CCIPReceiver} from "@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol";
 import {IERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 
-abstract contract BaseMessengerCCIP is Initializable, CCIPReceiver, OwnableUpgradeable {
+abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     using SafeERC20 for IERC20;
 
     error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees);
@@ -59,10 +58,9 @@ abstract contract BaseMessengerCCIP is Initializable, CCIPReceiver, OwnableUpgra
         address _link
     ) CCIPReceiver(_router) {
         s_linkToken = IERC20(_link);
-        _disableInitializers();
     }
 
-    function __BaseMessengerCCIP_init() internal initializer {
+    function __BaseMessengerCCIP_init() internal {
         OwnableUpgradeable.__Ownable_init();
     }
 
