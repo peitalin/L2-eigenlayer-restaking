@@ -24,8 +24,11 @@ import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
-import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
+import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
+
+import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
+import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 // import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 // import {IBeacon} from "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
@@ -73,9 +76,9 @@ contract DeployReceiverOnL1Script is Script {
         ProxyAdmin proxyAdmin = new ProxyAdmin();
 
         // deploy 6551 Registry
-        ERC6551Registry registry6551 = new ERC6551Registry();
+        IERC6551Registry registry6551 = IERC6551Registry(address(new ERC6551Registry()));
         // deploy 6551 EigenAgentOwner NFT
-        EigenAgentOwner721 eigenAgentOwner721 = EigenAgentOwner721(
+        IEigenAgentOwner721 eigenAgentOwner721 = IEigenAgentOwner721(
             address(new TransparentUpgradeableProxy(
                 address(new EigenAgentOwner721()),
                 address(proxyAdmin),

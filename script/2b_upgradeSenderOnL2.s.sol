@@ -25,23 +25,14 @@ contract UpgradeSenderOnL2Script is Script {
         ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL2());
         ISenderCCIP senderProxy = fileReader.readSenderContract();
 
-        // console.log("proxyAdminl2:", address(proxyAdmin));
-
-
-        /// Either use old implementation or deploy a new one if code differs.
-        /// ISenderUtils senderUtils = ISenderUtils(fileReader.readSenderUtils());
-        ISenderUtils senderUtils = ISenderUtils(address(new SenderUtils()));
-
         /////////////////////////////
         /// Begin Broadcast
         /////////////////////////////
         vm.startBroadcast(deployerKey);
 
-        SenderCCIP senderImpl = new SenderCCIP(
-            BaseSepolia.Router,
-            BaseSepolia.Link,
-            address(senderUtils)
-        );
+        ISenderUtils senderUtils = ISenderUtils(address(new SenderUtils()));
+
+        SenderCCIP senderImpl = new SenderCCIP(BaseSepolia.Router, BaseSepolia.Link);
 
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(senderProxy))),

@@ -23,6 +23,10 @@ import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContr
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
 
+import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
+import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
+import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
+
 
 contract UpgradeReceiverOnL1Script is Script {
 
@@ -57,6 +61,11 @@ contract UpgradeReceiverOnL1Script is Script {
             IReceiverCCIP receiverProxy,
             IRestakingConnector restakingConnectorProxy
         ) = fileReader.readReceiverRestakingConnector();
+
+        (
+            ERC6551Registry registry6551,
+            EigenAgentOwner721 eigenAgentOwner721
+        ) = fileReader.readEigenAgent6551Registry();
 
         // Deploy new RestakingConnector implementation + upgrade proxy
         RestakingConnector restakingConnectorImpl = new RestakingConnector();

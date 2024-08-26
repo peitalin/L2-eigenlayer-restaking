@@ -35,11 +35,7 @@ contract DeploySenderOnL2Script is Script {
         // deploy sender utils
         SenderUtils senderUtils = new SenderUtils();
         // deploy sender
-        SenderCCIP senderImpl = new SenderCCIP(
-            BaseSepolia.Router,
-            BaseSepolia.Link,
-            address(senderUtils)
-        );
+        SenderCCIP senderImpl = new SenderCCIP(BaseSepolia.Router, BaseSepolia.Link);
 
         SenderCCIP senderProxy = SenderCCIP(
             payable(address(
@@ -53,6 +49,7 @@ contract DeploySenderOnL2Script is Script {
         // whitelist both chain to receive and send messages
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
+        senderProxy.setSenderUtils(ISenderUtils(address(senderUtils)));
         vm.stopBroadcast();
 
         fileReader.saveSenderBridgeContracts(

@@ -45,10 +45,8 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
 
     function run() public {
 
-        bool isTest = block.chainid == 31337;
         uint256 l2ForkId = vm.createSelectFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
-        console.log("block.chainid", block.chainid);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
@@ -82,19 +80,16 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
 
         // First get EigenAgent from EthSepolia
         vm.selectFork(ethForkId);
-
         vm.startBroadcast(deployerKey);
 
         uint256 nonce = 0;
-        /// ReceiverCCIP will spawn a EigenAgent when CCIP message reaches L1 if user
-        /// does not already have a EigenAgent NFT on L1.
-        /// Nonce is then 0.
-        // address eigenAgent = receiverContract.getEigenAgent(deployer);
-        // if (eigenAgent != address(0)) {
-        //     // Otherwise if the user already has a EigenAgent, fetch current execution Nonce
-        //     nonce = IEigenAgent6551(eigenAgent).getExecNonce();
-        // }
-        vm.stopBroadcast();
+        /// ReceiverCCIP spawns an EigenAgent when CCIP message reaches L1
+        /// if user does not already have an EigenAgent NFT on L1.  Nonce is then 0.
+        address eigenAgent = restakingConnector.getEigenAgent(deployer);
+        if (eigenAgent != address(0)) {
+            // Otherwise if the user already has a EigenAgent, fetch current execution Nonce
+            nonce = IEigenAgent6551(eigenAgent).getExecNonce();
+        }
 
         uint256 amount = 0.00717 ether;
         uint256 expiry = block.timestamp + 3 hours;
@@ -130,6 +125,7 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
             expiry,
             signature
         );
+        vm.stopBroadcast();
 
         //////////////////////////////////////////////////////
         /// ReceiverCCIP -> EigenAgent -> Eigenlayer

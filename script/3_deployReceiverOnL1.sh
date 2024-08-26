@@ -9,7 +9,7 @@ forge script script/3_deployReceiverOnL1.s.sol:DeployReceiverOnL1Script \
     --etherscan-api-key $ETHERSCAN_API_KEY \
     --private-key $DEPLOYER_KEY \
     --verify \
-    --resume \
+    # --resume \
     -vvvv
 
 
