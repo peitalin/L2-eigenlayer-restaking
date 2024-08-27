@@ -215,7 +215,7 @@ contract SignatureUtilsEIP1271 is Script {
             signatureEigenAgent
         );
 
-        checkSignature_EIP1271(vm.addr(signerKey), digestHash, signature);
+        checkSignature_EIP1271(vm.addr(signerKey), digestHash, signatureEigenAgent);
 
         return (
             signatureEigenAgent,
