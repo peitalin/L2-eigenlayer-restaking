@@ -22,6 +22,7 @@ import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
 import {ScriptUtils} from "./ScriptUtils.sol";
 
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 
@@ -49,6 +50,9 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
     address public staker;
     uint256 public amount;
     uint256 public expiry;
+    uint256 public execNonce; // EigenAgent execution nonce
+    uint256 public withdrawalNonce; // Eigenlayer withdrawal nonce
+    IEigenAgent6551 public eigenAgent;
 
     function run() public {
 
@@ -88,7 +92,11 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             DeploySenderOnL2Script deployOnL2Script = new DeploySenderOnL2Script();
             senderContract = deployOnL2Script.testrun();
 
+            // go back to ETH fork
             vm.selectFork(ethForkId);
+            // Get EigenAccount address
+            eigenAgent = agentFactory.getEigenAgent(deployer);
+
         } else {
             // otherwise if running the script, read the existing contracts on Sepolia
             senderContract = fileReader.readSenderContract();
@@ -97,6 +105,15 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
                 restakingConnector
             ) = fileReader.readReceiverRestakingConnector();
             agentFactory = fileReader.readAgentFactory();
+
+            // Get EigenAccount address
+            eigenAgent = agentFactory.getEigenAgent(deployer);
+        }
+
+        console.log("eigenAgent:", address(eigenAgent));
+        execNonce = eigenAgent.getExecNonce();
+        if (address(eigenAgent) == address(0)) {
+            revert("User must have existing deposit in Eigenlayer + EigenAgent");
         }
 
         ////////////////////////////////////////////////////////////
@@ -116,34 +133,17 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         uint256[] memory sharesToWithdraw = new uint256[](1);
         sharesToWithdraw[0] = strategyManager.stakerStrategyShares(staker, strategy);
 
-        address withdrawer = address(receiverContract);
-        uint256 nonce = delegationManager.cumulativeWithdrawalsQueued(staker);
+        address withdrawer = address(eigenAgent);
+        withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(staker);
         address delegatedTo = delegationManager.delegatedTo(staker);
-        bytes memory signature;
-        {
-            bytes32 digestHash = signatureUtils.calculateQueueWithdrawalDigestHash(
-                staker,
-                strategiesToWithdraw,
-                sharesToWithdraw,
-                nonce,
-                expiry,
-                address(delegationManager),
-                block.chainid
-            );
-
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
-            signature = abi.encodePacked(r, s, v);
-
-            signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
-        }
-
 
         /////////////////////////////////////////////////////////////////
-        ////// Setup Queue Withdrawals Params (reads from Eigenlayer contracts on L1)
+        ////// Sign the queueWithdrawal payload for EigenAgent
         /////////////////////////////////////////////////////////////////
 
-        bytes memory message;
-        // put the following in separate closure (stack too deep errors)
+        bytes memory withdrawalMessage;
+        bytes memory signatureEigenAgent;
+        bytes memory messageWithSignature;
         {
             IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal;
             queuedWithdrawal = IDelegationManager.QueuedWithdrawalParams({
@@ -151,15 +151,29 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
                 shares: sharesToWithdraw,
                 withdrawer: withdrawer
             });
-
             IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalArray;
             queuedWithdrawalArray = new IDelegationManager.QueuedWithdrawalParams[](1);
             queuedWithdrawalArray[0] = queuedWithdrawal;
 
-            message = EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
+            // create the queueWithdrawal message for Eigenlayer
+            withdrawalMessage = EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
                 queuedWithdrawalArray
             );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            (
+                signatureEigenAgent,
+                messageWithSignature
+            ) = signatureUtils.signMessageForEigenAgentExecution(
+                deployerKey,
+                address(delegationManager),
+                withdrawalMessage,
+                execNonce,
+                expiry
+            );
         }
+
+        signatureUtils.checkSignature_EIP1271(deployer, digestHash, signature);
 
         /////////////////////////////////////////////////////////////////
         /////// Broadcast to L2
@@ -173,7 +187,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
-            string(message),
+            string(messageWithSignature),
             address(ccipBnM),
             amount
         );
@@ -193,7 +207,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             staker,
             delegatedTo,
             withdrawer,
-            nonce,
+            withdrawalNonce,
             0, // startBlock is created later
             strategiesToWithdraw,
             sharesToWithdraw,

@@ -1,22 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-// import {ERC6551AccountUpgradeable} from "@6551/examples/upgradeable/ERC6551AccountUpgradeable.sol";
-import {ERC6551AccountUpgradeable} from "./ERC6551AccountUpgradeable.sol";
-import {IERC6551Account} from "@6551/interfaces/IERC6551Account.sol";
-import {IERC6551Executable} from "@6551/interfaces/IERC6551Executable.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-import {IEigenAgent6551} from "./IEigenAgent6551.sol";
-import {SignatureUtilsEIP1271} from "../utils/SignatureUtilsEIP1271.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {IERC6551Account} from "@6551/interfaces/IERC6551Account.sol";
+import {IERC6551Executable} from "@6551/interfaces/IERC6551Executable.sol";
 
-contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent6551 {
+import {ERC6551AccountUpgradeable} from "./ERC6551AccountUpgradeable.sol";
+import {IEigenAgent6551} from "./IEigenAgent6551.sol";
+
+
+
+contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
 
     /*
      *
@@ -41,8 +38,6 @@ contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent
      *            Functions
      *
      */
-
-    function initialize() initializer public {}
 
     function getExecNonce() public view returns (uint256) {
         return execNonce;

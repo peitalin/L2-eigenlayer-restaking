@@ -1,28 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
-import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
-import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
-
 import {Adminable} from "../utils/Adminable.sol";
-import {EigenlayerMsgDecoders} from "../utils/EigenlayerMsgDecoders.sol";
-import {EigenlayerMsgEncoders} from "../utils/EigenlayerMsgEncoders.sol";
-import {EigenlayerDeposit6551Msg} from "../utils/EigenlayerMsgDecoders.sol";
-import {IRestakingConnector} from "../interfaces/IRestakingConnector.sol";
-
 import {ERC6551AccountProxy} from "@6551/examples/upgradeable/ERC6551AccountProxy.sol";
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgent6551} from "./IEigenAgent6551.sol";
 import {EigenAgent6551} from "./EigenAgent6551.sol";
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
 import {IAgentFactory} from "./IAgentFactory.sol";
-
-import {console} from "forge-std/Test.sol";
 
 
 
@@ -36,6 +21,12 @@ contract AgentFactory is Adminable {
 
     mapping(address => uint256) public userToEigenAgentTokenIds;
     mapping(uint256 => address) public tokenIdToEigenAgents;
+
+    event AgentCreated(
+        address indexed owner,
+        address indexed eigenAgent,
+        uint256 indexed tokenId
+    );
 
     /*
      *
@@ -61,8 +52,6 @@ contract AgentFactory is Adminable {
     }
 
     modifier onlyRestakingConnector() {
-        console.log("msg.sender:", msg.sender);
-        console.log("_restakingConnector:", _restakingConnector);
         require(msg.sender == _restakingConnector, "not called by RestakingConnector");
         _;
     }
@@ -103,8 +92,8 @@ contract AgentFactory is Adminable {
         return userToEigenAgentTokenIds[staker];
     }
 
-    function getEigenAgent(address staker) public view returns (address) {
-        return tokenIdToEigenAgents[userToEigenAgentTokenIds[staker]];
+    function getEigenAgent(address staker) public view returns (IEigenAgent6551) {
+        return IEigenAgent6551(tokenIdToEigenAgents[userToEigenAgentTokenIds[staker]]);
     }
 
     function spawnEigenAgentOnlyOwner(
@@ -114,10 +103,11 @@ contract AgentFactory is Adminable {
     }
 
     function tryGetEigenAgentOrSpawn(address staker)
-        external onlyRestakingConnector
+        external
+        onlyRestakingConnector
         returns (IEigenAgent6551)
     {
-        IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(getEigenAgent(staker)));
+        IEigenAgent6551 eigenAgent = getEigenAgent(staker);
         if (address(eigenAgent) != address(0)) {
             return eigenAgent;
         }
@@ -131,7 +121,7 @@ contract AgentFactory is Adminable {
             "staker already has an EigenAgentOwner NFT"
         );
         require(
-            getEigenAgent(staker) == address(0),
+            address(getEigenAgent(staker)) == address(0),
             "staker already has an EigenAgent account"
         );
 
@@ -153,6 +143,8 @@ contract AgentFactory is Adminable {
 
         userToEigenAgentTokenIds[staker] = tokenId;
         tokenIdToEigenAgents[tokenId] = address(eigenAgent);
+
+        emit AgentCreated(staker, address(eigenAgent), tokenId);
 
         return eigenAgent;
     }

@@ -175,13 +175,13 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
 
     function test_CCIP_Eigenlayer_DepositIntoStrategy6551() public {
 
-        vm.startBroadcast(deployerKey);
-        IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
-        vm.stopBroadcast();
+        // vm.startBroadcast(deployerKey);
+        // IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
+        // vm.stopBroadcast();
 
-        vm.startBroadcast(bobKey);
-        _nonce = eigenAgent.getExecNonce();
-        vm.stopBroadcast();
+        // vm.startBroadcast(bobKey);
+        // _nonce = eigenAgent.getExecNonce();
+        // vm.stopBroadcast();
 
         //////////////////////////////////////////////////////
         /// Receiver -> EigenAgent -> Eigenlayer
@@ -225,6 +225,8 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
         /////////////////////////////////////
         vm.startBroadcast(deployerKey);
         receiverContract.mockCCIPReceive(any2EvmMessage);
+
+        IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(bob);
 
         uint256 valueOfShares = strategy.userUnderlying(address(eigenAgent));
         require(_amount == valueOfShares, "valueofShares incorrect");

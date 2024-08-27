@@ -71,39 +71,11 @@ contract SignatureUtilsEIP1271 is Script {
         // So chainid should be destination chainid in the context of L2 -> L1 restaking calls
     }
 
-    function createEigenlayerDepositSignature(
-        uint256 signingKey,
-        IStrategy _strategy,
-        IERC20 _token,
-        uint256 amount,
-        address staker,
-        uint256 nonce,
-        uint256 expiry,
-        bytes32 domainSeparator
-    ) public pure returns (bytes memory, bytes32) {
-
-        bytes32 digestHash = createEigenlayerDepositDigest(
-            _strategy,
-            _token,
-            amount,
-            staker,
-            nonce,
-            expiry,
-            domainSeparator
-        );
-        // generate ECDSA signature
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signingKey, digestHash);
-        bytes memory signature = abi.encodePacked(r, s, v);
-        // r,s,v packed into 65byte signature: 32 + 32 + 1.
-        // the order of r,s,v differs from the above
-        return (signature, digestHash);
-    }
-
     function calculateQueueWithdrawalDigestHash(
         address staker,
         IStrategy[] memory strategies,
         uint256[] memory shares,
-        uint256 stakerNonce,
+        uint256 withdrawalNonce,
         uint256 expiry,
         address delegationManagerAddr,
         uint256 destinationChainid
@@ -119,7 +91,7 @@ contract SignatureUtilsEIP1271 is Script {
             staker,
             strategies,
             shares,
-            stakerNonce,
+            withdrawalNonce,
             expiry
         ));
         // calculate the digest hash
@@ -212,5 +184,40 @@ contract SignatureUtilsEIP1271 is Script {
         return digestHash;
     }
 
+    function signMessageForEigenAgentExecution(
+        uint256 signerKey,
+        address targetContractAddr,
+        bytes memory messageToEigenlayer,
+        uint256 execNonceEigenAgent,
+        uint256 expiry
+    ) returns (
+        bytes memory,
+        bytes memory
+    ) {
+        // sign the message for EigenAgent
+        bytes32 digestHash = createEigenAgentCallDigestHash(
+            targetContractAddr,
+            0 ether, // not sending ether
+            messageToEigenlayer,
+            execNonceEigenAgent,
+            EthSepolia.ChainId, // destination chainid where EigenAgent lives
+            expiry
+        );
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
+        signatureEigenAgent = abi.encodePacked(r, s, v);
+
+        // NOTE: abi.encodePacked to join the payload + expiry + signature
+        bytes memory messageWithSignature = abi.encodePacked(
+            messageToEigenlayer,
+            expiry,
+            signatureEigenAgent
+        );
+
+        return (
+            signatureEigenAgent,
+            messageWithSignature
+        );
+    }
 
 }

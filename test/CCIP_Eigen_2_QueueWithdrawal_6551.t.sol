@@ -204,7 +204,7 @@ contract CCIP_Eigen_QueueWithdrawal_6551Tests is Test {
         signatureUtils.checkSignature_EIP1271(bob, digestHash2, signature2);
 
         // note: abi.encodePacked to join the payload + signature
-        bytes memory dataWithSignature = abi.encodePacked(data2, _expiry, signature2);
+        bytes memory messageWithSignature = abi.encodePacked(data2, _expiry, signature2);
 
         Client.Any2EVMMessage memory any2EvmMessageQueueWithdrawal = Client.Any2EVMMessage({
             messageId: bytes32(uint256(9999)),
@@ -212,7 +212,7 @@ contract CCIP_Eigen_QueueWithdrawal_6551Tests is Test {
             sender: abi.encode(address(deployer)), // bytes: abi.decode(sender) if coming from an EVM chain.
             destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging coins, just sending msg
             data: abi.encode(string(
-                dataWithSignature
+                messageWithSignature
             ))
         });
 

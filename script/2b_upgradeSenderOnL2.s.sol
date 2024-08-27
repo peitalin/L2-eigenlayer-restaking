@@ -30,9 +30,9 @@ contract UpgradeSenderOnL2Script is Script {
         /////////////////////////////
         vm.startBroadcast(deployerKey);
 
-        ISenderUtils senderUtils = ISenderUtils(address(new SenderUtils()));
-
         SenderCCIP senderImpl = new SenderCCIP(BaseSepolia.Router, BaseSepolia.Link);
+
+        ISenderUtils senderUtils = ISenderUtils(address(new SenderUtils()));
 
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(senderProxy))),

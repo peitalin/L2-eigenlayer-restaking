@@ -9,7 +9,7 @@ import {EigenlayerMsgDecoders, TransferToAgentOwnerMsg} from "./utils/Eigenlayer
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 
 
-contract SenderUtils is Ownable {
+contract SenderUtils is Ownable, EigenlayerMsgDecoders {
 
     event SendingWithdrawalToAgentOwner(address indexed, uint256 indexed, address indexed);
     event WithdrawalCommitted(bytes32 indexed, address indexed, uint256 indexed);
@@ -23,7 +23,8 @@ contract SenderUtils is Ownable {
     constructor() {
 
         // depositIntoStrategy: [gas: 565_307]
-        _gasLimitsForFunctionSelectors[0xf7e784ef] = 600_000;
+        // cast sig "depositWithEigenAgent(bytes,address,uint256)" == 0xaac4ec88
+        _gasLimitsForFunctionSelectors[0xaac4ec88] = 800_000;
 
         // depositIntoStrategyWithSignature: [gas: 713_400]
         _gasLimitsForFunctionSelectors[0x32e89ace] = 800_000;
@@ -50,7 +51,7 @@ contract SenderUtils is Ownable {
         address
     ) {
 
-        TransferToAgentOwnerMsg memory transferToAgentOwnerMsg = EigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(message);
+        TransferToAgentOwnerMsg memory transferToAgentOwnerMsg = decodeTransferToAgentOwnerMsg(message);
 
         bytes32 withdrawalRoot = transferToAgentOwnerMsg.withdrawalRoot;
         address agentOwner = transferToAgentOwnerMsg.agentOwner;
@@ -106,7 +107,7 @@ contract SenderUtils is Ownable {
                 , // receiveAsTokens
                 , // expiry
                 , // signature
-            ) = EigenlayerMsgDecoders.decodeCompleteWithdrawalMsg(message);
+            ) = decodeCompleteWithdrawalMsg(message);
 
             bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
 

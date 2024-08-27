@@ -2,11 +2,17 @@
 pragma solidity 0.8.22;
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
-import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
+import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EigenlayerMsgEncoders} from "./EigenlayerMsgEncoders.sol";
 
+
+struct TransferToAgentOwnerMsg {
+    bytes32 withdrawalRoot;
+    address agentOwner;
+    bytes32 agentOwnerRoot;
+}
 
 struct EigenlayerDeposit6551Msg {
     address strategy;
@@ -16,31 +22,9 @@ struct EigenlayerDeposit6551Msg {
     uint256 expiry;
     bytes signature;
 }
-event EigenlayerDeposit6551Params(
-    address indexed staker,
-    address indexed strategy,
-    address token,
-    uint256 indexed amount
-);
-
-event EigenlayerQueueWithdrawalsParams(
-    uint256 indexed amount,
-    address indexed staker
-);
-
-struct TransferToAgentOwnerMsg {
-    bytes32 withdrawalRoot;
-    address agentOwner;
-    bytes32 agentOwnerRoot;
-}
-event TransferToAgentOwnerParams(
-    bytes32 indexed withdrawalRoot,
-    address indexed agentOwner,
-    bytes32 indexed agentOwnerRoot
-);
 
 
-library EigenlayerMsgDecoders {
+contract EigenlayerMsgDecoders {
 
     /*
      *
@@ -177,6 +161,24 @@ library EigenlayerMsgDecoders {
         // 1f7c77a6b0940a7ce34edf2821d323701213db8e237c46fdf8b7bedc8f295359 [452] signature r
         // 1b82b0bd80af2140d658af1312ba94049de6c699533bca58da0f29d659cdf61a [484] signature s
         // 1c000000000000000000000000000000000000000000000000000000         [516] signature v
+
+        // 0000000000000000000000000000000000000000000000000000000000000020
+        // 00000000000000000000000000000000000000000000000000000000000001a5
+        // 0dd8dd02
+        // 0000000000000000000000000000000000000000000000000000000000000020
+        // 0000000000000000000000000000000000000000000000000000000000000001
+        // 0000000000000000000000000000000000000000000000000000000000000020
+        // 0000000000000000000000000000000000000000000000000000000000000060
+        // 00000000000000000000000000000000000000000000000000000000000000a0
+        // 000000000000000000000000c4e6c67c8e9a3ca56dc37b0a4990895df330b69d
+        // 0000000000000000000000000000000000000000000000000000000000000001
+        // 000000000000000000000000ee33ddcfb85e06ac1fd0a4b36f9b6958d5a7d3f0
+        // 0000000000000000000000000000000000000000000000000000000000000001
+        // 000000000000000000000000000000000000000000000000002bc4f987a20000
+        // 0000000000000000000000000000000000000000000000000000000066ce097c
+        // 3a48571ab7105e42f6f94f44a2f7eb5fe96f3e5dc9a6d29a32ce10e83348a4b1
+        // 7ae411bb81dd0e6f1df7867d39a40f95e1402bc4e9a7ab0f1f71af4e5a9ac26a
+        // 1b000000000000000000000000000000000000000000000000000000
 
         uint256 arrayLength;
         assembly {
@@ -819,5 +821,4 @@ library EigenlayerMsgDecoders {
 
         return staker;
     }
-
 }

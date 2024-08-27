@@ -91,10 +91,12 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         uint256 nonce = 0;
         /// ReceiverCCIP spawns an EigenAgent when CCIP message reaches L1
         /// if user does not already have an EigenAgent NFT on L1.  Nonce is then 0.
-        address eigenAgent = agentFactory.getEigenAgent(deployer);
-        if (eigenAgent != address(0)) {
+        IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(deployer);
+        // IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
+        console.log("eigenAgent:", address(eigenAgent));
+        if (address(eigenAgent) != address(0)) {
             // Otherwise if the user already has a EigenAgent, fetch current execution Nonce
-            nonce = IEigenAgent6551(eigenAgent).getExecNonce();
+            nonce = eigenAgent.getExecNonce();
         }
 
         uint256 amount = 0.00717 ether;
@@ -121,22 +123,32 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
             signature = abi.encodePacked(r, s, v);
         }
 
+
+
+        bytes memory withdrawalMessage;
+        bytes memory signatureEigenAgent;
+        bytes memory messageWithSignature;
+
+        // sign the message for EigenAgent to execute Eigenlayer command
+        (
+            signatureEigenAgent,
+            messageWithSignature
+        ) = signatureUtils.signMessageForEigenAgentExecution(
+            deployerKey,
+            address(delegationManager),
+            withdrawalMessage,
+            execNonce,
+            expiry
+        );
+
         signatureUtils.checkSignature_EIP1271(deployer, digestHash, signature);
 
-        bytes memory message = EigenlayerMsgEncoders.encodeDepositWithSignature6551Msg(
-            address(strategy),
-            address(token),
-            amount,
-            deployer,
-            expiry,
-            signature
-        );
         vm.stopBroadcast();
 
         //////////////////////////////////////////////////////
         /// ReceiverCCIP -> EigenAgent -> Eigenlayer
         //////////////////////////////////////////////////////
-        //// Make sure we are on BaseSepolia Fork to make contract calls to CCIP-BnM
+        // Make sure we are on BaseSepolia Fork to make contract calls to CCIP-BnM
         vm.selectFork(l2ForkId);
         vm.startBroadcast(deployerKey);
 
@@ -153,7 +165,7 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
-            string(message),
+            string(messageWithSignature),
             address(ccipBnM),
             amount
         );

@@ -12,15 +12,23 @@ forge script script/3_deployReceiverOnL1.s.sol:DeployReceiverOnL1Script \
     -vvvv
 
 
-# ### Verify manually if verify failed in previous step
+
+### Verify manually if verify failed in previous step
 # forge verify-contract \
 #     --watch \
-#     --constructor-args $(cast abi-encode "constructor(address,address)" 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59 0x779877A7B0D9E8603169DdbD7836e478b4624789) \
 #     --rpc-url ethsepolia \
 #     --etherscan-api-key $ETHERSCAN_API_KEY \
 #     --compiler-version v0.8.22 \
-#     0x1689aD770c571004fA7F3896F64e49bfc61B564F \
-#     ./src/ReceiverCCIP.sol:ReceiverCCIP
+#     0x227F4A4e0B9e7E9bdaB98e738bBF7a59143a04c9 \
+#     ./src/6551/AgentFactory.sol:AgentFactory
+
+# forge verify-contract \
+#     --watch \
+#     --rpc-url ethsepolia \
+#     --etherscan-api-key $ETHERSCAN_API_KEY \
+#     --compiler-version v0.8.22 \
+#     0x35aD715913bF8A7dE9D4dc7DF4230c0c073E6f29 \
+#     src/utils/EigenlayerMsgDecoders.sol:EigenlayerMsgDecoders
 
 
 # forge verify-contract \
@@ -28,23 +36,23 @@ forge script script/3_deployReceiverOnL1.s.sol:DeployReceiverOnL1Script \
 #     --rpc-url ethsepolia \
 #     --etherscan-api-key $ETHERSCAN_API_KEY \
 #     --compiler-version v0.8.22 \
-#     0x4E08460C2cBc1c28AF92A8Da1FF5EB4257Ae6e58 \
+#     0x0aEDf2bfF862E2e8D31951E20f329F3776ceF974 \
+#     src/6551/EigenAgent6551.sol:EigenAgent6551
+
+# forge verify-contract \
+#     --watch \
+#     --rpc-url ethsepolia \
+#     --etherscan-api-key $ETHERSCAN_API_KEY \
+#     --compiler-version v0.8.22 \
+#     0x512157F3Bb7d0D808df4E3a2c6a6aF4341FB6205 \
 #     src/utils/EigenlayerMsgEncoders.sol:EigenlayerMsgEncoders
 
 
 # forge verify-contract \
+#     --constructor-args $(cast abi-encode "constructor(address,address)" 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59 0x779877A7B0D9E8603169DdbD7836e478b4624789) \
 #     --watch \
 #     --rpc-url ethsepolia \
 #     --etherscan-api-key $ETHERSCAN_API_KEY \
 #     --compiler-version v0.8.22 \
-#     0x66e79206a5ea3eb7d80ed7fbbaa5240262974594 \
-#     ./src/RestakingConnector.sol:RestakingConnector
-
-
-# forge verify-contract \
-#     --watch \
-#     --rpc-url ethsepolia \
-#     --etherscan-api-key $ETHERSCAN_API_KEY \
-#     --compiler-version v0.8.22 \
-#     0xeb72aa06bbec8e83b73e97fb06495a6305564882 \
-#     ./src/6551/EigenAgentOwner721.sol:EigenAgentOwner721
+#     0x560788e5070f7c369f140f79d87d9584a5a2bb3f \
+#     ./src/ReceiverCCIP.sol:ReceiverCCIP

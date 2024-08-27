@@ -9,9 +9,8 @@ import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IS
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 
-import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
+import {EigenlayerMsgDecoders, EigenlayerDeposit6551Msg} from "./utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
-import {EigenlayerDeposit6551Msg} from "./utils/EigenlayerMsgDecoders.sol";
 import {Adminable} from "./utils/Adminable.sol";
 
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
@@ -23,6 +22,7 @@ import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 contract RestakingConnector is
     Initializable,
     IRestakingConnector,
+    EigenlayerMsgDecoders,
     Adminable
 {
 
@@ -102,7 +102,7 @@ contract RestakingConnector is
         uint256 amount
     ) public onlyReceiverCCIP {
 
-        EigenlayerDeposit6551Msg memory eigenMsg = EigenlayerMsgDecoders.decodeDepositWithSignature6551Msg(message);
+        EigenlayerDeposit6551Msg memory eigenMsg = decodeDepositWithSignature6551Msg(message);
         IEigenAgent6551 eigenAgent = agentFactory.tryGetEigenAgentOrSpawn(eigenMsg.staker);
 
         bytes memory depositData = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
@@ -147,7 +147,7 @@ contract RestakingConnector is
             IDelegationManager.QueuedWithdrawalParams[] memory QWPArray,
             uint256 expiry,
             bytes memory signature
-        ) = EigenlayerMsgDecoders.decodeQueueWithdrawalsMsg(message);
+        ) = decodeQueueWithdrawalsMsg(message);
 
         /// @note: DelegationManager.queueWithdrawals requires:
         /// msg.sender == withdrawer == staker
@@ -176,7 +176,7 @@ contract RestakingConnector is
             bool receiveAsTokens,
             uint256 expiry,
             bytes memory signature
-        ) = EigenlayerMsgDecoders.decodeCompleteWithdrawalMsg(message);
+        ) = decodeCompleteWithdrawalMsg(message);
 
         // eigenAgent == withdrawer == staker == msg.sender (in Eigenlayer)
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawal.withdrawer));
@@ -221,7 +221,7 @@ contract RestakingConnector is
             ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry,
             ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
             bytes32 approverSalt
-        ) = EigenlayerMsgDecoders.decodeDelegateToBySignatureMsg(message);
+        ) = decodeDelegateToBySignatureMsg(message);
 
         delegationManager.delegateToBySignature(
             staker,

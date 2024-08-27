@@ -3,18 +3,18 @@ pragma solidity ^0.8.0;
 
 /// @author: manifold.xyz
 
-import "@openzeppelin/contracts/interfaces/IERC1271.sol";
-import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
-import "@openzeppelin/contracts/utils/StorageSlot.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
+import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
+import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
+import {StorageSlot} from "@openzeppelin/contracts/utils/StorageSlot.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import {IERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 
-import "@6551/interfaces/IERC6551Account.sol";
-import "@6551/interfaces/IERC6551Executable.sol";
-import "@6551/lib/ERC6551AccountLib.sol";
+import {IERC6551Account} from "@6551/interfaces/IERC6551Account.sol";
+import {IERC6551Executable} from "@6551/interfaces/IERC6551Executable.sol";
+import {ERC6551AccountLib} from "@6551/lib/ERC6551AccountLib.sol";
 
 /**
  * @title ERC6551AccountUpgradeable
