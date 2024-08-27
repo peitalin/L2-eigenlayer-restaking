@@ -1,15 +1,15 @@
 {
   "chainInfo": {
-    "block": 6582760,
+    "block": 6582849,
     "chainid": 11155111,
-    "timestamp": 1724782464
+    "timestamp": 1724783652
   },
   "contracts": {
-    "agentFactory": "0x2ac07B38f21Df59976B1B100C8B26E30f3feC135",
+    "agentFactory": "0x9EB42EaB5F4204eA26ed300Afc2165EE0998b0B3",
     "eigenAgentOwner721": "0x460ee91bA4305cd22cD51011280e751474F2f778",
     "proxyAdminL1": "0xc5d0BB6A1740968222EE184de6E51619c9280bD8",
     "receiverCCIP": "0xc4e6C67C8E9a3CA56dc37b0a4990895dF330B69d",
-    "registry6551": "0x5bAB4f00C7F3b3EcE472f1538064c69d0A7Cbd25",
+    "registry6551": "0x290907B4fF211a86b138335212384255f1275B55",
     "restakingConnector": "0xE79bc3229185C364D8527785DdaF7146bc7dfA20"
   }
 }

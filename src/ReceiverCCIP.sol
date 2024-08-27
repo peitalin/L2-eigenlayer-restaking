@@ -130,7 +130,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 senderContractL2Addr,
                 messageForL2,
                 address(withdrawalToken), // L1 token to burn/lock
-                amount
+                withdrawalAmount
             );
             textMsg = "completeQueuedWithdrawal()";
         }

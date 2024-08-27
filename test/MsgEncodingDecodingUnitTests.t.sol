@@ -471,9 +471,22 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         require(_receiveAsTokens == receiveAsTokens, "decodeCompleteWithdrawalMsg error");
     }
 
-    /// Note: Need to do a array version of this
-    function test_Decode_Array_CompleteQueuedWithdrawal() public {
 
+
+    function test_FunctionSelectors_CompleteQueueWithdrawal() public {
+
+        bytes4 fselector1 = IDelegationManager.completeQueuedWithdrawal.selector;
+        bytes4 fselector2 = bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)"));
+        bytes4 fselector3 = 0x60d7faed;
+        console.log("fselector1");
+        console.logBytes4(fselector1);
+        console.log("fselector2");
+        console.logBytes4(fselector2);
+        console.log("fselector3");
+        console.logBytes4(fselector3);
+
+        require(fselector1 == fselector2, "function selectors incorrect: completeQueuedWithdrawal [1]");
+        require(fselector2 == fselector3, "function selectors incorrect: completeQueuedWithdrawal [2]");
     }
 
     function test_Decode_TransferToAgentOwnerMsg() public view {
