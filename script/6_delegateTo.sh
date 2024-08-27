@@ -6,6 +6,7 @@ echo forge script script/6_delegateTo.s.sol:DelegateToScript --rpc-url basesepol
 forge script script/6_delegateTo.s.sol:DelegateToScript  \
     --rpc-url basesepolia \
     --broadcast \
+    --private-key $DEPLOYER_KEY \
     -vvvv
 
 

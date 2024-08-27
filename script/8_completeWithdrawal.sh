@@ -6,6 +6,7 @@ echo forge script script/8_completeWithdrawal.s.sol:CompleteWithdrawalScript --r
 forge script script/8_completeWithdrawal.s.sol:CompleteWithdrawalScript \
     --rpc-url basesepolia \
     --broadcast \
+    --private-key $DEPLOYER_KEY \
     -vvvv
 
 ##### Example 1:

@@ -7,6 +7,7 @@ forge script script/5_depositWithSignature.s.sol:DepositWithSignatureScript  \
     --rpc-url basesepolia \
     --broadcast \
     --verify \
+    --private-key $DEPLOYER_KEY \
     -vvvv
 
 

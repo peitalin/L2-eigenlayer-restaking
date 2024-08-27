@@ -1,9 +1,9 @@
 {
   "chainInfo": {
-    "block": 6582964,
+    "block": 6582962,
     "destinationChain": 84532,
     "sourceChain": 11155111,
-    "timestamp": 1724785200
+    "timestamp": 1724785176
   },
   "inputs": {
     "delegatedTo": "0x0000000000000000000000000000000000000000",

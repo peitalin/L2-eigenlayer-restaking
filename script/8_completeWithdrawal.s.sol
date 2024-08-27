@@ -137,8 +137,6 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         bytes memory completeWithdrawalMessage;
         bytes memory messageWithSignature;
         {
-            console.log("11111111", address(EigenlayerMsgEncoders));
-
             completeWithdrawalMessage = EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
                 withdrawal,
                 tokensToWithdraw,
@@ -152,7 +150,6 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
             //     middlewareTimesIndex,
             //     receiveAsTokens
             // );
-            console.log("222222");
 
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
@@ -163,7 +160,6 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
                 execNonce,
                 expiry
             );
-            console.log("3333333");
         }
 
         /////////////////////////////////////////////////////////////////

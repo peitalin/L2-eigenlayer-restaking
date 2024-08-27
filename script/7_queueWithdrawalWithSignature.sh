@@ -6,6 +6,7 @@ echo forge script script/7_queueWithdrawalWithSignature.s.sol:QueueWithdrawalWit
 forge script script/7_queueWithdrawalWithSignature.s.sol:QueueWithdrawalWithSignatureScript  \
     --rpc-url basesepolia \
     --broadcast \
+    --private-key $DEPLOYER_KEY \
     -vvvv
 
 
