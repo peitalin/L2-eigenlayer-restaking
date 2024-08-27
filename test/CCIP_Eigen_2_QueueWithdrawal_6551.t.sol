@@ -27,6 +27,7 @@ import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {EigenAgent6551TestUpgrade} from "./mocks/EigenAgent6551TestUpgrade.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
@@ -53,7 +54,7 @@ contract CCIP_Eigen_QueueWithdrawal_6551Tests is Test {
     IStrategy public strategy;
     ProxyAdmin public proxyAdmin;
 
-    ERC6551Registry public registry;
+    IAgentFactory public agentFactory;
     EigenAgentOwner721 public eigenAgentOwnerNft;
 
     // call params
@@ -91,7 +92,8 @@ contract CCIP_Eigen_QueueWithdrawal_6551Tests is Test {
         //// Configure CCIP contracts and 6551 EigenAgent
         (
             receiverContract,
-            restakingConnector
+            restakingConnector,
+            agentFactory
         ) = deployReceiverOnL1Script.testrun();
 
         //// allowlist deployer and mint initial balances
@@ -120,7 +122,7 @@ contract CCIP_Eigen_QueueWithdrawal_6551Tests is Test {
     function test_CCIP_Eigenlayer_QueueWithdrawal6551() public {
 
         vm.startBroadcast(deployerKey);
-        IEigenAgent6551 eigenAgent = restakingConnector.spawnEigenAgentOnlyOwner(bob);
+        IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
         vm.stopBroadcast();
 
         vm.startBroadcast(bobKey);

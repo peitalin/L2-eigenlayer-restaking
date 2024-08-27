@@ -12,8 +12,10 @@ import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {EthSepolia, BaseSepolia} from "./Addresses.sol";
-import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
-import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
+import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
+import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
+
 
 contract FileReader is Script {
 
@@ -100,14 +102,21 @@ contract FileReader is Script {
         );
     }
 
-    function readEigenAgent6551Registry() public view returns (ERC6551Registry, EigenAgentOwner721) {
+    function readAgentFactory() public view returns (IAgentFactory) {
         string memory addrData;
         addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
-        address registry6551 = stdJson.readAddress(addrData, ".contracts.registry6551");
+        address agentFactoryAddr = stdJson.readAddress(addrData, ".contracts.agentFactory");
+        return IAgentFactory(agentFactoryAddr);
+    }
+
+    function readEigenAgent721AndRegistry() public view returns (IEigenAgentOwner721, IERC6551Registry) {
+        string memory addrData;
+        addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
         address eigenAgentOwner721 = stdJson.readAddress(addrData, ".contracts.eigenAgentOwner721");
+        address registry6551 = stdJson.readAddress(addrData, ".contracts.registry6551");
         return (
-            ERC6551Registry(registry6551),
-            EigenAgentOwner721(eigenAgentOwner721)
+            IEigenAgentOwner721(eigenAgentOwner721),
+            IERC6551Registry(registry6551)
         );
     }
 
@@ -122,6 +131,7 @@ contract FileReader is Script {
         bool isTest,
         address receiverCCIP,
         address restakingConnector,
+        address agentFactory,
         address registry6551,
         address eigenAgentOwner721,
         address proxyAdminL1
@@ -130,6 +140,7 @@ contract FileReader is Script {
         /////////////////////////////////////////////////
         vm.serializeAddress("contracts" , "receiverCCIP", receiverCCIP);
         vm.serializeAddress("contracts" , "restakingConnector", restakingConnector);
+        vm.serializeAddress("contracts" , "agentFactory", agentFactory);
         vm.serializeAddress("contracts" , "registry6551", registry6551);
         vm.serializeAddress("contracts" , "eigenAgentOwner721", eigenAgentOwner721);
         string memory inputs_data = vm.serializeAddress("contracts" , "proxyAdminL1", proxyAdminL1);

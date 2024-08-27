@@ -18,14 +18,18 @@ import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+import {RestakingConnector} from "../src/RestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
 
-import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
-import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
+import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
+import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
+import {AgentFactory} from "../src/6551/AgentFactory.sol";
+
 
 
 contract UpgradeReceiverOnL1Script is Script {
@@ -33,21 +37,41 @@ contract UpgradeReceiverOnL1Script is Script {
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
     address deployer = vm.addr(deployerKey);
 
+    IAgentFactory public newAgentFactory;
+    RestakingConnector public restakingProxy;
+    ISenderCCIP public senderProxy;
+    ProxyAdmin public proxyAdmin;
+    IERC6551Registry public registry6551;
+    IEigenAgentOwner721 public eigenAgentOwner721;
+
+    FileReader public fileReader;
+    IStrategy public strategy;
+    IStrategyManager public strategyManager;
+    IDelegationManager public delegationManager;
+
     function run() public {
+        return _run(false);
+    }
+
+    function testrun() public {
+        return _run(true);
+    }
+
+    function _run(bool isTest) internal {
 
         vm.createSelectFork("ethsepolia");
 
-        FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
-        ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL1());
-        ISenderCCIP senderProxy = fileReader.readSenderContract();
+        fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
+        proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL1());
+        senderProxy = fileReader.readSenderContract();
 
         DeployMockEigenlayerContractsScript deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         (
-            IStrategy strategy,
-            IStrategyManager strategyManager,
+            strategy,
+            strategyManager,
             , // strategyFactory
             , // pauserRegistry
-            IDelegationManager delegationManager,
+            delegationManager,
             , // _rewardsCoordinator
             // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
@@ -59,32 +83,70 @@ contract UpgradeReceiverOnL1Script is Script {
 
         (
             IReceiverCCIP receiverProxy,
-            IRestakingConnector restakingConnectorProxy
+            IRestakingConnector restakingConnector
         ) = fileReader.readReceiverRestakingConnector();
 
         (
-            ERC6551Registry registry6551,
-            EigenAgentOwner721 eigenAgentOwner721
-        ) = fileReader.readEigenAgent6551Registry();
+            eigenAgentOwner721,
+            registry6551
+        ) = fileReader.readEigenAgent721AndRegistry();
 
-        // Deploy new RestakingConnector implementation + upgrade proxy
-        RestakingConnector restakingConnectorImpl = new RestakingConnector();
+        // deploy agentFactory
+        newAgentFactory = IAgentFactory(address(
+            new AgentFactory(registry6551, eigenAgentOwner721)
+        ));
+
+        // Get RestakingConnector proxy + upgrade to new implementation
+        restakingProxy = RestakingConnector(address(restakingConnector));
+
         proxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(restakingConnectorProxy))),
-            address(restakingConnectorImpl)
+            TransparentUpgradeableProxy(payable(address(restakingProxy))),
+            address(new RestakingConnector())
         );
+
+        restakingProxy.setAgentFactory(address(newAgentFactory));
+        eigenAgentOwner721.setAgentFactory(newAgentFactory);
+
+        restakingProxy.setReceiverCCIP(address(receiverProxy));
+        newAgentFactory.setRestakingConnector(address(restakingProxy));
 
         // Deploy new ReceiverCCIP implementation + upgrade proxy
-        ReceiverCCIP receiverImpl = new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link);
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(receiverProxy))),
-            address(receiverImpl)
+            address(new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link))
         );
-        // No need to upgradeAndCall:
-        // restakingProxy.setEigenlayerContracts(delegationManager, strategyManager, strategy);
-        // restakingProxy.addAdmin(deployer);
-        // receiverProxy.setSenderContractL2Addr(address(senderProxy));
-        // receiverProxy.setRestakingConnector(IRestakingConnector(address(restakingConnector)));
+
+        require(
+            address(receiverProxy.getRestakingConnector()) != address(0),
+            "upgrade receiverProxy: missing restakingConnector"
+        );
+        require(
+            address(restakingProxy.getAgentFactory()) != address(0),
+            "upgrade restakingConnectorProxy: missing AgentFactory"
+        );
+        require(
+            address(restakingProxy.getReceiverCCIP()) != address(0),
+            "upgrade restakingConnectorProxy: missing ReceiverCCIP"
+        );
+        require(
+            address(eigenAgentOwner721.getAgentFactory()) != address(0),
+            "upgrade EigenAgentOwner721 NFT: missing AgentFactory"
+        );
+        require(
+            address(newAgentFactory.getRestakingConnector()) != address(0),
+            "upgrade agentFactory: missing restakingConnector"
+        );
+
+        // update AgentFactory address (as it's not behind a proxy yet)
+        fileReader.saveReceiverBridgeContracts(
+            isTest,
+            address(receiverProxy),
+            address(restakingConnector),
+            address(newAgentFactory),
+            address(registry6551),
+            address(eigenAgentOwner721),
+            address(proxyAdmin)
+        );
 
         vm.stopBroadcast();
     }

@@ -66,12 +66,14 @@ contract DeployScriptsTests is Test, ScriptUtils {
         upgradeSenderOnL2Script.run();
     }
 
+    // writes new json files: contract addrs
     function test_step3_DeployReceiverOnL1Script() public {
         deployReceiverOnL1Script.testrun();
     }
 
+    // writes new json files: contract addrs
     function test_step3b_UpgradeReceiverOnL1Script() public {
-        upgradeReceiverOnL1Script.run();
+        upgradeReceiverOnL1Script.testrun();
     }
 
     function test_step4_WhitelistCCIPContractsScript() public {
@@ -86,7 +88,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
         delegateToScript.run();
     }
 
-    // writes new withdrawalRoots
+    // writes new json files: withdrawalRoots
     function test_step7_QueueWithdrawalWithSignatureScript() public {
         queueWithdrawalWithSignatureScript.run();
     }

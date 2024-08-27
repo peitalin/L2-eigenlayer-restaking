@@ -9,7 +9,6 @@ forge script script/3_deployReceiverOnL1.s.sol:DeployReceiverOnL1Script \
     --etherscan-api-key $ETHERSCAN_API_KEY \
     --private-key $DEPLOYER_KEY \
     --verify \
-    # --resume \
     -vvvv
 
 
@@ -23,13 +22,14 @@ forge script script/3_deployReceiverOnL1.s.sol:DeployReceiverOnL1Script \
 #     0x1689aD770c571004fA7F3896F64e49bfc61B564F \
 #     ./src/ReceiverCCIP.sol:ReceiverCCIP
 
+
 # forge verify-contract \
 #     --watch \
 #     --rpc-url ethsepolia \
 #     --etherscan-api-key $ETHERSCAN_API_KEY \
 #     --compiler-version v0.8.22 \
-#     0x033351244Ac8E03b484CF06a6A03bBE84352615D \
-#     lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol:ProxyAdmin
+#     0x4E08460C2cBc1c28AF92A8Da1FF5EB4257Ae6e58 \
+#     src/utils/EigenlayerMsgEncoders.sol:EigenlayerMsgEncoders
 
 
 # forge verify-contract \

@@ -7,45 +7,14 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgent6551} from "../../src/6551/IEigenAgent6551.sol";
-import {EigenAgentOwner721} from "../../src/6551/EigenAgentOwner721.sol";
+import {IEigenAgentOwner721} from "../../src/6551/IEigenAgentOwner721.sol";
 
 
 interface IRestakingConnector {
 
-    /*
-     *
-     *              L1->L2 Transfer Handler
-     *
-     *
-    */
+    function getReceiverCCIP() external view returns (address);
 
-    function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalRoot,
-        address agentOwner
-    ) external returns (bytes memory);
-
-    /*
-     *
-     *                EigenAgent Functions
-     *
-     *
-    */
-
-    function get6551Registry() external view returns (IERC6551Registry);
-
-    function getEigenAgentOwner721() external view returns (EigenAgentOwner721);
-
-    function getEigenAgentOwnerTokenId(address staker) external view returns (uint256);
-
-    function getEigenAgent(address staker) external view returns (address);
-
-    function updateEigenAgentOwnerTokenId(
-        address from,
-        address to,
-        uint256 tokenId
-    ) external returns (uint256);
-
-    function spawnEigenAgentOnlyOwner(address staker) external returns (IEigenAgent6551);
+    function setReceiverCCIP(address newReceiverCCIP) external;
 
     /*
      *
@@ -54,21 +23,21 @@ interface IRestakingConnector {
      *
     */
 
+    function getAgentFactory() external view returns (address);
+
+    function setAgentFactory(address newAgentFactory) external;
+
     function depositWithEigenAgent(bytes memory message, address token, uint256 amount) external;
 
-    function queueWithdrawalsWithEigenAgent(bytes memory message, address token, uint256 amount) external;
+    function queueWithdrawalsWithEigenAgent(bytes memory message) external;
 
-    function completeWithdrawalWithEigenAgent(
-        bytes memory message,
-        address token,
-        uint256 amount
-    ) external returns (
+    function completeWithdrawalWithEigenAgent(bytes memory message) external returns (
         uint256,
         address,
         string memory // CCIP message for transferToAgentOwner on L2
     );
 
-    function delegateToWithEigenAgent(bytes memory message, address token, uint256 amount) external;
+    function delegateToWithEigenAgent(bytes memory message) external;
 
     /*
      *
@@ -93,17 +62,25 @@ interface IRestakingConnector {
 
     function getQueueWithdrawalBlock(address staker, uint256 nonce) external returns (uint256);
 
-    function setFunctionSelectorName(
-        bytes4 functionSelector,
-        string memory _name
-    ) external returns (string memory);
+    /*
+     *
+     *              Messaging Helpers
+     *
+     *
+    */
 
-    function getFunctionSelectorName(bytes4 functionSelector) external returns (string memory);
+    function encodeHandleTransferToAgentOwnerMsg(
+        bytes32 withdrawalRoot,
+        address agentOwner
+    ) external returns (bytes memory);
 
     function setGasLimitsForFunctionSelectors(
         bytes4[] memory functionSelectors,
         uint256[] memory gasLimits
     ) external;
 
-    function getGasLimitForFunctionSelector(bytes4 functionSelector) external returns (uint256);
+    function getGasLimitForFunctionSelector(
+        bytes4 functionSelector
+    ) external returns (uint256);
+
 }

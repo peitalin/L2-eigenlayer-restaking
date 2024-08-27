@@ -117,7 +117,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         );
     }
 
-    function test_Decode_DepositWithSignature6551() public {
+    function test_Decode_DepositWithSignature6551() public view {
 
         bytes memory message_bytes = EigenlayerMsgEncoders.encodeDepositWithSignature6551Msg(
             address(strategy),
@@ -135,6 +135,27 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         require(depositMsg.signature.length == 65, "invalid signature length");
         require(depositMsg.staker == staker, "staker does not match");
         require(address(depositMsg.strategy) == address(strategy), "strategy does not match");
+    }
+
+    function test_Encode_DepositIntoStrategyMsg() public {
+
+        amount = 0.0077 ether;
+
+        bytes memory messageBytes2 = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
+            address(strategy),
+            address(token),
+            amount
+        );
+
+        (
+            address _strategy,
+            address _token,
+            uint256 _amount
+        ) = EigenlayerMsgDecoders.decodeDepositMsg(abi.encode(string(messageBytes2)));
+
+        require(_strategy == address(strategy), "encodeDepositMsg(): _strategy did not match");
+        require(_token == address(token), "encodeDepositMsg(): _token did not match");
+        require(_amount == amount, "encodeDepositMsg(): _amount did not match");
     }
 
     function test_Decode_RevertBadSignature_DepositWithSignature() public {
@@ -454,7 +475,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
     }
 
-    function test_Decode_TransferToAgentOwnerMsg() public {
+    function test_Decode_TransferToAgentOwnerMsg() public pure {
 
         bytes32 withdrawalRoot1 = 0x8c20d3a37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7d8ec77;
         address agentOwner = vm.addr(0x02);
@@ -479,7 +500,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
      *
     */
 
-    function test_Decode_DelegateToBySignature_BothSigned() public {
+    function test_Decode_DelegateToBySignature_BothSigned() public view {
 
         address staker1 = vm.addr(0x1);
         address operator = vm.addr(0x2);
@@ -568,7 +589,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         );
     }
 
-    function test_Decode_DelegateToBySignature_Unsigned() public {
+    function test_decode_delegatetobysignature_unsigned() public pure {
 
         address staker1 = vm.addr(0x1);
         address operator = vm.addr(0x2);
@@ -630,7 +651,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         );
     }
 
-    function test_Decode_DelegateToBySignature_StakerSigned() public {
+    function test_Decode_DelegateToBySignature_StakerSigned() public view {
 
         address staker1 = vm.addr(0x1);
         address operator = vm.addr(0x2);
@@ -710,7 +731,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         );
     }
 
-    function test_Decode_DelegateToBySignature_ApproverSigned() public {
+    function test_Decode_DelegateToBySignature_ApproverSigned() public view {
 
         address staker1 = vm.addr(0x1);
         address operator = vm.addr(0x2);
@@ -790,7 +811,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         );
     }
 
-    function test_Decode_Undelegate() public {
+    function test_Decode_Undelegate() public pure {
 
         address staker1 = vm.addr(0x1);
 

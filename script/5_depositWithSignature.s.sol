@@ -21,6 +21,7 @@ import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {ScriptUtils} from "./ScriptUtils.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
 
 contract DepositWithSignatureScript is Script, ScriptUtils {
@@ -28,6 +29,7 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
     IRestakingConnector public restakingConnector;
+    IAgentFactory public agentFactory;
     address public senderAddr;
 
     IStrategyManager public strategyManager;
@@ -68,7 +70,11 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         senderContract = fileReader.readSenderContract();
         senderAddr = address(senderContract);
 
-        (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
+        (
+            receiverContract,
+            restakingConnector
+        ) = fileReader.readReceiverRestakingConnector();
+        agentFactory = fileReader.readAgentFactory();
 
         ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
         token = IERC20(address(EthSepolia.BridgeToken)); // CCIPBnM on EthSepolia
@@ -85,7 +91,7 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         uint256 nonce = 0;
         /// ReceiverCCIP spawns an EigenAgent when CCIP message reaches L1
         /// if user does not already have an EigenAgent NFT on L1.  Nonce is then 0.
-        address eigenAgent = restakingConnector.getEigenAgent(deployer);
+        address eigenAgent = agentFactory.getEigenAgent(deployer);
         if (eigenAgent != address(0)) {
             // Otherwise if the user already has a EigenAgent, fetch current execution Nonce
             nonce = IEigenAgent6551(eigenAgent).getExecNonce();

@@ -9,33 +9,29 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
-import {SenderUtils} from "./SenderUtils.sol";
 
 
 
 contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
-    event MatchedReceivedFunctionSelector(bytes4 indexed, string indexed);
+    event MatchedReceivedFunctionSelector(bytes4 indexed);
 
-    event MatchedSentFunctionSelector(bytes4 indexed, string indexed);
+    event MatchedSentFunctionSelector(bytes4 indexed);
 
     ISenderUtils public senderUtils;
 
     /// @param _router address of the router contract.
     /// @param _link address of the link contract.
-    /// @param _senderUtils address of the SenderUtils contract.
-    constructor(
-        address _router,
-        address _link,
-        address _senderUtils
-    ) BaseMessengerCCIP(_router, _link) {
-        require(address(_senderUtils) != address(0), "_senderUtils cannot be address(0)");
-        senderUtils = ISenderUtils(_senderUtils);
+    constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {
         _disableInitializers();
     }
 
     function initialize() initializer public {
         BaseMessengerCCIP.__BaseMessengerCCIP_init();
+    }
+
+    function getSenderUtils() public view returns (ISenderUtils) {
+        return senderUtils;
     }
 
     function setSenderUtils(ISenderUtils _senderUtils) external onlyOwner {
@@ -87,7 +83,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
         } else {
 
-            emit MatchedReceivedFunctionSelector(functionSelector, "UnknownFunctionSelector");
+            emit MatchedReceivedFunctionSelector(functionSelector);
             text_msg = "unknown message";
         }
 
@@ -142,9 +138,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
         } else {
 
-            string memory _functionSelectorName = senderUtils.getFunctionSelectorName(functionSelector);
-            emit MatchedSentFunctionSelector(functionSelector, _functionSelectorName);
-
+            emit MatchedSentFunctionSelector(functionSelector);
         }
 
         uint256 gasLimit = senderUtils.getGasLimitForFunctionSelector(functionSelector);

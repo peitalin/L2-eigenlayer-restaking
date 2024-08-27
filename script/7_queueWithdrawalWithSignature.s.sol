@@ -11,6 +11,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
@@ -30,6 +31,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
     IRestakingConnector public restakingConnector;
+    IAgentFactory public agentFactory;
     address public senderAddr;
 
     IStrategyManager public strategyManager;
@@ -78,7 +80,8 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             vm.selectFork(ethForkId);
             (
                 receiverContract,
-                restakingConnector
+                restakingConnector,
+                agentFactory
             ) = deployReceiverOnL1Script.testrun();
 
             vm.selectFork(l2ForkId);
@@ -89,7 +92,11 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         } else {
             // otherwise if running the script, read the existing contracts on Sepolia
             senderContract = fileReader.readSenderContract();
-            (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
+            (
+                receiverContract,
+                restakingConnector
+            ) = fileReader.readReceiverRestakingConnector();
+            agentFactory = fileReader.readAgentFactory();
         }
 
         ////////////////////////////////////////////////////////////

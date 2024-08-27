@@ -26,10 +26,10 @@ import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 // 6551 accounts
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {EigenAgent6551TestUpgrade} from "./mocks/EigenAgent6551TestUpgrade.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
@@ -62,7 +62,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
     uint256 ethForkId;
     bool isTest;
 
-    ERC6551Registry public registry;
+    IAgentFactory public agentFactory;
     EigenAgentOwner721 public eigenAgentOwnerNft;
     IEigenAgent6551 public eigenAgent;
 
@@ -110,7 +110,12 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
         //// Setup L1 CCIP contracts and 6551 EigenAgent
-        (receiverContract, restakingConnector) = deployReceiverOnL1Script.testrun();
+        (
+            receiverContract,
+            restakingConnector,
+            agentFactory
+        ) = deployReceiverOnL1Script.testrun();
+
         vm.deal(address(receiverContract), 1 ether);
 
         vm.startBroadcast(deployerKey);
@@ -124,7 +129,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             erc20DripL1.drip(address(bob));
 
             /// Spawn EigenAgent for Bob
-            eigenAgent = restakingConnector.spawnEigenAgentOnlyOwner(bob);
+            eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
         }
         vm.stopBroadcast();
 

@@ -9,6 +9,8 @@ interface ISenderCCIP is IBaseMessengerCCIP {
 
     function mockCCIPReceive(Client.Any2EVMMessage memory any2EvmMessage) external;
 
+    function getSenderUtils() external returns (ISenderUtils);
+
     function setSenderUtils(ISenderUtils _senderUtils) external;
 }
 

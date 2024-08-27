@@ -4,9 +4,8 @@ pragma solidity 0.8.22;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
-import {TransferToAgentOwnerMsg} from "./utils/EigenlayerMsgDecoders.sol";
 import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
-import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
+import {EigenlayerMsgDecoders, TransferToAgentOwnerMsg} from "./utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 
 
@@ -20,37 +19,29 @@ contract SenderUtils is Ownable {
     mapping(bytes32 => bool) public withdrawalRootsSpent;
 
     mapping(bytes4 => uint256) internal _gasLimitsForFunctionSelectors;
-    mapping(bytes4 => string) internal _functionSelectorNames;
 
     constructor() {
 
         // depositIntoStrategy: [gas: 565_307]
         _gasLimitsForFunctionSelectors[0xf7e784ef] = 600_000;
-        _functionSelectorNames[0xf7e784ef] = "depositIntoStrategy";
 
         // depositIntoStrategyWithSignature: [gas: 713_400]
         _gasLimitsForFunctionSelectors[0x32e89ace] = 800_000;
-        _functionSelectorNames[0x32e89ace] = "depositIntoStrategyWithSignature";
 
         // queueWithdrawals: [gas: x]
         _gasLimitsForFunctionSelectors[0x0dd8dd02] = 700_000;
-        _functionSelectorNames[0x0dd8dd02] = "queueWithdrawals";
 
         // queueWithdrawalsWithSignature: [gas: 603_301]
         _gasLimitsForFunctionSelectors[0xa140f06e] = 700_000;
-        _functionSelectorNames[0xa140f06e] = "queueWithdrawalsWithSignature";
 
         // completeQueuedWithdrawals: [gas: 645_948]
         _gasLimitsForFunctionSelectors[0x54b2bf29] = 750_000;
-        _functionSelectorNames[0x54b2bf29] = "completeQueuedWithdrawals";
 
         // delegateToBySignature: [gas: ?]
         _gasLimitsForFunctionSelectors[0x7f548071] = 600_000;
-        _functionSelectorNames[0x7f548071] = "delegateToBySignature";
 
         // transferToStaker: [gas: 268_420]
         _gasLimitsForFunctionSelectors[0x27167d10] = 400_000;
-        _functionSelectorNames[0x27167d10] = "transferToStaker";
     }
 
     function handleTransferToAgentOwner(bytes memory message) public returns (
@@ -136,17 +127,6 @@ contract SenderUtils is Ownable {
             });
 
             emit WithdrawalCommitted(withdrawalRoot, withdrawal.withdrawer, withdrawal.shares[0]);
-    }
-
-    function setFunctionSelectorName(
-        bytes4 functionSelector,
-        string memory _name
-    ) public onlyOwner returns (string memory) {
-        return _functionSelectorNames[functionSelector] = _name;
-    }
-
-    function getFunctionSelectorName(bytes4 functionSelector) public view returns (string memory) {
-        return _functionSelectorNames[functionSelector];
     }
 
     function setGasLimitsForFunctionSelectors(

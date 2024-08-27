@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import {Test, console} from "forge-std/Test.sol";
 
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 
@@ -21,12 +22,12 @@ import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 
 // 6551 accounts
-import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
+import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {EigenAgent6551TestUpgrade} from "./mocks/EigenAgent6551TestUpgrade.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 
 
@@ -47,6 +48,7 @@ contract CCIP_EigenAgentTests is Test {
 
     IReceiverCCIP public receiverContract;
     IRestakingConnector public restakingConnector;
+    IAgentFactory public agentFactory;
     IERC20_CCIPBnM public erc20Drip; // has drip faucet functions
     IERC20 public token;
 
@@ -94,7 +96,8 @@ contract CCIP_EigenAgentTests is Test {
         //// Configure CCIP contracts
         (
             receiverContract,
-            restakingConnector
+            restakingConnector,
+            agentFactory
         ) = deployReceiverOnL1Script.testrun();
 
         erc20Drip = IERC20_CCIPBnM(address(token));
@@ -117,7 +120,7 @@ contract CCIP_EigenAgentTests is Test {
     function test_EigenAgent_ExecuteWithSignatures() public {
 
         vm.startBroadcast(deployerKey);
-        IEigenAgent6551 eigenAgent = restakingConnector.spawnEigenAgentOnlyOwner(bob);
+        IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
         vm.stopBroadcast();
 
         vm.startBroadcast(bobKey);
@@ -195,10 +198,10 @@ contract CCIP_EigenAgentTests is Test {
         vm.startBroadcast(deployerKey);
 
         EigenAgent6551 eigenAgentBob = EigenAgent6551(payable(address(
-            restakingConnector.spawnEigenAgentOnlyOwner(bob)
+            agentFactory.spawnEigenAgentOnlyOwner(bob)
         )));
         EigenAgent6551 eigenAgentDeployer = EigenAgent6551(payable(address(
-            restakingConnector.spawnEigenAgentOnlyOwner(deployer)
+            agentFactory.spawnEigenAgentOnlyOwner(deployer)
         )));
 
         ///// create new implementation and upgrade
@@ -229,7 +232,7 @@ contract CCIP_EigenAgentTests is Test {
         //////////////////////////////////////////////////////
 
         vm.startBroadcast(deployerKey);
-        IEigenAgent6551 eigenAgent = restakingConnector.spawnEigenAgentOnlyOwner(bob);
+        IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
         vm.stopBroadcast();
 
         vm.startBroadcast(bobKey);
@@ -301,12 +304,12 @@ contract CCIP_EigenAgentTests is Test {
         {
             vm.startBroadcast(bob);
 
-            uint256 transferredTokenId = restakingConnector.getEigenAgentOwnerTokenId(bob);
-            EigenAgentOwner721 eigenAgentOwnerNft = restakingConnector.getEigenAgentOwner721();
+            uint256 transferredTokenId = agentFactory.getEigenAgentOwnerTokenId(bob);
+            IEigenAgentOwner721 eigenAgentOwnerNft = agentFactory.getEigenAgentOwner721();
             eigenAgentOwnerNft.approve(alice, transferredTokenId);
 
             vm.expectEmit(true, true, true, true);
-            emit RestakingConnector.EigenAgentOwnerUpdated(bob, alice, transferredTokenId);
+            emit IAgentFactory.EigenAgentOwnerUpdated(bob, alice, transferredTokenId);
             eigenAgentOwnerNft.safeTransferFrom(bob, alice, transferredTokenId);
 
             require(

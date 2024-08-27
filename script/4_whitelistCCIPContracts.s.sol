@@ -6,6 +6,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 
@@ -17,6 +18,7 @@ import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 contract WhitelistCCIPContractsScript is Script {
 
     IRestakingConnector public restakingConnector;
+    IAgentFactory public agentFactory;
     IReceiverCCIP public receiverProxy;
     ISenderCCIP public senderProxy;
 
@@ -37,7 +39,11 @@ contract WhitelistCCIPContractsScript is Script {
 
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         senderProxy = fileReader.readSenderContract();
-        (receiverProxy, restakingConnector) = fileReader.readReceiverRestakingConnector();
+        (
+            receiverProxy,
+            restakingConnector
+        ) = fileReader.readReceiverRestakingConnector();
+        agentFactory = fileReader.readAgentFactory();
 
         require(address(receiverProxy) != address(0), "receiverProxy cannot be 0");
         require(address(restakingConnector) != address(0), "restakingConnector cannot be 0");

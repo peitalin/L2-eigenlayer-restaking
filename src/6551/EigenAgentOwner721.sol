@@ -8,18 +8,16 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {Adminable} from "../utils/Adminable.sol";
-import {IRestakingConnector} from "../interfaces/IRestakingConnector.sol";
+import {IAgentFactory} from "./IAgentFactory.sol";
 
 
 contract EigenAgentOwner721 is Initializable, IERC721Receiver, ERC721URIStorageUpgradeable, Adminable {
 
     uint256 private _tokenIdCounter;
-    IRestakingConnector public restakingConnector;
+    IAgentFactory public agentFactory;
 
-    function initialize(
-        string memory name,
-        string memory symbol
-    ) initializer public {
+    function initialize(string memory name, string memory symbol) initializer public {
+
         __ERC721_init(name, symbol);
         __ERC721URIStorage_init();
         __Adminable_init();
@@ -27,12 +25,29 @@ contract EigenAgentOwner721 is Initializable, IERC721Receiver, ERC721URIStorageU
         _tokenIdCounter = 1;
     }
 
-    function setRestakingConnector(IRestakingConnector _restakingConnector) public onlyAdminOrOwner() {
-        require(address(_restakingConnector) != address(0), "cannot set address(0)");
-        restakingConnector = _restakingConnector;
+    function getAgentFactory() public view returns (address) {
+        return address(agentFactory);
     }
 
-    function mint(address user) public onlyAdminOrOwner returns (uint256) {
+    function setAgentFactory(IAgentFactory _agentFactory) public onlyAdminOrOwner {
+        require(address(_agentFactory) != address(0), "cannot set address(0)");
+        agentFactory = _agentFactory;
+    }
+
+    modifier onlyAgentFactory() {
+        require(msg.sender == address(agentFactory), "Caller not AgentFactory");
+        _;
+    }
+
+    function mint(address user) public onlyAgentFactory returns (uint256) {
+        return _mint(user);
+    }
+
+    function mintAdmin(address user) public onlyAdminOrOwner returns (uint256) {
+        return _mint(user);
+    }
+
+    function _mint(address user) internal returns (uint256) {
         uint256 tokenId = _tokenIdCounter;
         _safeMint(user, tokenId);
         _setTokenURI(tokenId, string(abi.encodePacked("eigen-agent/", Strings.toString(tokenId), ".json")));
@@ -45,7 +60,7 @@ contract EigenAgentOwner721 is Initializable, IERC721Receiver, ERC721URIStorageU
         address to,
         uint256 tokenId
     ) internal override virtual {
-        restakingConnector.updateEigenAgentOwnerTokenId(from, to, tokenId);
+        agentFactory.updateEigenAgentOwnerTokenId(from, to, tokenId);
     }
 
     function onERC721Received(
@@ -53,12 +68,8 @@ contract EigenAgentOwner721 is Initializable, IERC721Receiver, ERC721URIStorageU
         address from,
         uint256 tokenId,
         bytes calldata data
-    ) external view override returns (bytes4) {
+    ) external pure override returns (bytes4) {
         return IERC721Receiver.onERC721Received.selector;
-    }
-
-    function _baseURI() internal pure override returns (string memory) {
-        return "ipfs://";
     }
 
 }

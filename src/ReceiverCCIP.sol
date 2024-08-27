@@ -94,7 +94,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         //////////////////////////////////
         // Deposit Into Strategy
         //////////////////////////////////
-        if (functionSelector == 0xaac4ec88) {
+        if (functionSelector == IRestakingConnector.depositWithEigenAgent.selector) {
             // cast sig "depositWithEigenAgent(bytes,address,uint256)" == 0xaac4ec88
             IERC20(token).approve(address(restakingConnector), amount);
             restakingConnector.depositWithEigenAgent(message, token, amount);
@@ -106,7 +106,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         //////////////////////////////////
         if (functionSelector == IDelegationManager.queueWithdrawals.selector) {
             // cast sig "queueWithdrawals((address[],uint256[],address)[])" == 0x0dd8dd02
-            restakingConnector.queueWithdrawalsWithEigenAgent(message, token, amount);
+            restakingConnector.queueWithdrawalsWithEigenAgent(message);
             textMsg = "withdrawal queued by EigenAgent";
         }
 
@@ -119,7 +119,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 uint256 withdrawalAmount,
                 address withdrawalToken,
                 string memory messageForL2
-            ) = restakingConnector.completeWithdrawalWithEigenAgent(message, token, amount);
+            ) = restakingConnector.completeWithdrawalWithEigenAgent(message);
 
             // Approve L1 receiverContract to send ccip-BnM tokens to Router
             IERC20(withdrawalToken).approve(address(this), withdrawalAmount);
@@ -140,7 +140,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         //////////////////////////////////
         if (functionSelector == IDelegationManager.delegateTo.selector) {
 
-            restakingConnector.delegateToWithEigenAgent(message, token, amount);
+            restakingConnector.delegateToWithEigenAgent(message);
         }
 
         emit MessageReceived(

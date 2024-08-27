@@ -52,6 +52,11 @@ contract DeploySenderOnL2Script is Script {
         senderProxy.setSenderUtils(ISenderUtils(address(senderUtils)));
         vm.stopBroadcast();
 
+        require(
+            address(senderProxy.senderUtils()) != address(0),
+            "Check script: senderProxy missing senderUtils"
+        );
+
         fileReader.saveSenderBridgeContracts(
             isTest,
             address(senderProxy),

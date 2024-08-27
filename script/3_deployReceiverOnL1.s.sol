@@ -22,63 +22,69 @@ import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContr
 import {FileReader} from "./FileReader.sol";
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 
-import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
+import {AgentFactory} from "../src/6551/AgentFactory.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
+
 import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
-import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
-
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
-import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
-// import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
-// import {IBeacon} from "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 
 
 
 contract DeployReceiverOnL1Script is Script {
 
-    RestakingConnector public restakingConnector;
+    RestakingConnector public restakingProxy;
     ReceiverCCIP public receiverProxy;
+    ISenderCCIP public senderContract;
+    ProxyAdmin public proxyAdmin;
+    IERC6551Registry public registry6551;
+    IEigenAgentOwner721 public eigenAgentOwner721;
+    IAgentFactory public agentFactory;
 
+    FileReader public fileReader;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
+    IStrategy public strategy;
+    IStrategyManager public strategyManager;
+    IDelegationManager public delegationManager;
 
     uint256 public deployerKey = vm.envUint("DEPLOYER_KEY");
     address public deployer = vm.addr(deployerKey);
 
-    function run() public returns (IReceiverCCIP, IRestakingConnector) {
+    function run() public returns (IReceiverCCIP, IRestakingConnector, IAgentFactory) {
         return _run(false);
     }
 
-    function testrun() public returns (IReceiverCCIP, IRestakingConnector) {
+    function testrun() public returns (IReceiverCCIP, IRestakingConnector, IAgentFactory) {
         vm.deal(deployer, 1 ether);
         return _run(true);
     }
 
-    function _run(bool isTest) internal returns (IReceiverCCIP, IRestakingConnector) {
+    function _run(bool isTest) internal returns (IReceiverCCIP, IRestakingConnector, IAgentFactory) {
 
-        FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
+        fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
-        ISenderCCIP senderContract = fileReader.readSenderContract();
+        senderContract = fileReader.readSenderContract();
 
         (
-            IStrategy strategy,
-            IStrategyManager strategyManager,
+            strategy,
+            strategyManager,
             , // strategyFactory
             , // pauserRegistry
-            IDelegationManager delegationManager,
+            delegationManager,
             , // _rewardsCoordinator
             // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
         vm.startBroadcast(deployerKey);
 
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
+        proxyAdmin = new ProxyAdmin();
 
         // deploy 6551 Registry
-        IERC6551Registry registry6551 = IERC6551Registry(address(new ERC6551Registry()));
+        registry6551 = IERC6551Registry(address(new ERC6551Registry()));
         // deploy 6551 EigenAgentOwner NFT
-        IEigenAgentOwner721 eigenAgentOwner721 = IEigenAgentOwner721(
+        eigenAgentOwner721 = IEigenAgentOwner721(
             address(new TransparentUpgradeableProxy(
                 address(new EigenAgentOwner721()),
                 address(proxyAdmin),
@@ -90,34 +96,38 @@ contract DeployReceiverOnL1Script is Script {
             ))
         );
 
+        agentFactory = IAgentFactory(address(
+            new AgentFactory(registry6551, eigenAgentOwner721)
+        ));
+
         // deploy restaking connector for Eigenlayer
-        RestakingConnector restakingConnectorImpl = new RestakingConnector();
-        restakingConnector = RestakingConnector(
+        restakingProxy = RestakingConnector(
             payable(address(
                 new TransparentUpgradeableProxy(
-                    address(restakingConnectorImpl),
+                    address(new RestakingConnector()),
                     address(proxyAdmin),
                     abi.encodeWithSelector(
                         RestakingConnector.initialize.selector,
-                        registry6551,
-                        eigenAgentOwner721
+                        agentFactory
                     )
                 )
             ))
         );
-        restakingConnector.addAdmin(deployer);
-        restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
+
+        restakingProxy.addAdmin(deployer);
+        restakingProxy.setEigenlayerContracts(delegationManager, strategyManager, strategy);
+        agentFactory.addAdmin(deployer);
+        agentFactory.setRestakingConnector(address(restakingProxy));
 
         // deploy real receiver implementation and upgradeAndCall initializer
-        ReceiverCCIP receiverImpl = new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link);
         receiverProxy = ReceiverCCIP(
             payable(address(
                 new TransparentUpgradeableProxy(
-                    address(receiverImpl),
+                    address(new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link)),
                     address(proxyAdmin),
                     abi.encodeWithSelector(
                         ReceiverCCIP.initialize.selector,
-                        IRestakingConnector(address(restakingConnector)),
+                        IRestakingConnector(address(restakingProxy)),
                         senderContract
                     )
                 )
@@ -130,10 +140,10 @@ contract DeployReceiverOnL1Script is Script {
         receiverProxy.setSenderContractL2Addr(address(senderContract));
 
         eigenAgentOwner721.addAdmin(deployer);
-        eigenAgentOwner721.addAdmin(address(restakingConnector));
-        eigenAgentOwner721.setRestakingConnector(IRestakingConnector(address(restakingConnector)));
+        eigenAgentOwner721.addAdmin(address(restakingProxy));
+        eigenAgentOwner721.setAgentFactory(agentFactory);
 
-        restakingConnector.setReceiverCCIP(address(receiverProxy));
+        restakingProxy.setReceiverCCIP(address(receiverProxy));
 
         // seed the receiver contract with a bit of ETH
         if (address(receiverProxy).balance < 0.02 ether) {
@@ -141,12 +151,38 @@ contract DeployReceiverOnL1Script is Script {
             require(sent, "Failed to send Ether");
         }
 
+        require(
+            address(agentFactory.getRestakingConnector()) == address(restakingProxy),
+            "agentFactory: did not set a restakingConnector"
+        );
+        require(
+            address(receiverProxy.getRestakingConnector()) == address(restakingProxy),
+            "receiverProxy: missing restakingConnector"
+        );
+        require(
+            address(restakingProxy.getAgentFactory()) == address(agentFactory),
+            "restakingConnector: missing AgentFactory"
+        );
+        require(
+            address(restakingProxy.getReceiverCCIP()) == address(receiverProxy),
+            "restakingConnector: missing ReceiverCCIP"
+        );
+        require(
+            address(eigenAgentOwner721.getAgentFactory()) == address(agentFactory),
+            "EigenAgentOwner721 NFT: missing AgentFactory"
+        );
+        require(
+            address(agentFactory.getRestakingConnector()) == address(restakingProxy),
+            "agentFactory: missing restakingConnector"
+        );
+
         vm.stopBroadcast();
 
         fileReader.saveReceiverBridgeContracts(
             isTest,
             address(receiverProxy),
-            address(restakingConnector),
+            address(restakingProxy),
+            address(agentFactory),
             address(registry6551),
             address(eigenAgentOwner721),
             address(proxyAdmin)
@@ -154,7 +190,8 @@ contract DeployReceiverOnL1Script is Script {
 
         return (
             IReceiverCCIP(address(receiverProxy)),
-            IRestakingConnector(address(restakingConnector))
+            IRestakingConnector(address(restakingProxy)),
+            IAgentFactory(address(agentFactory))
         );
     }
 }

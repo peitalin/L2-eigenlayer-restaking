@@ -51,7 +51,7 @@ library EigenlayerMsgDecoders {
     */
 
     function decodeDepositWithSignature6551Msg(bytes memory message)
-        public
+        public pure
         returns (EigenlayerDeposit6551Msg memory)
     {
         ////////////////////////////////////////////////////////
@@ -115,6 +115,31 @@ library EigenlayerMsgDecoders {
         });
     }
 
+    function decodeDepositMsg(bytes memory message)
+        public pure
+        returns (address, address, uint256)
+    {
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
+        // 0000000000000000000000000000000000000000000000000000000000000144 [64]
+        // 32e89ace                                                         [96] bytes4 truncates the right
+        // 000000000000000000000000bd4bcb3ad20e9d85d5152ae68f45f40af8952159 [100] reads 32 bytes from offset [100] right-to-left up to the function selector
+        // 0000000000000000000000003eef6ec7a9679e60cc57d9688e9ec0e6624d687a [132]
+        // 000000000000000000000000000000000000000000000000001b5b1bf4c54000 [164] uint256 amount in hex
+        // 00000000000000000000000000000000000000000000000000000000
+
+        address strategy;
+        address token;
+        uint256 amount;
+
+        assembly {
+            strategy := mload(add(message, 100))
+            token := mload(add(message, 132))
+            amount := mload(add(message, 164))
+        }
+
+        return (strategy, token, amount);
+    }
+
 
     /*
      *
@@ -125,7 +150,7 @@ library EigenlayerMsgDecoders {
     */
 
     function decodeQueueWithdrawalsMsg(bytes memory message)
-        public
+        public pure
         returns (
             IDelegationManager.QueuedWithdrawalParams[] memory,
             uint256,
@@ -193,11 +218,10 @@ library EigenlayerMsgDecoders {
         return (arrayQueuedWithdrawalParams, expiry, signature);
     }
 
-    function _decodeSingleQueueWithdrawalMsg(
-        bytes memory message,
-        uint256 arrayLength,
-        uint256 i
-    ) internal returns (IDelegationManager.QueuedWithdrawalParams memory) {
+    function _decodeSingleQueueWithdrawalMsg(bytes memory message, uint256 arrayLength, uint256 i)
+        internal pure
+        returns (IDelegationManager.QueuedWithdrawalParams memory)
+    {
         /// @dev: expect to use this in a for-loop with i iteration variable
 
         //////////////////////////////////////////////////
@@ -301,8 +325,7 @@ library EigenlayerMsgDecoders {
     */
 
     function decodeCompleteWithdrawalMsg(bytes memory message)
-        public
-        pure
+        public pure
         returns (
             IDelegationManager.Withdrawal memory,
             IERC20[] memory,
@@ -551,7 +574,7 @@ library EigenlayerMsgDecoders {
 
     /// @dev this message is dispatched from L1 -> L2 by ReceiverCCIP.sol
     function decodeTransferToAgentOwnerMsg(bytes memory message)
-        public
+        public pure
         returns (TransferToAgentOwnerMsg memory)
     {
         // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset

@@ -163,7 +163,7 @@ contract EigenAgent6551 is Initializable, ERC6551AccountUpgradeable, IEigenAgent
         uint256 _nonce,
         uint256 _chainid,
         uint256 _expiry
-    ) public view returns (bytes32) {
+    ) public pure returns (bytes32) {
 
         bytes32 structHash = keccak256(abi.encode(
             EIGEN_AGENT_EXEC_TYPEHASH,

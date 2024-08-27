@@ -20,6 +20,7 @@ import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
@@ -44,6 +45,7 @@ contract CCIP_Eigen_DelegationTests is Test {
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
     IRestakingConnector public restakingConnector;
+    IAgentFactory public agentFactory;
     IERC20 public token;
 
     IStrategyManager public strategyManager;
@@ -98,7 +100,11 @@ contract CCIP_Eigen_DelegationTests is Test {
 
         //////////// Eth Sepolia ////////////
         vm.selectFork(ethForkId);
-        (receiverContract, restakingConnector) = deployReceiverOnL1Script.testrun();
+        (
+            receiverContract,
+            restakingConnector,
+            agentFactory
+        ) = deployReceiverOnL1Script.testrun();
 
 
         //////////// Arb Sepolia ////////////

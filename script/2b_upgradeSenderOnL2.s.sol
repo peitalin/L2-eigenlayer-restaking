@@ -44,6 +44,11 @@ contract UpgradeSenderOnL2Script is Script {
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         senderProxy.setSenderUtils(senderUtils);
 
+        require(
+            address(senderProxy.getSenderUtils()) != address(0),
+            "Check script: senderProxy missing senderUtils"
+        );
+
         vm.stopBroadcast();
     }
 }
