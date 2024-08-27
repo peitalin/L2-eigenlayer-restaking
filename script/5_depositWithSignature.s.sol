@@ -88,22 +88,22 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployerKey);
 
-        uint256 nonce = 0;
+        uint256 execNonce = 0;
         /// ReceiverCCIP spawns an EigenAgent when CCIP message reaches L1
         /// if user does not already have an EigenAgent NFT on L1.  Nonce is then 0.
         IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(deployer);
         // IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
+
         console.log("eigenAgent:", address(eigenAgent));
         if (address(eigenAgent) != address(0)) {
             // Otherwise if the user already has a EigenAgent, fetch current execution Nonce
-            nonce = eigenAgent.getExecNonce();
+            execNonce = eigenAgent.getExecNonce();
         }
 
         uint256 amount = 0.00717 ether;
         uint256 expiry = block.timestamp + 3 hours;
 
         bytes memory depositMessage;
-        bytes memory signatureEigenAgent;
         bytes memory messageWithSignature;
         {
             depositMessage = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
@@ -113,10 +113,7 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            (
-                signatureEigenAgent,
-                messageWithSignature
-            ) = signatureUtils.signMessageForEigenAgentExecution(
+            messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
                 deployerKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),

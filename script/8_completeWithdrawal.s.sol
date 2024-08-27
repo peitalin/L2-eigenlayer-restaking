@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, stdJson, console} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
@@ -12,6 +12,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
@@ -27,6 +29,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
     IRestakingConnector public restakingConnector;
+    IAgentFactory public agentFactory;
     address public senderAddr;
 
     IStrategyManager public strategyManager;
@@ -46,16 +49,18 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
     uint256 public expiry;
     uint256 public middlewareTimesIndex; // not used yet, for slashing
     bool public receiveAsTokens;
+
     uint256 public execNonce; // EigenAgent execution nonce
+    IEigenAgent6551 public eigenAgent;
 
     function run() public {
+
+        deployerKey = vm.envUint("DEPLOYER_KEY");
+        deployer = vm.addr(deployerKey);
 
         bool isTest = block.chainid == 31337;
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
-
-        deployerKey = vm.envUint("DEPLOYER_KEY");
-        deployer = vm.addr(deployerKey);
 
         signatureUtils = new SignatureUtilsEIP1271(); // needs ethForkId to call getDomainSeparator
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
@@ -75,6 +80,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         senderAddr = address(senderContract);
 
         (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
+        agentFactory = fileReader.readAgentFactory();
 
         ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
 
@@ -82,12 +88,20 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         /// Create message and signature
         /// In production this is done on the client/frontend
         //////////////////////////////////////////////////////////
-
         vm.selectFork(ethForkId);
 
+        // Get EigenAgent
+        eigenAgent = agentFactory.getEigenAgent(deployer);
+        execNonce = eigenAgent.getExecNonce();
+        if (address(eigenAgent) == address(0)) {
+            revert("User must have existing deposit in Eigenlayer + EigenAgent");
+        }
+
+        console.log("eigenAgent:", address(eigenAgent));
         amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
-        staker = deployer;
         expiry = block.timestamp + 2 hours;
+        staker = deployer;
+        // staker = address(eigenAgent);
 
         IDelegationManager.Withdrawal memory withdrawal = fileReader.readWithdrawalInfo(
             staker,
@@ -95,7 +109,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         );
 
         if (isTest) {
-            // mock save a queueWithdrawalBloc
+            // mock save a queueWithdrawalBlock
             vm.prank(deployer);
             restakingConnector.setQueueWithdrawalBlock(withdrawal.staker, withdrawal.nonce);
         }
@@ -107,19 +121,12 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         ));
 
         bytes32 withdrawalRootCalculated = delegationManager.calculateWithdrawalRoot(withdrawal);
-
         console.log("withdrawalRootCalculated:");
         console.logBytes32(withdrawalRootCalculated);
 
         IERC20[] memory tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = withdrawal.strategies[0].underlyingToken();
 
-        // Get EigenAgent
-        eigenAgent = agentFactory.getEigenAgent(deployer);
-        execNonce = eigenAgent.getExecNonce();
-        if (address(eigenAgent) == address(0)) {
-            revert("User must have existing deposit in Eigenlayer + EigenAgent");
-        }
 
         /////////////////////////////////////////////////////////////////
         ////// Setup Complete Withdrawals Params
@@ -128,22 +135,27 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         receiveAsTokens = true;
 
         bytes memory completeWithdrawalMessage;
-        bytes memory signatureEigenAgent;
         bytes memory messageWithSignature;
         {
-            // send CCIP message to CompleteWithdrawal
+            console.log("11111111", address(EigenlayerMsgEncoders));
+
             completeWithdrawalMessage = EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
                 withdrawal,
                 tokensToWithdraw,
                 middlewareTimesIndex,
                 receiveAsTokens
             );
+            // completeWithdrawalMessage = abi.encodeWithSelector(
+            //     bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)")),
+            //     withdrawal,
+            //     tokensToWithdraw,
+            //     middlewareTimesIndex,
+            //     receiveAsTokens
+            // );
+            console.log("222222");
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            (
-                signatureEigenAgent,
-                messageWithSignature
-            ) = signatureUtils.signMessageForEigenAgentExecution(
+            messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
                 deployerKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
@@ -151,6 +163,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
                 execNonce,
                 expiry
             );
+            console.log("3333333");
         }
 
         /////////////////////////////////////////////////////////////////

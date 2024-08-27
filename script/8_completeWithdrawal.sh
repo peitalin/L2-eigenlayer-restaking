@@ -3,7 +3,7 @@ source .env
 
 echo forge script script/8_completeWithdrawal.s.sol:CompleteWithdrawalScript --rpc-url basesepolia --broadcast -vvvv
 
-forge script script/8_completeWithdrawal.s.sol:CompleteWithdrawalScript  \
+forge script script/8_completeWithdrawal.s.sol:CompleteWithdrawalScript \
     --rpc-url basesepolia \
     --broadcast \
     -vvvv

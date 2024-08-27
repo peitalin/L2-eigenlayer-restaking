@@ -30,13 +30,13 @@ contract SenderUtils is Ownable, EigenlayerMsgDecoders {
         _gasLimitsForFunctionSelectors[0x32e89ace] = 800_000;
 
         // queueWithdrawals: [gas: x]
-        _gasLimitsForFunctionSelectors[0x0dd8dd02] = 700_000;
+        _gasLimitsForFunctionSelectors[0x0dd8dd02] = 800_000;
 
         // queueWithdrawalsWithSignature: [gas: 603_301]
         _gasLimitsForFunctionSelectors[0xa140f06e] = 700_000;
 
         // completeQueuedWithdrawals: [gas: 645_948]
-        _gasLimitsForFunctionSelectors[0x54b2bf29] = 750_000;
+        _gasLimitsForFunctionSelectors[0x60d7faed] = 800_000;
 
         // delegateToBySignature: [gas: ?]
         _gasLimitsForFunctionSelectors[0x7f548071] = 600_000;

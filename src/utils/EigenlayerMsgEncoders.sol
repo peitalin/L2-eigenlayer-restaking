@@ -97,8 +97,9 @@ library EigenlayerMsgEncoders {
         //     }
 
         bytes memory message_bytes = abi.encodeWithSelector(
-            // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)")),
-            IDelegationManager.completeQueuedWithdrawal.selector,
+            // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
+            bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)")),
+            // IDelegationManager.completeQueuedWithdrawal.selector,
             withdrawal,
             tokensToWithdraw,
             middlewareTimesIndex,

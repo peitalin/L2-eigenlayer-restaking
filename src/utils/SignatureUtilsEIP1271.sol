@@ -159,7 +159,7 @@ contract SignatureUtilsEIP1271 is Script {
     function createEigenAgentCallDigestHash(
         address _target,
         uint256 _value,
-        bytes calldata _data,
+        bytes memory _data,
         uint256 _nonce,
         uint256 _chainid,
         uint256 _expiry
@@ -191,36 +191,34 @@ contract SignatureUtilsEIP1271 is Script {
         bytes memory messageToEigenlayer,
         uint256 execNonceEigenAgent,
         uint256 expiry
-    ) returns (
-        bytes memory,
-        bytes memory
-    ) {
-        // sign the message for EigenAgent
-        bytes32 digestHash = createEigenAgentCallDigestHash(
-            targetContractAddr,
-            0 ether, // not sending ether
-            messageToEigenlayer,
-            execNonceEigenAgent,
-            chainid, // destination chainid where EigenAgent lives, usually ETH
-            expiry
-        );
+    ) public view returns (bytes memory) {
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
-        bytes memory signatureEigenAgent = abi.encodePacked(r, s, v);
+        bytes memory messageWithSignature;
+        bytes memory signatureEigenAgent;
+        {
+            bytes32 digestHash = createEigenAgentCallDigestHash(
+                targetContractAddr,
+                0 ether, // not sending ether
+                messageToEigenlayer,
+                execNonceEigenAgent,
+                chainid, // destination chainid where EigenAgent lives, usually ETH
+                expiry
+            );
 
-        // NOTE: abi.encodePacked to join the payload + expiry + signature
-        bytes memory messageWithSignature = abi.encodePacked(
-            messageToEigenlayer,
-            expiry,
-            signatureEigenAgent
-        );
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
+            signatureEigenAgent = abi.encodePacked(r, s, v);
 
-        checkSignature_EIP1271(vm.addr(signerKey), digestHash, signatureEigenAgent);
+            // NOTE: abi.encodePacked to join the payload + expiry + signature
+            messageWithSignature = abi.encodePacked(
+                messageToEigenlayer,
+                expiry,
+                signatureEigenAgent
+            );
 
-        return (
-            signatureEigenAgent,
-            messageWithSignature
-        );
+            checkSignature_EIP1271(vm.addr(signerKey), digestHash, signatureEigenAgent);
+        }
+
+        return messageWithSignature;
     }
 
 }

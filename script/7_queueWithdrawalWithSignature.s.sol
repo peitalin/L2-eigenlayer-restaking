@@ -107,9 +107,13 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         }
 
         eigenAgent = agentFactory.getEigenAgent(deployer);
-        execNonce = eigenAgent.getExecNonce();
         if (address(eigenAgent) == address(0)) {
-            revert("User must have existing deposit in Eigenlayer + EigenAgent");
+            // revert("User must have existing deposit in Eigenlayer + EigenAgent");
+            vm.prank(deployer);
+            eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
+            execNonce = 0;
+        } else {
+            execNonce = eigenAgent.getExecNonce();
         }
 
         ////////////////////////////////////////////////////////////
@@ -121,6 +125,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
 
         amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
         staker = deployer;
+        // staker = address(eigenAgent);
         expiry = block.timestamp + 2 hours;
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
@@ -138,7 +143,6 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         /////////////////////////////////////////////////////////////////
 
         bytes memory withdrawalMessage;
-        bytes memory signatureEigenAgent;
         bytes memory messageWithSignature;
         {
             IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal;
@@ -157,10 +161,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            (
-                signatureEigenAgent,
-                messageWithSignature
-            ) = signatureUtils.signMessageForEigenAgentExecution(
+            messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
                 deployerKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),

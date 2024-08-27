@@ -175,14 +175,6 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
 
     function test_CCIP_Eigenlayer_DepositIntoStrategy6551() public {
 
-        // vm.startBroadcast(deployerKey);
-        // IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
-        // vm.stopBroadcast();
-
-        // vm.startBroadcast(bobKey);
-        // _nonce = eigenAgent.getExecNonce();
-        // vm.stopBroadcast();
-
         //////////////////////////////////////////////////////
         /// Receiver -> EigenAgent -> Eigenlayer
         //////////////////////////////////////////////////////

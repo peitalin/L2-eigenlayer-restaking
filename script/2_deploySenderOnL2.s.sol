@@ -57,12 +57,14 @@ contract DeploySenderOnL2Script is Script {
             "Check script: senderProxy missing senderUtils"
         );
 
-        fileReader.saveSenderBridgeContracts(
-            isTest,
-            address(senderProxy),
-            address(senderUtils),
-            address(proxyAdmin)
-        );
+        if (!isTest) {
+            fileReader.saveSenderBridgeContracts(
+                isTest,
+                address(senderProxy),
+                address(senderUtils),
+                address(proxyAdmin)
+            );
+        }
 
         return ISenderCCIP(address(senderProxy));
     }

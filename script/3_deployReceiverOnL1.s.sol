@@ -178,15 +178,17 @@ contract DeployReceiverOnL1Script is Script {
 
         vm.stopBroadcast();
 
-        fileReader.saveReceiverBridgeContracts(
-            isTest,
-            address(receiverProxy),
-            address(restakingProxy),
-            address(agentFactory),
-            address(registry6551),
-            address(eigenAgentOwner721),
-            address(proxyAdmin)
-        );
+        if (!isTest) {
+            fileReader.saveReceiverBridgeContracts(
+                isTest,
+                address(receiverProxy),
+                address(restakingProxy),
+                address(agentFactory),
+                address(registry6551),
+                address(eigenAgentOwner721),
+                address(proxyAdmin)
+            );
+        }
 
         return (
             IReceiverCCIP(address(receiverProxy)),
