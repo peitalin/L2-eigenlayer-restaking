@@ -5,7 +5,7 @@ import {Script} from "forge-std/Script.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP1271SignatureUtils} from "eigenlayer-contracts/src/contracts/libraries/EIP1271SignatureUtils.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 
 /// @dev Retrieve these struct hashes by calling Eigenlayer contracts, or storing the hash.
@@ -186,6 +186,7 @@ contract SignatureUtilsEIP1271 is Script {
 
     function signMessageForEigenAgentExecution(
         uint256 signerKey,
+        uint256 chainid,
         address targetContractAddr,
         bytes memory messageToEigenlayer,
         uint256 execNonceEigenAgent,
@@ -200,12 +201,12 @@ contract SignatureUtilsEIP1271 is Script {
             0 ether, // not sending ether
             messageToEigenlayer,
             execNonceEigenAgent,
-            EthSepolia.ChainId, // destination chainid where EigenAgent lives
+            chainid, // destination chainid where EigenAgent lives, usually ETH
             expiry
         );
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
-        signatureEigenAgent = abi.encodePacked(r, s, v);
+        bytes memory signatureEigenAgent = abi.encodePacked(r, s, v);
 
         // NOTE: abi.encodePacked to join the payload + expiry + signature
         bytes memory messageWithSignature = abi.encodePacked(
@@ -213,6 +214,8 @@ contract SignatureUtilsEIP1271 is Script {
             expiry,
             signatureEigenAgent
         );
+
+        checkSignature_EIP1271(vm.addr(signerKey), digestHash, signature);
 
         return (
             signatureEigenAgent,

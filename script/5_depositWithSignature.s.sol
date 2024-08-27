@@ -102,46 +102,29 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         uint256 amount = 0.00717 ether;
         uint256 expiry = block.timestamp + 3 hours;
 
-        bytes memory data = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
-            address(strategy),
-            address(token),
-            amount
-        );
-
-        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
-            address(strategyManager),
-            0 ether,
-            data,
-            nonce,
-            EthSepolia.ChainId, // destination chainid where EigenAgent lives
-            expiry
-        );
-
-        bytes memory signature;
-        {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
-            signature = abi.encodePacked(r, s, v);
-        }
-
-
-
-        bytes memory withdrawalMessage;
+        bytes memory depositMessage;
         bytes memory signatureEigenAgent;
         bytes memory messageWithSignature;
+        {
+            depositMessage = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
+                address(strategy),
+                address(token),
+                amount
+            );
 
-        // sign the message for EigenAgent to execute Eigenlayer command
-        (
-            signatureEigenAgent,
-            messageWithSignature
-        ) = signatureUtils.signMessageForEigenAgentExecution(
-            deployerKey,
-            address(delegationManager),
-            withdrawalMessage,
-            execNonce,
-            expiry
-        );
-
-        signatureUtils.checkSignature_EIP1271(deployer, digestHash, signature);
+            // sign the message for EigenAgent to execute Eigenlayer command
+            (
+                signatureEigenAgent,
+                messageWithSignature
+            ) = signatureUtils.signMessageForEigenAgentExecution(
+                deployerKey,
+                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                address(delegationManager),
+                depositMessage,
+                execNonce,
+                expiry
+            );
+        }
 
         vm.stopBroadcast();
 

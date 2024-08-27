@@ -46,6 +46,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
     uint256 public expiry;
     uint256 public middlewareTimesIndex; // not used yet, for slashing
     bool public receiveAsTokens;
+    uint256 public execNonce; // EigenAgent execution nonce
 
     function run() public {
 
@@ -86,7 +87,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
 
         amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
         staker = deployer;
-        expiry = block.timestamp + 6 hours;
+        expiry = block.timestamp + 2 hours;
 
         IDelegationManager.Withdrawal memory withdrawal = fileReader.readWithdrawalInfo(
             staker,
@@ -113,19 +114,44 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         IERC20[] memory tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = withdrawal.strategies[0].underlyingToken();
 
+        // Get EigenAgent
+        eigenAgent = agentFactory.getEigenAgent(deployer);
+        execNonce = eigenAgent.getExecNonce();
+        if (address(eigenAgent) == address(0)) {
+            revert("User must have existing deposit in Eigenlayer + EigenAgent");
+        }
+
         /////////////////////////////////////////////////////////////////
         ////// Setup Complete Withdrawals Params
         /////////////////////////////////////////////////////////////////
         middlewareTimesIndex = 0; // not used yet, for slashing
         receiveAsTokens = true;
 
-        // send CCIP message to CompleteWithdrawal
-        bytes memory message = EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
-            withdrawal,
-            tokensToWithdraw,
-            middlewareTimesIndex,
-            receiveAsTokens
-        );
+        bytes memory completeWithdrawalMessage;
+        bytes memory signatureEigenAgent;
+        bytes memory messageWithSignature;
+        {
+            // send CCIP message to CompleteWithdrawal
+            completeWithdrawalMessage = EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+                withdrawal,
+                tokensToWithdraw,
+                middlewareTimesIndex,
+                receiveAsTokens
+            );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            (
+                signatureEigenAgent,
+                messageWithSignature
+            ) = signatureUtils.signMessageForEigenAgentExecution(
+                deployerKey,
+                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                address(delegationManager),
+                completeWithdrawalMessage,
+                execNonce,
+                expiry
+            );
+        }
 
         /////////////////////////////////////////////////////////////////
         /////// Broadcast to L2
@@ -138,7 +164,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
-            string(message),
+            string(messageWithSignature),
             address(ccipBnM),
             amount
         );

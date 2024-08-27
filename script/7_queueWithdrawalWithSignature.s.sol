@@ -94,8 +94,6 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
 
             // go back to ETH fork
             vm.selectFork(ethForkId);
-            // Get EigenAccount address
-            eigenAgent = agentFactory.getEigenAgent(deployer);
 
         } else {
             // otherwise if running the script, read the existing contracts on Sepolia
@@ -106,11 +104,9 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             ) = fileReader.readReceiverRestakingConnector();
             agentFactory = fileReader.readAgentFactory();
 
-            // Get EigenAccount address
-            eigenAgent = agentFactory.getEigenAgent(deployer);
         }
 
-        console.log("eigenAgent:", address(eigenAgent));
+        eigenAgent = agentFactory.getEigenAgent(deployer);
         execNonce = eigenAgent.getExecNonce();
         if (address(eigenAgent) == address(0)) {
             revert("User must have existing deposit in Eigenlayer + EigenAgent");
@@ -166,14 +162,13 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
                 messageWithSignature
             ) = signatureUtils.signMessageForEigenAgentExecution(
                 deployerKey,
+                EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 withdrawalMessage,
                 execNonce,
                 expiry
             );
         }
-
-        signatureUtils.checkSignature_EIP1271(deployer, digestHash, signature);
 
         /////////////////////////////////////////////////////////////////
         /////// Broadcast to L2
