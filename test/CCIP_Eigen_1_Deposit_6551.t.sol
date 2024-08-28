@@ -55,9 +55,9 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
     EigenAgentOwner721 public eigenAgentOwnerNft;
 
     // call params
-    uint256 _expiry;
-    uint256 _nonce;
-    uint256 _amount;
+    uint256 expiry;
+    uint256 execNonce;
+    uint256 amount;
 
     function setUp() public {
 
@@ -104,8 +104,8 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
         erc20Drip.drip(address(bob));
         vm.stopBroadcast();
 
-        _amount = 0.0028 ether;
-        _expiry = block.timestamp + 1 days;
+        amount = 0.0028 ether;
+        expiry = block.timestamp + 1 days;
     }
 
     /*
@@ -124,16 +124,16 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
 
         vm.startBroadcast(bobKey);
 
-        _nonce = eigenAgent.getExecNonce();
-        bytes memory data = abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector);
+        execNonce = eigenAgent.getExecNonce();
+        bytes memory message = abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector);
 
         bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
             address(receiverContract),
             0 ether,
-            data,
-            _nonce,
+            message,
+            execNonce,
             block.chainid,
-            _expiry
+            expiry
         );
         bytes memory signature;
         {
@@ -149,8 +149,8 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
         bytes memory result = eigenAgent.executeWithSignature(
             address(receiverContract),
             0 ether,
-            data,
-            _expiry,
+            message,
+            expiry,
             signature
         );
 
@@ -178,22 +178,31 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
         //////////////////////////////////////////////////////
         /// Receiver -> EigenAgent -> Eigenlayer
         //////////////////////////////////////////////////////
-        (
-            bytes memory data,
-            bytes32 digestHash,
-            bytes memory signature
-        ) = createEigenAgentDepositSignature(
-            bobKey,
-            _amount,
-            _nonce,
-            _expiry
-        );
-        signatureUtils.checkSignature_EIP1271(bob, digestHash, signature);
+
+        bytes memory depositMessage;
+        bytes memory messageWithSignature;
+        {
+            depositMessage = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
+                address(strategy),
+                address(token),
+                amount
+            );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
+                bobKey,
+                block.chainid, // destination chainid where EigenAgent lives
+                address(strategyManager), // StrategyManager to approve + deposit
+                depositMessage,
+                execNonce,
+                expiry
+            );
+        }
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
             token: address(token), // CCIP-BnM token address on Eth Sepolia.
-            amount: _amount
+            amount: amount
         });
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0x0),
@@ -201,14 +210,7 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
             sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
             destTokenAmounts: destTokenAmounts, // Tokens and their amounts in their destination chain representation.
             data: abi.encode(string(
-                EigenlayerMsgEncoders.encodeDepositWithSignature6551Msg(
-                    address(strategy),
-                    address(token),
-                    _amount,
-                    bob,
-                    _expiry,
-                    signature
-                )
+                messageWithSignature
             )) // CCIP abi.encodes a string message when sending
         });
 
@@ -221,51 +223,12 @@ contract CCIP_Eigen_Deposit_6551Tests is Test {
         IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(bob);
 
         uint256 valueOfShares = strategy.userUnderlying(address(eigenAgent));
-        require(_amount == valueOfShares, "valueofShares incorrect");
+        require(amount == valueOfShares, "valueofShares incorrect");
         require(
-            _amount == strategyManager.stakerStrategyShares(address(eigenAgent), strategy),
-            "Bob's EigenAgent stakerStrategyShares should equal deposited _amount"
+            amount == strategyManager.stakerStrategyShares(address(eigenAgent), strategy),
+            "Bob's EigenAgent stakerStrategyShares should equal deposited amount"
         );
         vm.stopBroadcast();
-    }
-
-    /*
-     *
-     *
-     *             Functions
-     *
-     *
-     */
-
-    function createEigenAgentDepositSignature(
-        uint256 signerKey,
-        uint256 amount,
-        uint256 nonce,
-        uint256 expiry
-    ) public view returns (bytes memory, bytes32, bytes memory) {
-
-        bytes memory data = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
-            address(strategy),
-            address(token),
-            amount
-        );
-
-        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
-            address(strategyManager),
-            0 ether,
-            data,
-            nonce,
-            block.chainid,
-            expiry
-        );
-
-        bytes memory signature;
-        {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
-            signature = abi.encodePacked(r, s, v);
-        }
-
-        return (data, digestHash, signature);
     }
 
 }

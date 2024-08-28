@@ -45,6 +45,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
     uint256 public deployerKey;
     address public deployer;
     address public staker;
+    address public withdrawer;
     uint256 public amount;
     uint256 public expiry;
     uint256 public middlewareTimesIndex; // not used yet, for slashing
@@ -97,11 +98,10 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
             revert("User must have existing deposit in Eigenlayer + EigenAgent");
         }
 
-        console.log("eigenAgent:", address(eigenAgent));
         amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
         expiry = block.timestamp + 2 hours;
         staker = deployer;
-        // staker = address(eigenAgent);
+        withdrawer = address(eigenAgent);
 
         IDelegationManager.Withdrawal memory withdrawal = fileReader.readWithdrawalInfo(
             staker,
@@ -143,13 +143,6 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
                 middlewareTimesIndex,
                 receiveAsTokens
             );
-            // completeWithdrawalMessage = abi.encodeWithSelector(
-            //     bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)")),
-            //     withdrawal,
-            //     tokensToWithdraw,
-            //     middlewareTimesIndex,
-            //     receiveAsTokens
-            // );
 
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(

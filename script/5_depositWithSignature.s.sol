@@ -94,13 +94,15 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(deployer);
         // IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
 
+        console.log("agentOwner:", address(eigenAgent.getAgentOwner()));
         console.log("eigenAgent:", address(eigenAgent));
+
         if (address(eigenAgent) != address(0)) {
             // Otherwise if the user already has a EigenAgent, fetch current execution Nonce
             execNonce = eigenAgent.getExecNonce();
         }
 
-        uint256 amount = 0.00717 ether;
+        uint256 amount = 0.00333 ether;
         uint256 expiry = block.timestamp + 3 hours;
 
         bytes memory depositMessage;
@@ -151,6 +153,7 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         );
 
         vm.stopBroadcast();
+
     }
 
 }

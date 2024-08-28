@@ -85,7 +85,7 @@ contract UpgradeReceiverOnL1Script is Script {
             // registry6551
         ) = fileReader.readEigenAgent721AndRegistry();
 
-        IAgentFactory agentFactory = fileReader.readAgentFactory();
+        agentFactory = fileReader.readAgentFactory();
 
         /////////////////////////////
         /// Begin Broadcast
@@ -108,6 +108,7 @@ contract UpgradeReceiverOnL1Script is Script {
         //     TransparentUpgradeableProxy(payable(address(eigenAgentOwner721Proxy))),
         //     address(eigenAgentOwner721Impl)
         // );
+        // eigenAgentOwner721Proxy.addToWhitelistedCallers(address(restakingProxy));
 
         // // deploy agentFactory
         // agentFactory = IAgentFactory(address(
@@ -130,6 +131,10 @@ contract UpgradeReceiverOnL1Script is Script {
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(restakingProxy))),
             address(restakingConnectorImpl)
+            // , abi.encodeWithSelector(
+            //     RestakingConnector.initialize.selector,
+            //     agentFactory
+            // )
         );
         restakingProxy.setAgentFactory(address(agentFactory));
         eigenAgentOwner721Proxy.setAgentFactory(agentFactory);
@@ -158,15 +163,15 @@ contract UpgradeReceiverOnL1Script is Script {
         );
 
         // update AgentFactory address (as it's not behind a proxy yet)
-        fileReader.saveReceiverBridgeContracts(
-            isTest,
-            address(receiverProxy),
-            address(restakingProxy),
-            address(agentFactory),
-            address(registry6551),
-            address(eigenAgentOwner721Proxy),
-            address(proxyAdmin)
-        );
+        // fileReader.saveReceiverBridgeContracts(
+        //     isTest,
+        //     address(receiverProxy),
+        //     address(restakingProxy),
+        //     address(agentFactory),
+        //     address(registry6551),
+        //     address(eigenAgentOwner721Proxy),
+        //     address(proxyAdmin)
+        // );
 
         vm.stopBroadcast();
     }

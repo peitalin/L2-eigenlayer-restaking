@@ -134,13 +134,18 @@ contract DeployReceiverOnL1Script is Script {
             ))
         );
 
+        // Receiver both receives and sends messages back to L2 Sender
+        receiverProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         receiverProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
         receiverProxy.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
+        receiverProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
+
         receiverProxy.allowlistSender(address(senderContract), true);
         receiverProxy.setSenderContractL2Addr(address(senderContract));
 
         eigenAgentOwner721.addAdmin(deployer);
         eigenAgentOwner721.addAdmin(address(restakingProxy));
+        eigenAgentOwner721.addToWhitelistedCallers(address(restakingProxy));
         eigenAgentOwner721.setAgentFactory(agentFactory);
 
         restakingProxy.setReceiverCCIP(address(receiverProxy));

@@ -22,9 +22,13 @@ contract SenderUtils is Ownable, EigenlayerMsgDecoders {
 
     constructor() {
 
-        // depositIntoStrategy: [gas: 565_307]
+        // depositWithEigenAgent: [gas: ?]
         // cast sig "depositWithEigenAgent(bytes,address,uint256)" == 0xaac4ec88
         _gasLimitsForFunctionSelectors[0xaac4ec88] = 800_000;
+
+        // depositIntoStrategy: [gas: 565_307]
+        // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
+        _gasLimitsForFunctionSelectors[0xe7a050aa] = 800_000;
 
         // depositIntoStrategyWithSignature: [gas: 713_400]
         _gasLimitsForFunctionSelectors[0x32e89ace] = 800_000;
@@ -96,15 +100,14 @@ contract SenderUtils is Ownable, EigenlayerMsgDecoders {
         return keccak256(abi.encode(withdrawal));
     }
 
-    function commitWithdrawalRootInfo(
-        bytes memory message,
-        address tokenDestination
-    ) public {
+    function commitWithdrawalRootInfo(bytes memory message, address tokenDestination) public {
+
             (
                 IDelegationManager.Withdrawal memory withdrawal
                 , // tokensToWithdraw,
                 , // middlewareTimesIndex
                 , // receiveAsTokens
+                , // signer
                 , // expiry
                 , // signature
             ) = decodeCompleteWithdrawalMsg(message);

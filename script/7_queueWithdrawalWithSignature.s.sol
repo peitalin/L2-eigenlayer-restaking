@@ -48,6 +48,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
     uint256 public deployerKey;
     address public deployer;
     address public staker;
+    address public withdrawer;
     uint256 public amount;
     uint256 public expiry;
     uint256 public execNonce; // EigenAgent execution nonce
@@ -123,20 +124,26 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         senderAddr = address(senderContract);
         ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
 
-        amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
-        staker = deployer;
-        // staker = address(eigenAgent);
+        // only sending a withdrawal message, not bridging tokens.
+        amount = 0 ether;
         expiry = block.timestamp + 2 hours;
+        // original staker, not EigenAgent
+        staker = eigenAgent.getAgentOwner();
+        // withdrawer is EigenAgent
+        withdrawer = address(eigenAgent);
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         strategiesToWithdraw[0] = strategy;
 
         uint256[] memory sharesToWithdraw = new uint256[](1);
-        sharesToWithdraw[0] = strategyManager.stakerStrategyShares(staker, strategy);
+        sharesToWithdraw[0] = strategyManager.stakerStrategyShares(withdrawer, strategy);
 
-        address withdrawer = address(eigenAgent);
-        withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(staker);
-        address delegatedTo = delegationManager.delegatedTo(staker);
+        withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(withdrawer);
+        address delegatedTo = delegationManager.delegatedTo(withdrawer);
+
+        console.log("staker (agentOwner):", staker);
+        console.log("withdrawer (eigenAgent):", withdrawer);
+        console.log("sharesToWithdraw:", sharesToWithdraw[0]);
 
         /////////////////////////////////////////////////////////////////
         ////// Sign the queueWithdrawal payload for EigenAgent

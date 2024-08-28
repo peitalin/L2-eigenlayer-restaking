@@ -15,14 +15,30 @@ contract EigenAgentOwner721 is Initializable, IERC721Receiver, ERC721URIStorageU
 
     uint256 private _tokenIdCounter;
     IAgentFactory public agentFactory;
+    mapping(address contracts => bool whitelisted) public whitelistedCallers;
 
-    function initialize(string memory name, string memory symbol) initializer public {
+    function initialize(
+        string memory name,
+        string memory symbol
+    ) initializer public {
 
         __ERC721_init(name, symbol);
         __ERC721URIStorage_init();
         __Adminable_init();
 
         _tokenIdCounter = 1;
+    }
+
+    function addToWhitelistedCallers(address caller) external onlyAdminOrOwner {
+        whitelistedCallers[caller] = true;
+    }
+
+    function removeFromWhitelistedCallers(address caller) external onlyAdminOrOwner {
+        whitelistedCallers[caller] = false;
+    }
+
+    function isWhitelistedCaller(address caller) public view returns (bool) {
+        return whitelistedCallers[caller];
     }
 
     function getAgentFactory() public view returns (address) {

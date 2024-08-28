@@ -11,29 +11,6 @@ import {IRestakingConnector} from "../interfaces/IRestakingConnector.sol";
 
 library EigenlayerMsgEncoders {
 
-    // used by CCIP -> EigenAgent
-    function encodeDepositWithSignature6551Msg(
-        address strategy,
-        address token,
-        uint256 amount,
-        address staker,
-        uint256 expiry,
-        bytes memory signature
-    ) public pure returns (bytes memory) {
-
-        bytes memory message_bytes = abi.encodeWithSelector(
-            // cast sig "depositWithEigenAgent(bytes,address,uint256)" == 0xaac4ec88
-            IRestakingConnector.depositWithEigenAgent.selector,
-            strategy,
-            token,
-            amount,
-            staker,
-            expiry,
-            signature
-        );
-        return message_bytes;
-    }
-
     // used by EigenAgent -> Eigenlayer
     function encodeDepositIntoStrategyMsg(
         address strategy,
@@ -42,7 +19,7 @@ library EigenlayerMsgEncoders {
     ) public pure returns (bytes memory) {
 
         bytes memory message_bytes = abi.encodeWithSelector(
-            // bytes4(keccak256("depositIntoStrategy(address,address,uint256)")),
+            // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
             IStrategyManager.depositIntoStrategy.selector,
             strategy,
             token,

@@ -63,13 +63,13 @@ contract WhitelistCCIPContractsScript is Script {
         IERC20_CCIPBnM(tokenL2).drip(deployer);
         vm.stopBroadcast();
 
-
         //////////// Eth Sepolia ////////////
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployerKey);
 
         receiverProxy.allowlistSender(address(senderProxy), true);
         receiverProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
+        receiverProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         receiverProxy.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
         // Remember to fund L1 receiver with gas and tokens in production.
 

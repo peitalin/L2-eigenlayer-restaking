@@ -18,6 +18,12 @@ interface IEigenAgentOwner721 is IAdminable, IERC721, IERC721Receiver {
 
     function setAgentFactory(IAgentFactory _agentFactory) external;
 
+    function isWhitelistedCaller(address caller) external returns (bool);
+
+    function addToWhitelistedCallers(address caller) external;
+
+    function removeFromWhitelistedCallers(address caller) external;
+
     function mint(address user) external returns (uint256);
 
     function mintAdmin(address user) external returns (uint256);

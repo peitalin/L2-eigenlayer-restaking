@@ -10,6 +10,7 @@ import {IERC6551Executable} from "@6551/interfaces/IERC6551Executable.sol";
 
 import {ERC6551AccountUpgradeable} from "./ERC6551AccountUpgradeable.sol";
 import {IEigenAgent6551} from "./IEigenAgent6551.sol";
+import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
 
 
 
@@ -30,8 +31,11 @@ contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
     error CallerIsNotOwner();
+    error CallerNotWhitelisted();
     error SignatureNotFromNftOwner();
     error OnlyCallOperationsSupported();
+
+    event ExecutedCall(address indexed target, bytes indexed data);
 
     /*
      *
@@ -84,95 +88,114 @@ contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
         _;
     }
 
+    modifier onlyWhitelistedCallers() {
+        (uint256 chainId, address contractAddress, uint256 tokenId) = token();
+        // TODO: require chainId == L1
+        if (!IEigenAgentOwner721(contractAddress).isWhitelistedCaller(msg.sender)) {
+            revert CallerNotWhitelisted();
+        }
+        _;
+    }
+
     // Uses the signature that signed the depositIntoStrategy struct,
     // as depositIntoStrategy struct contains (token, amount) fields used in ERC20 approve()
-    function approveStrategyManagerWithSignature(
-        address _target,
-        uint256 _value,
-        bytes calldata _data,
-        uint256 _expiry,
-        bytes memory _signature
+    function approveWithSignature(
+        address targetContract,
+        uint256 value,
+        bytes calldata data,
+        uint256 expiry,
+        bytes memory signature
     ) external returns (bool) {
 
-        bytes32 _digestHash = createEigenAgentCallDigestHash(
-            _target,
-            _value,
-            _data,
+        bytes32 digestHash = createEigenAgentCallDigestHash(
+            targetContract,
+            value,
+            data,
             execNonce,
             block.chainid,
-            _expiry
+            expiry
         );
 
-        if (isValidSignature(_digestHash, _signature) != IERC1271.isValidSignature.selector)
+        if (isValidSignature(digestHash, signature) != IERC1271.isValidSignature.selector)
             revert SignatureNotFromNftOwner();
 
-        (address token, uint256 amount) = decodeApproveERC20FromDepositMsg(_data);
+        (address token, uint256 amount) = decodeApproveERC20FromDepositMsg(data);
 
-        return IERC20(token).approve(_target, amount);
+        return IERC20(token).approve(targetContract, amount);
+    }
+
+    function approveByWhitelistedContract(
+        address targetContract,
+        address token,
+        uint256 amount
+    ) external onlyWhitelistedCallers returns (bool) {
+        return IERC20(token).approve(targetContract, amount);
     }
 
     function executeWithSignature(
-        address _target,
-        uint256 _value,
-        bytes calldata _data,
-        uint256 _expiry,
-        bytes memory _signature
+        address targetContract,
+        uint256 value,
+        bytes calldata data,
+        uint256 expiry,
+        bytes memory signature
     )
         external
         payable
         virtual
-        returns (bytes memory _result)
+        returns (bytes memory result)
     {
         // no longer need msg.sender == nftOwner constraint
         // if (!_isValidSigner(msg.sender)) revert CallerIsNotOwner();
-        bytes32 _digestHash = createEigenAgentCallDigestHash(
-            _target,
-            _value,
-            _data,
+        bytes32 digestHash = createEigenAgentCallDigestHash(
+            targetContract,
+            value,
+            data,
             execNonce,
             block.chainid,
-            _expiry
+            expiry
         );
 
-        if (isValidSignature(_digestHash, _signature) != IERC1271.isValidSignature.selector)
+        if (isValidSignature(digestHash, signature) != IERC1271.isValidSignature.selector)
             revert SignatureNotFromNftOwner();
 
         ++state;
         bool success;
 
-        beforeExecute(_data);
+        beforeExecute(data);
         {
             // solhint-disable-next-line avoid-low-level-calls
-            (success, _result) = _target.call{value: _value}(_data);
+            (success, result) = targetContract.call{value: value}(data);
         }
-        afterExecute(_data, success, _result);
+        afterExecute(data, success, result);
 
-        require(success, string(_result));
-        return _result;
+        emit ExecutedCall(targetContract, data);
+
+        require(success, string(result));
+        return result;
     }
 
     function createEigenAgentCallDigestHash(
-        address _target,
-        uint256 _value,
-        bytes calldata _data,
-        uint256 _nonce,
-        uint256 _chainid,
-        uint256 _expiry
+        address target,
+        uint256 value,
+        bytes calldata data,
+        uint256 nonce,
+        uint256 chainid,
+        uint256 expiry
     ) public pure returns (bytes32) {
 
         bytes32 structHash = keccak256(abi.encode(
             EIGEN_AGENT_EXEC_TYPEHASH,
-            _target,
-            _value,
-            _data,
-            _nonce,
-            _chainid,
-            _expiry
+            target,
+            value,
+            data,
+            nonce,
+            chainid,
+            expiry
         ));
         // calculate the digest hash
         bytes32 digestHash = keccak256(abi.encodePacked(
             "\x19\x01",
-            getDomainSeparator(_target, _chainid),
+            getDomainSeparator(target, chainid),
             structHash
         ));
 

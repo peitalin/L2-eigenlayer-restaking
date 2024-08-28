@@ -207,15 +207,22 @@ contract SignatureUtilsEIP1271 is Script {
 
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
             signatureEigenAgent = abi.encodePacked(r, s, v);
+            address signer = vm.addr(signerKey);
 
-            // NOTE: abi.encodePacked to join the payload + expiry + signature
+            // Join the payload + signer + expiry + signature
+            // NOTE: the order:
+            // 1: message
+            // 2: signer
+            // 3: expiry
+            // 4: signature
             messageWithSignature = abi.encodePacked(
                 messageToEigenlayer,
+                bytes32(abi.encode(signer)), // pad signer to 32byte word
                 expiry,
                 signatureEigenAgent
             );
 
-            checkSignature_EIP1271(vm.addr(signerKey), digestHash, signatureEigenAgent);
+            checkSignature_EIP1271(signer, digestHash, signatureEigenAgent);
         }
 
         return messageWithSignature;

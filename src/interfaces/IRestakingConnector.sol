@@ -27,7 +27,7 @@ interface IRestakingConnector {
 
     function setAgentFactory(address newAgentFactory) external;
 
-    function depositWithEigenAgent(bytes memory message, address token, uint256 amount) external;
+    function depositWithEigenAgent(bytes memory message) external;
 
     function queueWithdrawalsWithEigenAgent(bytes memory message) external;
 

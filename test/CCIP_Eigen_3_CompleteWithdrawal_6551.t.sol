@@ -15,6 +15,7 @@ import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
@@ -51,7 +52,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
     ISenderCCIP public senderContract;
     IRestakingConnector public restakingConnector;
     IERC20_CCIPBnM public erc20DripL1; // has drip faucet functions
-    IERC20 public token;
+    IERC20 public tokenL1;
 
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
@@ -67,13 +68,11 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
     IEigenAgent6551 public eigenAgent;
 
     // call params
-    uint256 _expiry;
-    uint256 _nonce;
-    uint256 _amount;
-
-    IStrategy[] public strategiesToWithdraw;
-    uint256[] public sharesToWithdraw;
-
+    uint256 expiry;
+    uint256 execNonce = 0;
+    uint256 amount;
+    uint256 balanceOfReceiverBefore;
+    uint256 balanceOfEigenAgent;
 
     function setUp() public {
 
@@ -93,8 +92,6 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         isTest = block.chainid == 31337;
         l2ForkId = vm.createFork("basesepolia");        // 0
         ethForkId = vm.createSelectFork("ethsepolia"); // 1
-        console.log("l2ForkId:", l2ForkId);
-        console.log("ethForkId:", ethForkId);
 
         //////////////////////////////////////////////////////
         //// Setup L1 CCIP and Eigenlayer contracts
@@ -106,7 +103,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             , // pauserRegistry
             delegationManager,
             , // rewardsCoordinator
-            token
+            tokenL1
         ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
         //// Setup L1 CCIP contracts and 6551 EigenAgent
@@ -124,7 +121,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             receiverContract.allowlistSender(deployer, true);
             restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
 
-            erc20DripL1 = IERC20_CCIPBnM(address(token));
+            erc20DripL1 = IERC20_CCIPBnM(address(tokenL1));
             erc20DripL1.drip(address(receiverContract));
             erc20DripL1.drip(address(bob));
 
@@ -164,32 +161,50 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         //////////////////////////////////////////////////////
         vm.selectFork(ethForkId);
 
-        _amount = 0.0133 ether;
-        _expiry = block.timestamp + 1 days;
+        amount = 0.0333 ether;
+        expiry = block.timestamp + 1 days;
 
         vm.startBroadcast(bobKey);
-        _nonce = eigenAgent.getExecNonce();
+        execNonce = eigenAgent.getExecNonce();
         vm.stopBroadcast();
+
+        console.log("bob address:", bob);
+        console.log("eigenAgent:", address(eigenAgent));
+        console.log("---------------------------------------------");
+
+        balanceOfEigenAgent = tokenL1.balanceOf(address(eigenAgent));
+        balanceOfReceiverBefore = tokenL1.balanceOf(address(receiverContract));
+        console.log("balanceOf(receiverContract):", balanceOfReceiverBefore);
+        console.log("balanceOf(eigenAgent):", balanceOfEigenAgent);
 
         /////////////////////////////////////
         //// Queue Withdrawal with EigenAgent
         /////////////////////////////////////
-        (
-            bytes memory data,
-            bytes32 digestHash,
-            bytes memory signature
-        ) = createEigenAgentDepositSignature(
-            bobKey,
-            _amount,
-            _nonce,
-            _expiry
-        );
-        signatureUtils.checkSignature_EIP1271(bob, digestHash, signature);
+
+        bytes memory depositMessage;
+        bytes memory messageWithSignature_D;
+        {
+            depositMessage = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
+                address(strategy),
+                address(tokenL1),
+                amount
+            );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature_D = signatureUtils.signMessageForEigenAgentExecution(
+                bobKey,
+                block.chainid, // destination chainid where EigenAgent lives
+                address(strategyManager),
+                depositMessage,
+                execNonce,
+                expiry
+            );
+        }
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(token), // CCIP-BnM token address on Eth Sepolia.
-            amount: _amount
+            token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
+            amount: amount
         });
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0x0),
@@ -197,20 +212,24 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
             destTokenAmounts: destTokenAmounts, // Tokens and their amounts in their destination chain representation.
             data: abi.encode(string(
-                EigenlayerMsgEncoders.encodeDepositWithSignature6551Msg(
-                    address(strategy),
-                    address(token),
-                    _amount,
-                    bob, // original staker: looks up userToEigenAgent[staker] or spawns an EigenAgent
-                    _expiry,
-                    signature
-                )
+                messageWithSignature_D
             )) // CCIP abi.encodes a string message when sending
         });
 
         vm.startBroadcast(deployerKey);
         receiverContract.mockCCIPReceive(any2EvmMessage);
+        console.log("--------------- After Deposit -----------------");
         vm.stopBroadcast();
+
+        require(
+            tokenL1.balanceOf(address(receiverContract)) == (balanceOfReceiverBefore - amount),
+            "receiverContract did not send tokens to EigenAgent after depositing"
+        );
+        console.log("balanceOf(receiverContract) after deposit:", tokenL1.balanceOf(address(receiverContract)));
+        console.log("balanceOf(eigenAgent) after deposit:", tokenL1.balanceOf(address(eigenAgent)));
+        uint256 eigenAgentShares = strategyManager.stakerStrategyShares(address(eigenAgent), strategy);
+        console.log("eigenAgent shares after deposit:", eigenAgentShares);
+        require(eigenAgentShares > 0, "eigenAgent should have >0 shares after deposit");
 
         /////////////////////////////////////
         //// Queue Withdrawal with EigenAgent
@@ -219,52 +238,63 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         vm.selectFork(ethForkId);
         vm.startBroadcast(bobKey);
 
-        strategiesToWithdraw = new IStrategy[](1);
-        strategiesToWithdraw[0] = strategy;
+        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
+        uint256[] memory sharesToWithdraw = new uint256[](1);
+        IDelegationManager.QueuedWithdrawalParams[] memory QWPArray;
 
-        sharesToWithdraw = new uint256[](1);
-        sharesToWithdraw[0] = _amount;
-
+        bytes memory withdrawalMessage;
+        bytes memory messageWithSignature_QW;
         {
+            strategiesToWithdraw[0] = strategy;
+            sharesToWithdraw[0] = amount;
 
-            IDelegationManager.QueuedWithdrawalParams[] memory QWPArray;
             QWPArray = new IDelegationManager.QueuedWithdrawalParams[](1);
-            QWPArray[0] =
-                IDelegationManager.QueuedWithdrawalParams({
-                    strategies: strategiesToWithdraw,
-                    shares: sharesToWithdraw,
-                    withdrawer: address(eigenAgent)
-                });
-
-            (
-                bytes memory data2,
-                bytes32 digestHash2,
-                bytes memory signature2
-            ) = createEigenAgentQueueWithdrawalsSignature(
-                bobKey,
-                _nonce,
-                _expiry,
-                QWPArray
-            );
-            signatureUtils.checkSignature_EIP1271(bob, digestHash2, signature2);
-
-            // note: abi.encodePacked to join the payload + signature
-            bytes memory dataWithSignature = abi.encodePacked(data2, _expiry, signature2);
-
-            Client.Any2EVMMessage memory any2EvmMessageQueueWithdrawal = Client.Any2EVMMessage({
-                messageId: bytes32(uint256(9999)),
-                sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
-                sender: abi.encode(address(deployer)), // bytes: abi.decode(sender) if coming from an EVM chain.
-                destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging coins, just sending msg
-                data: abi.encode(string(
-                    dataWithSignature
-                ))
+            QWPArray[0] = IDelegationManager.QueuedWithdrawalParams({
+                strategies: strategiesToWithdraw,
+                shares: sharesToWithdraw,
+                withdrawer: address(eigenAgent)
             });
 
-            receiverContract.mockCCIPReceive(any2EvmMessageQueueWithdrawal);
-        }
-       vm.stopBroadcast();
+            // create the queueWithdrawal message for Eigenlayer
+            withdrawalMessage = EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
+                QWPArray
+            );
 
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature_QW = signatureUtils.signMessageForEigenAgentExecution(
+                bobKey,
+                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                address(delegationManager),
+                withdrawalMessage,
+                execNonce,
+                expiry
+            );
+        }
+
+        Client.Any2EVMMessage memory any2EvmMessageQueueWithdrawal = Client.Any2EVMMessage({
+            messageId: bytes32(uint256(9999)),
+            sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
+            sender: abi.encode(address(deployer)), // bytes: abi.decode(sender) if coming from an EVM chain.
+            destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging coins, just sending msg
+            data: abi.encode(string(
+                messageWithSignature_QW
+            ))
+        });
+
+        receiverContract.mockCCIPReceive(any2EvmMessageQueueWithdrawal);
+        console.log("--------------- After Queue Withdrawal -----------------");
+
+        uint256 numWithdrawals = delegationManager.cumulativeWithdrawalsQueued(address(eigenAgent));
+        require(numWithdrawals > 0, "must queueWithdrawals first before completeWithdrawals");
+
+        console.log("balanceOf(receiver):", tokenL1.balanceOf(address(receiverContract)));
+        console.log("balanceOf(eigenAgent):", tokenL1.balanceOf(address(eigenAgent)));
+
+        uint256 eigenAgentSharesQW = strategyManager.stakerStrategyShares(address(eigenAgent), strategy);
+        console.log("eigenAgent shares after queueWithdrawal:", eigenAgentSharesQW);
+        require(eigenAgentSharesQW == 0, "eigenAgent should have 0 shares after queueWithdrawal");
+
+        vm.stopBroadcast();
     }
 
     /*
@@ -283,11 +313,14 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
 
         vm.selectFork(ethForkId);
         vm.startBroadcast(bob);
-        console.log("bob:", bob);
 
         uint32 startBlock = uint32(block.number);
-        // uint256 withdrawalNonce = 0;
         uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(bob);
+
+        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
+        uint256[] memory sharesToWithdraw = new uint256[](1);
+        strategiesToWithdraw[0] = strategy;
+        sharesToWithdraw[0] = amount;
 
         IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
             staker: address(eigenAgent),
@@ -300,10 +333,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         });
 
         bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
-        require(withdrawalRoot != 0, "withdrawal root missing");
-
-        IERC20[] memory tokensToWithdraw = new IERC20[](1);
-        tokensToWithdraw[0] = strategiesToWithdraw[0].underlyingToken();
+        require(withdrawalRoot != 0, "withdrawal root missing, queueWithdrawal first");
 
         vm.stopBroadcast();
 
@@ -316,27 +346,35 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         address tokenDestination = BaseSepolia.CcipBnM; // CCIP-BnM L2 address
         uint256 stakerBalanceOnL2Before = IERC20(tokenDestination).balanceOf(bob);
 
-        (
-            bytes memory data,
-            bytes32 digestHash,
-            bytes memory signature
-        ) = createEigenAgentCompleteWithdrawalSignature(
-            bobKey,
-            withdrawal,
-            tokensToWithdraw,
-            0, //middlewareTimesIndex,
-            true // receiveAsTokens
-        );
-        signatureUtils.checkSignature_EIP1271(bob, digestHash, signature);
+        bytes memory completeWithdrawalMessage;
+        bytes memory messageWithSignature_CW;
+        {
+            // create the completeWithdrawal message for Eigenlayer
+            IERC20[] memory tokensToWithdraw = new IERC20[](1);
+            tokensToWithdraw[0] = tokenL1;
 
-        bytes memory dataWithSignature = abi.encodePacked(data, _expiry, signature);
-        console.log("sig1");
-        console.logBytes(signature);
+            completeWithdrawalMessage = EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+                withdrawal,
+                tokensToWithdraw,
+                0, //middlewareTimesIndex,
+                true // receiveAsTokens
+            );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature_CW = signatureUtils.signMessageForEigenAgentExecution(
+                bobKey,
+                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                address(delegationManager),
+                completeWithdrawalMessage,
+                execNonce,
+                expiry
+            );
+        }
 
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
-            string(dataWithSignature),
+            string(messageWithSignature_CW),
             address(tokenDestination),
             0 // not sending tokens, just message
         );
@@ -349,31 +387,44 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         /////////////////////////////////////////////////////////////////
         //// 2. [L1] Mock receiving CompleteWithdrawals message on L1 Bridge
         /////////////////////////////////////////////////////////////////
-        // need to fork ethsepolia to get: ReceiverCCIP -> Router calls to work
+
+        // fork ethsepolia so ReceiverCCIP -> Router calls work
         vm.selectFork(ethForkId);
         vm.startBroadcast(address(receiverContract));
 
         vm.warp(block.timestamp + 120); // 120 seconds = 10 blocks (12second per block)
         vm.roll((block.timestamp + 120) / 12);
 
-        uint256 _numWithdrawals = delegationManager.cumulativeWithdrawalsQueued(address(eigenAgent));
-        require(_numWithdrawals > 0, "must queueWithdrawals first before completeWithdrawals");
-        console.log("eigenAgent withdrawals queued:", _numWithdrawals);
-
-        // mock L1 bridge receiving CCIP message and calling CompleteWithdrawal on Eigenlayer
+        // Mock L1 bridge receiving CCIP message and calling CompleteWithdrawal on Eigenlayer
+        // topic [1] event check is false: senderContract is test deployed address
+        vm.expectEmit(false, true, false, false);
+        emit ReceiverCCIP.BridgingWithdrawalToL2(address(senderContract), amount);
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: BaseSepolia.ChainSelector,
+                sourceChainSelector: EthSepolia.ChainSelector,
                 sender: abi.encode(deployer),
                 data: abi.encode(string(
-                    dataWithSignature
+                    messageWithSignature_CW
                 )),
                 destTokenAmounts: new Client.EVMTokenAmount[](0)
             })
         );
+        console.log("--------------- After Complete Withdrawal -----------------");
+
         // tokens in the ReceiverCCIP bridge contract
-        console.log("balanceOf(receiverContract):", token.balanceOf(address(receiverContract)));
+        console.log("balanceOf(receiverContract) after:", tokenL1.balanceOf(address(receiverContract)));
+        console.log("balanceOf(eigenAgent) after:", tokenL1.balanceOf(address(eigenAgent)));
+        console.log("balanceOf(restakingConnector) after:", tokenL1.balanceOf(address(restakingConnector)));
+        console.log("balanceOf(router) after:", tokenL1.balanceOf(address(EthSepolia.Router)));
+        require(
+            tokenL1.balanceOf(address(receiverContract)) == (balanceOfReceiverBefore - amount),
+            "receiverContract did not send tokens to L1 completeWithdrawal"
+        );
+        require(
+            tokenL1.balanceOf(address(eigenAgent)) == 0,
+            "EigenAgent did not send tokens to ReceiverCCIP after completeWithdrawal"
+        );
         vm.stopBroadcast();
 
         /////////////////////////////////////////////////////////////////
@@ -385,9 +436,22 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
         vm.startBroadcast(deployerKey);
+
         // Mock SenderContract on L2 receiving the tokens and TransferToAgentOwner CCIP message from L1
         senderContract.mockCCIPReceive(
-            makeCCIPEigenlayerMsg_TransferToAgentOwner(withdrawalRoot, bob)
+            Client.Any2EVMMessage({
+                messageId: bytes32(uint256(9999)),
+                sourceChainSelector: EthSepolia.ChainSelector,
+                sender: abi.encode(deployer),
+                data: abi.encode(string(
+                    EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
+                        withdrawalRoot,
+                        bob
+                    )
+                )), // CCIP abi.encodes a string message when sending
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
+                // Not bridging tokens, just sending message to withdraw
+            })
         );
 
         uint256 stakerBalanceOnL2After = IERC20(tokenDestination).balanceOf(address(bob));
@@ -395,137 +459,11 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         console.log("balanceOf(eigenAgent) on L2 after:", stakerBalanceOnL2After);
 
         require(
-            (stakerBalanceOnL2Before + _amount) == stakerBalanceOnL2After,
-            "balanceOf(bob) on L2 should increase by _amount after L2 -> L2 withdrawal"
+            (stakerBalanceOnL2Before + amount) == stakerBalanceOnL2After,
+            "balanceOf(bob) on L2 should increase by amount after L2 -> L2 withdrawal"
         );
 
         vm.stopBroadcast();
-    }
-
-    /*
-     *
-     *
-     *             Functions
-     *
-     *
-     */
-
-    function createEigenAgentQueueWithdrawalsSignature(
-        uint256 signerKey,
-        uint256 nonce,
-        uint256 expiry,
-        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalsArray
-    ) public view returns (bytes memory, bytes32, bytes memory) {
-
-        bytes memory data = EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
-            queuedWithdrawalsArray
-        );
-
-        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
-            address(delegationManager), // target to call
-            0 ether,
-            data,
-            nonce,
-            block.chainid,
-            expiry
-        );
-
-        bytes memory signature;
-        {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
-            signature = abi.encodePacked(r, s, v);
-        }
-
-        return (data, digestHash, signature);
-    }
-
-    function createEigenAgentDepositSignature(
-        uint256 signerKey,
-        uint256 amount,
-        uint256 nonce,
-        uint256 expiry
-    ) public view returns (bytes memory, bytes32, bytes memory) {
-
-        bytes memory data = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
-            address(strategy),
-            address(token),
-            amount
-        );
-
-        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
-            address(strategyManager),
-            0 ether,
-            data,
-            nonce,
-            block.chainid,
-            expiry
-        );
-
-        bytes memory signature;
-        {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
-            signature = abi.encodePacked(r, s, v);
-        }
-
-        return (data, digestHash, signature);
-    }
-
-    function createEigenAgentCompleteWithdrawalSignature(
-        uint256 signerKey,
-        IDelegationManager.Withdrawal memory withdrawal,
-        IERC20[] memory tokensToWithdraw,
-        uint256 middlewareTimesIndex,
-        bool receiveAsTokens
-    ) public view returns (bytes memory, bytes32, bytes memory) {
-
-        bytes memory data = EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
-            withdrawal,
-            tokensToWithdraw,
-            middlewareTimesIndex,
-            receiveAsTokens
-        );
-
-        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
-            address(delegationManager),
-            0 ether,
-            data,
-            _nonce,
-            EthSepolia.ChainId,
-            _expiry
-        );
-
-        bytes memory signature;
-        {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
-            signature = abi.encodePacked(r, s, v);
-        }
-
-        return (data, digestHash, signature);
-    }
-
-
-    function makeCCIPEigenlayerMsg_TransferToAgentOwner(
-        bytes32 withdrawalRoot,
-        address agentOwner
-    ) public view returns (Client.Any2EVMMessage memory) {
-
-        // Not bridging tokens, just sending message to withdraw
-        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
-
-        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: bytes32(uint256(9999)),
-            sourceChainSelector: EthSepolia.ChainSelector,
-            sender: abi.encode(deployer),
-            data: abi.encode(string(
-                EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
-                    withdrawalRoot,
-                    agentOwner
-                )
-            )), // CCIP abi.encodes a string message when sending
-            destTokenAmounts: destTokenAmounts
-        });
-
-        return any2EvmMessage;
     }
 
 }
