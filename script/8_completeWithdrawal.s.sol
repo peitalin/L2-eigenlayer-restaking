@@ -51,6 +51,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
     uint256 public middlewareTimesIndex; // not used yet, for slashing
     bool public receiveAsTokens;
 
+    address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
     uint256 public execNonce; // EigenAgent execution nonce
     IEigenAgent6551 public eigenAgent;
 
@@ -84,6 +85,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         agentFactory = fileReader.readAgentFactory();
 
         ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
+        TARGET_CONTRACT = address(delegationManager);
 
         //////////////////////////////////////////////////////////
         /// Create message and signature
@@ -148,7 +150,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
             messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
                 deployerKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
-                address(delegationManager),
+                TARGET_CONTRACT,
                 completeWithdrawalMessage,
                 execNonce,
                 expiry

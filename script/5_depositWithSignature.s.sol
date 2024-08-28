@@ -44,6 +44,7 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
 
     uint256 public deployerKey;
     address public deployer;
+    address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
 
@@ -78,6 +79,8 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
 
         ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
         token = IERC20(address(EthSepolia.BridgeToken)); // CCIPBnM on EthSepolia
+
+        TARGET_CONTRACT = address(strategyManager);
 
         //////////////////////////////////////////////////////////
         /// Create message and signature
@@ -115,7 +118,7 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
             messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
                 deployerKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
-                address(strategyManager), // StrategyManager is the target
+                TARGET_CONTRACT, // StrategyManager is the target
                 depositMessage,
                 execNonce,
                 expiry

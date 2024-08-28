@@ -40,6 +40,7 @@ contract DelegateToScript is Script, ScriptUtils {
     uint256 public operatorKey;
     address public operator;
     address public staker;
+    address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
 
@@ -65,7 +66,9 @@ contract DelegateToScript is Script, ScriptUtils {
 
         senderContract = fileReader.readSenderContract();
         (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
+
         ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
+        TARGET_CONTRACT = address(delegationManager);
 
         //////////////////////////////////////////////////////////
         /// Create message and signature
@@ -122,7 +125,7 @@ contract DelegateToScript is Script, ScriptUtils {
                 0,  // nonce
                 operator,
                 sig1_expiry,
-                address(delegationManager),
+                TARGET_CONTRACT,
                 EthSepolia.ChainId
             );
             bytes32 digestHash2 = signatureUtils.calculateDelegationApprovalDigestHash(
@@ -131,7 +134,7 @@ contract DelegateToScript is Script, ScriptUtils {
                 operator, // _delegationApprover,
                 approverSalt,
                 sig2_expiry,
-                address(delegationManager), // delegationManagerAddr
+                TARGET_CONTRACT, // delegationManagerAddr
                 EthSepolia.ChainId
             );
 

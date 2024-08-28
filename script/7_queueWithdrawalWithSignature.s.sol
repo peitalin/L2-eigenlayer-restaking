@@ -54,6 +54,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
     uint256 public execNonce; // EigenAgent execution nonce
     uint256 public withdrawalNonce; // Eigenlayer withdrawal nonce
     IEigenAgent6551 public eigenAgent;
+    address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
 
@@ -123,6 +124,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
 
         senderAddr = address(senderContract);
         ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
+        TARGET_CONTRACT = address(delegationManager);
 
         // only sending a withdrawal message, not bridging tokens.
         amount = 0 ether;
@@ -171,7 +173,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
                 deployerKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
-                address(delegationManager),
+                TARGET_CONTRACT,
                 withdrawalMessage,
                 execNonce,
                 expiry
