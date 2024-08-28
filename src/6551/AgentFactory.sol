@@ -78,7 +78,7 @@ contract AgentFactory is Adminable {
         address from,
         address to,
         uint256 tokenId
-    ) external returns (uint256) {
+    ) external {
         require(
             msg.sender == address(eigenAgentOwner721),
             "AgentFactory.updateEigenAgentOwnerTokenId: caller not EigenAgentOwner721 contract"

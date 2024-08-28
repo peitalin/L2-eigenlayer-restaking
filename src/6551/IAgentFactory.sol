@@ -34,7 +34,7 @@ interface IAgentFactory is IAdminable {
         address from,
         address to,
         uint256 tokenId
-    ) external returns (uint256);
+    ) external;
 
     function spawnEigenAgentOnlyOwner(address staker) external returns (IEigenAgent6551);
 

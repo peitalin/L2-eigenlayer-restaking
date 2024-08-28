@@ -93,10 +93,7 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         /// if user does not already have an EigenAgent NFT on L1.  Nonce is then 0.
         IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(deployer);
         // IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
-
-        console.log("agentOwner:", address(eigenAgent.getAgentOwner()));
         console.log("eigenAgent:", address(eigenAgent));
-
         if (address(eigenAgent) != address(0)) {
             // Otherwise if the user already has a EigenAgent, fetch current execution Nonce
             execNonce = eigenAgent.getExecNonce();
@@ -118,7 +115,7 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
             messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
                 deployerKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
-                address(delegationManager),
+                address(strategyManager), // StrategyManager is the target
                 depositMessage,
                 execNonce,
                 expiry
