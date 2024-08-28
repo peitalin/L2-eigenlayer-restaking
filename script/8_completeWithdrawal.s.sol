@@ -21,7 +21,7 @@ import {ScriptUtils} from "./ScriptUtils.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
-import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
+import {ClientEncoders} from "./ClientEncoders.sol";
 
 
 contract CompleteWithdrawalScript is Script, ScriptUtils {
@@ -40,6 +40,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
+    ClientEncoders public encoders;
     SignatureUtilsEIP1271 public signatureUtils;
 
     uint256 public deployerKey;
@@ -64,7 +65,6 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
 
-        signatureUtils = new SignatureUtilsEIP1271(); // needs ethForkId to call getDomainSeparator
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
@@ -87,17 +87,19 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
         TARGET_CONTRACT = address(delegationManager);
 
-        //////////////////////////////////////////////////////////
-        /// Create message and signature
-        /// In production this is done on the client/frontend
-        //////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////
+        ////// L1: Get Complete Withdrawals Params
+        /////////////////////////////////////////////////////////////////
         vm.selectFork(ethForkId);
 
         // Get EigenAgent
         eigenAgent = agentFactory.getEigenAgent(deployer);
-        execNonce = eigenAgent.getExecNonce();
-        if (address(eigenAgent) == address(0)) {
-            revert("User must have existing deposit in Eigenlayer + EigenAgent");
+        if (address(eigenAgent) != address(0)) {
+            // if the user already has a EigenAgent, fetch current execution Nonce
+            execNonce = eigenAgent.getExecNonce();
+        } else {
+            // otherwise agentFactory will spawn one for the user
+            // eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
         }
 
         amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
@@ -123,23 +125,27 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         ));
 
         bytes32 withdrawalRootCalculated = delegationManager.calculateWithdrawalRoot(withdrawal);
-        console.log("withdrawalRootCalculated:");
-        console.logBytes32(withdrawalRootCalculated);
 
         IERC20[] memory tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = withdrawal.strategies[0].underlyingToken();
 
+        /////////////////////////////////////////////////////////////////
+        /////// Broadcast to L2
+        /////////////////////////////////////////////////////////////////
 
-        /////////////////////////////////////////////////////////////////
-        ////// Setup Complete Withdrawals Params
-        /////////////////////////////////////////////////////////////////
+        vm.selectFork(l2ForkId);
+        encoders = new ClientEncoders();
+        signatureUtils = new SignatureUtilsEIP1271();
+
+        vm.startBroadcast(deployerKey);
+
         middlewareTimesIndex = 0; // not used yet, for slashing
         receiveAsTokens = true;
 
         bytes memory completeWithdrawalMessage;
         bytes memory messageWithSignature;
         {
-            completeWithdrawalMessage = EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+            completeWithdrawalMessage = encoders.encodeCompleteWithdrawalMsg(
                 withdrawal,
                 tokensToWithdraw,
                 middlewareTimesIndex,
@@ -156,13 +162,6 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
                 expiry
             );
         }
-
-        /////////////////////////////////////////////////////////////////
-        /////// Broadcast to L2
-        /////////////////////////////////////////////////////////////////
-
-        vm.selectFork(l2ForkId);
-        vm.startBroadcast(deployerKey);
 
         topupSenderEthBalance(senderAddr);
         senderContract.sendMessagePayNative(

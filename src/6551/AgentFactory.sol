@@ -117,10 +117,6 @@ contract AgentFactory is Adminable {
     /// Mints an NFT and creates a 6551 account for it
     function _spawnEigenAgent6551(address staker) internal returns (IEigenAgent6551) {
         require(
-            getEigenAgentOwnerTokenId(staker) == 0,
-            "staker already has an EigenAgentOwner NFT"
-        );
-        require(
             address(getEigenAgent(staker)) == address(0),
             "staker already has an EigenAgent account"
         );

@@ -24,7 +24,7 @@ import {ScriptUtils} from "./ScriptUtils.sol";
 
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
-import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
+import {ClientEncoders} from "./ClientEncoders.sol";
 
 
 contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
@@ -43,6 +43,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
+    ClientEncoders public encoders;
     SignatureUtilsEIP1271 public signatureUtils;
 
     uint256 public deployerKey;
@@ -65,9 +66,9 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        signatureUtils = new SignatureUtilsEIP1271(); // needs ethForkId to call getDomainSeparator
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
+
         DeployReceiverOnL1Script deployReceiverOnL1Script = new DeployReceiverOnL1Script();
 
         (
@@ -104,8 +105,8 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
                 receiverContract,
                 restakingConnector
             ) = fileReader.readReceiverRestakingConnector();
-            agentFactory = fileReader.readAgentFactory();
 
+            agentFactory = fileReader.readAgentFactory();
         }
 
         eigenAgent = agentFactory.getEigenAgent(deployer);
@@ -151,41 +152,43 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         ////// Sign the queueWithdrawal payload for EigenAgent
         /////////////////////////////////////////////////////////////////
 
+        vm.selectFork(l2ForkId);
+        encoders = new ClientEncoders();
+        signatureUtils = new SignatureUtilsEIP1271();
+
+        vm.startBroadcast(deployerKey);
+
         bytes memory withdrawalMessage;
         bytes memory messageWithSignature;
-        {
-            IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal;
-            queuedWithdrawal = IDelegationManager.QueuedWithdrawalParams({
-                strategies: strategiesToWithdraw,
-                shares: sharesToWithdraw,
-                withdrawer: withdrawer
-            });
-            IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalArray;
-            queuedWithdrawalArray = new IDelegationManager.QueuedWithdrawalParams[](1);
-            queuedWithdrawalArray[0] = queuedWithdrawal;
 
-            // create the queueWithdrawal message for Eigenlayer
-            withdrawalMessage = EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
-                queuedWithdrawalArray
-            );
+        IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal;
+        queuedWithdrawal = IDelegationManager.QueuedWithdrawalParams({
+            strategies: strategiesToWithdraw,
+            shares: sharesToWithdraw,
+            withdrawer: withdrawer
+        });
+        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalArray;
+        queuedWithdrawalArray = new IDelegationManager.QueuedWithdrawalParams[](1);
+        queuedWithdrawalArray[0] = queuedWithdrawal;
 
-            // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
-                deployerKey,
-                EthSepolia.ChainId, // destination chainid where EigenAgent lives
-                TARGET_CONTRACT,
-                withdrawalMessage,
-                execNonce,
-                expiry
-            );
-        }
+        // create the queueWithdrawal message for Eigenlayer
+        withdrawalMessage = encoders.encodeQueueWithdrawalsMsg(
+            queuedWithdrawalArray
+        );
+
+        // sign the message for EigenAgent to execute Eigenlayer command
+        messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
+            deployerKey,
+            EthSepolia.ChainId, // destination chainid where EigenAgent lives
+            TARGET_CONTRACT,
+            withdrawalMessage,
+            execNonce,
+            expiry
+        );
 
         /////////////////////////////////////////////////////////////////
         /////// Broadcast to L2
         /////////////////////////////////////////////////////////////////
-
-        vm.selectFork(l2ForkId);
-        vm.startBroadcast(deployerKey);
 
         topupSenderEthBalance(senderAddr);
 

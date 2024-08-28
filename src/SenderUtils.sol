@@ -22,13 +22,11 @@ contract SenderUtils is Ownable, EigenlayerMsgDecoders {
 
     constructor() {
 
-        // depositWithEigenAgent: [gas: ?]
-        // cast sig "depositWithEigenAgent(bytes,address,uint256)" == 0xaac4ec88
-        _gasLimitsForFunctionSelectors[0xaac4ec88] = 800_000;
-
-        // depositIntoStrategy: [gas: 565_307]
+        // depositIntoStrategy: [gas: 2_650_000]
+        // Mint EigenAgent: 1_857_622 gas
+        // Deposit tx: 718_947 gas
+        _gasLimitsForFunctionSelectors[0xe7a050aa] = 2_800_000;
         // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
-        _gasLimitsForFunctionSelectors[0xe7a050aa] = 800_000;
 
         // depositIntoStrategyWithSignature: [gas: 713_400]
         _gasLimitsForFunctionSelectors[0x32e89ace] = 800_000;

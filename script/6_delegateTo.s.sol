@@ -20,7 +20,7 @@ import {ScriptUtils} from "./ScriptUtils.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
-import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
+import {ClientEncoders} from "./ClientEncoders.sol";
 
 
 contract DelegateToScript is Script, ScriptUtils {
@@ -33,6 +33,7 @@ contract DelegateToScript is Script, ScriptUtils {
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
+    ClientEncoders public encoders;
     SignatureUtilsEIP1271 public signatureUtils;
 
     uint256 public deployerKey;
@@ -50,7 +51,6 @@ contract DelegateToScript is Script, ScriptUtils {
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        signatureUtils = new SignatureUtilsEIP1271(); // needs ethForkId to call getDomainSeparator
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
@@ -105,9 +105,14 @@ contract DelegateToScript is Script, ScriptUtils {
             vm.stopBroadcast();
         }
 
-        //////////////////////////////////////////////////////////
-        // DelegateTo
-        //////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////
+        /////// Broadcast to L2
+        /////////////////////////////////////////////////////////////////
+        vm.selectFork(l2ForkId);
+        encoders = new ClientEncoders();
+        signatureUtils = new SignatureUtilsEIP1271();
+
+        vm.startBroadcast(deployerKey);
 
         ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry;
         ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
@@ -154,20 +159,13 @@ contract DelegateToScript is Script, ScriptUtils {
         }
 
         // send CCIP message to CompleteWithdrawal
-        bytes memory message = EigenlayerMsgEncoders.encodeDelegateToBySignature(
+        bytes memory message = encoders.encodeDelegateToBySignature(
             staker,
             operator,
             stakerSignatureAndExpiry,
             approverSignatureAndExpiry,
             approverSalt
         );
-
-        /////////////////////////////////////////////////////////////////
-        /////// Broadcast to L2
-        /////////////////////////////////////////////////////////////////
-
-        vm.selectFork(l2ForkId);
-        vm.startBroadcast(deployerKey);
 
         topupSenderEthBalance(address(senderContract));
         senderContract.sendMessagePayNative(

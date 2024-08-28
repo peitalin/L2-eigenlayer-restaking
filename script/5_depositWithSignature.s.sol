@@ -18,7 +18,7 @@ import {FileReader} from "./FileReader.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
-import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
+import {ClientEncoders} from "./ClientEncoders.sol";
 import {ScriptUtils} from "./ScriptUtils.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
@@ -40,21 +40,22 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
+    ClientEncoders public encoders;
     SignatureUtilsEIP1271 public signatureUtils;
 
     uint256 public deployerKey;
     address public deployer;
+    IEigenAgent6551 public eigenAgent;
     address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
 
-        uint256 l2ForkId = vm.createSelectFork("basesepolia");
-        uint256 ethForkId = vm.createSelectFork("ethsepolia");
-
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        signatureUtils = new SignatureUtilsEIP1271(); // needs ethForkId to call getDomainSeparator
+        uint256 l2ForkId = vm.createFork("basesepolia");
+        uint256 ethForkId = vm.createSelectFork("ethsepolia");
+
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
@@ -83,32 +84,42 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         TARGET_CONTRACT = address(strategyManager);
 
         //////////////////////////////////////////////////////////
-        /// Create message and signature
-        /// In production this is done on the client/frontend
+        /// L1: Get Deposit Inputs
         //////////////////////////////////////////////////////////
 
-        // First get EigenAgent from EthSepolia
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployerKey);
 
         uint256 execNonce = 0;
         /// ReceiverCCIP spawns an EigenAgent when CCIP message reaches L1
         /// if user does not already have an EigenAgent NFT on L1.  Nonce is then 0.
-        IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(deployer);
-        // IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
-        console.log("eigenAgent:", address(eigenAgent));
+        eigenAgent = agentFactory.getEigenAgent(deployer);
         if (address(eigenAgent) != address(0)) {
-            // Otherwise if the user already has a EigenAgent, fetch current execution Nonce
+            // if the user already has a EigenAgent, fetch current execution Nonce
             execNonce = eigenAgent.getExecNonce();
+        } else {
+            // otherwise agentFactory will spawn one for the user
+            eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
         }
+        console.log("eigenAgent:", address(eigenAgent));
+        vm.stopBroadcast();
+
+        //////////////////////////////////////////////////////
+        /// L2: Dispatch Call
+        //////////////////////////////////////////////////////
+        // Make sure we are on BaseSepolia Fork
+        vm.selectFork(l2ForkId);
+        encoders = new ClientEncoders();
+        signatureUtils = new SignatureUtilsEIP1271();
+
+        vm.startBroadcast(deployerKey);
 
         uint256 amount = 0.00333 ether;
         uint256 expiry = block.timestamp + 3 hours;
-
         bytes memory depositMessage;
         bytes memory messageWithSignature;
         {
-            depositMessage = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
+            depositMessage = encoders.encodeDepositIntoStrategyMsg(
                 address(strategy),
                 address(token),
                 amount
@@ -124,15 +135,6 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
                 expiry
             );
         }
-
-        vm.stopBroadcast();
-
-        //////////////////////////////////////////////////////
-        /// ReceiverCCIP -> EigenAgent -> Eigenlayer
-        //////////////////////////////////////////////////////
-        // Make sure we are on BaseSepolia Fork to make contract calls to CCIP-BnM
-        vm.selectFork(l2ForkId);
-        vm.startBroadcast(deployerKey);
 
         topupSenderEthBalance(senderAddr);
 

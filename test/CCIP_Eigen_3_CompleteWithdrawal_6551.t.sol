@@ -31,8 +31,9 @@ import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
+import {AgentFactory} from "../src/6551/AgentFactory.sol";
+
 import {EigenAgent6551TestUpgrade} from "./mocks/EigenAgent6551TestUpgrade.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
 
 
@@ -57,7 +58,6 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
     IStrategy public strategy;
-    ProxyAdmin public proxyAdmin;
 
     uint256 l2ForkId;
     uint256 ethForkId;
@@ -124,9 +124,6 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             erc20DripL1 = IERC20_CCIPBnM(address(tokenL1));
             erc20DripL1.drip(address(receiverContract));
             erc20DripL1.drip(address(bob));
-
-            /// Spawn EigenAgent for Bob
-            eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
         }
         vm.stopBroadcast();
 
@@ -163,10 +160,11 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
 
         amount = 0.0333 ether;
         expiry = block.timestamp + 1 days;
+        execNonce = 0;
 
         vm.startBroadcast(bobKey);
-        execNonce = eigenAgent.getExecNonce();
-        vm.stopBroadcast();
+        eigenAgent = agentFactory.getEigenAgent(bob); // should not exist yet
+        require(address(eigenAgent) == address(0), "test assumes no EigenAgent yet");
 
         console.log("bob address:", bob);
         console.log("eigenAgent:", address(eigenAgent));
@@ -176,6 +174,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         balanceOfReceiverBefore = tokenL1.balanceOf(address(receiverContract));
         console.log("balanceOf(receiverContract):", balanceOfReceiverBefore);
         console.log("balanceOf(eigenAgent):", balanceOfEigenAgent);
+        vm.stopBroadcast();
 
         /////////////////////////////////////
         //// Queue Withdrawal with EigenAgent
@@ -217,8 +216,15 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         });
 
         vm.startBroadcast(deployerKey);
+
+        vm.expectEmit(true, false, true, false); // don't check EigenAgent address
+        emit AgentFactory.AgentCreated(bob, vm.addr(1111), 1);
         receiverContract.mockCCIPReceive(any2EvmMessage);
+
         console.log("--------------- After Deposit -----------------");
+        eigenAgent = agentFactory.getEigenAgent(bob);
+        console.log("spawned eigenAgent: ", address(eigenAgent));
+
         vm.stopBroadcast();
 
         require(
@@ -455,8 +461,9 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         );
 
         uint256 stakerBalanceOnL2After = IERC20(tokenDestination).balanceOf(address(bob));
+        console.log("--------------- L2 After Bridge back -----------------");
         console.log("balanceOf(bob) on L2 before:", stakerBalanceOnL2Before);
-        console.log("balanceOf(eigenAgent) on L2 after:", stakerBalanceOnL2After);
+        console.log("balanceOf(bob) on L2 after:", stakerBalanceOnL2After);
 
         require(
             (stakerBalanceOnL2Before + amount) == stakerBalanceOnL2After,
