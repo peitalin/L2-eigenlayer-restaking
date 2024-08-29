@@ -100,7 +100,8 @@ contract DeployReceiverOnL1Script is Script {
             payable(address(
                 new TransparentUpgradeableProxy(
                     address(new AgentFactory(registry6551, eigenAgentOwner721)),
-                    address(proxyAdmin)
+                    address(proxyAdmin),
+                    ""
                 )
             ))
         );
