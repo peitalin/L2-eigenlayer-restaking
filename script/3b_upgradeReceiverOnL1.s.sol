@@ -84,7 +84,7 @@ contract UpgradeReceiverOnL1Script is Script {
             // registry6551
         ) = fileReader.readEigenAgent721AndRegistry();
 
-        agentFactory = fileReader.readAgentFactory();
+        agentFactoryProxy = fileReader.readAgentFactory();
 
         /////////////////////////////
         /// Begin Broadcast
@@ -98,21 +98,21 @@ contract UpgradeReceiverOnL1Script is Script {
 
         ReceiverCCIP receiverContractImpl = new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link);
 
-        // // deploy new 6551 Registry
-        // registry6551 = IERC6551Registry(address(new ERC6551Registry()));
-        // // deployer new EigenAgentOwner NFT implementation
-        // EigenAgentOwner721 eigenAgentOwner721Impl = new EigenAgentOwner721();
-        // // upgrade 6551 EigenAgentOwner NFT
-        // proxyAdmin.upgrade(
-        //     TransparentUpgradeableProxy(payable(address(eigenAgentOwner721Proxy))),
-        //     address(eigenAgentOwner721Impl)
-        // );
-        // eigenAgentOwner721Proxy.addToWhitelistedCallers(address(restakingProxy));
+        // upgrade 6551 EigenAgentOwner NFT
+        proxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(eigenAgentOwner721Proxy))),
+            address(new EigenAgentOwner721())
+        );
+        eigenAgentOwner721Proxy.addToWhitelistedCallers(address(restakingProxy));
 
-        // // deploy agentFactory
-        // agentFactory = IAgentFactory(address(
-        //     new AgentFactory(registry6551, eigenAgentOwner721Proxy)
-        // ));
+        // deploy new 6551 Registry
+        registry6551 = IERC6551Registry(address(new ERC6551Registry()));
+
+        // upgrade agentFactoryProxy
+        proxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(agentFactoryProxy))),
+            address(new AgentFactory(registry6551, eigenAgentOwner721Proxy))
+        );
 
         //////////////////////////////////////////////////
         // Upgrade proxies to new implementations
@@ -131,10 +131,10 @@ contract UpgradeReceiverOnL1Script is Script {
             TransparentUpgradeableProxy(payable(address(restakingProxy))),
             address(restakingConnectorImpl)
         );
-        restakingProxy.setAgentFactory(address(agentFactory));
-        eigenAgentOwner721Proxy.setAgentFactory(agentFactory);
+        restakingProxy.setAgentFactory(address(agentFactoryProxy));
+        eigenAgentOwner721Proxy.setAgentFactory(agentFactoryProxy);
         restakingProxy.setReceiverCCIP(address(receiverProxy));
-        agentFactory.setRestakingConnector(address(restakingProxy));
+        agentFactoryProxy.setRestakingConnector(address(restakingProxy));
 
         require(
             address(receiverProxy.getRestakingConnector()) != address(0),
@@ -153,20 +153,20 @@ contract UpgradeReceiverOnL1Script is Script {
             "upgrade EigenAgentOwner721 NFT: missing AgentFactory"
         );
         require(
-            address(agentFactory.getRestakingConnector()) != address(0),
+            address(agentFactoryProxy.getRestakingConnector()) != address(0),
             "upgrade agentFactory: missing restakingConnector"
         );
 
-        // update AgentFactory address (as it's not behind a proxy yet)
-        // fileReader.saveReceiverBridgeContracts(
-        //     isTest,
-        //     address(receiverProxy),
-        //     address(restakingProxy),
-        //     address(agentFactory),
-        //     address(registry6551),
-        //     address(eigenAgentOwner721Proxy),
-        //     address(proxyAdmin)
-        // );
+        // Update registry6551 address, all other proxies stay the same
+        fileReader.saveReceiverBridgeContracts(
+            isTest,
+            address(receiverProxy),
+            address(restakingProxy),
+            address(agentFactoryProxy),
+            address(registry6551),
+            address(eigenAgentOwner721Proxy),
+            address(proxyAdmin)
+        );
 
         vm.stopBroadcast();
     }

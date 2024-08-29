@@ -3,12 +3,12 @@
 
 
 
-Eigenlayer does not allow ThirdParty withdrawals, users must use their wallets to deposit and withdraw funds. So we cannot withdraw for our users via our L1 bridge contracts.
+Eigenlayer does not allow ThirdParty withdrawals, users must use their wallets to deposit and withdraw funds. So we cannot withdraw on behalf of our users via L1 bridge contracts.
 
-This forces us to either: 
-- **(Option 1)** force users to manually bridge to L1, deposit, withdraw, then bridge back to L2, or 
-- **(Option 2)** create an LRT for *every* operator. 
-- **(Option 4)** Routing contract calls from L2 through user-owned 6551 Accounts works around these issues, and keeps custody of funds with the user (who owns the 6551 NFT).
+This forces us to either:
+- **(Option 1)** force users to manually bridge to L1, deposit, withdraw, then bridge back to L2, or
+- **(Option 2)** create an LRT for *every* operator.
+- **(Option 4)** routing contract calls through user-owned 6551 accounts works around these issues, and keeps custody of funds with the user (who owns the 6551 NFT).
 
 
 
@@ -74,7 +74,7 @@ Queued withdrawals information are stored in `script/withdrawals-queued/<user_ad
 
 
 NOTE:
-EigenAgent accounts will only execute calls if the signature came from the user who owns the associated EigenAgentOwner 721 NFT. 
+EigenAgent accounts will only execute calls if the signature came from the user who owns the associated EigenAgentOwner 721 NFT.
 See: [https://eips.ethereum.org/EIPS/eip-6551](https://eips.ethereum.org/EIPS/eip-6551)
 
 Each user can only have 1 EigenAgentOwner NFT at the moment. We can make them tradeable or soulbound.
