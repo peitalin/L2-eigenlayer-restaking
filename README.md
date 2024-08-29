@@ -82,16 +82,17 @@ The message routes to L1 creating `WithdrawalQueued` events in Eigenlayer's Dele
 
 
 NOTE:
-EigenAgent accounts will only execute calls if the signature came from a user who owns the EigenAgentOwner 721 NFTs. See: [https://eips.ethereum.org/EIPS/eip-6551](https://eips.ethereum.org/EIPS/eip-6551)
+EigenAgent accounts will only execute calls if the signature came from the user who owns the associated EigenAgentOwner 721 NFT. 
+See: [https://eips.ethereum.org/EIPS/eip-6551](https://eips.ethereum.org/EIPS/eip-6551)
 
-Each user can only have 1 EigenAgentOwner NFT. We can make them tradeable or soulbound.
+Each user can only have 1 EigenAgentOwner NFT at the moment. We can make them tradeable or soulbound.
 
-EigenAgent accounts are ERC1967 Proxies (can use ERC1167 Minimal Proxies in previous version) and can be upgraded. We can also look at Beacon implementation if we want upgradeability for all accounts.
+EigenAgent accounts are ERC1967 Proxies and can be upgraded. We can also look at BeaconProxy implementation if we want upgradeability for all accounts (Agents just route contract calls, so upgradeability is not strictly needed).
 
-EigenAgentOwner NFTs are spawn via the AgentFactory (which talkes to 6551 Registry keeps track of EigenAgent 6551 accounts and ownership)
+EigenAgentOwner NFTs are minted via the AgentFactory (which talks to a 6551 Registry and keeps track of EigenAgent 6551 accounts and ownership)
 [https://sepolia.etherscan.io/address/0x551c6f21ba8c842ed58c2124a07766e903f24c75#internaltx](https://sepolia.etherscan.io/address/0x551c6f21ba8c842ed58c2124a07766e903f24c75#internaltx)
 
-Cost of deploying EigenAgent should be manageable (as they use ERC1167 minimal proxies and ERC1967):
+Cost of deploying EigenAgent should be manageable (as they use ERC1967 proxies (earlier versions used ERC1167 minimal proxies)):
 ```
 forge test --match-test test_step5b_MintEigenAgent -vvvv --gas-report
 ```
