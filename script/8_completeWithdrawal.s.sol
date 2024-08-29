@@ -104,25 +104,33 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
 
         amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
         expiry = block.timestamp + 2 hours;
-        staker = deployer;
+        staker = address(eigenAgent); // this should be EigenAgent (as in StrategyManager)
         withdrawer = address(eigenAgent);
+
+        require(staker == withdrawer, "require: staker == withdrawer");
+        require(address(eigenAgent) == withdrawer, "require withdrawer == EigenAgent");
 
         IDelegationManager.Withdrawal memory withdrawal = fileReader.readWithdrawalInfo(
             staker,
             "script/withdrawals-queued/"
         );
 
-        if (isTest) {
-            // mock save a queueWithdrawalBlock
-            vm.prank(deployer);
-            restakingConnector.setQueueWithdrawalBlock(withdrawal.staker, withdrawal.nonce);
-        }
+        // if (isTest) {
+        //     // mock save a queueWithdrawalBlock
+        //     vm.prank(deployer);
+        //     restakingConnector.setQueueWithdrawalBlock(
+        //         withdrawal.staker,
+        //         withdrawal.nonce,
+        //         6592939
+        //     );
+        // }
 
         // Fetch the correct withdrawal.startBlock and withdrawalRoot
         withdrawal.startBlock = uint32(restakingConnector.getQueueWithdrawalBlock(
             withdrawal.staker,
             withdrawal.nonce
         ));
+        withdrawal.startBlock = 6592939;
 
         bytes32 withdrawalRootCalculated = delegationManager.calculateWithdrawalRoot(withdrawal);
 

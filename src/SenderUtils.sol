@@ -54,6 +54,13 @@ contract SenderUtils is Ownable, EigenlayerMsgDecoders {
     ) {
 
         TransferToAgentOwnerMsg memory transferToAgentOwnerMsg = decodeTransferToAgentOwnerMsg(message);
+        // 0000000000000000000000000000000000000000000000000000000000000020
+        // 0000000000000000000000000000000000000000000000000000000000000064
+        // d8a85b48
+        // de2d6fe858b7ce7d03bac292d3faddd82f3c3e6cca16e9837941989f328c0e7b
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c
+        // 7e65465374cc2a055c74d64e1e5fad1b47dce00c83a5cf786545a62a3c00b851
+        // 00000000000000000000000000000000000000000000000000000000
 
         bytes32 withdrawalRoot = transferToAgentOwnerMsg.withdrawalRoot;
         address agentOwner = transferToAgentOwnerMsg.agentOwner;

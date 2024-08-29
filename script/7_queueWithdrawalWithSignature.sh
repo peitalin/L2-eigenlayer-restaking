@@ -11,11 +11,11 @@ forge script script/7_queueWithdrawalWithSignature.s.sol:QueueWithdrawalWithSign
 
 
 # Users queue withdrawal via their 6551 EigenAgent from L2 with signatures:
-# [https://ccip.chain.link/msg/0xa5fb65eff93c716bfad205dcaa0225737fc665e53bee55fb23db07ac5b499018](https://ccip.chain.link/msg/0xa5fb65eff93c716bfad205dcaa0225737fc665e53bee55fb23db07ac5b499018)
+# [https://ccip.chain.link/msg/0x2358f618e54c1b56510989002fc7da10691d9a8ecb99dce4c75a7446db193531](https://ccip.chain.link/msg/0x2358f618e54c1b56510989002fc7da10691d9a8ecb99dce4c75a7446db193531)
 
 
-# The message makes it's way to L1 resulting in the following Eigenlayer `queueWithdrawal` events:
-# [https://sepolia.etherscan.io/tx/0x21b1e008d4fdf5a5a966f0bd65bbb13a1a4187a242a7f7c7ab8fb4c86410b1d7](https://sepolia.etherscan.io/tx/0x21b1e008d4fdf5a5a966f0bd65bbb13a1a4187a242a7f7c7ab8fb4c86410b1d7)
+# The message routes to L1 creating `WithdrawalQueued` events in Eigenlayer's DelegationManager contract:
+# [https://sepolia.etherscan.io/tx/0x5816ab72f39581e6b3f74ab90f29ff6e4382264ada642442e2bdd5208a23be3e#eventlog](https://sepolia.etherscan.io/tx/0x5816ab72f39581e6b3f74ab90f29ff6e4382264ada642442e2bdd5208a23be3e#eventlog)
 
-# Withdrawal events can be seen on DelegationManager contract on L1:
-# [https://sepolia.etherscan.io/address/0xebbc61ccacf45396ff4b447f353cea404993de98#events](https://sepolia.etherscan.io/address/0xebbc61ccacf45396ff4b447f353cea404993de98#events)
+
+

@@ -9,9 +9,11 @@ import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
 import {UpgradeReceiverOnL1Script} from "../script/3b_upgradeReceiverOnL1.s.sol";
 import {WhitelistCCIPContractsScript} from "../script/4_whitelistCCIPContracts.s.sol";
 import {DepositWithSignatureScript} from "../script/5_depositWithSignature.s.sol";
+import {MintEigenAgentScript} from "../script/5b_mintEigenAgent.s.sol";
 import {DelegateToScript} from "../script/6_delegateTo.s.sol";
 import {QueueWithdrawalWithSignatureScript} from "../script/7_queueWithdrawalWithSignature.s.sol";
 import {CompleteWithdrawalScript} from "../script/8_completeWithdrawal.s.sol";
+import {TestDeployVerifyScript} from "../script/x_testDeployVerify.s.sol";
 import {ScriptUtils} from "../script/ScriptUtils.sol";
 
 
@@ -25,11 +27,16 @@ contract DeployScriptsTests is Test, ScriptUtils {
     UpgradeReceiverOnL1Script public upgradeReceiverOnL1Script;
 
     WhitelistCCIPContractsScript public whitelistCCIPContractsScript;
+
     DepositWithSignatureScript public depositWithSignatureScript;
+    MintEigenAgentScript public mintEigenAgentScript;
+
     DelegateToScript public delegateToScript;
 
     QueueWithdrawalWithSignatureScript public queueWithdrawalWithSignatureScript;
     CompleteWithdrawalScript public completeWithdrawalScript;
+
+    TestDeployVerifyScript public testDeployVerifyScript;
 
     uint256 public deployerKey;
     address public deployer;
@@ -48,11 +55,14 @@ contract DeployScriptsTests is Test, ScriptUtils {
         whitelistCCIPContractsScript = new WhitelistCCIPContractsScript();
 
         depositWithSignatureScript = new DepositWithSignatureScript();
+        mintEigenAgentScript = new MintEigenAgentScript();
 
         delegateToScript = new DelegateToScript();
 
         queueWithdrawalWithSignatureScript = new QueueWithdrawalWithSignatureScript();
         completeWithdrawalScript = new CompleteWithdrawalScript();
+
+        testDeployVerifyScript = new TestDeployVerifyScript();
 
         vm.chainId(31337); // sets isTest flag; script uses forkSelect()
         vm.deal(deployer, 1 ether);
@@ -84,6 +94,10 @@ contract DeployScriptsTests is Test, ScriptUtils {
         depositWithSignatureScript.run();
     }
 
+    function test_step5b_MintEigenAgent() public {
+        mintEigenAgentScript.run();
+    }
+
     function test_step6_DelegateToScript() public {
         delegateToScript.run();
     }
@@ -94,7 +108,13 @@ contract DeployScriptsTests is Test, ScriptUtils {
     }
 
     function test_step8_CompleteWithdrawalScript() public {
+        // requires step6 to be run first so that
+        // script/withdrawals-queued/<eigen-agent-address>/run-latest.json exists
         completeWithdrawalScript.run();
+    }
+
+    function test_stepx_TestDeployVerify() public {
+        testDeployVerifyScript.run();
     }
 }
 

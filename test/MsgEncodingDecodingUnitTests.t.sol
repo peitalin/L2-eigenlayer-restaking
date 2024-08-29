@@ -137,47 +137,50 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
     function test_Decode_Array_QueueWithdrawals() public {
 
+        IStrategy[] memory strategiesToWithdraw0 = new IStrategy[](1);
         IStrategy[] memory strategiesToWithdraw1 = new IStrategy[](1);
         IStrategy[] memory strategiesToWithdraw2 = new IStrategy[](1);
-        IStrategy[] memory strategiesToWithdraw3 = new IStrategy[](1);
 
+        uint256[] memory sharesToWithdraw0 = new uint256[](1);
         uint256[] memory sharesToWithdraw1 = new uint256[](1);
         uint256[] memory sharesToWithdraw2 = new uint256[](1);
-        uint256[] memory sharesToWithdraw3 = new uint256[](1);
 
-        IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal1;
-        IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal2;
-        IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal3;
+        strategiesToWithdraw0[0] = IStrategy(0xb111111AD20E9d85d5152aE68f45f40A11111111);
+        strategiesToWithdraw1[0] = IStrategy(0xb222222AD20e9D85d5152ae68F45f40a22222222);
+        strategiesToWithdraw2[0] = IStrategy(0xb333333AD20e9D85D5152aE68f45F40A33333333);
 
-        strategiesToWithdraw1[0] = IStrategy(0xb111111AD20E9d85d5152aE68f45f40A11111111);
-        strategiesToWithdraw2[0] = IStrategy(0xb222222AD20e9D85d5152ae68F45f40a22222222);
-        strategiesToWithdraw3[0] = IStrategy(0xb333333AD20e9D85D5152aE68f45F40A33333333);
-
-        sharesToWithdraw1[0] = 0.010101 ether;
-        sharesToWithdraw2[0] = 0.020202 ether;
-        sharesToWithdraw3[0] = 0.030303 ether;
-
-        queuedWithdrawal1 = IDelegationManager.QueuedWithdrawalParams({
-            strategies: strategiesToWithdraw1,
-            shares: sharesToWithdraw1,
-            withdrawer: deployer
-        });
-        queuedWithdrawal2 = IDelegationManager.QueuedWithdrawalParams({
-            strategies: strategiesToWithdraw2,
-            shares: sharesToWithdraw2,
-            withdrawer: vm.addr(0x2)
-        });
-        queuedWithdrawal3 = IDelegationManager.QueuedWithdrawalParams({
-            strategies: strategiesToWithdraw3,
-            shares: sharesToWithdraw3,
-            withdrawer: vm.addr(0x3)
-        });
+        sharesToWithdraw0[0] = 0.010101 ether;
+        sharesToWithdraw1[0] = 0.020202 ether;
+        sharesToWithdraw2[0] = 0.030303 ether;
 
         IDelegationManager.QueuedWithdrawalParams[] memory QWPArray =
             new IDelegationManager.QueuedWithdrawalParams[](3);
-        QWPArray[0] = queuedWithdrawal1;
-        QWPArray[1] = queuedWithdrawal2;
-        QWPArray[2] = queuedWithdrawal3;
+
+        {
+            IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal0;
+            IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal1;
+            IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal2;
+
+            queuedWithdrawal0 = IDelegationManager.QueuedWithdrawalParams({
+                strategies: strategiesToWithdraw0,
+                shares: sharesToWithdraw0,
+                withdrawer: deployer
+            });
+            queuedWithdrawal1 = IDelegationManager.QueuedWithdrawalParams({
+                strategies: strategiesToWithdraw1,
+                shares: sharesToWithdraw1,
+                withdrawer: vm.addr(0x1)
+            });
+            queuedWithdrawal2 = IDelegationManager.QueuedWithdrawalParams({
+                strategies: strategiesToWithdraw2,
+                shares: sharesToWithdraw2,
+                withdrawer: vm.addr(0x2)
+            });
+
+            QWPArray[0] = queuedWithdrawal0;
+            QWPArray[1] = queuedWithdrawal1;
+            QWPArray[2] = queuedWithdrawal2;
+        }
 
         bytes memory message_QW;
         bytes memory messageWithSignature_QW;
@@ -231,27 +234,35 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         // console.log(decodedQW[2].withdrawer);
 
         // signature
-        require(_signature.length == 65, "signature incorrect length: decodeQueueWithdrawalsMsg");
+        require(_signature.length == 65, "signature bad length: decodeQueueWithdrawalsMsg");
         require(signer == deployer, "incorrect signer: decodeQueueWithdrawalsMsg");
         require(expiry == expiry2, "incorrect decoding: decodeQueueWithdrawalsMsg");
         // strategies
         require(
-            decodedQW[2].strategies[0] == strategiesToWithdraw3[0],
-            "incorrect decoding: decodeQueueWithdrawalsMsg: strategies"
+            decodedQW[2].strategies[0] == strategiesToWithdraw2[0],
+            "incorrect decoding: decodeQueueWithdrawalsMsg[2]: strategies"
         );
         // shares
         require(
-            decodedQW[0].shares[0] == sharesToWithdraw1[0],
-            "incorrect decoding: decodeQueueWithdrawalsMsg: shares"
+            decodedQW[0].shares[0] == sharesToWithdraw0[0],
+            "incorrect decoding: decodeQueueWithdrawalsMsg[0]: shares"
         );
         require(
-            decodedQW[1].shares[0] == sharesToWithdraw2[0],
-            "incorrect decoding: decodeQueueWithdrawalsMsg: shares"
+            decodedQW[1].shares[0] == sharesToWithdraw1[0],
+            "incorrect decoding: decodeQueueWithdrawalsMsg[1]: shares"
         );
         // withdrawers
         require(
-            decodedQW[0].withdrawer == queuedWithdrawal1.withdrawer,
-            "incorrect decoding: decodeQueueWithdrawalsMsg: withdrawer"
+            decodedQW[0].withdrawer == QWPArray[0].withdrawer,
+            "incorrect decoding: decodeQueueWithdrawalsMsg[0]: withdrawer"
+        );
+        require(
+            decodedQW[1].withdrawer == QWPArray[1].withdrawer,
+            "incorrect decoding: decodeQueueWithdrawalsMsg[1]: withdrawer"
+        );
+        require(
+            decodedQW[2].withdrawer == QWPArray[2].withdrawer,
+            "incorrect decoding: decodeQueueWithdrawalsMsg[2]: withdrawer"
         );
     }
 

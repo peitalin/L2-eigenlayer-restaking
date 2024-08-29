@@ -130,10 +130,11 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         // only sending a withdrawal message, not bridging tokens.
         amount = 0 ether;
         expiry = block.timestamp + 2 hours;
-        // original staker, not EigenAgent
-        staker = eigenAgent.getAgentOwner();
-        // withdrawer is EigenAgent
+        staker = address(eigenAgent);
         withdrawer = address(eigenAgent);
+        // staker == withdrawer == msg.sender in StrategyManager, which is EigenAgent
+        require(staker == withdrawer, "require: staker == withdrawer");
+        require(address(eigenAgent) == withdrawer, "require withdrawer == EigenAgent");
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         strategiesToWithdraw[0] = strategy;
@@ -144,7 +145,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(withdrawer);
         address delegatedTo = delegationManager.delegatedTo(withdrawer);
 
-        console.log("staker (agentOwner):", staker);
+        console.log("staker (eigenAgent):", staker);
         console.log("withdrawer (eigenAgent):", withdrawer);
         console.log("sharesToWithdraw:", sharesToWithdraw[0]);
 

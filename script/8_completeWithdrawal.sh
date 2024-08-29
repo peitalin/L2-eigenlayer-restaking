@@ -12,20 +12,20 @@ forge script script/8_completeWithdrawal.s.sol:CompleteWithdrawalScript \
 ##### Example 1:
 
 # We dispatch a call to complete the withdrawal to our SenderCCIP contract from L2:
-# [https://ccip.chain.link/msg/0x3a02206482f0148c74cb4b34a631b998502c754d198abc378e10ccaf6c725825](https://ccip.chain.link/msg/0x3a02206482f0148c74cb4b34a631b998502c754d198abc378e10ccaf6c725825)
+# [https://ccip.chain.link/msg/0x2bf12fb2f940fb2b3258e1c05d76bd0cdee91c95a34058e1439f152d31dfccb7](https://ccip.chain.link/msg/0x2bf12fb2f940fb2b3258e1c05d76bd0cdee91c95a34058e1439f152d31dfccb7)
 
-# Which executes on L1 with the following Eigenlayer completeWithdrawal events:
-# [https://sepolia.etherscan.io/tx/0xc4e336ee410598fff9e6951b176b11e4ac6f3d0df2768eb79a986ada7e829037#eventlog](https://sepolia.etherscan.io/tx/0xc4e336ee410598fff9e6951b176b11e4ac6f3d0df2768eb79a986ada7e829037#eventlog)
+# Which executes on L1 with the following Eigenlayer `WithdrawalCompleted` events:
+# [https://sepolia.etherscan.io/tx/0x3a55a8ed9bd23c1b2bec5f24be4c7c71da9a21ab2e2f39ba51c5835811df153b#eventlog](https://sepolia.etherscan.io/tx/0x3a55a8ed9bd23c1b2bec5f24be4c7c71da9a21ab2e2f39ba51c5835811df153b#eventlog)
 
 
-# While the tokens are being bridged back, you can see the `messageId` in one of the emitted `Message Sent` event on the ReceiverCCIP contract:
-# [https://sepolia.etherscan.io/address/0x4c854b17250582413783b96e020e5606a561eddc#events](https://sepolia.etherscan.io/address/0x4c854b17250582413783b96e020e5606a561eddc#events)
+# While the tokens are being bridged back, you can see the `messageId` in one of the emitted `MessageSent` event on the ReceiverCCIP contract:
+# [messageId: E0D94E5E264424E2CBD8AE28F9CC7EFFCAE1EBB25424273561828F43944A9208](https://sepolia.etherscan.io/tx/0x3a55a8ed9bd23c1b2bec5f24be4c7c71da9a21ab2e2f39ba51c5835811df153b#eventlog#144)
 
 # Copy the `messageId` (topic[1]) on this page and search for it on `https://ccip.chain.link` to view  bridging status:
-# [https://ccip.chain.link/msg/0xf6165cfb76cceaebbb93e9b49f7ac373547e51368bf9048c59c90c2d774fc42e](https://ccip.chain.link/msg/0xf6165cfb76cceaebbb93e9b49f7ac373547e51368bf9048c59c90c2d774fc42e)
+# [https://ccip.chain.link/msg/0xe0d94e5e264424e2cbd8ae28f9cc7effcae1ebb25424273561828f43944a9208](https://ccip.chain.link/msg/0xe0d94e5e264424e2cbd8ae28f9cc7effcae1ebb25424273561828f43944a9208)
 
 # Once we wait for the L1 -> L2 bridge back, we can see the token transferred back to the original staker's account:
-# [https://sepolia.basescan.org/tx/0xf4824d3fc1925a91f5cec814d6e03985092c38e7838c38f83d755a698923446c](https://sepolia.basescan.org/tx/0xf4824d3fc1925a91f5cec814d6e03985092c38e7838c38f83d755a698923446c)
+# [https://sepolia.basescan.org/tx/0x1753d98c605f9fc542e1a612531c634afd6da647b2eb4f1d6d094f74af94e9a8](https://sepolia.basescan.org/tx/0x1753d98c605f9fc542e1a612531c634afd6da647b2eb4f1d6d094f74af94e9a8)
 
 
 

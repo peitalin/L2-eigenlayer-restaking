@@ -157,10 +157,14 @@ contract RestakingConnector is
             bytes memory signature
         ) = decodeQueueWithdrawalsMsg(messageWithSignature);
 
+        address withdrawer = QWPArray[0].withdrawer;
         /// @note: DelegationManager.queueWithdrawals requires:
-        /// msg.sender == withdrawer == staker
-        /// EigenAgent is all three.
-        IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(QWPArray[0].withdrawer));
+        /// msg.sender == withdrawer == staker (EigenAgent is all three)
+        IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawer));
+
+        uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(withdrawer);
+
+        _withdrawalBlock[withdrawer][withdrawalNonce] = block.number;
 
         bytes memory result = eigenAgent.executeWithSignature(
             address(delegationManager),
@@ -286,9 +290,13 @@ contract RestakingConnector is
     /// varies depending on how long it takes to bridge.
     /// We need the block.number to in the following step to
     /// create the withdrawalRoot used to completeWithdrawal.
-    function setQueueWithdrawalBlock(address staker, uint256 nonce) external onlyAdminOrOwner {
-        _withdrawalBlock[staker][nonce] = block.number;
-        emit SetQueueWithdrawalBlock(staker, nonce, block.number);
+    function setQueueWithdrawalBlock(
+        address staker,
+        uint256 nonce,
+        uint256 blockNumber
+    ) external onlyAdminOrOwner {
+        _withdrawalBlock[staker][nonce] = blockNumber;
+        emit SetQueueWithdrawalBlock(staker, nonce, blockNumber);
     }
 
     function getEigenlayerContracts()

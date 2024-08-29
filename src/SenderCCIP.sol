@@ -68,7 +68,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
         if (functionSelector == ISenderUtils.handleTransferToAgentOwner.selector) {
-            // bytes4(keccak256("handleTransferToAgentOwner(bytes32,address,bytes32)")) == 0x17f23aea
+            // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             (
                 address agentOwner,
                 uint256 amount,

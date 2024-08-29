@@ -58,9 +58,9 @@ interface IRestakingConnector {
         IStrategy _strategy
     ) external;
 
-    function setQueueWithdrawalBlock(address staker, uint256 nonce) external;
-
     function getQueueWithdrawalBlock(address staker, uint256 nonce) external returns (uint256);
+
+    function setQueueWithdrawalBlock(address staker, uint256 nonce, uint256 blockNumber) external;
 
     /*
      *

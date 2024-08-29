@@ -29,12 +29,13 @@ Tests bridge from L2 to L1, then deposit in Eigenlayer, queueWithdrawal, complet
 
 The scripts run on Base Sepolia, and Eth Sepolia and bridges CCIP's BnM ERC20 token (swap for MAGIC).
 
-Tests:
+Test deposit and withdrawal:
 ```
 forge test --match-test test_CCIP_Eigenlayer_CompleteWithdrawal -vvv
 ```
+All Tests:
 ```
-forge test -vvv
+forge test -vvvv
 ```
 
 
@@ -56,27 +57,25 @@ There are `2b` and `3b` upgrade scripts which need to be run when changes made t
 #### 1.  L2 Restaking into Eigenlayer via 6551 Agents (with signatures)
 
 We bridge the token from L2 to L1, then deposit into Eigenlayer through 6551 accounts owned by the user, with user signatures:
-[https://ccip.chain.link/msg/0x8a985c00bfafce4fb3e52f281ec5d1bfd4e15c82333f27cc2fd5064422b1f10b](https://ccip.chain.link/msg/0x8a985c00bfafce4fb3e52f281ec5d1bfd4e15c82333f27cc2fd5064422b1f10b)
+[https://ccip.chain.link/msg/0x025b854ed6d4c0af1b2c8cf696fb3f310702492cdbe2618135dacf4d74208e2b](https://ccip.chain.link/msg/0x025b854ed6d4c0af1b2c8cf696fb3f310702492cdbe2618135dacf4d74208e2b)
 
 On L1, we see the CCIP-BnM token routing through: Sender CCIP (L1 Bridge) -> 6551 Agent -> Eigenlayer Strategy Vault:
-[https://sepolia.etherscan.io/tx/0x90fb208ac0596b3c407d50bbbcd78b074ac459e53248b551cbe56fa16c0a302a](https://sepolia.etherscan.io/tx/0x90fb208ac0596b3c407d50bbbcd78b074ac459e53248b551cbe56fa16c0a302a)
+[https://sepolia.etherscan.io/tx/0x55580c6681525f385198639814f1e54e9213c613cdcdef806e89e9403f3f3c9a](https://sepolia.etherscan.io/tx/0x55580c6681525f385198639814f1e54e9213c613cdcdef806e89e9403f3f3c9a)
 
-Gas cost: 0.01396 ETH (approx $36) in (i) bridging, (ii) creating a 6551 EigenAgent, (iii) depositing in Eigenalayer
+...which we also see in the Eigenlayer StrategyManager contract: [https://sepolia.etherscan.io/address/0x7d73d2641d4c68f7b8f11b1ce212645423a0e8b5#events](https://sepolia.etherscan.io/address/0x7d73d2641d4c68f7b8f11b1ce212645423a0e8b5#events)
 
-Deposit events can be seen in the Eigenlayer StrategyManager contract: [https://sepolia.etherscan.io/address/0x7d73d2641d4c68f7b8f11b1ce212645423a0e8b5#events](https://sepolia.etherscan.io/address/0x7d73d2641d4c68f7b8f11b1ce212645423a0e8b5#events)
+
+TODO: Gas cost estimates in (i) bridging, (ii) creating a 6551 EigenAgent, (iii) depositing in Eigenalayer
 
 
 #### 2. Queue withdrawal via EigenAgent with user signature
 
 Users queue withdrawal via their 6551 EigenAgent from L2 with signatures:
-[https://ccip.chain.link/msg/0xa5fb65eff93c716bfad205dcaa0225737fc665e53bee55fb23db07ac5b499018](https://ccip.chain.link/msg/0xa5fb65eff93c716bfad205dcaa0225737fc665e53bee55fb23db07ac5b499018)
+[https://ccip.chain.link/msg/0x2358f618e54c1b56510989002fc7da10691d9a8ecb99dce4c75a7446db193531](https://ccip.chain.link/msg/0x2358f618e54c1b56510989002fc7da10691d9a8ecb99dce4c75a7446db193531)
 
 
-# The message makes it's way to L1 resulting in the following Eigenlayer `queueWithdrawal` events:
-# [https://sepolia.etherscan.io/tx/0x21b1e008d4fdf5a5a966f0bd65bbb13a1a4187a242a7f7c7ab8fb4c86410b1d7](https://sepolia.etherscan.io/tx/0x21b1e008d4fdf5a5a966f0bd65bbb13a1a4187a242a7f7c7ab8fb4c86410b1d7)
-
-# Withdrawal events can be seen on DelegationManager contract on L1:
-# [https://sepolia.etherscan.io/address/0xebbc61ccacf45396ff4b447f353cea404993de98#events](https://sepolia.etherscan.io/address/0xebbc61ccacf45396ff4b447f353cea404993de98#events)
+The message routes to L1 creating `WithdrawalQueued` events in Eigenlayer's DelegationManager contract:
+[https://sepolia.etherscan.io/tx/0x5816ab72f39581e6b3f74ab90f29ff6e4382264ada642442e2bdd5208a23be3e#eventlog](https://sepolia.etherscan.io/tx/0x5816ab72f39581e6b3f74ab90f29ff6e4382264ada642442e2bdd5208a23be3e#eventlog)
 
 
 NOTE:
@@ -89,25 +88,29 @@ EigenAgent accounts are ERC1967 Proxies (can use ERC1167 Minimal Proxies in prev
 EigenAgentOwner NFTs are spawn via the AgentFactory (which talkes to 6551 Registry keeps track of EigenAgent 6551 accounts and ownership)
 [https://sepolia.etherscan.io/address/0x551c6f21ba8c842ed58c2124a07766e903f24c75#internaltx](https://sepolia.etherscan.io/address/0x551c6f21ba8c842ed58c2124a07766e903f24c75#internaltx)
 
+Cost of deploying EigenAgent should be manageable (as they use ERC1167 minimal proxies and ERC1967):
+```
+forge test --match-test test_step5b_MintEigenAgent -vvvv --gas-report
+```
 
 
 #### 3. Complete withdrawal from L2 and bridge back to original wallet on L2
 
 We dispatch a call to complete the withdrawal to our SenderCCIP contract from L2:
-[https://ccip.chain.link/msg/0xa5280a7ea3bd82c327cc54d1ad0d649a40b23184033e7928bee51f5a0a445adc](https://ccip.chain.link/msg/0xa5280a7ea3bd82c327cc54d1ad0d649a40b23184033e7928bee51f5a0a445adc)
+[https://ccip.chain.link/msg/0x2bf12fb2f940fb2b3258e1c05d76bd0cdee91c95a34058e1439f152d31dfccb7](https://ccip.chain.link/msg/0x2bf12fb2f940fb2b3258e1c05d76bd0cdee91c95a34058e1439f152d31dfccb7)
 
-Which executes on L1 with the following Eigenlayer completeWithdrawal events:
-[]()
+Which executes on L1 with the following Eigenlayer `WithdrawalCompleted` events:
+[https://sepolia.etherscan.io/tx/0x3a55a8ed9bd23c1b2bec5f24be4c7c71da9a21ab2e2f39ba51c5835811df153b#eventlog](https://sepolia.etherscan.io/tx/0x3a55a8ed9bd23c1b2bec5f24be4c7c71da9a21ab2e2f39ba51c5835811df153b#eventlog)
 
 
-While the tokens are being bridged back, you can see the `messageId` in one of the emitted `Message Sent` event on the ReceiverCCIP contract:
-[]()
+While the tokens are being bridged back, you can see the `messageId` in one of the emitted `MessageSent` event on the ReceiverCCIP contract:
+[messageId: E0D94E5E264424E2CBD8AE28F9CC7EFFCAE1EBB25424273561828F43944A9208](https://sepolia.etherscan.io/tx/0x3a55a8ed9bd23c1b2bec5f24be4c7c71da9a21ab2e2f39ba51c5835811df153b#eventlog#144)
 
 Copy the `messageId` (topic[1]) on this page and search for it on `https://ccip.chain.link` to view  bridging status:
-[]()
+[https://ccip.chain.link/msg/0xe0d94e5e264424e2cbd8ae28f9cc7effcae1ebb25424273561828f43944a9208](https://ccip.chain.link/msg/0xe0d94e5e264424e2cbd8ae28f9cc7effcae1ebb25424273561828f43944a9208)
 
-Once we wait for the L1 -> L2 bridge back, we can see the token transferred back to the original staker's account:
-[]()
+Once we wait for the L1 -> L2 bridge back, we can see the original `0.00333` tokens transferred back to the original staker's account:
+[https://sepolia.basescan.org/tx/0x1753d98c605f9fc542e1a612531c634afd6da647b2eb4f1d6d094f74af94e9a8](https://sepolia.basescan.org/tx/0x1753d98c605f9fc542e1a612531c634afd6da647b2eb4f1d6d094f74af94e9a8)
 
 
 

@@ -2,7 +2,7 @@
 pragma solidity 0.8.22;
 
 import {Adminable} from "../utils/Adminable.sol";
-import {ERC6551AccountProxy} from "@6551/examples/upgradeable/ERC6551AccountProxy.sol";
+// import {ERC6551AccountProxy} from "@6551/examples/upgradeable/ERC6551AccountProxy.sol";
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgent6551} from "./IEigenAgent6551.sol";
 import {EigenAgent6551} from "./EigenAgent6551.sol";
@@ -125,11 +125,11 @@ contract AgentFactory is Adminable {
         uint256 tokenId = eigenAgentOwner721.mint(staker);
 
         EigenAgent6551 eigenAgentImplementation = new EigenAgent6551();
-        ERC6551AccountProxy eigenAgentProxy = new ERC6551AccountProxy(address(eigenAgentImplementation));
+        // ERC6551AccountProxy eigenAgentProxy = new ERC6551AccountProxy(address(eigenAgentImplementation));
 
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(
             erc6551Registry.createAccount(
-                address(eigenAgentProxy),
+                address(eigenAgentImplementation),
                 salt,
                 block.chainid,
                 address(eigenAgentOwner721),
