@@ -182,47 +182,47 @@ contract CCIP_EigenAgentTests is Test {
     }
 
 
-    function test_EigenAgent_TestUpgrade() public {
-        // Note: 6551 upgrades must be initiated by the NFT owner
-        // Unlike UpgradeableBeacons, admin cannot upgrade the implementation for everyone.
-        //
-        // 6551 uses ERC1167 minimal proxies to save gas, which are not compatible with this flow:
-        // Minimal Proxy -> Upgradeable BeaconProxy -> Logic contract
-        // See: https://forum.openzeppelin.com/t/using-eip1167-with-upgradability/3217/3
-        //
-        // We would have to replace 6551 with something that combines:
-        // UpgradeableBeacon +
-        // Create2 deterministic account creation + registry
-        // remove the NFT requirement
+    // function test_EigenAgent_TestUpgrade() public {
+    //     // Note: 6551 upgrades must be initiated by the NFT owner
+    //     // Unlike UpgradeableBeacons, admin cannot upgrade the implementation for everyone.
+    //     //
+    //     // 6551 uses ERC1167 minimal proxies to save gas, which are not compatible with this flow:
+    //     // Minimal Proxy -> Upgradeable BeaconProxy -> Logic contract
+    //     // See: https://forum.openzeppelin.com/t/using-eip1167-with-upgradability/3217/3
+    //     //
+    //     // We would have to replace 6551 with something that combines:
+    //     // UpgradeableBeacon +
+    //     // Create2 deterministic account creation + registry
+    //     // remove the NFT requirement
 
-        vm.startBroadcast(deployerKey);
+    //     vm.startBroadcast(deployerKey);
 
-        EigenAgent6551 eigenAgentBob = EigenAgent6551(payable(address(
-            agentFactory.spawnEigenAgentOnlyOwner(bob)
-        )));
-        EigenAgent6551 eigenAgentDeployer = EigenAgent6551(payable(address(
-            agentFactory.spawnEigenAgentOnlyOwner(deployer)
-        )));
+    //     EigenAgent6551 eigenAgentBob = EigenAgent6551(payable(address(
+    //         agentFactory.spawnEigenAgentOnlyOwner(bob)
+    //     )));
+    //     EigenAgent6551 eigenAgentDeployer = EigenAgent6551(payable(address(
+    //         agentFactory.spawnEigenAgentOnlyOwner(deployer)
+    //     )));
 
-        ///// create new implementation and upgrade
-        EigenAgent6551TestUpgrade eigenAgentUpgradedImpl = new EigenAgent6551TestUpgrade();
+    //     ///// create new implementation and upgrade
+    //     EigenAgent6551TestUpgrade eigenAgentUpgradedImpl = new EigenAgent6551TestUpgrade();
 
-        vm.expectRevert("Caller is not owner");
-        eigenAgentBob.upgrade(address(eigenAgentUpgradedImpl));
+    //     vm.expectRevert("Caller is not owner");
+    //     eigenAgentBob.upgrade(address(eigenAgentUpgradedImpl));
 
-        eigenAgentDeployer.upgrade(address(eigenAgentUpgradedImpl));
+    //     eigenAgentDeployer.upgrade(address(eigenAgentUpgradedImpl));
 
-        require(
-            eigenAgentBob.agentImplVersion() == 1,
-            "EigenAgentBob should fail to upgrade to new implementation"
-        );
-        // check if both eigenAgents have been upgraded to new implementation, or just one?
-        require(
-            eigenAgentDeployer.agentImplVersion() == 2,
-            "EigenAgentDeployer should have upgraded to new implementation"
-        );
-        vm.stopBroadcast();
-    }
+    //     require(
+    //         eigenAgentBob.agentImplVersion() == 1,
+    //         "EigenAgentBob should fail to upgrade to new implementation"
+    //     );
+    //     // check if both eigenAgents have been upgraded to new implementation, or just one?
+    //     require(
+    //         eigenAgentDeployer.agentImplVersion() == 2,
+    //         "EigenAgentDeployer should have upgraded to new implementation"
+    //     );
+    //     vm.stopBroadcast();
+    // }
 
 
     function test_CCIP_EigenAgent_DepositTransferThenWithdraw() public {

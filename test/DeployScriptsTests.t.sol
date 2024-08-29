@@ -102,13 +102,15 @@ contract DeployScriptsTests is Test, ScriptUtils {
         delegateToScript.run();
     }
 
-    // writes new json files: withdrawalRoots
+    // Note: writes new json files: withdrawalRoots
     function test_step7_QueueWithdrawalWithSignatureScript() public {
+        // Note II: If step8 has completed withdrawal, this test may warn it failed with:
+        // "revert: withdrawalRoot has already been used"
         queueWithdrawalWithSignatureScript.run();
     }
 
     function test_step8_CompleteWithdrawalScript() public {
-        // requires step6 to be run first so that
+        // Note: requires step7 to be run first so that:
         // script/withdrawals-queued/<eigen-agent-address>/run-latest.json exists
         completeWithdrawalScript.run();
     }
