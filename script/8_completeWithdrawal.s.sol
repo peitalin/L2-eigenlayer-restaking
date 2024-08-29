@@ -115,22 +115,21 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
             "script/withdrawals-queued/"
         );
 
-        // if (isTest) {
-        //     // mock save a queueWithdrawalBlock
-        //     vm.prank(deployer);
-        //     restakingConnector.setQueueWithdrawalBlock(
-        //         withdrawal.staker,
-        //         withdrawal.nonce,
-        //         6592939
-        //     );
-        // }
+        if (isTest) {
+            // mock save a queueWithdrawalBlock
+            vm.prank(deployer);
+            restakingConnector.setQueueWithdrawalBlock(
+                withdrawal.staker,
+                withdrawal.nonce,
+                111
+            );
+        }
 
         // Fetch the correct withdrawal.startBlock and withdrawalRoot
         withdrawal.startBlock = uint32(restakingConnector.getQueueWithdrawalBlock(
             withdrawal.staker,
             withdrawal.nonce
         ));
-        withdrawal.startBlock = 6592939;
 
         bytes32 withdrawalRootCalculated = delegationManager.calculateWithdrawalRoot(withdrawal);
 

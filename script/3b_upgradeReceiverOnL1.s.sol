@@ -85,18 +85,13 @@ contract UpgradeReceiverOnL1Script is Script {
         ) = fileReader.readEigenAgent721AndRegistry();
 
         agentFactoryProxy = fileReader.readAgentFactory();
+        proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL1());
 
         /////////////////////////////
         /// Begin Broadcast
         /////////////////////////////
         vm.startBroadcast(deployerKey);
-        proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL1());
-        // deploy new implementations
-        // note: watch out for: ERC1967: new implementation is not a contract
-        // https://docs.openzeppelin.com/contracts/2.x/api/utils#Address-isContract-address-
-        restakingConnectorImpl = new RestakingConnector();
 
-        ReceiverCCIP receiverContractImpl = new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link);
 
         // upgrade 6551 EigenAgentOwner NFT
         proxyAdmin.upgrade(
@@ -121,7 +116,7 @@ contract UpgradeReceiverOnL1Script is Script {
         // Upgrade ReceiverCCIP proxy to new implementation
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(receiverProxy))),
-            address(receiverContractImpl)
+            address(new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link))
         );
         vm.stopBroadcast();
 
@@ -129,7 +124,7 @@ contract UpgradeReceiverOnL1Script is Script {
         // Upgrade RestakingConnector proxy to new implementation
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(restakingProxy))),
-            address(restakingConnectorImpl)
+            address(new RestakingConnector())
         );
         restakingProxy.setAgentFactory(address(agentFactoryProxy));
         eigenAgentOwner721Proxy.setAgentFactory(agentFactoryProxy);
