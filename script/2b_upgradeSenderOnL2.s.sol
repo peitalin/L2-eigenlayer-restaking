@@ -19,7 +19,6 @@ contract UpgradeSenderOnL2Script is Script {
     function run() public {
 
         uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
-        vm.createSelectFork("basesepolia");
 
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL2());

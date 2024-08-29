@@ -60,7 +60,6 @@ contract UpgradeReceiverOnL1Script is Script {
 
     function _run(bool isTest) internal {
 
-        vm.createSelectFork("ethsepolia");
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         senderProxy = fileReader.readSenderContract();
         DeployMockEigenlayerContractsScript deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
@@ -131,10 +130,6 @@ contract UpgradeReceiverOnL1Script is Script {
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(restakingProxy))),
             address(restakingConnectorImpl)
-            // , abi.encodeWithSelector(
-            //     RestakingConnector.initialize.selector,
-            //     agentFactory
-            // )
         );
         restakingProxy.setAgentFactory(address(agentFactory));
         eigenAgentOwner721Proxy.setAgentFactory(agentFactory);
