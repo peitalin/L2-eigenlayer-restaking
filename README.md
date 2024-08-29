@@ -56,7 +56,10 @@ There are `2b` and `3b` upgrade scripts which need to be run when changes made t
 
 #### 1.  L2 Restaking into Eigenlayer via 6551 Agents (with signatures)
 
-We bridge the token from L2 to L1, then deposit into Eigenlayer through 6551 accounts owned by the user, with user signatures:
+We bridge the token from L2 to L1 first with a message to `DespositIntoStrategy`, signed by the user for their 6551 Agent to execute:
+[https://sepolia.basescan.org/tx/0xafc1cf7a6629a53b525c49e3637d6f5accb8021a3a08a9e253ffd5f5a25876da](https://sepolia.basescan.org/tx/0xafc1cf7a6629a53b525c49e3637d6f5accb8021a3a08a9e253ffd5f5a25876da)
+
+This then bridges across CCIP from L2 (Base Sepolia) to L1 (Eth Sepolia):
 [https://ccip.chain.link/msg/0x025b854ed6d4c0af1b2c8cf696fb3f310702492cdbe2618135dacf4d74208e2b](https://ccip.chain.link/msg/0x025b854ed6d4c0af1b2c8cf696fb3f310702492cdbe2618135dacf4d74208e2b)
 
 On L1, we see the CCIP-BnM token routing through: Sender CCIP (L1 Bridge) -> 6551 Agent -> Eigenlayer Strategy Vault:
