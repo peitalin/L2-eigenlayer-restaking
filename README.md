@@ -56,7 +56,7 @@ There are `2b` and `3b` upgrade scripts which need to be run when changes made t
 
 #### 1.  L2 Restaking into Eigenlayer via 6551 Agents (with signatures)
 
-We bridge the token from L2 to L1 first with a message to `DespositIntoStrategy`, signed by the user for their 6551 Agent to execute:
+We bridge `0.00333` tokens from L2 to L1 first with a message to `DepositIntoStrategy`, signed by the user for their 6551 Agent to execute:
 [https://sepolia.basescan.org/tx/0xafc1cf7a6629a53b525c49e3637d6f5accb8021a3a08a9e253ffd5f5a25876da](https://sepolia.basescan.org/tx/0xafc1cf7a6629a53b525c49e3637d6f5accb8021a3a08a9e253ffd5f5a25876da)
 
 This then bridges across CCIP from L2 (Base Sepolia) to L1 (Eth Sepolia):
