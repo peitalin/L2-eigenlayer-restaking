@@ -10,6 +10,7 @@ import {UpgradeReceiverOnL1Script} from "../script/3b_upgradeReceiverOnL1.s.sol"
 import {WhitelistCCIPContractsScript} from "../script/4_whitelistCCIPContracts.s.sol";
 import {DepositWithSignatureScript} from "../script/5_depositWithSignature.s.sol";
 import {MintEigenAgentScript} from "../script/5b_mintEigenAgent.s.sol";
+import {CheckMintEigenAgentGasCostsScript} from "../script/5c_checkMintEigenAgentGasCosts.s.sol";
 import {DelegateToScript} from "../script/6_delegateTo.s.sol";
 import {QueueWithdrawalWithSignatureScript} from "../script/7_queueWithdrawalWithSignature.s.sol";
 import {CompleteWithdrawalScript} from "../script/8_completeWithdrawal.s.sol";
@@ -30,6 +31,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
 
     DepositWithSignatureScript public depositWithSignatureScript;
     MintEigenAgentScript public mintEigenAgentScript;
+    CheckMintEigenAgentGasCostsScript public checkMintEigenAgentGasCostsScript;
 
     DelegateToScript public delegateToScript;
 
@@ -56,6 +58,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
 
         depositWithSignatureScript = new DepositWithSignatureScript();
         mintEigenAgentScript = new MintEigenAgentScript();
+        checkMintEigenAgentGasCostsScript = new CheckMintEigenAgentGasCostsScript();
 
         delegateToScript = new DelegateToScript();
 
@@ -96,6 +99,10 @@ contract DeployScriptsTests is Test, ScriptUtils {
 
     function test_step5b_MintEigenAgent() public {
         mintEigenAgentScript.run();
+    }
+
+    function test_step5c_CheckMintEigenAgentGasCosts() public {
+        checkMintEigenAgentGasCostsScript.run();
     }
 
     function test_step6_DelegateToScript() public {
