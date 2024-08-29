@@ -96,12 +96,10 @@ contract DeployReceiverOnL1Script is Script {
             ))
         );
 
-        agentFactoryImpl = new AgentFactory(registry6551, eigenAgentOwner721);
-
         agentFactoryProxy = IAgentFactory(
             payable(address(
                 new TransparentUpgradeableProxy(
-                    address(agentFactoryImpl),
+                    address(new AgentFactory(registry6551, eigenAgentOwner721)),
                     address(proxyAdmin)
                 )
             ))
