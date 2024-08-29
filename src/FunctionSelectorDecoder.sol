@@ -3,14 +3,9 @@ pragma solidity 0.8.22;
 
 library FunctionSelectorDecoder {
 
-    event MessengerDecodedFunctionSelector(
-        bytes4 indexed functionSelector,
-        address indexed contractAddr
-    );
-
     /// @dev Decodes leading bytes4 in the string message to know how to decode the rest of the message
     /// @param message is the CCIP Any2EVMMessage.data payload: an abi.encoded string
-    function decodeFunctionSelector(bytes memory message) public returns (bytes4) {
+    function decodeFunctionSelector(bytes memory message) public pure returns (bytes4) {
 
         bytes32 offset; // string offset
         bytes32 length; // string length
@@ -21,8 +16,6 @@ library FunctionSelectorDecoder {
             length := mload(add(message, 64))
             functionSelector := mload(add(message, 96))
         }
-
-        emit MessengerDecodedFunctionSelector(functionSelector, address(this));
 
         return functionSelector;
     }

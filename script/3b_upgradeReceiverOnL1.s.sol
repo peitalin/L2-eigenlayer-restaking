@@ -37,7 +37,7 @@ contract UpgradeReceiverOnL1Script is Script {
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
     address deployer = vm.addr(deployerKey);
 
-    IAgentFactory public agentFactory;
+    IAgentFactory public agentFactoryProxy;
     ISenderCCIP public senderProxy;
     ProxyAdmin public proxyAdmin;
     IERC6551Registry public registry6551;

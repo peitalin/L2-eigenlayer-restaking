@@ -40,7 +40,7 @@ contract DeployReceiverOnL1Script is Script {
     ProxyAdmin public proxyAdmin;
     IERC6551Registry public registry6551;
     IEigenAgentOwner721 public eigenAgentOwner721;
-    IAgentFactory public agentFactory;
+    IAgentFactory public agentFactoryProxy;
 
     FileReader public fileReader;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
