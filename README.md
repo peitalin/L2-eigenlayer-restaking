@@ -1,7 +1,7 @@
 # L2 Eigenlayer Restaking via 6551 accounts
 
 
-#### Comparing L2 Restaking Options
+### Comparing L2 Restaking Options
 
 Eigenlayer does not allow ThirdParty withdrawals, users must use their wallets to deposit and withdraw funds, so you cannot stake/withdraw for users from our L1 bridge contracts and L2 restaking is impossible.
 
@@ -9,13 +9,13 @@ This forces us to either (1) force users to manually bridge to L1, stake, withdr
 
 Routing contract calls from L2 through user-owned 6551 Accounts works around these issues, and keeps custody of funds with the user (who owns the 6551 NFT).
 
-*Option 2 (Operator-specific LRTs)*
+**Option 2 (Operator-specific LRTs)**
 - Allows batching and potential gas savings for users, we'll need to subsidize gas for staking (which can get expensive)
 - We take on more risk (we custody funds on behalf of operators in segregated LRT vaults)
 - More friction starting an Operator: as we'll need to contract LRT operators to spin up new vaults. (not really permissionless)
 - Need to build operator-specific dashboards, dev-ops processes for batch staking/unstaking, tracking withdrawals, and rewards accounting for each LRT operator (stuff Eigenlayer provides for native stakers).
 
-*Option 4 (6551 Accounts for users)*
+**Option 4 (6551 Accounts for users)**
 - Likely higher gas costs, but costs are paid by end-users (instead of us)
 - Leverage existing dashboards from Eigenlayer (swap user address with EigenAgent address)
 - no need to do withdrawals accounting, rewards accounting, handle vaults
@@ -23,7 +23,7 @@ Routing contract calls from L2 through user-owned 6551 Accounts works around the
 
 
 
-#### Running L2 Restaking Scripts
+### Running L2 Restaking Scripts
 
 Tests bridge from L2 to L1, then deposit in Eigenlayer, queueWithdrawal, completeWithdrawal, then bridge back to the original user on L2.
 
