@@ -81,6 +81,9 @@ The message routes to L1 creating `WithdrawalQueued` events in Eigenlayer's Dele
 [https://sepolia.etherscan.io/tx/0x5816ab72f39581e6b3f74ab90f29ff6e4382264ada642442e2bdd5208a23be3e#eventlog](https://sepolia.etherscan.io/tx/0x5816ab72f39581e6b3f74ab90f29ff6e4382264ada642442e2bdd5208a23be3e#eventlog)
 
 
+Queued withdrawals information are stored in `script/withdrawals-queued/<user_address>/`, and completed withdrawals are stored in `script/withdrawals-completed/<user_address>/`.
+
+
 NOTE:
 EigenAgent accounts will only execute calls if the signature came from the user who owns the associated EigenAgentOwner 721 NFT. 
 See: [https://eips.ethereum.org/EIPS/eip-6551](https://eips.ethereum.org/EIPS/eip-6551)
@@ -107,13 +110,13 @@ Which executes on L1 with the following Eigenlayer `WithdrawalCompleted` events:
 [https://sepolia.etherscan.io/tx/0x3a55a8ed9bd23c1b2bec5f24be4c7c71da9a21ab2e2f39ba51c5835811df153b#eventlog](https://sepolia.etherscan.io/tx/0x3a55a8ed9bd23c1b2bec5f24be4c7c71da9a21ab2e2f39ba51c5835811df153b#eventlog)
 
 
-While the tokens are being bridged back, you can see the `messageId` in one of the emitted `MessageSent` event on the ReceiverCCIP contract:
+The withdrawal is automatically bridged back with a L1 -> L2 CCIP message: you can see the `messageId` in one of the emitted `MessageSent` event on the ReceiverCCIP contract:
 [messageId: E0D94E5E264424E2CBD8AE28F9CC7EFFCAE1EBB25424273561828F43944A9208](https://sepolia.etherscan.io/tx/0x3a55a8ed9bd23c1b2bec5f24be4c7c71da9a21ab2e2f39ba51c5835811df153b#eventlog#144)
 
 Copy the `messageId` (topic[1]) on this page and search for it on `https://ccip.chain.link` to view  bridging status:
 [https://ccip.chain.link/msg/0xe0d94e5e264424e2cbd8ae28f9cc7effcae1ebb25424273561828f43944a9208](https://ccip.chain.link/msg/0xe0d94e5e264424e2cbd8ae28f9cc7effcae1ebb25424273561828f43944a9208)
 
-Once we wait for the L1 -> L2 bridge back, we can see the original `0.00333` tokens transferred back to the original staker's account:
+Once the L1 -> L2 bridge completes, we can see the original `0.00333` tokens transferred back to the original staker's account:
 [https://sepolia.basescan.org/tx/0x1753d98c605f9fc542e1a612531c634afd6da647b2eb4f1d6d094f74af94e9a8](https://sepolia.basescan.org/tx/0x1753d98c605f9fc542e1a612531c634afd6da647b2eb4f1d6d094f74af94e9a8)
 
 
@@ -126,9 +129,7 @@ Once we wait for the L1 -> L2 bridge back, we can see the original `0.00333` tok
     - [x] `queueWithdrawals` via EigenAgent
     - [x] `completeQueuedWithdrawals` via EigenAgent
         - [x] Transfer withdrawn tokens from L1 back to L2
-        - [x] Make `mapping(bytes32 withdrawalRoot => Withdrawal)` and `withdrawalRootsSpent` mappings on L1 SenderCCIP bridge, so when the withdrawalRoot is messaged back from L1 we can look up the original staker on L2 to transfer to without needing another signature.
-        - [x] Add `setQueueWithdrawalBlock(staker, nonce)` and `getQueueWithdrawalBlock(staker, nonce)` to record the `block.number` needed to re-created the withdrawalRoot to `completeQueuedWithdrawal` via L2.
-Queued withdrawals are store in `script/withdrawals-queued/<user_address>/`, and completed withdrawals are recored in `script/withdrawals-completed/<user_address>/`.
+        - [x] Make `mapping(bytes32 withdrawalRoot => Withdrawal)` and `withdrawalRootsSpent` mappings on the L2 SenderCCIP bridge, so that when the `withdrawalRoot` is messaged back from L1 we can look up the original staker on L2 to transfer to without needing another signature.
     - [ ] `delegateTo`
     - [ ] `undelegate` (this also withdraws the staker and has the same constraints as queueWithdrawals). There is no way to directly re-delegate to another operator, a staker must undelegate + withdraw, wait 7 days, then restake and re-delegate to a new operator.
 
