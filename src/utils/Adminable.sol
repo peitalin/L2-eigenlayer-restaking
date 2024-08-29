@@ -3,7 +3,17 @@ pragma solidity 0.8.22;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract Adminable is OwnableUpgradeable {
+
+interface IAdminable {
+
+    function addAdmin(address a) external;
+
+    function removeAdmin(address a) external;
+
+    function isAdmin(address a) external view returns(bool);
+}
+
+contract Adminable is IAdminable, OwnableUpgradeable {
 
     mapping(address => bool) private admins;
 
@@ -35,24 +45,5 @@ contract Adminable is OwnableUpgradeable {
 
     function isOwner() internal view returns(bool) {
         return owner() == msg.sender;
-    }
-}
-
-contract MockAdminable is Adminable {
-
-    constructor() {
-        __Adminable_init();
-    }
-
-    function mockIsOwner() public view returns (bool) {
-        return isOwner();
-    }
-
-    function mockOnlyAdmin() public view onlyAdmin returns (bool) {
-        return true;
-    }
-
-    function mockOnlyAdminOrOwner() public view onlyAdminOrOwner returns (bool) {
-        return true;
     }
 }

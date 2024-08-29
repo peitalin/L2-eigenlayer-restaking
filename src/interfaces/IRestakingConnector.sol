@@ -1,20 +1,50 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
-
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IEigenlayerMsgDecoders} from "../interfaces/IEigenlayerMsgDecoders.sol";
+
+import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
+import {IEigenAgent6551} from "../../src/6551/IEigenAgent6551.sol";
+import {IEigenAgentOwner721} from "../../src/6551/IEigenAgentOwner721.sol";
 
 
-interface IRestakingConnector is IEigenlayerMsgDecoders {
+interface IRestakingConnector {
 
-    function decodeFunctionSelector(bytes memory message) external returns (bytes4);
+    function getReceiverCCIP() external view returns (address);
 
-    function encodeTransferToStakerMsg(bytes32 withdrawalRoot) external returns (bytes memory);
+    function setReceiverCCIP(address newReceiverCCIP) external;
+
+    /*
+     *
+     *                EigenAgent -> Eigenlayer Handlers
+     *
+     *
+    */
+
+    function getAgentFactory() external view returns (address);
+
+    function setAgentFactory(address newAgentFactory) external;
+
+    function depositWithEigenAgent(bytes memory message) external;
+
+    function queueWithdrawalsWithEigenAgent(bytes memory message) external;
+
+    function completeWithdrawalWithEigenAgent(bytes memory message) external returns (
+        uint256,
+        address,
+        string memory // CCIP message for transferToAgentOwner on L2
+    );
+
+    function delegateToWithEigenAgent(bytes memory message) external;
+
+    /*
+     *
+     *                Eigenlayer Functions
+     *
+     *
+    */
 
     function getEigenlayerContracts() external returns (
         IDelegationManager,
@@ -28,8 +58,29 @@ interface IRestakingConnector is IEigenlayerMsgDecoders {
         IStrategy _strategy
     ) external;
 
-    function setQueueWithdrawalBlock(address staker, uint256 nonce) external;
-
     function getQueueWithdrawalBlock(address staker, uint256 nonce) external returns (uint256);
+
+    function setQueueWithdrawalBlock(address staker, uint256 nonce, uint256 blockNumber) external;
+
+    /*
+     *
+     *              Messaging Helpers
+     *
+     *
+    */
+
+    function encodeHandleTransferToAgentOwnerMsg(
+        bytes32 withdrawalRoot,
+        address agentOwner
+    ) external returns (bytes memory);
+
+    function setGasLimitsForFunctionSelectors(
+        bytes4[] memory functionSelectors,
+        uint256[] memory gasLimits
+    ) external;
+
+    function getGasLimitForFunctionSelector(
+        bytes4 functionSelector
+    ) external returns (uint256);
 
 }

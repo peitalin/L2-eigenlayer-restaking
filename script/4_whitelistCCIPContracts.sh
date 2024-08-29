@@ -7,5 +7,6 @@ forge script script/4_whitelistCCIPContracts.s.sol:WhitelistCCIPContractsScript 
     --rpc-url basesepolia \
     --broadcast \
     --verify \
+    --private-key $DEPLOYER_KEY \
     -vvvv
 

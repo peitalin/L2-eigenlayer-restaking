@@ -22,7 +22,6 @@ library FunctionSelectorDecoder {
             functionSelector := mload(add(message, 96))
         }
 
-        // Note: production logging, can remove for gas
         emit MessengerDecodedFunctionSelector(functionSelector, address(this));
 
         return functionSelector;

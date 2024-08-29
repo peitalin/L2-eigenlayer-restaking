@@ -1,53 +1,41 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
+import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-
-import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
+import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
-import {TransferToStakerMessage} from "./interfaces/IEigenlayerMsgDecoders.sol";
 import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
-import {BaseSepolia} from "../script/Addresses.sol";
 
 
-contract SenderCCIP is BaseMessengerCCIP {
 
-    event SendingWithdrawalToStaker(address indexed, uint256 indexed, address indexed);
+contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
-    event MatchedReceivedFunctionSelector(bytes4 indexed, string indexed);
+    event MatchedReceivedFunctionSelector(bytes4 indexed);
 
-    event MatchedSentFunctionSelector(bytes4 indexed, string indexed);
-
-    event WithdrawalCommitted(bytes32 indexed, address indexed, uint256 indexed);
-
-    struct WithdrawalTransfer {
-        address staker;
-        uint256 amount;
-        address tokenDestination;
-    }
-
-    mapping(bytes32 => WithdrawalTransfer) public withdrawalTransferCommittments;
-
-    mapping(bytes32 => bool) public withdrawalRootsSpent;
+    event MatchedSentFunctionSelector(bytes4 indexed);
 
     ISenderUtils public senderUtils;
 
-    /// @param _router The address of the router contract.
-    /// @param _link The address of the link contract.
-    constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {}
+    /// @param _router address of the router contract.
+    /// @param _link address of the link contract.
+    constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {
+        _disableInitializers();
+    }
 
-    function initialize(ISenderUtils _senderUtils) initializer public {
-
-        require(address(_senderUtils) != address(0), "_senderUtils cannot be address(0)");
-        senderUtils = _senderUtils;
-
+    function initialize() initializer public {
         BaseMessengerCCIP.__BaseMessengerCCIP_init();
     }
 
+    function getSenderUtils() public view returns (ISenderUtils) {
+        return senderUtils;
+    }
+
     function setSenderUtils(ISenderUtils _senderUtils) external onlyOwner {
+        require(address(_senderUtils) != address(0), "_senderUtils cannot be address(0)");
         senderUtils = _senderUtils;
     }
 
@@ -77,37 +65,25 @@ contract SenderCCIP is BaseMessengerCCIP {
 
         bytes memory message = any2EvmMessage.data;
         string memory text_msg;
-        bytes4 functionSelector = senderUtils.decodeFunctionSelector(message);
+        bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
-        if (functionSelector == 0x27167d10) {
-            // keccak256(abi.encode("transferToStaker(bytes32)")) == 0x27167d10
-            TransferToStakerMessage memory transferToStakerMsg = senderUtils.decodeTransferToStakerMessage(message);
+        if (functionSelector == ISenderUtils.handleTransferToAgentOwner.selector) {
+            // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
+            (
+                address agentOwner,
+                uint256 amount,
+                address tokenL2Address
+            ) = senderUtils.handleTransferToAgentOwner(message);
 
-            bytes32 withdrawalRoot = transferToStakerMsg.withdrawalRoot;
+            bool success = IERC20(tokenL2Address).transfer(agentOwner, amount);
 
-            WithdrawalTransfer memory withdrawalTransfer = withdrawalTransferCommittments[withdrawalRoot];
-
-            address staker = withdrawalTransfer.staker;
-            uint256 amount = withdrawalTransfer.amount;
-            address tokenDestination = withdrawalTransfer.tokenDestination;
-            emit SendingWithdrawalToStaker(staker, amount, tokenDestination);
-            // address tokenDestination = BaseSepolia.CcipBnM;
-            // emit SendingWithdrawalToStaker(staker, amount, tokenDestination);
-
-            // checks-effects-interactions
-            // delete withdrawalRoot entry and mark the withdrawalRoot as spent
-            // to prevent multiple withdrawals
-            // delete withdrawalTransferCommittments[withdrawalRoot];
-            withdrawalRootsSpent[withdrawalRoot] = true;
-
-            IERC20(tokenDestination).approve(address(this), amount);
-            IERC20(tokenDestination).transfer(staker, amount);
+            require(success, "SenderCCIP: failed to transfer token to agentOwner");
 
             text_msg = "completed eigenlayer withdrawal and transferred token to L2 staker";
 
         } else {
 
-            emit MatchedReceivedFunctionSelector(functionSelector, "UnknownFunctionSelector");
+            emit MatchedReceivedFunctionSelector(functionSelector);
             text_msg = "unknown message";
         }
 
@@ -150,39 +126,19 @@ contract SenderCCIP is BaseMessengerCCIP {
 
         bytes memory message = abi.encode(_text);
 
-        bytes4 functionSelector = senderUtils.decodeFunctionSelector(message);
+        bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
         // When User sends a message to CompleteQueuedWithdrawal from L2 to L1
-        if (functionSelector == 0x54b2bf29) {
-            // 0x54b2bf29 = abi.encode(keccask256(completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)))
-            (
-                IDelegationManager.Withdrawal memory withdrawal
-                ,
-                ,
-                ,
-            ) = senderUtils.decodeCompleteWithdrawalMessage(message);
-
-            bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
-
-            // Check for spent withdrawalRoots to prevent wasted CCIP message
-            // as it will fail to withdraw from Eigenlayer
-            require(
-                withdrawalRootsSpent[withdrawalRoot] == false,
-                "withdrawalRoot has already been used"
+        if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
+            // 0x60d7faed = abi.encode(keccask256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)"))
+            senderUtils.commitWithdrawalRootInfo(
+                message,
+                _token // token on L2 for TransferToAgentOwner callback
             );
-            // Commit to WithdrawalTransfer(staker, amount, token) before sending completeWithdrawal message,
-            // so that when the message returns with withdrawalRoot, we use it to lookup (staker, amount)
-            // to transfer the bridged withdrawn funds to.
-            withdrawalTransferCommittments[withdrawalRoot] = WithdrawalTransfer({
-                staker: withdrawal.staker,
-                amount: withdrawal.shares[0],
-                tokenDestination: _token
-            });
 
-            emit WithdrawalCommitted(withdrawalRoot, withdrawal.staker, withdrawal.shares[0]);
         } else {
-            string memory _functionSelectorName = senderUtils.getFunctionSelectorName(functionSelector);
-            emit MatchedSentFunctionSelector(functionSelector, _functionSelectorName);
+
+            emit MatchedSentFunctionSelector(functionSelector);
         }
 
         uint256 gasLimit = senderUtils.getGasLimitForFunctionSelector(functionSelector);
@@ -198,16 +154,5 @@ contract SenderCCIP is BaseMessengerCCIP {
                 )
             });
     }
-
-    function getWithdrawal(bytes32 withdrawalRoot) public view returns (WithdrawalTransfer memory) {
-        return withdrawalTransferCommittments[withdrawalRoot];
-    }
-
-    function calculateWithdrawalRoot(
-        IDelegationManager.Withdrawal memory withdrawal
-    ) public pure returns (bytes32) {
-        return keccak256(abi.encode(withdrawal));
-    }
-
 }
 

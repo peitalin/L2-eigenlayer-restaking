@@ -1,7 +1,7 @@
 #!/bin/bash
 source .env
 
-echo forge script script/2b_upgradeSenderOnL2.s.sol:DeployOnL2Script --rpc-url basesepolia --broadcast --verify -vvvv
+echo forge script script/2b_upgradeSenderOnL2.s.sol:UpgradeSenderOnL2Script --rpc-url basesepolia --broadcast --verify -vvvv
 
 forge script script/2b_upgradeSenderOnL2.s.sol:UpgradeSenderOnL2Script \
     --rpc-url basesepolia \
@@ -21,7 +21,6 @@ forge script script/2b_upgradeSenderOnL2.s.sol:UpgradeSenderOnL2Script \
 #     --compiler-version v0.8.22 \
 #     0x95bA1749619C81E70f3eF276Ce8A392747e32aE4 \
 #     ./src/SenderCCIP.sol:SenderCCIP
-
 
 # forge verify-contract \
 #     --chain-id 421614 \

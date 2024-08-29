@@ -11,18 +11,20 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
-import {DeployOnL2Script} from "../script/2_deployOnL2.s.sol";
-import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
+import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
+import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
 import {WhitelistCCIPContractsScript} from "../script/4_whitelistCCIPContracts.s.sol";
 
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
 import {ScriptUtils} from "./ScriptUtils.sol";
 
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
-import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
+import {ClientEncoders} from "./ClientEncoders.sol";
 
 
 contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
@@ -30,6 +32,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
     IRestakingConnector public restakingConnector;
+    IAgentFactory public agentFactory;
     address public senderAddr;
 
     IStrategyManager public strategyManager;
@@ -40,30 +43,33 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
+    ClientEncoders public encoders;
     SignatureUtilsEIP1271 public signatureUtils;
 
     uint256 public deployerKey;
     address public deployer;
     address public staker;
+    address public withdrawer;
     uint256 public amount;
     uint256 public expiry;
+    uint256 public execNonce; // EigenAgent execution nonce
+    uint256 public withdrawalNonce; // Eigenlayer withdrawal nonce
+    IEigenAgent6551 public eigenAgent;
+    address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
 
         bool isTest = block.chainid == 31337;
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
-        console.log("l2ForkId:", l2ForkId);
-        console.log("ethForkId:", ethForkId);
-        console.log("block.chainid", block.chainid);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        signatureUtils = new SignatureUtilsEIP1271(); // needs ethForkId to call getDomainSeparator
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-        DeployOnEthScript deployOnEthScript = new DeployOnEthScript();
+
+        DeployReceiverOnL1Script deployReceiverOnL1Script = new DeployReceiverOnL1Script();
 
         (
             strategy,
@@ -81,18 +87,36 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             vm.selectFork(ethForkId);
             (
                 receiverContract,
-                restakingConnector
-            ) = deployOnEthScript.run();
+                restakingConnector,
+                agentFactory
+            ) = deployReceiverOnL1Script.testrun();
 
             vm.selectFork(l2ForkId);
-            DeployOnL2Script deployOnL2Script = new DeployOnL2Script();
-            senderContract = deployOnL2Script.run();
+            DeploySenderOnL2Script deployOnL2Script = new DeploySenderOnL2Script();
+            senderContract = deployOnL2Script.testrun();
 
+            // go back to ETH fork
             vm.selectFork(ethForkId);
+
         } else {
             // otherwise if running the script, read the existing contracts on Sepolia
-            senderContract = fileReader.getSenderContract();
-            (receiverContract, restakingConnector) = fileReader.getReceiverRestakingConnectorContracts();
+            senderContract = fileReader.readSenderContract();
+            (
+                receiverContract,
+                restakingConnector
+            ) = fileReader.readReceiverRestakingConnector();
+
+            agentFactory = fileReader.readAgentFactory();
+        }
+
+        eigenAgent = agentFactory.getEigenAgent(deployer);
+        if (address(eigenAgent) == address(0)) {
+            // revert("User must have existing deposit in Eigenlayer + EigenAgent");
+            vm.prank(deployer);
+            eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
+            execNonce = 0;
+        } else {
+            execNonce = eigenAgent.getExecNonce();
         }
 
         ////////////////////////////////////////////////////////////
@@ -101,78 +125,78 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
 
         senderAddr = address(senderContract);
         ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
+        TARGET_CONTRACT = address(delegationManager);
 
-        amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
-        staker = deployer;
+        // only sending a withdrawal message, not bridging tokens.
+        amount = 0 ether;
         expiry = block.timestamp + 2 hours;
+        staker = address(eigenAgent);
+        withdrawer = address(eigenAgent);
+        // staker == withdrawer == msg.sender in StrategyManager, which is EigenAgent
+        require(staker == withdrawer, "require: staker == withdrawer");
+        require(address(eigenAgent) == withdrawer, "require withdrawer == EigenAgent");
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         strategiesToWithdraw[0] = strategy;
 
         uint256[] memory sharesToWithdraw = new uint256[](1);
-        sharesToWithdraw[0] = strategyManager.stakerStrategyShares(staker, strategy);
+        sharesToWithdraw[0] = strategyManager.stakerStrategyShares(withdrawer, strategy);
 
-        address withdrawer = address(receiverContract);
-        uint256 nonce = delegationManager.cumulativeWithdrawalsQueued(staker);
-        address delegatedTo = delegationManager.delegatedTo(staker);
-        bytes memory signature;
-        {
-            bytes32 digestHash = signatureUtils.calculateQueueWithdrawalDigestHash(
-                staker,
-                strategiesToWithdraw,
-                sharesToWithdraw,
-                nonce,
-                expiry,
-                address(delegationManager),
-                block.chainid
-            );
+        withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(withdrawer);
+        address delegatedTo = delegationManager.delegatedTo(withdrawer);
 
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
-            signature = abi.encodePacked(r, s, v);
-
-            signatureUtils.checkSignature_EIP1271(staker, digestHash, signature);
-        }
-
+        console.log("staker (eigenAgent):", staker);
+        console.log("withdrawer (eigenAgent):", withdrawer);
+        console.log("sharesToWithdraw:", sharesToWithdraw[0]);
 
         /////////////////////////////////////////////////////////////////
-        ////// Setup Queue Withdrawals Params (reads from Eigenlayer contracts on L1)
+        ////// Sign the queueWithdrawal payload for EigenAgent
         /////////////////////////////////////////////////////////////////
 
-        bytes memory message;
-        // put the following in separate closure (stack too deep errors)
-        {
-            IDelegationManager.QueuedWithdrawalWithSignatureParams memory queuedWithdrawalWithSig;
-            queuedWithdrawalWithSig = IDelegationManager.QueuedWithdrawalWithSignatureParams({
-                strategies: strategiesToWithdraw,
-                shares: sharesToWithdraw,
-                withdrawer: withdrawer,
-                staker: staker,
-                signature: signature,
-                expiry: expiry
-            });
+        vm.selectFork(l2ForkId);
+        encoders = new ClientEncoders();
+        signatureUtils = new SignatureUtilsEIP1271();
 
-            IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray;
-            queuedWithdrawalWithSigArray = new IDelegationManager.QueuedWithdrawalWithSignatureParams[](1);
-            queuedWithdrawalWithSigArray[0] = queuedWithdrawalWithSig;
+        vm.startBroadcast(deployerKey);
 
-            message = EigenlayerMsgEncoders.encodeQueueWithdrawalsWithSignatureMsg(
-                queuedWithdrawalWithSigArray
-            );
-        }
+        bytes memory withdrawalMessage;
+        bytes memory messageWithSignature;
+
+        IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal;
+        queuedWithdrawal = IDelegationManager.QueuedWithdrawalParams({
+            strategies: strategiesToWithdraw,
+            shares: sharesToWithdraw,
+            withdrawer: withdrawer
+        });
+        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalArray;
+        queuedWithdrawalArray = new IDelegationManager.QueuedWithdrawalParams[](1);
+        queuedWithdrawalArray[0] = queuedWithdrawal;
+
+        // create the queueWithdrawal message for Eigenlayer
+        withdrawalMessage = encoders.encodeQueueWithdrawalsMsg(
+            queuedWithdrawalArray
+        );
+
+        // sign the message for EigenAgent to execute Eigenlayer command
+        messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
+            deployerKey,
+            EthSepolia.ChainId, // destination chainid where EigenAgent lives
+            TARGET_CONTRACT,
+            withdrawalMessage,
+            execNonce,
+            expiry
+        );
 
         /////////////////////////////////////////////////////////////////
         /////// Broadcast to L2
         /////////////////////////////////////////////////////////////////
-
-        vm.selectFork(l2ForkId);
-        vm.startBroadcast(deployerKey);
 
         topupSenderEthBalance(senderAddr);
 
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
-            string(message),
+            string(messageWithSignature),
             address(ccipBnM),
             amount
         );
@@ -192,7 +216,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             staker,
             delegatedTo,
             withdrawer,
-            nonce,
+            withdrawalNonce,
             0, // startBlock is created later
             strategiesToWithdraw,
             sharesToWithdraw,

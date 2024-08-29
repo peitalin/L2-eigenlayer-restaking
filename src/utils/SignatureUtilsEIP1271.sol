@@ -1,15 +1,33 @@
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP1271SignatureUtils} from "eigenlayer-contracts/src/contracts/libraries/EIP1271SignatureUtils.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 
 /// @dev Retrieve these struct hashes by calling Eigenlayer contracts, or storing the hash.
 contract SignatureUtilsEIP1271 is Script {
+
+    /*
+     *
+     *            Constants
+     *
+     */
+
+    /// @notice The EIP-712 typehash for the deposit struct used by the contract
+    bytes32 public constant EIGEN_AGENT_EXEC_TYPEHASH = keccak256("ExecuteWithSignature(address target, uint256 value, bytes data, uint256 expiry)");
+
+    /// @notice The EIP-712 typehash for the contract's domain
+    bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
+
+    /*
+     *
+     *            Functions
+     *
+     */
 
     function checkSignature_EIP1271(
         address signer,
@@ -43,16 +61,6 @@ contract SignatureUtilsEIP1271 is Script {
         address contractAddr, // strategyManagerAddr, or delegationManagerAddr
         uint256 destinationChainid
     ) public pure returns (bytes32) {
-        return calculateDomainSeparator(contractAddr, destinationChainid);
-    }
-
-    function calculateDomainSeparator(
-        address contractAddr, // strategyManagerAddr, or delegationManagerAddr
-        uint256 destinationChainid
-    ) public pure returns (bytes32) {
-
-        /// @notice The EIP-712 typehash for the contract's domain
-        bytes32 DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
         uint256 chainid = destinationChainid;
 
@@ -63,39 +71,11 @@ contract SignatureUtilsEIP1271 is Script {
         // So chainid should be destination chainid in the context of L2 -> L1 restaking calls
     }
 
-    function createEigenlayerDepositSignature(
-        uint256 signingKey,
-        IStrategy _strategy,
-        IERC20 _token,
-        uint256 amount,
-        address staker,
-        uint256 nonce,
-        uint256 expiry,
-        bytes32 domainSeparator
-    ) public pure returns (bytes memory, bytes32) {
-
-        bytes32 digestHash = createEigenlayerDepositDigest(
-            _strategy,
-            _token,
-            amount,
-            staker,
-            nonce,
-            expiry,
-            domainSeparator
-        );
-        // generate ECDSA signature
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signingKey, digestHash);
-        bytes memory signature = abi.encodePacked(r, s, v);
-        // r,s,v packed into 65byte signature: 32 + 32 + 1.
-        // the order of r,s,v differs from the above
-        return (signature, digestHash);
-    }
-
     function calculateQueueWithdrawalDigestHash(
         address staker,
         IStrategy[] memory strategies,
         uint256[] memory shares,
-        uint256 stakerNonce,
+        uint256 withdrawalNonce,
         uint256 expiry,
         address delegationManagerAddr,
         uint256 destinationChainid
@@ -111,7 +91,7 @@ contract SignatureUtilsEIP1271 is Script {
             staker,
             strategies,
             shares,
-            stakerNonce,
+            withdrawalNonce,
             expiry
         ));
         // calculate the digest hash
@@ -174,6 +154,78 @@ contract SignatureUtilsEIP1271 is Script {
             approverStructHash
         ));
         return approverDigestHash;
+    }
+
+    function createEigenAgentCallDigestHash(
+        address _target,
+        uint256 _value,
+        bytes memory _data,
+        uint256 _nonce,
+        uint256 _chainid,
+        uint256 _expiry
+    ) public pure returns (bytes32) {
+
+        bytes32 structHash = keccak256(abi.encode(
+            EIGEN_AGENT_EXEC_TYPEHASH,
+            _target,
+            _value,
+            _data,
+            _nonce,
+            _chainid,
+            _expiry
+        ));
+        // calculate the digest hash
+        bytes32 digestHash = keccak256(abi.encodePacked(
+            "\x19\x01",
+            getDomainSeparator(_target, _chainid),
+            structHash
+        ));
+
+        return digestHash;
+    }
+
+    function signMessageForEigenAgentExecution(
+        uint256 signerKey,
+        uint256 chainid,
+        address targetContractAddr,
+        bytes memory messageToEigenlayer,
+        uint256 execNonceEigenAgent,
+        uint256 expiry
+    ) public view returns (bytes memory) {
+
+        bytes memory messageWithSignature;
+        bytes memory signatureEigenAgent;
+        {
+            bytes32 digestHash = createEigenAgentCallDigestHash(
+                targetContractAddr,
+                0 ether, // not sending ether
+                messageToEigenlayer,
+                execNonceEigenAgent,
+                chainid, // destination chainid where EigenAgent lives, usually ETH
+                expiry
+            );
+
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
+            signatureEigenAgent = abi.encodePacked(r, s, v);
+            address signer = vm.addr(signerKey);
+
+            // Join the payload + signer + expiry + signature
+            // NOTE: the order:
+            // 1: message
+            // 2: signer
+            // 3: expiry
+            // 4: signature
+            messageWithSignature = abi.encodePacked(
+                messageToEigenlayer,
+                bytes32(abi.encode(signer)), // pad signer to 32byte word
+                expiry,
+                signatureEigenAgent
+            );
+
+            checkSignature_EIP1271(signer, digestHash, signatureEigenAgent);
+        }
+
+        return messageWithSignature;
     }
 
 }

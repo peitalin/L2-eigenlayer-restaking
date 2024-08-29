@@ -6,20 +6,34 @@ echo forge script script/5_depositWithSignature.s.sol:DepositWithSignatureScript
 forge script script/5_depositWithSignature.s.sol:DepositWithSignatureScript  \
     --rpc-url basesepolia \
     --broadcast \
+    --verify \
     --private-key $DEPLOYER_KEY \
     -vvvv
 
+
+### TODO: automatically verify EigenAgent contract after they are spawned
+# forge verify-contract \
+#     --watch \
+#     --rpc-url ethsepolia \
+#     --etherscan-api-key $ETHERSCAN_API_KEY \
+#     --compiler-version v0.8.22 \
+#     0x0aEDf2bfF862E2e8D31951E20f329F3776ceF974 \
+#     src/6551/EigenAgent6551.sol:EigenAgent6551
+
+
 ## After running this script, search for the TX hash on https://ccip.chain.link/
 
-## Example 1:
-## Restaking CCIP-BnM token from L2 into Eigenlayer example (with staker signatures)
-# https://ccip.chain.link/msg/0xffea9be16502ed6ce6d1c9993d99dbad93a947bef0dc7f8fce8d608e8529972e
-## with associated Eigenlayer deposit events:
-# https://sepolia.etherscan.io/tx/0xae4d9c3c81d77f15405bdfc6e7a018389c7ff6911b9e6b6fbc8048cfe32393f3#eventlog
+# We bridge the token from L2 to L1, then deposit into Eigenlayer through 6551 accounts owned by the user, with user signatures:
+# [https://ccip.chain.link/msg/0x025b854ed6d4c0af1b2c8cf696fb3f310702492cdbe2618135dacf4d74208e2b](https://ccip.chain.link/msg/0x025b854ed6d4c0af1b2c8cf696fb3f310702492cdbe2618135dacf4d74208e2b)
 
-## Example 2:
-## Restaking CCIP-BnM token from L2 into Eigenlayer example (with staker signatures)
-# https://ccip.chain.link/msg/0xab63cce8f46eb63aa3df280145e362a6eb2d0204b48f237fad493e094bb099e5
+# On L1, we see the CCIP-BnM token routing through: Sender CCIP (L1 Bridge) -> 6551 Agent -> Eigenlayer Strategy Vault:
+# [https://sepolia.etherscan.io/tx/0x55580c6681525f385198639814f1e54e9213c613cdcdef806e89e9403f3f3c9a](https://sepolia.etherscan.io/tx/0x55580c6681525f385198639814f1e54e9213c613cdcdef806e89e9403f3f3c9a)
 
-## with associated Eigenlayer deposit events:
-# https://sepolia.etherscan.io/tx/0x1fdcc0cb12cb332cc704996f404f8d40d00c84166d3f5887c8e9e17ad370c374
+# Gas cost estimate in (i) bridging, (ii) creating a 6551 EigenAgent, (iii) depositing in Eigenalayer
+# most of the gas cost is in creating the 6551 EigenAgent (1.8mil gas)
+
+# and also in the Eigenlayer StrategyManager contract: [https://sepolia.etherscan.io/address/0x7d73d2641d4c68f7b8f11b1ce212645423a0e8b5#events](https://sepolia.etherscan.io/address/0x7d73d2641d4c68f7b8f11b1ce212645423a0e8b5#events)
+
+
+
+

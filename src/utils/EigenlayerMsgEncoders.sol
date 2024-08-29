@@ -3,66 +3,50 @@ pragma solidity 0.8.22;
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
-import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ISenderUtils} from "../interfaces/ISenderUtils.sol";
+import {IRestakingConnector} from "../interfaces/IRestakingConnector.sol";
 
 
 library EigenlayerMsgEncoders {
 
-    function encodeDepositIntoStrategyWithSignatureMsg(
+    // used by EigenAgent -> Eigenlayer
+    function encodeDepositIntoStrategyMsg(
         address strategy,
         address token,
-        uint256 amount,
-        address staker,
-        uint256 expiry,
-        bytes memory signature
+        uint256 amount
     ) public pure returns (bytes memory) {
 
-        // encode message payload
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("depositIntoStrategyWithSignature(address,address,uint256,address,uint256,bytes)")),
+            // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
+            IStrategyManager.depositIntoStrategy.selector,
             strategy,
             token,
-            amount,
-            staker,
-            expiry,
-            signature
+            amount
         );
-        // CCIP turns the message into string when sending
-        // bytes memory message = abi.encode(string(message_bytes));
         return message_bytes;
     }
 
-    function encodeQueueWithdrawalMsg(
+    function encodeQueueWithdrawalsMsg(
         IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
     ) public pure returns (bytes memory) {
-        // structs are encoded as tuples:
-        // QueuedWithdrawalParams {
-        //     IStrategy[] strategies;
-        //     uint256[] shares;
-        //     address withdrawer;
-        // }
+
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
+            // bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
+            IDelegationManager.queueWithdrawals.selector,
             queuedWithdrawalParams
         );
 
         return message_bytes;
     }
 
-    function encodeQueueWithdrawalsWithSignatureMsg(
-        IDelegationManager.QueuedWithdrawalWithSignatureParams[] memory queuedWithdrawalWithSigArray
-    ) public pure returns (bytes memory) {
-
-        // Structs are encoded as tuples:
-        // queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])
-        bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("queueWithdrawalsWithSignature((address[],uint256[],address,address,bytes)[])")),
-            queuedWithdrawalWithSigArray
-        );
-
-        return message_bytes;
-    }
+    /*
+     *
+     *         Standard Messages
+     *
+     *
+    */
 
     function encodeCompleteWithdrawalMsg(
         IDelegationManager.Withdrawal memory withdrawal,
@@ -90,7 +74,9 @@ library EigenlayerMsgEncoders {
         //     }
 
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,address[],uint256[]),address[],uint256,bool)")),
+            // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
+            // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)")),
+            IDelegationManager.completeQueuedWithdrawal.selector,
             withdrawal,
             tokensToWithdraw,
             middlewareTimesIndex,
@@ -100,14 +86,56 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-    function encodeTransferToStakerMsg(bytes32 withdrawalRoot) public pure returns (bytes memory) {
+    function encodeHandleTransferToAgentOwnerMsg(
+        bytes32 withdrawalRoot,
+        address agentOwner
+    ) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("transferToStaker(bytes32)")),
-            withdrawalRoot
+            // bytes4(keccak256("handleTransferToAgentOwner(bytes32,address,bytes32)")),
+            ISenderUtils.handleTransferToAgentOwner.selector,
+            withdrawalRoot,
+            agentOwner,
+            calculateAgentOwnerRoot(withdrawalRoot, agentOwner)
         );
         return message_bytes;
     }
 
+
+    function encodeDelegateTo(
+        address operator,
+        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
+        bytes32 approverSalt
+    ) public pure returns (bytes memory) {
+
+        // function delegateTo(
+        //     address operator,
+        //     SignatureWithExpiry memory approverSignatureAndExpiry,
+        //     bytes32 approverSalt
+        // )
+
+        // 0000000000000000000000000000000000000000000000000000000000000020
+        // 0000000000000000000000000000000000000000000000000000000000000164
+        // 0xeea9064b                                                       [96] function selector
+        // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d412eb
+        // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d41333
+        // 00000000000000000000000000000000000000000000000000000000000000a0
+        // 0000000000000000000000000000000000000000000000000000000000000100
+        // 0000000000000000000000000000000000000000000000000000000000004444
+        // 0000000000000000000000000000000000000000000000000000000000000040
+        // 0000000000000000000000000000000000000000000000000000000000000000
+        // 0000000000000000000000000000000000000000000000000000000000000000
+        // 0000000000000000000000000000000000000000000000000000000000000040
+        // 0000000000000000000000000000000000000000000000000000000000000001
+        // 0000000000000000000000000000000000000000000000000000000000000000
+
+        bytes memory message_bytes = abi.encodeWithSelector(
+            IDelegationManager.delegateTo.selector,
+            operator,
+            approverSignatureAndExpiry,
+            approverSalt
+        );
+        return message_bytes;
+    }
 
     function encodeDelegateToBySignature(
         address staker,
@@ -127,7 +155,7 @@ library EigenlayerMsgEncoders {
 
         // 0000000000000000000000000000000000000000000000000000000000000020
         // 0000000000000000000000000000000000000000000000000000000000000164
-        // 7f548071                                                         [96] function selector
+        // 0xeea9064b                                                       [96] function selector
         // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d412eb
         // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d41333
         // 00000000000000000000000000000000000000000000000000000000000000a0
@@ -140,9 +168,8 @@ library EigenlayerMsgEncoders {
         // 0000000000000000000000000000000000000000000000000000000000000001
         // 0000000000000000000000000000000000000000000000000000000000000000
 
-        // 0x7f548071
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("delegateToBySignature(address,address,(bytes,uint256),(bytes,uint256),bytes32)")),
+            IDelegationManager.delegateToBySignature.selector,
             staker,
             operator,
             stakerSignatureAndExpiry,
@@ -154,9 +181,17 @@ library EigenlayerMsgEncoders {
 
     function encodeUndelegateMsg(address staker) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
-            bytes4(keccak256("undelegate(address)")),
+            // bytes4(keccak256("undelegate(address)")),
+            IDelegationManager.undelegate.selector,
             staker
         );
         return message_bytes;
+    }
+
+    function calculateAgentOwnerRoot(
+        bytes32 withdrawalRoot,
+        address agentOwner
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(withdrawalRoot, agentOwner));
     }
 }

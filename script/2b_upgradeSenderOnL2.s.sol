@@ -19,14 +19,11 @@ contract UpgradeSenderOnL2Script is Script {
     function run() public {
 
         uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+        vm.createSelectFork("basesepolia");
 
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
-        ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.getL2ProxyAdmin());
-        ISenderCCIP senderProxy = fileReader.getSenderContract();
-
-        // Either use old implementation or deploy a new one if code differs.
-        ISenderUtils senderUtils = ISenderUtils(fileReader.getSenderUtils());
-        // SenderUtils senderUtils = new SenderUtils();
+        ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL2());
+        ISenderCCIP senderProxy = fileReader.readSenderContract();
 
         /////////////////////////////
         /// Begin Broadcast
@@ -35,16 +32,22 @@ contract UpgradeSenderOnL2Script is Script {
 
         SenderCCIP senderImpl = new SenderCCIP(BaseSepolia.Router, BaseSepolia.Link);
 
+        ISenderUtils senderUtils = ISenderUtils(address(new SenderUtils()));
+
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(senderProxy))),
             address(senderImpl)
         );
-        // no need to upgradeAndCall: already initialized
 
-        // whitelist destination chain
+        /// whitelist destination chain
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         senderProxy.setSenderUtils(senderUtils);
+
+        require(
+            address(senderProxy.getSenderUtils()) != address(0),
+            "Check script: senderProxy missing senderUtils"
+        );
 
         vm.stopBroadcast();
     }

@@ -10,4 +10,12 @@ forge script script/7_queueWithdrawalWithSignature.s.sol:QueueWithdrawalWithSign
     -vvvv
 
 
-# https://ccip.chain.link/msg/0x003e44447eba1797ef07561bd3c391a490770a6383f8f0de3d0a19973b5e47f3
+# Users queue withdrawal via their 6551 EigenAgent from L2 with signatures:
+# [https://ccip.chain.link/msg/0x2358f618e54c1b56510989002fc7da10691d9a8ecb99dce4c75a7446db193531](https://ccip.chain.link/msg/0x2358f618e54c1b56510989002fc7da10691d9a8ecb99dce4c75a7446db193531)
+
+
+# The message routes to L1 creating `WithdrawalQueued` events in Eigenlayer's DelegationManager contract:
+# [https://sepolia.etherscan.io/tx/0x5816ab72f39581e6b3f74ab90f29ff6e4382264ada642442e2bdd5208a23be3e#eventlog](https://sepolia.etherscan.io/tx/0x5816ab72f39581e6b3f74ab90f29ff6e4382264ada642442e2bdd5208a23be3e#eventlog)
+
+
+

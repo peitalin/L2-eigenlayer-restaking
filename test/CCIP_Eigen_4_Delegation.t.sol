@@ -19,12 +19,12 @@ import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
-import {EigenlayerDepositWithSignatureParams} from "../src/interfaces/IEigenlayerMsgDecoders.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
-import {DeployOnEthScript} from "../script/3_deployOnEth.s.sol";
-import {DeployOnL2Script} from "../script/2_deployOnL2.s.sol";
+import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
+import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
 
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
@@ -34,8 +34,8 @@ import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 contract CCIP_Eigen_DelegationTests is Test {
 
-    DeployOnEthScript public deployOnEthScript;
-    DeployOnL2Script public deployOnL2Script;
+    DeployReceiverOnL1Script public deployReceiverOnL1Script;
+    DeploySenderOnL2Script public deployOnL2Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
 
@@ -45,6 +45,7 @@ contract CCIP_Eigen_DelegationTests is Test {
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
     IRestakingConnector public restakingConnector;
+    IAgentFactory public agentFactory;
     IERC20 public token;
 
     IStrategyManager public strategyManager;
@@ -68,12 +69,11 @@ contract CCIP_Eigen_DelegationTests is Test {
 		deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        deployOnEthScript = new DeployOnEthScript();
-        deployOnL2Script = new DeployOnL2Script();
+        deployReceiverOnL1Script = new DeployReceiverOnL1Script();
+        deployOnL2Script = new DeploySenderOnL2Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         signatureUtils = new SignatureUtilsEIP1271();
 
-        bool isTest = block.chainid == 31337;
         l2ForkId = vm.createFork("basesepolia");        // 0
         ethForkId = vm.createSelectFork("ethsepolia"); // 1
         console.log("l2ForkId:", l2ForkId);
@@ -95,12 +95,16 @@ contract CCIP_Eigen_DelegationTests is Test {
 
         //////////// Arb Sepolia ////////////
         vm.selectFork(l2ForkId);
-        senderContract = deployOnL2Script.run();
+        senderContract = deployOnL2Script.testrun();
 
 
         //////////// Eth Sepolia ////////////
         vm.selectFork(ethForkId);
-        (receiverContract, restakingConnector) = deployOnEthScript.run();
+        (
+            receiverContract,
+            restakingConnector,
+            agentFactory
+        ) = deployReceiverOnL1Script.testrun();
 
 
         //////////// Arb Sepolia ////////////
@@ -149,21 +153,10 @@ contract CCIP_Eigen_DelegationTests is Test {
 
         vm.stopBroadcast();
 
-        /////////////////////////////////////
-        //// ETH: Mock deposits on Eigenlayer
-        vm.selectFork(ethForkId);
-        /////////////////////////////////////
-        vm.startBroadcast(address(receiverContract)); // simulate router sending receiver message on L1
-        Client.Any2EVMMessage memory any2EvmMessage = makeCCIPEigenlayerMsg_DepositWithSignature(
-            amountToStake,
-            staker,
-            block.timestamp + 1 hours
-        );
-        receiverContract.mockCCIPReceive(any2EvmMessage);
-
-        stakerShares = strategyManager.stakerStrategyShares(staker, strategy);
-        uint256 receiverShares = strategyManager.stakerStrategyShares(address(receiverContract), strategy);
-        vm.stopBroadcast();
+        // /////////////////////////////////////
+        // //// ETH: Mock deposits on Eigenlayer
+        // vm.selectFork(ethForkId);
+        // /////////////////////////////////////
 
 
         // register Operator, to test delegation
@@ -238,7 +231,7 @@ contract CCIP_Eigen_DelegationTests is Test {
         );
 
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
+            messageId: bytes32(uint256(9999)),
             sourceChainSelector: BaseSepolia.ChainSelector,
             sender: abi.encode(deployer),
             destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging any tokens
@@ -254,56 +247,5 @@ contract CCIP_Eigen_DelegationTests is Test {
         // DelegationManager.undelegate
     }
 
-
-    function makeCCIPEigenlayerMsg_DepositWithSignature(
-        uint256 _amount,
-        address _staker,
-        uint256 expiry
-    ) public view returns (Client.Any2EVMMessage memory) {
-
-        uint256 nonce = 0; // in production retrieve on StrategyManager on L1
-        bytes32 domainSeparator = signatureUtils.getDomainSeparator(address(strategyManager), block.chainid);
-
-        (
-            bytes memory signature,
-            bytes32 digestHash
-        ) = signatureUtils.createEigenlayerDepositSignature(
-            deployerKey,
-            strategy,
-            token,
-            _amount,
-            _staker,
-            nonce,
-            expiry,
-            domainSeparator
-        );
-
-        signatureUtils.checkSignature_EIP1271(_staker, digestHash, signature);
-
-        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
-        destTokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(token),
-            amount: _amount
-        });
-
-        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: bytes32(0xffffffffffffffff9999999999999999eeeeeeeeeeeeeeee8888888888888888),
-            sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
-            sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
-            data: abi.encode(string(
-                EigenlayerMsgEncoders.encodeDepositIntoStrategyWithSignatureMsg(
-                    address(strategy),
-                    address(token),
-                    _amount,
-                    _staker,
-                    expiry,
-                    signature
-                )
-            )), // CCIP abi.encodes a string message when sending
-            destTokenAmounts: destTokenAmounts // Tokens and their amounts in their destination chain representation.
-        });
-
-        return any2EvmMessage;
-    }
 
 }

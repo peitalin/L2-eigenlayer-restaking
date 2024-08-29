@@ -442,14 +442,6 @@ contract DeployMockEigenlayerContractsScript is Script {
         chains[11155111] = "ethsepolia";
         // Eigenlayer contract addresses are only on EthSepolia and localhost, not L2
 
-        IStrategy _strategy;
-        IStrategyManager _strategyManager;
-        IStrategyFactory _strategyFactory;
-        IDelegationManager _delegationManager;
-        IRewardsCoordinator _rewardsCoordinator;
-        IPauserRegistry _pauserRegistry;
-        IERC20 _tokenERC20;
-
         string memory deploymentData = vm.readFile(
             string(abi.encodePacked(
                 "script/",
@@ -458,22 +450,29 @@ contract DeployMockEigenlayerContractsScript is Script {
             ))
         );
 
-        _strategy = IStrategy(stdJson.readAddress(deploymentData, ".addresses.strategies.CCIPStrategy"));
-        _strategyManager = IStrategyManager(stdJson.readAddress(deploymentData, ".addresses.StrategyManager"));
-        _strategyFactory = IStrategyFactory(stdJson.readAddress(deploymentData, ".addresses.StrategyFactory"));
-        _delegationManager = IDelegationManager(stdJson.readAddress(deploymentData, ".addresses.DelegationManager"));
-        _rewardsCoordinator = IRewardsCoordinator(stdJson.readAddress(deploymentData, ".addresses.RewardsCoordinator"));
-        _pauserRegistry = IPauserRegistry(stdJson.readAddress(deploymentData, ".addresses.PauserRegistry"));
-        _tokenERC20 = IERC20(stdJson.readAddress(deploymentData, ".addresses.TokenERC20"));
+        address _strategy = stdJson.readAddress(deploymentData, ".addresses.strategies.CCIPStrategy");
+        address _strategyManager = stdJson.readAddress(deploymentData, ".addresses.StrategyManager");
+        address _strategyFactory = stdJson.readAddress(deploymentData, ".addresses.StrategyFactory");
+        address _pauserRegistry = stdJson.readAddress(deploymentData, ".addresses.PauserRegistry");
+        address _delegationManager = stdJson.readAddress(deploymentData, ".addresses.DelegationManager");
+        address _rewardsCoordinator = stdJson.readAddress(deploymentData, ".addresses.RewardsCoordinator");
+        address _tokenERC20 = stdJson.readAddress(deploymentData, ".addresses.TokenERC20");
+
+        require(_strategy != address(0), "readSavedEigenlayerAddresses: _strategy cannot be address(0)");
+        require(_strategyManager != address(0), "readSavedEigenlayerAddresses: _strategyManager cannot be address(0)");
+        require(_strategyFactory != address(0), "readSavedEigenlayerAddresses: _strategyFactory cannot be address(0)");
+        require(_delegationManager != address(0), "readSavedEigenlayerAddresses: _delegationManager cannot be address(0)");
+        require(_rewardsCoordinator != address(0), "readSavedEigenlayerAddresses: _rewardsCoordinator cannot be address(0)");
+        require(_pauserRegistry != address(0), "readSavedEigenlayerAddresses: _pauserRegistry cannot be address(0)");
 
         return (
-            _strategy,
-            _strategyManager,
-            _strategyFactory,
-            _pauserRegistry,
-            _delegationManager,
-            _rewardsCoordinator,
-            _tokenERC20
+            IStrategy(_strategy),
+            IStrategyManager(_strategyManager),
+            IStrategyFactory(_strategyFactory),
+            IPauserRegistry(_pauserRegistry),
+            IDelegationManager(_delegationManager),
+            IRewardsCoordinator(_rewardsCoordinator),
+            IERC20(_tokenERC20)
         );
     }
 
