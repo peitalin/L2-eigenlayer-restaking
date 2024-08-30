@@ -144,7 +144,6 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         }
         vm.stopBroadcast();
 
-
         //////////////////////////////////////////////////////
         /// L1: ReceiverCCIP -> EigenAgent -> Eigenlayer
         //////////////////////////////////////////////////////
@@ -463,6 +462,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             (stakerBalanceOnL2Before + amount) == stakerBalanceOnL2After,
             "balanceOf(bob) on L2 should increase by amount after L2 -> L2 withdrawal"
         );
+
 
         vm.stopBroadcast();
     }

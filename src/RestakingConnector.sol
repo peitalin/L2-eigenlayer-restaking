@@ -60,8 +60,8 @@ contract RestakingConnector is
         agentFactory = newAgentFactory;
 
         // handleTransferToAgentOwner: [gas: 268_420]
-        // cast sig "handleTransferToAgentOwner(bytes32,address,bytes32)" == 0x17f23aea
-        _gasLimitsForFunctionSelectors[0x17f23aea] = 400_000;
+        // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
+        _gasLimitsForFunctionSelectors[0xd8a85b48] = 500_000;
 
         __Adminable_init();
     }

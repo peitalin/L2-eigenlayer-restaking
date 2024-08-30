@@ -71,8 +71,6 @@ contract EigenAgent6551 is ERC6551Account, IEigenAgent6551 {
         returns (bytes memory result)
     {
 
-        console.log("eenonce:", execNonce);
-
         bytes32 digestHash = createEigenAgentCallDigestHash(
             targetContract,
             value,

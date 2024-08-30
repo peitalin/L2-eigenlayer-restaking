@@ -20,7 +20,7 @@ contract WhitelistCCIPContractsScript is Script {
 
     FileReader public fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
 
-    IRestakingConnector public restakingConnector;
+    IRestakingConnector public restakingConnectorProxy;
     IAgentFactory public agentFactory;
     IReceiverCCIP public receiverProxy;
     ISenderCCIP public senderProxy;
@@ -36,7 +36,7 @@ contract WhitelistCCIPContractsScript is Script {
 
         (
             receiverProxy,
-            restakingConnector
+            restakingConnectorProxy
         ) = fileReader.readReceiverRestakingConnector();
 
         agentFactory = fileReader.readAgentFactory();
@@ -63,7 +63,7 @@ contract WhitelistCCIPContractsScript is Script {
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
 
         // set GasLimits
-        uint256[] memory gasLimits = new uint256[](8);
+        uint256[] memory gasLimits = new uint256[](7);
         gasLimits[0] = 2_200_000; // depositIntoStrategy            [gas: 1,935,006] 1.4mil to mint agent, 500k for deposit
         // https://sepolia.etherscan.io/tx/0xebcf428192d04fc02b1770c40feaa81429424ba6c42ac8bad6cbadb1c31b7c1c
         gasLimits[1] = 700_000; // depositIntoStrategyWithSignature [gas: ?]
@@ -72,9 +72,8 @@ contract WhitelistCCIPContractsScript is Script {
         gasLimits[4] = 600_000; // delegateTo                       [gas: ?]
         gasLimits[5] = 600_000; // delegateToBySignature            [gas: ?]
         gasLimits[6] = 400_000; // undelegate                       [gas: ?]
-        gasLimits[7] = 400_000; // handleTransferToAgentOwner       [gas: 268_420]
 
-        bytes4[] memory functionSelectors = new bytes4[](8);
+        bytes4[] memory functionSelectors = new bytes4[](7);
         functionSelectors[0] = 0xe7a050aa;
         // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
         functionSelectors[1] = 0x32e89ace;
@@ -89,12 +88,22 @@ contract WhitelistCCIPContractsScript is Script {
         // cast sig "delegateToBySignature(address,address,(bytes,uint256),(bytes,uint256),bytes32)" == 0x7f548071
         functionSelectors[6] = 0xda8be864;
             // cast sig "undelegate(address)" == 0xda8be864
-        functionSelectors[7] = 0x17f23aea;
-        // cast sig "handleTransferToAgentOwner(bytes32,address,bytes32)" == 0x17f23aea
 
         senderUtilsProxy.setGasLimitsForFunctionSelectors(
             functionSelectors,
             gasLimits
+        );
+
+        uint256[] memory gasLimits_R = new uint256[](1);
+        gasLimits_R[0] = 400_000; // handleTransferToAgentOwner       [gas: 268_420]
+
+        bytes4[] memory functionSelectors_R = new bytes4[](8);
+        functionSelectors_R[0] = 0xd8a85b48;
+        // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
+
+        restakingConnectorProxy.setGasLimitsForFunctionSelectors(
+            functionSelectors_R,
+            gasLimits_R
         );
 
         IERC20_CCIPBnM(tokenL2).drip(deployer);

@@ -34,7 +34,7 @@ contract ClientEncoders {
     ) public pure returns (bytes memory) {
 
         bytes memory message_bytes = abi.encodeWithSelector(
-            // bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
+            // cast sig "queueWithdrawals((address[],uint256[],address)[])" == 0x0dd8dd02
             IDelegationManager.queueWithdrawals.selector,
             queuedWithdrawalParams
         );
@@ -76,7 +76,6 @@ contract ClientEncoders {
 
         bytes memory message_bytes = abi.encodeWithSelector(
             // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
-            // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)")),
             IDelegationManager.completeQueuedWithdrawal.selector,
             withdrawal,
             tokensToWithdraw,
@@ -92,11 +91,11 @@ contract ClientEncoders {
         address agentOwner
     ) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
-            // bytes4(keccak256("handleTransferToAgentOwner(bytes32,address,bytes32)")),
+            // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderUtils.handleTransferToAgentOwner.selector,
             withdrawalRoot,
             agentOwner,
-            calculateAgentOwnerRoot(withdrawalRoot, agentOwner)
+            hashAgentOwnerRoot(withdrawalRoot, agentOwner)
         );
         return message_bytes;
     }
@@ -189,10 +188,7 @@ contract ClientEncoders {
         return message_bytes;
     }
 
-    function calculateAgentOwnerRoot(
-        bytes32 withdrawalRoot,
-        address agentOwner
-    ) public pure returns (bytes32) {
+    function hashAgentOwnerRoot(bytes32 withdrawalRoot, address agentOwner) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(withdrawalRoot, agentOwner));
     }
 }

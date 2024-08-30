@@ -27,26 +27,29 @@ contract UpgradeSenderOnL2Script is Script {
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
 
         ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL2());
+
         ISenderCCIP senderProxy = fileReader.readSenderContract();
+        ISenderUtils senderUtilsProxy = fileReader.readSenderUtils();
 
         /////////////////////////////
         /// Begin Broadcast
         /////////////////////////////
         vm.startBroadcast(deployerKey);
 
-        SenderCCIP senderImpl = new SenderCCIP(BaseSepolia.Router, BaseSepolia.Link);
-
-        ISenderUtils senderUtils = ISenderUtils(address(new SenderUtils()));
-
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(senderProxy))),
-            address(senderImpl)
+            address(new SenderCCIP(BaseSepolia.Router, BaseSepolia.Link))
+        );
+
+        proxyAdmin.upgrade(
+            TransparentUpgradeableProxy(payable(address(senderUtilsProxy))),
+            address(new SenderUtils())
         );
 
         /// whitelist destination chain
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
-        senderProxy.setSenderUtils(senderUtils);
+        senderProxy.setSenderUtils(senderUtilsProxy);
 
         require(
             address(senderProxy.getSenderUtils()) != address(0),

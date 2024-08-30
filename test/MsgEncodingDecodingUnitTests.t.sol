@@ -454,7 +454,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         );
     }
 
-    function test_decode_delegatetobysignature_unsigned() public view {
+    function test_Decode_DelegateToBySignature_Unsigned() public view {
 
         address staker1 = vm.addr(0x1);
         address operator = vm.addr(0x2);

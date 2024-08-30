@@ -9,6 +9,8 @@ import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
 import {EigenlayerMsgDecoders, TransferToAgentOwnerMsg} from "./utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 
+import {console} from "forge-std/Test.sol";
+
 
 contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
 
@@ -26,10 +28,10 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
     }
 
     function initialize() initializer public {
-        // depositIntoStrategy: [gas: 2_650_000]
-        // Mint EigenAgent: 1_857_622 gas
-        // Deposit tx: 718_947 gas
-        _gasLimitsForFunctionSelectors[0xe7a050aa] = 2_500_000;
+        // depositIntoStrategy: [gas: 1_950_000]
+        // Mint EigenAgent: 1_400_000 gas
+        // Deposit tx: 550_000 gas
+        _gasLimitsForFunctionSelectors[0xe7a050aa] = 2_200_000;
         // depositIntoStrategyWithSignature: [gas: 713_400]
         _gasLimitsForFunctionSelectors[0x32e89ace] = 800_000;
         // queueWithdrawals: [gas: x]
@@ -42,8 +44,6 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
         _gasLimitsForFunctionSelectors[0x7f548071] = 600_000;
         // undelegate: [gas: ?]
         _gasLimitsForFunctionSelectors[0xda8be864] = 400_000;
-        // transferToStaker: [gas: 268_420]
-        _gasLimitsForFunctionSelectors[0x27167d10] = 400_000;
 
         __Adminable_init();
     }
@@ -55,41 +55,32 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
     ) {
 
         TransferToAgentOwnerMsg memory transferToAgentOwnerMsg = decodeTransferToAgentOwnerMsg(message);
-        // 0000000000000000000000000000000000000000000000000000000000000020
-        // 0000000000000000000000000000000000000000000000000000000000000064
-        // d8a85b48
-        // de2d6fe858b7ce7d03bac292d3faddd82f3c3e6cca16e9837941989f328c0e7b
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c
-        // 7e65465374cc2a055c74d64e1e5fad1b47dce00c83a5cf786545a62a3c00b851
-        // 00000000000000000000000000000000000000000000000000000000
 
         bytes32 withdrawalRoot = transferToAgentOwnerMsg.withdrawalRoot;
         address agentOwner = transferToAgentOwnerMsg.agentOwner;
         bytes32 agentOwnerRoot = transferToAgentOwnerMsg.agentOwnerRoot;
 
         require(
-            EigenlayerMsgEncoders.calculateAgentOwnerRoot(withdrawalRoot, agentOwner) == agentOwnerRoot,
-            "SenderUtils.transferToAgentOwner: invalid agentOwnerRoot"
+            EigenlayerMsgEncoders.hashAgentOwnerRoot(withdrawalRoot, agentOwner) == agentOwnerRoot,
+            "SenderUtils.handleTransferToAgentOwner: invalid agentOwnerRoot"
         );
 
         ISenderUtils.WithdrawalTransfer memory withdrawalTransfer = withdrawalTransferCommittments[withdrawalRoot];
 
-        // address withdrawer = withdrawalTransfer.withdrawer; // withdrawer == eigenAgent
-        uint256 amount = withdrawalTransfer.amount;
-        address tokenL2Address = withdrawalTransfer.tokenDestination;
-        // BaseSepolia.CcipBnM;
-
-        emit SendingWithdrawalToAgentOwner(agentOwner, amount, tokenL2Address);
-
-        // checks-effects-interactions
         // mark the withdrawalRoot as spent to prevent multiple withdrawals
         withdrawalRootsSpent[withdrawalRoot] = true;
-        // delete withdrawalTransferCommittments[withdrawalRoot];
+        delete withdrawalTransferCommittments[withdrawalRoot];
+
+        emit SendingWithdrawalToAgentOwner(
+            agentOwner,
+            withdrawalTransfer.amount, // amount
+            withdrawalTransfer.tokenDestination // tokenL2Address
+        );
 
         return (
             agentOwner,
-            amount,
-            tokenL2Address
+            withdrawalTransfer.amount, // amount
+            withdrawalTransfer.tokenDestination // tokenL2Address
         );
     }
 
@@ -106,7 +97,9 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
         return keccak256(abi.encode(withdrawal));
     }
 
-    function commitWithdrawalRootInfo(bytes memory message, address tokenDestination) public {
+    function commitWithdrawalRootInfo(bytes memory message, address tokenDestinationL2) public {
+
+            require(tokenDestinationL2 != address(0), "cannot commit tokenL2 as address(0)");
 
             (
                 IDelegationManager.Withdrawal memory withdrawal
@@ -133,7 +126,7 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
             withdrawalTransferCommittments[withdrawalRoot] = ISenderUtils.WithdrawalTransfer({
                 withdrawer: withdrawal.withdrawer,
                 amount: withdrawal.shares[0],
-                tokenDestination: tokenDestination
+                tokenDestination: tokenDestinationL2
             });
 
             emit WithdrawalCommitted(withdrawalRoot, withdrawal.withdrawer, withdrawal.shares[0]);

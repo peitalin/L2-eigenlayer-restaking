@@ -502,29 +502,34 @@ contract EigenlayerMsgDecoders {
         public pure
         returns (TransferToAgentOwnerMsg memory transferToAgentOwnerMsg)
     {
-        // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
-        // 0000000000000000000000000000000000000000000000000000000000000024 [64] string length
-        // 27167d10                                                         [96] function selector
-        // 8c20d3a37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7d8ec77 [100] withdrawalRoot
+
+        // 0000000000000000000000000000000000000000000000000000000000000020
+        // 0000000000000000000000000000000000000000000000000000000000000064
+        // d8a85b48                                                         [96] function selector
+        // d4051832dcd7410644cd25870cdbe10efd8579e9a00f3e771b8d457c584e229a [100] withdrawal root
         // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] agent owner
+        // 4e692baa2e5b644d9f77780b439b315bdce9c0672e7e6c45cb79875f9f754350 [164] agentOwnerRoot
         // 00000000000000000000000000000000000000000000000000000000
 
         bytes4 functionSelector;
         bytes32 withdrawalRoot;
         address agentOwner;
+        // bytes32 agentOwnerRoot;
 
         assembly {
             functionSelector := mload(add(message, 96))
             withdrawalRoot := mload(add(message, 100))
             agentOwner := mload(add(message, 132))
+            // agentOwnerRoot := mload(add(message, 164))
         }
 
-        bytes32 agentOwnerRoot = EigenlayerMsgEncoders.calculateAgentOwnerRoot(withdrawalRoot, agentOwner);
+        bytes32 computedRoot = EigenlayerMsgEncoders.hashAgentOwnerRoot(withdrawalRoot, agentOwner);
+        // require(computedRoot == agentOwnerRoot, "invalid AgentOwnerRoot");
 
         return TransferToAgentOwnerMsg({
             withdrawalRoot: withdrawalRoot,
             agentOwner: agentOwner,
-            agentOwnerRoot: agentOwnerRoot
+            agentOwnerRoot: computedRoot
         });
     }
 
