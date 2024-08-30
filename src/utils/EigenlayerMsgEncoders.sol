@@ -33,7 +33,7 @@ library EigenlayerMsgEncoders {
     ) public pure returns (bytes memory) {
 
         bytes memory message_bytes = abi.encodeWithSelector(
-            // bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
+            // cast sig "queueWithdrawals((address[],uint256[],address)[])"
             IDelegationManager.queueWithdrawals.selector,
             queuedWithdrawalParams
         );
@@ -75,7 +75,6 @@ library EigenlayerMsgEncoders {
 
         bytes memory message_bytes = abi.encodeWithSelector(
             // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
-            // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)")),
             IDelegationManager.completeQueuedWithdrawal.selector,
             withdrawal,
             tokensToWithdraw,
@@ -91,7 +90,7 @@ library EigenlayerMsgEncoders {
         address agentOwner
     ) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
-            // bytes4(keccak256("handleTransferToAgentOwner(bytes32,address,bytes32)")),
+            // cast sig "handleTransferToAgentOwner(bytes32,address,bytes32)"
             ISenderUtils.handleTransferToAgentOwner.selector,
             withdrawalRoot,
             agentOwner,
@@ -112,6 +111,12 @@ library EigenlayerMsgEncoders {
         //     SignatureWithExpiry memory approverSignatureAndExpiry,
         //     bytes32 approverSalt
         // )
+        // struct SignatureWithExpiry {
+        //     // the signature itself, formatted as a single bytes object
+        //     bytes signature;
+        //     // the expiration timestamp (UTC) of the signature
+        //     uint256 expiry;
+        // }
 
         // 0000000000000000000000000000000000000000000000000000000000000020
         // 0000000000000000000000000000000000000000000000000000000000000164
@@ -129,6 +134,7 @@ library EigenlayerMsgEncoders {
         // 0000000000000000000000000000000000000000000000000000000000000000
 
         bytes memory message_bytes = abi.encodeWithSelector(
+            // cast sig "delegateTo(address,(bytes,uint256),bytes32)" == 0xeea9064b
             IDelegationManager.delegateTo.selector,
             operator,
             approverSignatureAndExpiry,
@@ -169,6 +175,7 @@ library EigenlayerMsgEncoders {
         // 0000000000000000000000000000000000000000000000000000000000000000
 
         bytes memory message_bytes = abi.encodeWithSelector(
+            // cast sig "delegateToBySignature(address,address,(bytes,uint256),(bytes,uint256),bytes32)" == 0x7f548071
             IDelegationManager.delegateToBySignature.selector,
             staker,
             operator,
@@ -181,7 +188,7 @@ library EigenlayerMsgEncoders {
 
     function encodeUndelegateMsg(address staker) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
-            // bytes4(keccak256("undelegate(address)")),
+            // cast sig "undelegate(address)"
             IDelegationManager.undelegate.selector,
             staker
         );

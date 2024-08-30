@@ -5,7 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 
 contract ScriptUtils is Script {
 
-    uint256 public amountToTopup = 0.15 ether;
+    uint256 public amountToTopup = 0.2 ether;
 
     function topupSenderEthBalance(address _senderAddr) public {
         if (_senderAddr.balance < 0.05 ether) {

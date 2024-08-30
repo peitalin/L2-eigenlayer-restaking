@@ -40,7 +40,6 @@ contract RestakingConnector is
 
     mapping(address user => mapping(uint256 nonce => uint256 withdrawalBlock)) private _withdrawalBlock;
     mapping(bytes4 => uint256) internal _gasLimitsForFunctionSelectors;
-    mapping(bytes4 => string) internal _functionSelectorNames;
 
     /*
      *
@@ -61,9 +60,8 @@ contract RestakingConnector is
         agentFactory = newAgentFactory;
 
         // handleTransferToAgentOwner: [gas: 268_420]
-        // bytes4(keccak256("handleTransferToAgentOwner(bytes32,address,bytes32)")) == 0x17f23aea
+        // cast sig "handleTransferToAgentOwner(bytes32,address,bytes32)" == 0x17f23aea
         _gasLimitsForFunctionSelectors[0x17f23aea] = 400_000;
-        _functionSelectorNames[0x17f23aea] = "handleTransferToAgentOwner";
 
         __Adminable_init();
     }

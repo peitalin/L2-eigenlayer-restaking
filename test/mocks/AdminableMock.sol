@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import {Adminable} from "../../src/utils/Adminable.sol";
 
-contract MockAdminable is Adminable {
+contract AdminableMock is Adminable {
 
     constructor() {
         __Adminable_init();

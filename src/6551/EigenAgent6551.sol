@@ -5,66 +5,37 @@ import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IERC6551Account} from "@6551/interfaces/IERC6551Account.sol";
-import {IERC6551Executable} from "@6551/interfaces/IERC6551Executable.sol";
-
-import {ERC6551AccountUpgradeable} from "./ERC6551AccountUpgradeable.sol";
+import {ERC6551Account} from "./ERC6551Account.sol";
 import {IEigenAgent6551} from "./IEigenAgent6551.sol";
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
 
+import {console} from "forge-std/Test.sol";
 
 
-contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
-
-    /*
-     *
-     *            Constants
-     *
-     */
-
-    uint256 public execNonce;
+contract EigenAgent6551 is ERC6551Account, IEigenAgent6551 {
 
     /// @notice The EIP-712 typehash for the deposit struct used by the contract
-    bytes32 public constant EIGEN_AGENT_EXEC_TYPEHASH = keccak256("ExecuteWithSignature(address target, uint256 value, bytes data, uint256 expiry)");
+    bytes32 public constant EIGEN_AGENT_EXEC_TYPEHASH = keccak256(
+        "ExecuteWithSignature(address target,uint256 value,bytes data,uint256 execNonce,uint256 chainId,uint256 expiry)"
+    );
 
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
-    error CallerIsNotOwner();
     error CallerNotWhitelisted();
     error SignatureNotFromNftOwner();
-    error OnlyCallOperationsSupported();
 
-    event ExecutedCall(address indexed target, bytes indexed data);
-
-    /*
-     *
-     *            Functions
-     *
-     */
-
-    function getExecNonce() public view returns (uint256) {
-        return execNonce;
+    modifier onlyWhitelistedCallers() {
+        // get the 721 NFT associated with 6551 account and check if caller is whitelisted
+        (uint256 chainId, address contractAddress, uint256 tokenId) = token();
+        if (!IEigenAgentOwner721(contractAddress).isWhitelistedCaller(msg.sender)) {
+            revert CallerNotWhitelisted();
+        }
+        _;
     }
 
     function getAgentOwner() public view returns (address) {
         return owner();
-    }
-
-    function agentImplVersion() public virtual override returns (uint256) {
-        return 1;
-    }
-
-    function beforeExecute(bytes calldata data) public override virtual returns (bytes4) {
-        return IEigenAgent6551.beforeExecute.selector;
-    }
-
-    function afterExecute(
-        bytes calldata data,
-        bool success,
-        bytes memory result
-    ) public override virtual returns (bytes4) {
-        return IEigenAgent6551.afterExecute.selector;
     }
 
     function isValidSignature(
@@ -77,51 +48,6 @@ contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
         }
 
         return bytes4(0);
-    }
-
-    modifier onlySignedByNftOwner(
-        bytes32 _digestHash,
-        bytes memory _signature
-    ) {
-        if (isValidSignature(_digestHash, _signature) != IERC1271.isValidSignature.selector)
-            revert SignatureNotFromNftOwner();
-        _;
-    }
-
-    modifier onlyWhitelistedCallers() {
-        (uint256 chainId, address contractAddress, uint256 tokenId) = token();
-        // TODO: require chainId == L1
-        if (!IEigenAgentOwner721(contractAddress).isWhitelistedCaller(msg.sender)) {
-            revert CallerNotWhitelisted();
-        }
-        _;
-    }
-
-    // Uses the signature that signed the depositIntoStrategy struct,
-    // as depositIntoStrategy struct contains (token, amount) fields used in ERC20 approve()
-    function approveWithSignature(
-        address targetContract,
-        uint256 value,
-        bytes calldata data,
-        uint256 expiry,
-        bytes memory signature
-    ) external returns (bool) {
-
-        bytes32 digestHash = createEigenAgentCallDigestHash(
-            targetContract,
-            value,
-            data,
-            execNonce,
-            block.chainid,
-            expiry
-        );
-
-        if (isValidSignature(digestHash, signature) != IERC1271.isValidSignature.selector)
-            revert SignatureNotFromNftOwner();
-
-        (address token, uint256 amount) = decodeApproveERC20FromDepositMsg(data);
-
-        return IERC20(token).approve(targetContract, amount);
     }
 
     function approveByWhitelistedContract(
@@ -144,8 +70,9 @@ contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
         virtual
         returns (bytes memory result)
     {
-        // no longer need msg.sender == nftOwner constraint
-        // if (!_isValidSigner(msg.sender)) revert CallerIsNotOwner();
+
+        console.log("eenonce:", execNonce);
+
         bytes32 digestHash = createEigenAgentCallDigestHash(
             targetContract,
             value,
@@ -158,17 +85,13 @@ contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
         if (isValidSignature(digestHash, signature) != IERC1271.isValidSignature.selector)
             revert SignatureNotFromNftOwner();
 
-        ++state;
+        ++execNonce;
         bool success;
 
-        beforeExecute(data);
         {
             // solhint-disable-next-line avoid-low-level-calls
             (success, result) = targetContract.call{value: value}(data);
         }
-        afterExecute(data, success, result);
-
-        emit ExecutedCall(targetContract, data);
 
         require(success, string(result));
         return result;
@@ -202,60 +125,13 @@ contract EigenAgent6551 is ERC6551AccountUpgradeable, IEigenAgent6551 {
         return digestHash;
     }
 
+    /// @param contractAddr is the address of the contract being called,
+    /// usually Eigenlayer StrategyManager, or DelegationManager.
+    /// @param chainid is the chain Eigenlayer is deployed on
     function getDomainSeparator(
         address contractAddr, // strategyManagerAddr, or delegationManagerAddr
-        uint256 destinationChainid
+        uint256 chainid
     ) public pure returns (bytes32) {
-
-        uint256 chainid = destinationChainid;
-
         return keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes("EigenLayer")), chainid, contractAddr));
-        // Note: in calculating the domainSeparator:
-        // address(this) is the StrategyManager, not this contract (SignatureUtilsEIP2172)
-        // chainid is the chain Eigenlayer is deployed on (it can fork!), not the chain you are calling this function
-        // So chainid should be destination chainid in the context of L2 -> L1 restaking calls
     }
-
-    function decodeApproveERC20FromDepositMsg(bytes memory message)
-        public pure
-        returns (address, uint256)
-    {
-        ////////////////////////////////////////////////////////
-        //// deserialize data from Deposit Msg for approve()
-        ////////////////////////////////////////////////////////
-
-        // e7a050aa                                                         [32] function selector
-        // 0000000000000000000000000b731ce99ec04be646ecac8a7fa9a5126b44c54b [36] strategy
-        // 000000000000000000000000fd57b4ddbf88a4e07ff4e34c487b99af2fe82a05 [68] token
-        // 0000000000000000000000000000000000000000000000000009f295cd5f0000 [100] amount
-
-        address token;
-        uint256 amount;
-
-        assembly {
-            token := mload(add(message, 68))
-            amount := mload(add(message, 100))
-        }
-
-        return (token, amount);
-    }
-
-    /*
-     *
-     *            EIP-1271 Smart Contract Signature
-     *
-     */
-
-    // function isValidSignature(
-    //     bytes32 _hash,
-    //     bytes memory _signature
-    // ) public pure returns (bytes4 magicValue) {
-    //     bytes4 constant internal MAGICVALUE = 0x1626ba7e;
-    //     // implement some hash/signature scheme that checks:
-    //     // (bool success, bytes memory result) = EigenAgent6551.staticcall(
-    //     //     abi.encodeWithSelector(IERC1271.isValidSignature.selector, hash, signature)
-    //     // );
-    //     // abi.decode(result, (bytes32)) == bytes32(IERC1271.isValidSignature.selector));
-    //     return MAGICVALUE;
-    // }
 }

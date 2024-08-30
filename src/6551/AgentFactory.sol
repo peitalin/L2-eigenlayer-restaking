@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Adminable} from "../utils/Adminable.sol";
-// import {ERC6551AccountProxy} from "@6551/examples/upgradeable/ERC6551AccountProxy.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgent6551} from "./IEigenAgent6551.sol";
 import {EigenAgent6551} from "./EigenAgent6551.sol";
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
 import {IAgentFactory} from "./IAgentFactory.sol";
+import {Adminable} from "../utils/Adminable.sol";
 
 
 
-contract AgentFactory is Adminable {
+contract AgentFactory is Initializable, Adminable {
 
     error AddressZero(string msg);
 
@@ -35,10 +36,15 @@ contract AgentFactory is Adminable {
      *
      */
 
-    constructor(
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         IERC6551Registry _erc6551Registry,
         IEigenAgentOwner721 _eigenAgentOwner721
-    ) {
+    ) public initializer {
+
         if (address(_erc6551Registry) == address(0))
             revert AddressZero("ERC6551Registry cannot be address(0)");
 
@@ -66,14 +72,19 @@ contract AgentFactory is Adminable {
         _restakingConnector = newRestakingConnector;
     }
 
-    function get6551Registry() public view returns (IERC6551Registry) {
-        return erc6551Registry;
+    function set6551Registry(IERC6551Registry new6551Registry) public onlyAdminOrOwner {
+        if (address(new6551Registry) == address(0))
+            revert AddressZero("AgentFactory.set6551Registry: cannot be address(0)");
+        erc6551Registry = new6551Registry;
     }
 
-    function getEigenAgentOwner721() public view returns (IEigenAgentOwner721) {
-        return eigenAgentOwner721;
+    function setEigenAgentOwner721(IEigenAgentOwner721 newEigenAgentOwner721) public onlyAdminOrOwner {
+        if (address(newEigenAgentOwner721) == address(0))
+            revert AddressZero("AgentFactory.setEigenAgent721: cannot be address(0)");
+        eigenAgentOwner721 = newEigenAgentOwner721;
     }
 
+    /// @dev this callback is triggered every time a EigenAgentOwner721 NFT is transferred
     function updateEigenAgentOwnerTokenId(
         address from,
         address to,
@@ -93,12 +104,13 @@ contract AgentFactory is Adminable {
     }
 
     function getEigenAgent(address staker) public view returns (IEigenAgent6551) {
-        return IEigenAgent6551(tokenIdToEigenAgents[userToEigenAgentTokenIds[staker]]);
+        return IEigenAgent6551(payable(tokenIdToEigenAgents[userToEigenAgentTokenIds[staker]]));
     }
 
-    function spawnEigenAgentOnlyOwner(
-        address staker
-    ) external onlyAdminOrOwner returns (IEigenAgent6551) {
+    function spawnEigenAgentOnlyOwner(address staker)
+        external onlyAdminOrOwner
+        returns (IEigenAgent6551)
+    {
         return _spawnEigenAgent6551(staker);
     }
 
@@ -124,12 +136,9 @@ contract AgentFactory is Adminable {
         bytes32 salt = bytes32(abi.encode(staker));
         uint256 tokenId = eigenAgentOwner721.mint(staker);
 
-        EigenAgent6551 eigenAgentImplementation = new EigenAgent6551();
-        // ERC6551AccountProxy eigenAgentProxy = new ERC6551AccountProxy(address(eigenAgentImplementation));
-
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(
             erc6551Registry.createAccount(
-                address(eigenAgentImplementation),
+                address(new EigenAgent6551()),
                 salt,
                 block.chainid,
                 address(eigenAgentOwner721),

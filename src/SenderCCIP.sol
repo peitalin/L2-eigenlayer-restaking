@@ -11,7 +11,7 @@ import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
 
 
-
+/// @title L2 Messenger Contract: sends Eigenlayer messages to CCIP Router
 contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
     event MatchedReceivedFunctionSelector(bytes4 indexed);
@@ -37,12 +37,6 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
     function setSenderUtils(ISenderUtils _senderUtils) external onlyOwner {
         require(address(_senderUtils) != address(0), "_senderUtils cannot be address(0)");
         senderUtils = _senderUtils;
-    }
-
-    function mockCCIPReceive(
-        Client.Any2EVMMessage memory any2EvmMessage
-    ) public {
-        _ccipReceive(any2EvmMessage);
     }
 
     function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage)

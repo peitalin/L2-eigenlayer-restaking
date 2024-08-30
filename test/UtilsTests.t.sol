@@ -5,28 +5,22 @@ import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {ScriptUtils} from "../script/ScriptUtils.sol";
-import {MockAdminable} from "./mocks/MockAdminable.sol";
+import {AdminableMock} from "./mocks/AdminableMock.sol";
 import {ERC20Minter} from "../src/ERC20Minter.sol";
 
 
 contract UtilsTests is Test, ScriptUtils {
 
-    MockAdminable public mockAdminable;
+    AdminableMock public adminableMock;
     ERC20Minter public erc20Minter;
 
-    uint256 public deployerKey;
-    address public deployer;
-    address public bob;
+    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+    address deployer = vm.addr(deployerKey);
+    address bob = vm.addr(0xb0b);
 
     function setUp() public {
-
-		deployerKey = vm.envUint("DEPLOYER_KEY");
-        deployer = vm.addr(deployerKey);
-        bob = vm.addr(0xb0b);
-
         vm.startBroadcast(deployer);
-
-        mockAdminable = new MockAdminable();
+        adminableMock = new AdminableMock();
         erc20Minter = ERC20Minter(address(
             new TransparentUpgradeableProxy(
                 address(new ERC20Minter()),
@@ -34,7 +28,6 @@ contract UtilsTests is Test, ScriptUtils {
                 abi.encodeWithSelector(ERC20Minter.initialize.selector, "test", "TST")
             )
         ));
-
         vm.stopBroadcast();
     }
 
@@ -59,38 +52,38 @@ contract UtilsTests is Test, ScriptUtils {
 
         vm.prank(bob);
         vm.expectRevert("Not an admin");
-        mockAdminable.mockOnlyAdmin();
+        adminableMock.mockOnlyAdmin();
 
         vm.prank(bob);
         vm.expectRevert("Not admin or owner");
-        mockAdminable.mockOnlyAdminOrOwner();
+        adminableMock.mockOnlyAdminOrOwner();
 
         vm.prank(bob);
-        require(mockAdminable.mockIsOwner() == false, "bob is not owner");
-
-        vm.prank(bob);
-        vm.expectRevert("Ownable: caller is not the owner");
-        mockAdminable.addAdmin(bob);
-
-        vm.prank(deployer);
-        mockAdminable.addAdmin(bob);
-
-        require(mockAdminable.isAdmin(bob), "should be admin");
-
-        vm.prank(bob);
-        require(mockAdminable.mockOnlyAdmin(), "should pass onlyAdmin modifier");
+        require(adminableMock.mockIsOwner() == false, "bob is not owner");
 
         vm.prank(bob);
         vm.expectRevert("Ownable: caller is not the owner");
-        mockAdminable.removeAdmin(bob);
+        adminableMock.addAdmin(bob);
 
         vm.prank(deployer);
-        mockAdminable.removeAdmin(bob);
+        adminableMock.addAdmin(bob);
 
-        require(!mockAdminable.isAdmin(bob), "should of removed admin");
+        require(adminableMock.isAdmin(bob), "should be admin");
+
+        vm.prank(bob);
+        require(adminableMock.mockOnlyAdmin(), "should pass onlyAdmin modifier");
+
+        vm.prank(bob);
+        vm.expectRevert("Ownable: caller is not the owner");
+        adminableMock.removeAdmin(bob);
 
         vm.prank(deployer);
-        require(mockAdminable.mockOnlyAdminOrOwner(), "deployer should pass onlyAdminOrOwner modifier");
+        adminableMock.removeAdmin(bob);
+
+        require(!adminableMock.isAdmin(bob), "should of removed admin");
+
+        vm.prank(deployer);
+        require(adminableMock.mockOnlyAdminOrOwner(), "deployer should pass onlyAdminOrOwner modifier");
     }
 
     function test_ScriptUtils() public {

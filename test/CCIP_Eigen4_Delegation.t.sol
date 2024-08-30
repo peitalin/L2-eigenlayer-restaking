@@ -4,7 +4,6 @@ pragma solidity 0.8.22;
 import {Test, console} from "forge-std/Test.sol";
 
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
-import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 
@@ -17,9 +16,11 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
+import {IReceiverCCIPMock} from "./mocks/ReceiverCCIPMock.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
+import {ISenderCCIPMock} from "./mocks/SenderCCIPMock.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
@@ -39,27 +40,27 @@ contract CCIP_Eigen_DelegationTests is Test {
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
 
-    uint256 public deployerKey;
-    address public deployer;
-
-    IReceiverCCIP public receiverContract;
-    ISenderCCIP public senderContract;
+    IReceiverCCIPMock public receiverContract;
+    ISenderCCIPMock public senderContract;
     IRestakingConnector public restakingConnector;
     IAgentFactory public agentFactory;
-    IERC20 public token;
 
     IStrategyManager public strategyManager;
     IPauserRegistry public _pauserRegistry;
     IRewardsCoordinator public _rewardsCoordinator;
     IDelegationManager public delegationManager;
     IStrategy public strategy;
+    IERC20 public tokenL1;
 
-    uint256 public stakerShares;
-    uint256 public initialReceiverBalance = 5 ether;
-    uint256 public amountToStake = 0.0091 ether;
-    address public staker;
-    uint256 public operatorKey;
-    address public operator;
+    uint256 deployerKey;
+    address deployer;
+
+    uint256 stakerShares;
+    uint256 initialReceiverBalance = 1 ether;
+    uint256 amountToStake = 0.0091 ether;
+    address staker;
+    uint256 operatorKey;
+    address operator;
 
     uint256 l2ForkId;
     uint256 ethForkId;
@@ -76,8 +77,6 @@ contract CCIP_Eigen_DelegationTests is Test {
 
         l2ForkId = vm.createFork("basesepolia");        // 0
         ethForkId = vm.createSelectFork("ethsepolia"); // 1
-        console.log("l2ForkId:", l2ForkId);
-        console.log("ethForkId:", ethForkId);
 
         (
             strategy,
@@ -86,7 +85,7 @@ contract CCIP_Eigen_DelegationTests is Test {
             _pauserRegistry,
             delegationManager,
             _rewardsCoordinator,
-            token
+            tokenL1
         ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
         staker = deployer;
@@ -95,7 +94,7 @@ contract CCIP_Eigen_DelegationTests is Test {
 
         //////////// Arb Sepolia ////////////
         vm.selectFork(l2ForkId);
-        senderContract = deployOnL2Script.testrun();
+        senderContract = deployOnL2Script.mockrun();
 
 
         //////////// Eth Sepolia ////////////
@@ -104,7 +103,7 @@ contract CCIP_Eigen_DelegationTests is Test {
             receiverContract,
             restakingConnector,
             agentFactory
-        ) = deployReceiverOnL1Script.testrun();
+        ) = deployReceiverOnL1Script.mockrun();
 
 
         //////////// Arb Sepolia ////////////
@@ -119,12 +118,12 @@ contract CCIP_Eigen_DelegationTests is Test {
         if (block.chainid == BaseSepolia.ChainId) {
             // drip() using CCIP's BnM faucet if forking from Arb Sepolia
             for (uint256 i = 0; i < 5; ++i) {
-                IERC20_CCIPBnM(BaseSepolia.CcipBnM).drip(address(senderContract));
+                IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(senderContract));
                 // each drip() gives you 1e18 coin
             }
         } else {
             // mint() if we deployed our own Mock ERC20
-            IERC20Minter(BaseSepolia.CcipBnM).mint(address(senderContract), 5 ether);
+            IERC20Minter(BaseSepolia.BridgeToken).mint(address(senderContract), 5 ether);
         }
         vm.stopBroadcast();
 
@@ -141,14 +140,14 @@ contract CCIP_Eigen_DelegationTests is Test {
         if (block.chainid == 11155111) {
             // drip() using CCIP's BnM faucet if forking from Eth Sepolia
             for (uint256 i = 0; i < 5; ++i) {
-                IERC20_CCIPBnM(address(token)).drip(address(receiverContract));
+                IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
                 // each drip() gives you 1e18 coin
             }
-            initialReceiverBalance = IERC20_CCIPBnM(address(token)).balanceOf(address(receiverContract));
+            initialReceiverBalance = IERC20_CCIPBnM(address(tokenL1)).balanceOf(address(receiverContract));
             // set initialReceiverBalancer for tests
         } else {
             // mint() if we deployed our own Mock ERC20
-            IERC20Minter(address(token)).mint(address(receiverContract), initialReceiverBalance);
+            IERC20Minter(address(tokenL1)).mint(address(receiverContract), initialReceiverBalance);
         }
 
         vm.stopBroadcast();

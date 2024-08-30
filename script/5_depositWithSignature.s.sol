@@ -8,6 +8,7 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
@@ -15,43 +16,40 @@ import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
+import {ScriptUtils} from "./ScriptUtils.sol";
+import {ClientEncoders} from "./ClientEncoders.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
-import {ClientEncoders} from "./ClientEncoders.sol";
-import {ScriptUtils} from "./ScriptUtils.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
 
 contract DepositWithSignatureScript is Script, ScriptUtils {
 
+    FileReader public fileReader;
+    DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
+    ClientEncoders public encoders;
+    SignatureUtilsEIP1271 public signatureUtils;
+
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
     IRestakingConnector public restakingConnector;
     IAgentFactory public agentFactory;
-    address public senderAddr;
 
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
     IStrategy public strategy;
-    IERC20 public token;
-    IERC20 public ccipBnM;
+    IERC20 public tokenL1;
+    IERC20 public tokenL2;
 
-    DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-    FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
-    ClientEncoders public encoders;
-    SignatureUtilsEIP1271 public signatureUtils;
+    uint256 public deployerKey = vm.envUint("DEPLOYER_KEY");
+    address public deployer = vm.addr(deployerKey);
 
-    uint256 public deployerKey;
-    address public deployer;
     IEigenAgent6551 public eigenAgent;
     address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
-
-        deployerKey = vm.envUint("DEPLOYER_KEY");
-        deployer = vm.addr(deployerKey);
 
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
@@ -70,7 +68,7 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
         senderContract = fileReader.readSenderContract();
-        senderAddr = address(senderContract);
+        address senderAddr = address(senderContract);
 
         (
             receiverContract,
@@ -78,8 +76,8 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         ) = fileReader.readReceiverRestakingConnector();
         agentFactory = fileReader.readAgentFactory();
 
-        ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
-        token = IERC20(address(EthSepolia.BridgeToken)); // CCIPBnM on EthSepolia
+        tokenL1 = IERC20(address(EthSepolia.BridgeToken)); // CCIP-BnM on EthSepolia
+        tokenL2 = IERC20(address(BaseSepolia.BridgeToken)); // CCIP-BnM on BaseSepolia
 
         TARGET_CONTRACT = address(strategyManager);
 
@@ -96,7 +94,7 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         eigenAgent = agentFactory.getEigenAgent(deployer);
         if (address(eigenAgent) != address(0)) {
             // if the user already has a EigenAgent, fetch current execution Nonce
-            execNonce = eigenAgent.getExecNonce();
+            execNonce = eigenAgent.execNonce();
         } else {
             // otherwise agentFactory will spawn one for the user after bridging.
             ///// For testing only:
@@ -119,10 +117,12 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         uint256 expiry = block.timestamp + 3 hours;
         bytes memory depositMessage;
         bytes memory messageWithSignature;
+
+        IERC20_CCIPBnM(address(tokenL2)).drip(deployer);
         {
             depositMessage = encoders.encodeDepositIntoStrategyMsg(
                 address(strategy),
-                address(token),
+                address(tokenL1),
                 amount
             );
 
@@ -140,23 +140,21 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         topupSenderEthBalance(senderAddr);
 
         // Check L2 CCIP-BnM ETH balances for gas
-        if (ccipBnM.balanceOf(senderAddr) < 0.1 ether) {
-            ccipBnM.approve(deployer, 0.1 ether);
-            ccipBnM.transferFrom(deployer, senderAddr, 0.1 ether);
+        if (tokenL2.balanceOf(senderAddr) < 0.1 ether) {
+            tokenL2.approve(deployer, 0.1 ether);
+            tokenL2.transferFrom(deployer, senderAddr, 0.1 ether);
         }
         // Approve L2 senderContract to send ccip-BnM tokens to Router
-        ccipBnM.approve(senderAddr, amount);
+        tokenL2.approve(senderAddr, amount);
 
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature),
-            address(ccipBnM),
+            address(tokenL2),
             amount
         );
 
         vm.stopBroadcast();
-
     }
-
 }

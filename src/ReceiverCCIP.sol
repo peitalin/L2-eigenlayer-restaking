@@ -11,7 +11,6 @@ import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
-
 import {BaseSepolia} from "../script/Addresses.sol";
 
 
@@ -63,10 +62,6 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     function setRestakingConnector(IRestakingConnector _restakingConnector) public onlyOwner {
         require(address(restakingConnector) != address(0), "cannot set address(0)");
         restakingConnector = _restakingConnector;
-    }
-
-    function mockCCIPReceive(Client.Any2EVMMessage memory any2EvmMessage) public {
-        _ccipReceive(any2EvmMessage);
     }
 
     function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage)

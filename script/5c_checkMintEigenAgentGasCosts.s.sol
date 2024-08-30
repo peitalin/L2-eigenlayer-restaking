@@ -21,8 +21,8 @@ contract CheckMintEigenAgentGasCostsScript is Script, ScriptUtils {
         FileReader fileReader = new FileReader();
         IAgentFactory agentFactory = fileReader.readAgentFactory();
 
-        //// Just for testing gas costs
-        //// forge test --match-test test_step5c_CheckMintEigenAgentGasCosts -vvvv --gas-report
+        // Just for testing gas costs
+        // forge test --match-test test_step5c_CheckMintEigenAgentGasCosts -vvvv --gas-report
 
         vm.createSelectFork("ethsepolia");
         vm.startBroadcast(deployer);

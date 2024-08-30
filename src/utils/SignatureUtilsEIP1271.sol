@@ -18,7 +18,10 @@ contract SignatureUtilsEIP1271 is Script {
      */
 
     /// @notice The EIP-712 typehash for the deposit struct used by the contract
-    bytes32 public constant EIGEN_AGENT_EXEC_TYPEHASH = keccak256("ExecuteWithSignature(address target, uint256 value, bytes data, uint256 expiry)");
+    bytes32 public constant EIGEN_AGENT_EXEC_TYPEHASH = keccak256(
+        "ExecuteWithSignature(address target,uint256 value,bytes data,uint256 execNonce,uint256 chainId,uint256 expiry)"
+    );
+
 
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");

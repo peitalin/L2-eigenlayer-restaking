@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
+import {Adminable} from "./utils/Adminable.sol";
 
 import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
 import {EigenlayerMsgDecoders, TransferToAgentOwnerMsg} from "./utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 
 
-contract SenderUtils is Ownable, EigenlayerMsgDecoders {
+contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
 
     event SendingWithdrawalToAgentOwner(address indexed, uint256 indexed, address indexed);
     event WithdrawalCommitted(bytes32 indexed, address indexed, uint256 indexed);
@@ -21,30 +22,30 @@ contract SenderUtils is Ownable, EigenlayerMsgDecoders {
     mapping(bytes4 => uint256) internal _gasLimitsForFunctionSelectors;
 
     constructor() {
+        _disableInitializers();
+    }
 
+    function initialize() initializer public {
         // depositIntoStrategy: [gas: 2_650_000]
         // Mint EigenAgent: 1_857_622 gas
         // Deposit tx: 718_947 gas
-        _gasLimitsForFunctionSelectors[0xe7a050aa] = 2_800_000;
-        // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
-
+        _gasLimitsForFunctionSelectors[0xe7a050aa] = 2_500_000;
         // depositIntoStrategyWithSignature: [gas: 713_400]
         _gasLimitsForFunctionSelectors[0x32e89ace] = 800_000;
-
         // queueWithdrawals: [gas: x]
         _gasLimitsForFunctionSelectors[0x0dd8dd02] = 800_000;
-
-        // queueWithdrawalsWithSignature: [gas: 603_301]
-        _gasLimitsForFunctionSelectors[0xa140f06e] = 700_000;
-
         // completeQueuedWithdrawals: [gas: 645_948]
         _gasLimitsForFunctionSelectors[0x60d7faed] = 800_000;
-
+        // delegateTo: [gas: ?]
+        _gasLimitsForFunctionSelectors[0xeea9064b] = 600_000;
         // delegateToBySignature: [gas: ?]
         _gasLimitsForFunctionSelectors[0x7f548071] = 600_000;
-
+        // undelegate: [gas: ?]
+        _gasLimitsForFunctionSelectors[0xda8be864] = 400_000;
         // transferToStaker: [gas: 268_420]
         _gasLimitsForFunctionSelectors[0x27167d10] = 400_000;
+
+        __Adminable_init();
     }
 
     function handleTransferToAgentOwner(bytes memory message) public returns (

@@ -16,13 +16,17 @@ interface IAgentFactory is IAdminable {
 
     event EigenAgentOwnerUpdated(address indexed, address indexed, uint256 indexed);
 
+    function erc6551Registry() external view returns (IERC6551Registry);
+
+    function eigenAgentOwner721() external view returns (IEigenAgentOwner721);
+
     function getRestakingConnector() external view returns (address);
 
     function setRestakingConnector(address newRestakingConnector) external;
 
-    function get6551Registry() external view returns (IERC6551Registry);
+    function set6551Registry(IERC6551Registry new6551Registry) external;
 
-    function getEigenAgentOwner721() external view returns (IEigenAgentOwner721);
+    function setEigenAgentOwner721(IEigenAgentOwner721 newEigenAgentOwner721) external;
 
     function getEigenAgentOwnerTokenId(address staker) external view returns (uint256);
 

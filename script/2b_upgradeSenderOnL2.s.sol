@@ -16,11 +16,16 @@ import {FileReader} from "./FileReader.sol";
 
 contract UpgradeSenderOnL2Script is Script {
 
+
+    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+    address deployer = vm.addr(deployerKey);
+
     function run() public {
 
-        uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+        uint256 l2ForkId = vm.createSelectFork("basesepolia");
 
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
+
         ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL2());
         ISenderCCIP senderProxy = fileReader.readSenderContract();
 

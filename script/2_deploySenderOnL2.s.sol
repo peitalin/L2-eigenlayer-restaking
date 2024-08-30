@@ -9,6 +9,7 @@ import {FileReader} from "./FileReader.sol";
 import {Script} from "forge-std/Script.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
+import {ISenderCCIPMock, SenderCCIPMock} from "../test/mocks/SenderCCIPMock.sol";
 import {SenderUtils} from "../src/SenderUtils.sol";
 import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
@@ -16,26 +17,43 @@ import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 
 contract DeploySenderOnL2Script is Script {
 
+    FileReader public fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
+
+    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+    address deployer = vm.addr(deployerKey);
+
     function run() public returns (ISenderCCIP) {
         return _run(false);
     }
 
-    function testrun() public returns (ISenderCCIP) {
-        return _run(true);
+    function mockrun() public returns (ISenderCCIPMock) {
+        return ISenderCCIPMock(address(_run(true)));
     }
 
-    function _run(bool isTest) internal returns (ISenderCCIP) {
-
-        uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
-        FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
+    function _run(bool isMockRun) internal returns (ISenderCCIP) {
 
         vm.startBroadcast(deployerKey);
 
         ProxyAdmin proxyAdmin = new ProxyAdmin();
-        // deploy sender utils
-        SenderUtils senderUtils = new SenderUtils();
+
+        // deploy sender utils proxy
+        SenderUtils senderUtilsProxy = SenderUtils(
+            payable(address(
+                new TransparentUpgradeableProxy(
+                    address(new SenderUtils()),
+                    address(proxyAdmin),
+                    abi.encodeWithSelector(SenderUtils.initialize.selector)
+                )
+            ))
+        );
+
         // deploy sender
-        SenderCCIP senderImpl = new SenderCCIP(BaseSepolia.Router, BaseSepolia.Link);
+        SenderCCIP senderImpl;
+        if (isMockRun) {
+            senderImpl = new SenderCCIPMock(BaseSepolia.Router, BaseSepolia.Link);
+        } else {
+            senderImpl = new SenderCCIP(BaseSepolia.Router, BaseSepolia.Link);
+        }
 
         SenderCCIP senderProxy = SenderCCIP(
             payable(address(
@@ -49,7 +67,8 @@ contract DeploySenderOnL2Script is Script {
         // whitelist both chain to receive and send messages
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
-        senderProxy.setSenderUtils(ISenderUtils(address(senderUtils)));
+        senderProxy.setSenderUtils(ISenderUtils(address(senderUtilsProxy)));
+
         vm.stopBroadcast();
 
         require(
@@ -57,11 +76,10 @@ contract DeploySenderOnL2Script is Script {
             "Check script: senderProxy missing senderUtils"
         );
 
-        if (!isTest) {
+        if (!isMockRun) {
             fileReader.saveSenderBridgeContracts(
-                isTest,
                 address(senderProxy),
-                address(senderUtils),
+                address(senderUtilsProxy),
                 address(proxyAdmin)
             );
         }

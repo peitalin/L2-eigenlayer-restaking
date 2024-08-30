@@ -26,6 +26,11 @@ import {ClientEncoders} from "./ClientEncoders.sol";
 
 contract CompleteWithdrawalScript is Script, ScriptUtils {
 
+    FileReader public fileReader;
+    DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
+    ClientEncoders public encoders;
+    SignatureUtilsEIP1271 public signatureUtils;
+
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
     IRestakingConnector public restakingConnector;
@@ -37,11 +42,6 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
     IStrategy public strategy;
     IERC20 public token;
     IERC20 public ccipBnM;
-
-    DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-    FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
-    ClientEncoders public encoders;
-    SignatureUtilsEIP1271 public signatureUtils;
 
     uint256 public deployerKey;
     address public deployer;
@@ -84,7 +84,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
         agentFactory = fileReader.readAgentFactory();
 
-        ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
+        ccipBnM = IERC20(address(BaseSepolia.BridgeToken)); // BaseSepolia contract
         TARGET_CONTRACT = address(delegationManager);
 
         /////////////////////////////////////////////////////////////////
@@ -96,7 +96,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         eigenAgent = agentFactory.getEigenAgent(deployer);
         if (address(eigenAgent) != address(0)) {
             // if the user already has a EigenAgent, fetch current execution Nonce
-            execNonce = eigenAgent.getExecNonce();
+            execNonce = eigenAgent.execNonce();
         } else {
             // otherwise agentFactory will spawn one for the user
             // eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);

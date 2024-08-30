@@ -29,25 +29,28 @@ import {ClientEncoders} from "./ClientEncoders.sol";
 
 contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
 
+    FileReader public fileReader;
+    DeployReceiverOnL1Script public deployReceiverOnL1Script;
+    DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
+
+    // client libs
+    ClientEncoders public encoders;
+    SignatureUtilsEIP1271 public signatureUtils;
+
+    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+    address deployer = vm.addr(deployerKey);
+    bool isTest = block.chainid == 31337;
+
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
     IRestakingConnector public restakingConnector;
     IAgentFactory public agentFactory;
-    address public senderAddr;
 
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
     IStrategy public strategy;
-    IERC20 public token;
-    IERC20 public ccipBnM;
+    IERC20 public tokenL2;
 
-    DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-    FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
-    ClientEncoders public encoders;
-    SignatureUtilsEIP1271 public signatureUtils;
-
-    uint256 public deployerKey;
-    address public deployer;
     address public staker;
     address public withdrawer;
     uint256 public amount;
@@ -59,17 +62,12 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
 
     function run() public {
 
-        bool isTest = block.chainid == 31337;
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
 
-        deployerKey = vm.envUint("DEPLOYER_KEY");
-        deployer = vm.addr(deployerKey);
-
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
+        deployReceiverOnL1Script = new DeployReceiverOnL1Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-
-        DeployReceiverOnL1Script deployReceiverOnL1Script = new DeployReceiverOnL1Script();
 
         (
             strategy,
@@ -82,18 +80,19 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
         if (isTest) {
-            // if isTest, deploy SenderCCIP and ReceiverCCIP again to get the latest version
-            // or you will read the stale versions because of forkSelect
+            // if isTest, deploy SenderCCIP and ReceiverCCIP again
+            // or it will read stale deployed versions because of forkSelect
             vm.selectFork(ethForkId);
             (
                 receiverContract,
                 restakingConnector,
                 agentFactory
-            ) = deployReceiverOnL1Script.testrun();
+            ) = deployReceiverOnL1Script.mockrun();
 
             vm.selectFork(l2ForkId);
+            // mock deploy on L2 Fork
             DeploySenderOnL2Script deployOnL2Script = new DeploySenderOnL2Script();
-            senderContract = deployOnL2Script.testrun();
+            senderContract = deployOnL2Script.mockrun();
 
             // go back to ETH fork
             vm.selectFork(ethForkId);
@@ -116,15 +115,15 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
             execNonce = 0;
         } else {
-            execNonce = eigenAgent.getExecNonce();
+            execNonce = eigenAgent.execNonce();
         }
 
         ////////////////////////////////////////////////////////////
         // Parameters
         ////////////////////////////////////////////////////////////
 
-        senderAddr = address(senderContract);
-        ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
+        address senderAddr = address(senderContract);
+        tokenL2 = IERC20(address(BaseSepolia.BridgeToken)); // BaseSepolia contract
         TARGET_CONTRACT = address(delegationManager);
 
         // only sending a withdrawal message, not bridging tokens.
@@ -197,7 +196,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature),
-            address(ccipBnM),
+            address(tokenL2),
             amount
         );
 
@@ -217,7 +216,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
             delegatedTo,
             withdrawer,
             withdrawalNonce,
-            0, // startBlock is created later
+            0, // startBlock is created later in Eigenlayer
             strategiesToWithdraw,
             sharesToWithdraw,
             bytes32(0x0), // withdrawalRoot is created later

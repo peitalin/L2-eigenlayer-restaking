@@ -14,6 +14,7 @@ contract TestDeployVerifyScript is Script {
     function run() public {
         vm.startBroadcast(deployerKey);
         EmptyContract empty = new EmptyContract();
+        empty.foo();
         vm.stopBroadcast();
     }
 }

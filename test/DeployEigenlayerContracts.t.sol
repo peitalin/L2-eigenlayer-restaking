@@ -16,14 +16,12 @@ import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenla
 
 contract DeployEigenlayerContractsTests is Test {
 
-    uint256 public deployerKey;
-    address public deployer;
+    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+    address deployer = vm.addr(deployerKey);
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
 
     function setUp() public {
-		deployerKey = vm.envUint("DEPLOYER_KEY");
-        deployer = vm.addr(deployerKey);
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
     }
 

@@ -46,7 +46,6 @@ contract FileReader is Script {
 
     /// @dev hardcoded chainid for contracts. Update for prod
     function saveSenderBridgeContracts(
-        bool isTest,
         address senderCCIP,
         address senderUtils,
         address proxyAdminL2
@@ -74,17 +73,10 @@ contract FileReader is Script {
         // chains[17000] = "holesky";
         // chains[84532] = "basesepolia";
         // chains[11155111] = "ethsepolia";
-        if (isTest) {
-            string memory finalOutputPath2 = string(abi.encodePacked(
-                "script/localhost/bridgeContractsL2.config.json"
-            ));
-            vm.writeJson(finalJson2, finalOutputPath2);
-        } else {
-            string memory finalOutputPath2 = string(abi.encodePacked(
-                "script/basesepolia/bridgeContractsL2.config.json"
-            ));
-            vm.writeJson(finalJson2, finalOutputPath2);
-        }
+        string memory finalOutputPath2 = string(abi.encodePacked(
+            "script/basesepolia/bridgeContractsL2.config.json"
+        ));
+        vm.writeJson(finalJson2, finalOutputPath2);
     }
 
     /////////////////////////////////////////////////
@@ -128,7 +120,6 @@ contract FileReader is Script {
     }
 
     function saveReceiverBridgeContracts(
-        bool isTest,
         address receiverCCIP,
         address restakingConnector,
         address agentFactory,
@@ -162,17 +153,10 @@ contract FileReader is Script {
         // chains[17000] = "holesky";
         // chains[84532] = "basesepolia";
         // chains[11155111] = "ethsepolia";
-        if (isTest) {
-            string memory finalOutputPath1 = string(abi.encodePacked(
-                "script/localhost/bridgeContractsL1.config.json"
-            ));
-            vm.writeJson(finalJson1, finalOutputPath1);
-        } else {
-            string memory finalOutputPath1 = string(abi.encodePacked(
-                "script/ethsepolia/bridgeContractsL1.config.json"
-            ));
-            vm.writeJson(finalJson1, finalOutputPath1);
-        }
+        string memory finalOutputPath1 = string(abi.encodePacked(
+            "script/ethsepolia/bridgeContractsL1.config.json"
+        ));
+        vm.writeJson(finalJson1, finalOutputPath1);
     }
 
     /////////////////////////////////////////////////

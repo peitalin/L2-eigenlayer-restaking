@@ -11,9 +11,10 @@ import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IS
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 
-import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
+import {IReceiverCCIPMock} from "./mocks/ReceiverCCIPMock.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
+import {ISenderCCIPMock} from "./mocks/SenderCCIPMock.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 
@@ -26,14 +27,11 @@ import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 // 6551 accounts
-import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
-
-import {EigenAgent6551TestUpgrade} from "./mocks/EigenAgent6551TestUpgrade.sol";
 
 
 
@@ -44,32 +42,28 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     SignatureUtilsEIP1271 public signatureUtils;
 
-    uint256 public deployerKey;
-    address public deployer;
-    uint256 public bobKey;
-    address public bob;
-
-    IReceiverCCIP public receiverContract;
-    ISenderCCIP public senderContract;
+    IReceiverCCIPMock public receiverContract;
+    ISenderCCIPMock public senderContract;
     IRestakingConnector public restakingConnector;
-    IERC20_CCIPBnM public erc20DripL1; // has drip faucet functions
-    IERC20 public tokenL1;
 
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
     IStrategy public strategy;
-
-    uint256 l2ForkId;
-    uint256 ethForkId;
-    bool isTest;
+    IERC20 public tokenL1;
 
     IAgentFactory public agentFactory;
     EigenAgentOwner721 public eigenAgentOwnerNft;
     IEigenAgent6551 public eigenAgent;
 
+    uint256 deployerKey;
+    address deployer;
+    uint256 bobKey;
+    address bob;
+
+    uint256 l2ForkId;
+    uint256 ethForkId;
     // call params
     uint256 expiry;
-    uint256 execNonce = 0;
     uint256 amount;
     uint256 balanceOfReceiverBefore;
     uint256 balanceOfEigenAgent;
@@ -89,7 +83,6 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         signatureUtils = new SignatureUtilsEIP1271();
 
-        isTest = block.chainid == 31337;
         l2ForkId = vm.createFork("basesepolia");        // 0
         ethForkId = vm.createSelectFork("ethsepolia"); // 1
 
@@ -111,7 +104,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             receiverContract,
             restakingConnector,
             agentFactory
-        ) = deployReceiverOnL1Script.testrun();
+        ) = deployReceiverOnL1Script.mockrun();
 
         vm.deal(address(receiverContract), 1 ether);
 
@@ -121,9 +114,8 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             receiverContract.allowlistSender(deployer, true);
             restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
 
-            erc20DripL1 = IERC20_CCIPBnM(address(tokenL1));
-            erc20DripL1.drip(address(receiverContract));
-            erc20DripL1.drip(address(bob));
+            IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
+            IERC20_CCIPBnM(address(tokenL1)).drip(bob);
         }
         vm.stopBroadcast();
 
@@ -132,7 +124,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         //// Setup L2 CCIP contracts
         /////////////////////////////////////////
         vm.selectFork(l2ForkId);
-        senderContract = deployOnL2Script.testrun();
+        senderContract = deployOnL2Script.mockrun();
         vm.deal(address(senderContract), 1 ether);
 
         vm.startBroadcast(deployerKey);
@@ -145,7 +137,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             if (block.chainid == BaseSepolia.ChainId) {
                 // drip() using CCIP's BnM faucet if forking from L2 Sepolia
                 for (uint256 i = 0; i < 3; ++i) {
-                    IERC20_CCIPBnM(BaseSepolia.CcipBnM).drip(address(senderContract));
+                    IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(senderContract));
                 }
             }
 
@@ -158,27 +150,27 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         //////////////////////////////////////////////////////
         vm.selectFork(ethForkId);
 
-        amount = 0.0333 ether;
-        expiry = block.timestamp + 1 days;
-        execNonce = 0;
-
         vm.startBroadcast(bobKey);
         eigenAgent = agentFactory.getEigenAgent(bob); // should not exist yet
         require(address(eigenAgent) == address(0), "test assumes no EigenAgent yet");
+        vm.stopBroadcast();
+
 
         console.log("bob address:", bob);
         console.log("eigenAgent:", address(eigenAgent));
         console.log("---------------------------------------------");
-
         balanceOfEigenAgent = tokenL1.balanceOf(address(eigenAgent));
         balanceOfReceiverBefore = tokenL1.balanceOf(address(receiverContract));
         console.log("balanceOf(receiverContract):", balanceOfReceiverBefore);
         console.log("balanceOf(eigenAgent):", balanceOfEigenAgent);
-        vm.stopBroadcast();
 
         /////////////////////////////////////
         //// Queue Withdrawal with EigenAgent
         /////////////////////////////////////
+
+        amount = 0.0333 ether;
+        expiry = block.timestamp + 1 days;
+        uint256 execNonce0 = 0; // no eigenAgent yet, execNonce is 0
 
         bytes memory depositMessage;
         bytes memory messageWithSignature_D;
@@ -195,7 +187,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager),
                 depositMessage,
-                execNonce,
+                execNonce0,
                 expiry
             );
         }
@@ -238,7 +230,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         require(eigenAgentShares > 0, "eigenAgent should have >0 shares after deposit");
 
         /////////////////////////////////////
-        //// Queue Withdrawal with EigenAgent
+        //// [L1] Queue Withdrawal with EigenAgent
         /////////////////////////////////////
 
         vm.selectFork(ethForkId);
@@ -247,6 +239,8 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         uint256[] memory sharesToWithdraw = new uint256[](1);
         IDelegationManager.QueuedWithdrawalParams[] memory QWPArray;
+
+        uint256 execNonce1 = eigenAgent.execNonce();
 
         bytes memory withdrawalMessage;
         bytes memory messageWithSignature_QW;
@@ -272,22 +266,22 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 withdrawalMessage,
-                execNonce,
+                execNonce1,
                 expiry
             );
         }
 
-        Client.Any2EVMMessage memory any2EvmMessageQueueWithdrawal = Client.Any2EVMMessage({
-            messageId: bytes32(uint256(9999)),
-            sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
-            sender: abi.encode(address(deployer)), // bytes: abi.decode(sender) if coming from an EVM chain.
-            destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging coins, just sending msg
-            data: abi.encode(string(
-                messageWithSignature_QW
-            ))
-        });
-
-        receiverContract.mockCCIPReceive(any2EvmMessageQueueWithdrawal);
+        receiverContract.mockCCIPReceive(
+            Client.Any2EVMMessage({
+                messageId: bytes32(uint256(9999)),
+                sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
+                sender: abi.encode(address(deployer)), // bytes: abi.decode(sender) if coming from an EVM chain.
+                destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging coins, just sending msg
+                data: abi.encode(string(
+                    messageWithSignature_QW
+                ))
+            })
+        );
         console.log("--------------- After Queue Withdrawal -----------------");
 
         uint256 numWithdrawals = delegationManager.cumulativeWithdrawalsQueued(address(eigenAgent));
@@ -314,13 +308,14 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
     function test_CCIP_Eigenlayer_CompleteWithdrawal() public {
 
         /////////////////////////////////////////////////////////////////
-        //// Complete Queued Withdrawals
+        //// [L1] Complete Queued Withdrawals
         /////////////////////////////////////////////////////////////////
 
         vm.selectFork(ethForkId);
         vm.startBroadcast(bob);
 
         uint32 startBlock = uint32(block.number);
+        uint256 execNonce2 = eigenAgent.execNonce();
         uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(bob);
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
@@ -349,8 +344,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         vm.selectFork(l2ForkId);
         vm.startBroadcast(bob);
 
-        address tokenDestination = BaseSepolia.CcipBnM; // CCIP-BnM L2 address
-        uint256 stakerBalanceOnL2Before = IERC20(tokenDestination).balanceOf(bob);
+        uint256 stakerBalanceOnL2Before = IERC20(BaseSepolia.BridgeToken).balanceOf(bob);
 
         bytes memory completeWithdrawalMessage;
         bytes memory messageWithSignature_CW;
@@ -372,7 +366,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 completeWithdrawalMessage,
-                execNonce,
+                execNonce2,
                 expiry
             );
         }
@@ -381,7 +375,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_CW),
-            address(tokenDestination),
+            address(BaseSepolia.BridgeToken), // destination token
             0 // not sending tokens, just message
         );
         vm.stopBroadcast();
@@ -460,7 +454,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             })
         );
 
-        uint256 stakerBalanceOnL2After = IERC20(tokenDestination).balanceOf(address(bob));
+        uint256 stakerBalanceOnL2After = IERC20(BaseSepolia.BridgeToken).balanceOf(address(bob));
         console.log("--------------- L2 After Bridge back -----------------");
         console.log("balanceOf(bob) on L2 before:", stakerBalanceOnL2Before);
         console.log("balanceOf(bob) on L2 after:", stakerBalanceOnL2After);

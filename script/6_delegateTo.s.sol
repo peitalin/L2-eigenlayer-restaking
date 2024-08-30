@@ -67,7 +67,7 @@ contract DelegateToScript is Script, ScriptUtils {
         senderContract = fileReader.readSenderContract();
         (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
 
-        ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
+        ccipBnM = IERC20(address(BaseSepolia.BridgeToken)); // BaseSepolia contract
         TARGET_CONTRACT = address(delegationManager);
 
         //////////////////////////////////////////////////////////

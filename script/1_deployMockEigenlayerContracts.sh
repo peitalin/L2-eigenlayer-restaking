@@ -10,4 +10,3 @@ forge script script/1_deployMockEigenlayerContracts.s.sol:DeployMockEigenlayerCo
     --private-key $DEPLOYER_KEY \
     -vvvv
 
-# echo "uncomment --private-key to deploy Eigenlayer contracts (~11 contracts)"

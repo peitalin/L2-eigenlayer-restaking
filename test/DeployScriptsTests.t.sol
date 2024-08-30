@@ -40,13 +40,10 @@ contract DeployScriptsTests is Test, ScriptUtils {
 
     TestDeployVerifyScript public testDeployVerifyScript;
 
-    uint256 public deployerKey;
-    address public deployer;
+    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+    address deployer = vm.addr(deployerKey);
 
     function setUp() public {
-
-		deployerKey = vm.envUint("DEPLOYER_KEY");
-        deployer = vm.addr(deployerKey);
 
         deploySenderOnL2Script = new DeploySenderOnL2Script();
         upgradeSenderOnL2Script = new UpgradeSenderOnL2Script();
@@ -72,21 +69,23 @@ contract DeployScriptsTests is Test, ScriptUtils {
     }
 
     function test_step2_DeploySenderOnL2Script() public {
-        deploySenderOnL2Script.testrun();
+        deploySenderOnL2Script.mockrun();
     }
 
     function test_step2b_UpgradeSenderOnL2Script() public {
+        // this test fails if L2 contracts have not been deployed + saved to disk
         upgradeSenderOnL2Script.run();
     }
 
-    // writes new json files: contract addrs
     function test_step3_DeployReceiverOnL1Script() public {
-        deployReceiverOnL1Script.testrun();
+        deployReceiverOnL1Script.mockrun();
+        // writes new json files: contract addrs
     }
 
-    // writes new json files: contract addrs
     function test_step3b_UpgradeReceiverOnL1Script() public {
-        upgradeReceiverOnL1Script.testrun();
+        // this test fails if L1 contracts have not been deployed + saved to disk
+        upgradeReceiverOnL1Script.mockrun();
+        // writes new json files: contract addrs
     }
 
     function test_step4_WhitelistCCIPContractsScript() public {
@@ -109,11 +108,11 @@ contract DeployScriptsTests is Test, ScriptUtils {
         delegateToScript.run();
     }
 
-    // Note: writes new json files: withdrawalRoots
     function test_step7_QueueWithdrawalWithSignatureScript() public {
         // Note II: If step8 has completed withdrawal, this test may warn it failed with:
         // "revert: withdrawalRoot has already been used"
         queueWithdrawalWithSignatureScript.run();
+        // writes new json files: withdrawalRoots
     }
 
     function test_step8_CompleteWithdrawalScript() public {

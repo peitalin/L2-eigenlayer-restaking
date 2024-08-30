@@ -536,6 +536,38 @@ contract EigenlayerMsgDecoders {
      *
     */
 
+    // function decodeDelegateToMsg(bytes memory message)
+    //     public pure
+    //     returns (
+    //         address,
+    //         ISignatureUtils.SignatureWithExpiry memory,
+    //         bytes32
+    //     )
+    // {
+    //     // function delegateTo(
+    //     //     address operator,
+    //     //     SignatureWithExpiry memory approverSignatureAndExpiry,
+    //     //     bytes32 approverSalt
+    //     // )
+
+    //     uint256 msg_length;
+    //     uint256 staker_sig_offset;
+    //     uint256 approver_sig_offset;
+    //     assembly {
+    //         msg_length := mload(add(message, 64))
+    //         staker_sig_offset := mload(add(message, 164))
+    //         approver_sig_offset := mload(add(message, 196))
+    //     }
+
+    //     return (
+    //         staker,
+    //         operator,
+    //         stakerSignatureAndExpiry,
+    //         approverSignatureAndExpiry,
+    //         approverSalt
+    //     );
+    // }
+
     function decodeDelegateToBySignatureMsg(bytes memory message)
         public pure
         returns (

@@ -34,18 +34,20 @@ import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
 contract UpgradeReceiverOnL1Script is Script {
 
+    FileReader public fileReader;
+    DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
+
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
     address deployer = vm.addr(deployerKey);
 
     IAgentFactory public agentFactoryProxy;
     ISenderCCIP public senderProxy;
+    RestakingConnector public restakingConnectorImpl;
     ProxyAdmin public proxyAdmin;
+
     IERC6551Registry public registry6551;
     IEigenAgentOwner721 public eigenAgentOwner721Proxy;
 
-    RestakingConnector public restakingConnectorImpl;
-
-    FileReader public fileReader;
     IStrategy public strategy;
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
@@ -54,15 +56,18 @@ contract UpgradeReceiverOnL1Script is Script {
         return _run(false);
     }
 
-    function testrun() public {
+    function mockrun() public {
         return _run(true);
     }
 
     function _run(bool isTest) internal {
 
+        uint256 ethForkId = vm.createSelectFork("ethsepolia");
+
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
+        deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
+
         senderProxy = fileReader.readSenderContract();
-        DeployMockEigenlayerContractsScript deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
         (
             strategy,
@@ -106,7 +111,7 @@ contract UpgradeReceiverOnL1Script is Script {
         // upgrade agentFactoryProxy
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(agentFactoryProxy))),
-            address(new AgentFactory(registry6551, eigenAgentOwner721Proxy))
+            address(new AgentFactory())
         );
 
         //////////////////////////////////////////////////
@@ -126,6 +131,7 @@ contract UpgradeReceiverOnL1Script is Script {
             TransparentUpgradeableProxy(payable(address(restakingProxy))),
             address(new RestakingConnector())
         );
+
         restakingProxy.setAgentFactory(address(agentFactoryProxy));
         eigenAgentOwner721Proxy.setAgentFactory(agentFactoryProxy);
         restakingProxy.setReceiverCCIP(address(receiverProxy));
@@ -153,15 +159,16 @@ contract UpgradeReceiverOnL1Script is Script {
         );
 
         // Update registry6551 address, all other proxies stay the same
-        fileReader.saveReceiverBridgeContracts(
-            isTest,
-            address(receiverProxy),
-            address(restakingProxy),
-            address(agentFactoryProxy),
-            address(registry6551),
-            address(eigenAgentOwner721Proxy),
-            address(proxyAdmin)
-        );
+        if (!isTest) {
+            fileReader.saveReceiverBridgeContracts(
+                address(receiverProxy),
+                address(restakingProxy),
+                address(agentFactoryProxy),
+                address(registry6551),
+                address(eigenAgentOwner721Proxy),
+                address(proxyAdmin)
+            );
+        }
 
         vm.stopBroadcast();
     }

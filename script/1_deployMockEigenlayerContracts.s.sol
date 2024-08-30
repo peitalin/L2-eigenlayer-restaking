@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, stdJson, console} from "forge-std/Script.sol";
+import {Script, stdJson} from "forge-std/Script.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {IBeacon} from "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
@@ -105,7 +105,7 @@ contract DeployMockEigenlayerContractsScript is Script {
             tokenERC20 = IERC20(address(deployERC20Minter("Mock MAGIC", "MMAGIC", proxyAdmin)));
         } else {
             // can't mint, you need to transfer CCIP-BnM tokens to receiver contract
-            tokenERC20 = IERC20(address(IERC20_CCIPBnM(EthSepolia.CcipBnM)));
+            tokenERC20 = IERC20(address(IERC20_CCIPBnM(EthSepolia.BridgeToken)));
         }
 
         (StrategyFactory strategyFactory, UpgradeableBeacon strategyBeacon) = _deployStrategyFactory(
@@ -388,7 +388,6 @@ contract DeployMockEigenlayerContractsScript is Script {
         require(address(_pauserRegistry) != address(0), "pauserRegistry cannot be address(0)");
 
         StrategyBaseTVLLimits strategyImpl = new StrategyBaseTVLLimits(_strategyManager);
-        console.log("s", address(strategyImpl));
 
         StrategyBaseTVLLimits strategyProxy = StrategyBaseTVLLimits(
             address(

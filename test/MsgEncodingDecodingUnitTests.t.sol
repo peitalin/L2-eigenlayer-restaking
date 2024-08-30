@@ -8,59 +8,47 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
-import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {TransferToAgentOwnerMsg} from "../src/utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {EigenlayerMsgDecoders} from "../src/utils/EigenlayerMsgDecoders.sol";
 import {FunctionSelectorDecoder} from "../src/FunctionSelectorDecoder.sol";
 
-import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {EthSepolia} from "../script/Addresses.sol";
 import {FileReader} from "../script/FileReader.sol";
 
 
-
 contract EigenlayerMsg_EncodingDecodingTests is Test {
 
-    uint256 public deployerKey;
-    address public deployer;
-
     SignatureUtilsEIP1271 public signatureUtils;
-    FileReader public fileReader;
     EigenlayerMsgDecoders public eigenlayerMsgDecoders;
 
-    RestakingConnector public restakingConnector;
-    IReceiverCCIP public receiverContract;
     IStrategy public strategy;
     IERC20 public token;
+
+    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+    address deployer = vm.addr(deployerKey);
+
     uint256 amount;
     address staker;
     uint256 expiry;
     uint256 execNonce;
 
     function setUp() public {
-		deployerKey = vm.envUint("DEPLOYER_KEY");
-        deployer = vm.addr(deployerKey);
 
-        restakingConnector = new RestakingConnector();
         signatureUtils = new SignatureUtilsEIP1271();
-        fileReader = new FileReader();
         eigenlayerMsgDecoders = new EigenlayerMsgDecoders();
-
-        (receiverContract,) = fileReader.readReceiverRestakingConnector();
 
         // just for deserializing, not calling these contracts
         strategy = IStrategy(0xBd4bcb3AD20E9d85D5152aE68F45f40aF8952159);
         token = IERC20(0x3Eef6ec7a9679e60CC57D9688E9eC0e6624D687A);
         amount = 0.0077 ether;
-        staker = address(0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c);
+        staker = deployer;
         expiry = 86421;
         execNonce = 0;
     }
 
-    function test_DecodeFunctionSelectors() public {
+    function test_DecodeFunctionSelectors() public view {
 
         bytes memory message1 = hex"00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000044f7e784ef00000000000000000000000000000000000000000000000000000000000000020000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c00000000000000000000000000000000000000000000000000000000";
         bytes4 functionSelector1 = FunctionSelectorDecoder.decodeFunctionSelector(message1);
@@ -135,7 +123,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
      *
     */
 
-    function test_Decode_Array_QueueWithdrawals() public {
+    function test_Decode_Array_QueueWithdrawals() public view {
 
         IStrategy[] memory strategiesToWithdraw0 = new IStrategy[](1);
         IStrategy[] memory strategiesToWithdraw1 = new IStrategy[](1);
@@ -274,7 +262,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
      *
     */
 
-    function test_Decode_CompleteQueuedWithdrawal() public {
+    function test_Decode_CompleteQueuedWithdrawal() public view {
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         uint256[] memory sharesToWithdraw = new uint256[](1);
@@ -285,7 +273,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
             staker: deployer,
             delegatedTo: address(0x0),
-            withdrawer: address(receiverContract),
+            withdrawer: deployer,
             nonce: 0,
             startBlock: uint32(block.number),
             strategies: strategiesToWithdraw,
@@ -345,7 +333,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
     }
 
 
-    function test_FunctionSelectors_CompleteQueueWithdrawal() public {
+    function test_FunctionSelectors_CompleteQueueWithdrawal() public pure {
         bytes4 fselector1 = IDelegationManager.completeQueuedWithdrawal.selector;
         bytes4 fselector2 = bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)"));
         // bytes4 fselector3 = 0x60d7faed;
@@ -470,13 +458,9 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
         address staker1 = vm.addr(0x1);
         address operator = vm.addr(0x2);
-        address delegationManager = vm.addr(0xde);
 
         ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry;
         ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
-
-        bytes memory signature1;
-        bytes memory signature2;
 
         stakerSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
             signature: new bytes(0),
@@ -538,7 +522,6 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
 
         bytes memory signature1;
-        bytes memory signature2;
         {
             uint256 sig1_expiry = 5;
 
@@ -618,7 +601,6 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
 
         bytes memory signature1;
-        bytes memory signature2;
         {
             uint256 sig1_expiry = 6;
 
