@@ -3,12 +3,12 @@
 
 
 
-Eigenlayer does not allow ThirdParty withdrawals, users must use their wallets to deposit and withdraw funds. So we cannot withdraw for our users via our L1 bridge contracts.
+Eigenlayer does not allow ThirdParty withdrawals, users must use their wallets to deposit and withdraw funds. So we cannot withdraw on behalf of our users via L1 bridge contracts.
 
-This forces us to either: 
-- **(Option 1)** force users to manually bridge to L1, deposit, withdraw, then bridge back to L2, or 
-- **(Option 2)** create an LRT for *every* operator. 
-- **(Option 4)** Routing contract calls from L2 through user-owned 6551 Accounts works around these issues, and keeps custody of funds with the user (who owns the 6551 NFT).
+This forces us to either:
+- **(Option 1)** force users to manually bridge to L1, deposit, withdraw, then bridge back to L2, or
+- **(Option 2)** create an LRT for *every* operator.
+- **(Option 4)** routing contract calls through user-owned 6551 accounts works around these issues, and keeps custody of funds with the user (who owns the 6551 NFT).
 
 
 
@@ -74,7 +74,7 @@ Queued withdrawals information are stored in `script/withdrawals-queued/<user_ad
 
 
 NOTE:
-EigenAgent accounts will only execute calls if the signature came from the user who owns the associated EigenAgentOwner 721 NFT. 
+EigenAgent accounts will only execute calls if the signature came from the user who owns the associated EigenAgentOwner 721 NFT.
 See: [https://eips.ethereum.org/EIPS/eip-6551](https://eips.ethereum.org/EIPS/eip-6551)
 
 Each user can only have 1 EigenAgentOwner NFT at the moment. We can make them tradeable or soulbound.
@@ -148,3 +148,45 @@ Once the L1 -> L2 bridge completes, we can see the original `0.00333` tokens tra
     - [ ] Can Chainlink deploy lanes on Holesky? Or can Eigenlayer deploy on Sepolia?
 
 - Adapt differences in burn/mint model with CCIP-BnM and MAGIC's bridging model (Lock-and-mint?);
+
+
+
+
+### Example 2 (with a non-deployer account):
+
+#### 1. CCIP Mint EigenAgent and Deposit message from L2:
+[https://ccip.chain.link/msg/0xa6a95f12fed2e29ca8e74ceca711f18746853cb087d07c51b3b31cd77b2bbd18](https://ccip.chain.link/msg/0xa6a95f12fed2e29ca8e74ceca711f18746853cb087d07c51b3b31cd77b2bbd18)
+
+...with assocaited `Deposit` event:
+[https://sepolia.etherscan.io/tx/0xf2e146800acedcc8fd366bc3668add33c5ac748b4eab893095470036170626b5]
+(https://sepolia.etherscan.io/tx/0xf2e146800acedcc8fd366bc3668add33c5ac748b4eab893095470036170626b5)
+
+
+#### 2. CCIP queueWithdrawal message from L2:
+[https://ccip.chain.link/msg/0x3644dee9d68d2340f4b835280dfe5136bfc94ad5e42aa31af5a49c26ce3de98e]
+(https://ccip.chain.link/msg/0x3644dee9d68d2340f4b835280dfe5136bfc94ad5e42aa31af5a49c26ce3de98e)
+
+...with associated `WithdrawalQueued` event:
+[https://sepolia.etherscan.io/tx/0x10cf29842862daee469ce39aaa57b166fe5fe6662dc1a9f113536eb98de411f4#eventlog#60](https://sepolia.etherscan.io/tx/0x10cf29842862daee469ce39aaa57b166fe5fe6662dc1a9f113536eb98de411f4#eventlog#60)
+
+
+#### 3. CCIP completeWithdrawal message from L2:
+[https://ccip.chain.link/msg/0xca947ff0dc61aafed61f54efc627c767390f1cfb114fed4761a3e80e55c7f498]
+(https://ccip.chain.link/msg/0xca947ff0dc61aafed61f54efc627c767390f1cfb114fed4761a3e80e55c7f498)
+
+...with associated `WithdrawalCompleted` event:
+[https://sepolia.etherscan.io/tx/0xac83846d482e7a92f13bd39024b67b3fc94311f83e10a8d8a2c32434189e7298#eventlog#35](https://sepolia.etherscan.io/tx/0xac83846d482e7a92f13bd39024b67b3fc94311f83e10a8d8a2c32434189e7298#eventlog#35)
+
+The L2 Bridge contract will automatically dispatch a message to return the withdrawal to L2:
+[https://sepolia.etherscan.io/tx/0xac83846d482e7a92f13bd39024b67b3fc94311f83e10a8d8a2c32434189e7298#eventlog#50](https://sepolia.etherscan.io/tx/0xac83846d482e7a92f13bd39024b67b3fc94311f83e10a8d8a2c32434189e7298#eventlog#50)
+
+
+#### 4. CCIP message (and CCIP messageID) to bridge withdrawn funds back to L1:
+
+...Which you can you can track the L1 -> L2 brige back on CCIP:
+[https://ccip.chain.link/msg/0x5b3f6bf4cd50d4d9f335cee7072278acfe536e94689fdfc62c4bf7a3e6b1684b]
+(https://ccip.chain.link/msg/0x5b3f6bf4cd50d4d9f335cee7072278acfe536e94689fdfc62c4bf7a3e6b1684b)
+
+
+When the withdrawn funds arrive on L2, they are transferred back to the original user's address:
+[https://sepolia.basescan.org/tx/0x53961a97e21df2080ae8cd75a284fdff4b99e701c2744e5eea3bb0ca2042ad27](https://sepolia.basescan.org/tx/0x53961a97e21df2080ae8cd75a284fdff4b99e701c2744e5eea3bb0ca2042ad27)

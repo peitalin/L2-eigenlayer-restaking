@@ -12,7 +12,7 @@
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
 [submodule "lib/eigenlayer-contracts"]
 	path = lib/eigenlayer-contracts
-	url = https://github.com/peitalin/eigenlayer-contracts
+	url = https://github.com/Layr-Labs/eigenlayer-contracts
 [submodule "lib/reference"]
 	path = lib/reference
 	url = https://github.com/erc6551/reference

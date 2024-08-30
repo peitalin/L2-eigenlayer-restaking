@@ -98,8 +98,9 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
             // if the user already has a EigenAgent, fetch current execution Nonce
             execNonce = eigenAgent.getExecNonce();
         } else {
-            // otherwise agentFactory will spawn one for the user
-            eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
+            // otherwise agentFactory will spawn one for the user after bridging.
+            ///// For testing only:
+            // eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
         }
         console.log("eigenAgent:", address(eigenAgent));
         vm.stopBroadcast();
