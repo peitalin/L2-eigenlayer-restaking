@@ -13,6 +13,9 @@ contract MintEigenAgentScript is Script, ScriptUtils {
     uint256 public deployerKey;
     address public deployer;
 
+    uint256 public aliceKey;
+    address public alice;
+
     FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
     IAgentFactory public agentFactory;
     IEigenAgent6551 public eigenAgent;
@@ -21,6 +24,9 @@ contract MintEigenAgentScript is Script, ScriptUtils {
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
+
+        aliceKey = uint256(5555);
+        alice = vm.addr(aliceKey);
 
         fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         agentFactory = fileReader.readAgentFactory();

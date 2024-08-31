@@ -184,7 +184,6 @@ contract FileReader is Script {
         vm.serializeUint("inputs" , "startBlock", _startBlock);
         vm.serializeAddress("inputs" , "strategy", address(_strategies[0]));
         string memory inputs_data = vm.serializeUint("inputs" , "shares", _shares[0]);
-        // figure out how to serialize arrays
 
         /////////////////////////////////////////////////
         // { "outputs": <outputs_data>}
@@ -253,7 +252,7 @@ contract FileReader is Script {
         address _withdrawer = stdJson.readAddress(withdrawalData, ".inputs.withdrawer");
         address _delegatedTo = stdJson.readAddress(withdrawalData, ".inputs.delegatedTo");
         ///// NOTE: Wrong withdrawalRoot because the written startBlock is wrong
-        ///// (written when bridging is initiated), instead of written after bridging is complete
+        ///// (written when bridging is initiated), not during queueWithdrawal tx in L1
         uint32 _startBlock = uint32(stdJson.readUint(withdrawalData, ".inputs.startBlock"));
         // bytes32 _withdrawalRoot = stdJson.readBytes32(withdrawalData, ".outputs.withdrawalRoot");
 

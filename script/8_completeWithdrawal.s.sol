@@ -31,8 +31,8 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
     ClientEncoders public encoders;
     SignatureUtilsEIP1271 public signatureUtils;
 
-    IReceiverCCIP public receiverContract;
-    ISenderCCIP public senderContract;
+    IReceiverCCIP public receiverProxy;
+    ISenderCCIP public senderProxy;
     IRestakingConnector public restakingConnector;
     IAgentFactory public agentFactory;
     address public senderAddr;
@@ -78,10 +78,10 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
             // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
-        senderContract = fileReader.readSenderContract();
-        senderAddr = address(senderContract);
+        senderProxy = fileReader.readSenderContract();
+        senderAddr = address(senderProxy);
 
-        (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
+        (receiverProxy, restakingConnector) = fileReader.readReceiverRestakingConnector();
         agentFactory = fileReader.readAgentFactory();
 
         ccipBnM = IERC20(address(BaseSepolia.BridgeToken)); // BaseSepolia contract
@@ -146,6 +146,11 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
 
         vm.startBroadcast(deployerKey);
 
+        require(
+            senderProxy.allowlistedSenders(address(receiverProxy)),
+            "senderCCIP: must allowlistSender(receiverCCIP)"
+        );
+
         middlewareTimesIndex = 0; // not used yet, for slashing
         receiveAsTokens = true;
 
@@ -171,9 +176,9 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         }
 
         topupSenderEthBalance(senderAddr);
-        senderContract.sendMessagePayNative(
+        senderProxy.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
-            address(receiverContract),
+            address(receiverProxy),
             string(messageWithSignature),
             address(ccipBnM),
             amount

@@ -3,13 +3,16 @@ pragma solidity 0.8.22;
 
 import {Script, console} from "forge-std/Script.sol";
 
+import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
+import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
-import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
+import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
+import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 import {FileReader} from "./FileReader.sol";
@@ -21,7 +24,7 @@ contract WhitelistCCIPContractsScript is Script {
     FileReader public fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
 
     IRestakingConnector public restakingConnectorProxy;
-    IAgentFactory public agentFactory;
+    IAgentFactory public agentFactoryProxy;
     IReceiverCCIP public receiverProxy;
     ISenderCCIP public senderProxy;
     ISenderUtils public senderUtilsProxy;
@@ -39,13 +42,18 @@ contract WhitelistCCIPContractsScript is Script {
             restakingConnectorProxy
         ) = fileReader.readReceiverRestakingConnector();
 
-        agentFactory = fileReader.readAgentFactory();
+        agentFactoryProxy = fileReader.readAgentFactory();
+
+        (
+            IEigenAgentOwner721 eigenAgentOwner721,
+            IERC6551Registry registry6551
+        ) = fileReader.readEigenAgent721AndRegistry();
 
         require(address(senderProxy) != address(0), "senderProxy cannot be 0");
         require(address(senderUtilsProxy) != address(0), "senderUtilsProxy cannot be 0");
         require(address(receiverProxy) != address(0), "receiverProxy cannot be 0");
         require(address(restakingConnectorProxy) != address(0), "restakingConnectorProxy cannot be 0");
-        require(address(agentFactory) != address(0), "agentFactory cannot be 0");
+        require(address(agentFactoryProxy) != address(0), "agentFactory cannot be 0");
 
         address tokenL1 = EthSepolia.BridgeToken;
         address tokenL2 = BaseSepolia.BridgeToken;
@@ -53,7 +61,9 @@ contract WhitelistCCIPContractsScript is Script {
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
 
-       //////////// L2 Sepolia ////////////
+        /////////////////////////////////////////////
+        //////////// Setup L2 SenderCCIP ////////////
+        /////////////////////////////////////////////
         vm.selectFork(l2ForkId);
         vm.startBroadcast(deployerKey);
 
@@ -64,11 +74,11 @@ contract WhitelistCCIPContractsScript is Script {
 
         // set GasLimits
         uint256[] memory gasLimits = new uint256[](7);
-        gasLimits[0] = 2_200_000; // depositIntoStrategy            [gas: 1,935,006] 1.4mil to mint agent, 500k for deposit
+        gasLimits[0] = 2_100_000; // depositIntoStrategy            [gas: 1,935,006] 1.4mil to mint agent, 500k for deposit
         // https://sepolia.etherscan.io/tx/0xebcf428192d04fc02b1770c40feaa81429424ba6c42ac8bad6cbadb1c31b7c1c
         gasLimits[1] = 700_000; // depositIntoStrategyWithSignature [gas: ?]
-        gasLimits[2] = 800_000; // queueWithdrawals                 [gas: 713_400]
-        gasLimits[3] = 800_000; // completeWithdrawals              [gas: 645_948]
+        gasLimits[2] = 780_000; // queueWithdrawals                 [gas: 713_400]
+        gasLimits[3] = 700_000; // completeWithdrawals              [gas: 645_948]
         gasLimits[4] = 600_000; // delegateTo                       [gas: ?]
         gasLimits[5] = 600_000; // delegateToBySignature            [gas: ?]
         gasLimits[6] = 400_000; // undelegate                       [gas: ?]
@@ -87,7 +97,7 @@ contract WhitelistCCIPContractsScript is Script {
         functionSelectors[5] = 0x7f548071;
         // cast sig "delegateToBySignature(address,address,(bytes,uint256),(bytes,uint256),bytes32)" == 0x7f548071
         functionSelectors[6] = 0xda8be864;
-            // cast sig "undelegate(address)" == 0xda8be864
+        // cast sig "undelegate(address)" == 0xda8be864
 
         senderUtilsProxy.setGasLimitsForFunctionSelectors(
             functionSelectors,
@@ -96,9 +106,28 @@ contract WhitelistCCIPContractsScript is Script {
 
         IERC20_CCIPBnM(tokenL2).drip(deployer);
 
+        require(
+            address(senderProxy.getSenderUtils()) != address(0),
+            "senderProxy: missing senderUtils"
+        );
+        require(
+            senderProxy.allowlistedSenders(address(receiverProxy)),
+            "senderProxy: must allowlistSender(receiverProxy)"
+        );
+        require(
+            senderProxy.allowlistedSourceChains(EthSepolia.ChainSelector),
+            "senderProxy: must allowlist SourceChain: EthSepolia"
+        );
+        require(
+            senderProxy.allowlistedDestinationChains(EthSepolia.ChainSelector),
+            "senderProxy: must allowlist DestinationChain: EthSepolia)"
+        );
+
         vm.stopBroadcast();
 
-        //////////// Eth Sepolia ////////////
+        ///////////////////////////////////////////////
+        //////////// Setup L1 ReceiverCCIP ////////////
+        ///////////////////////////////////////////////
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployerKey);
 
@@ -109,7 +138,7 @@ contract WhitelistCCIPContractsScript is Script {
         // Remember to fund L1 receiver with gas and tokens in production.
 
         uint256[] memory gasLimits_R = new uint256[](1);
-        gasLimits_R[0] = 400_000; // handleTransferToAgentOwner       [gas: 268_420]
+        gasLimits_R[0] = 295_000; // handleTransferToAgentOwner       [gas: 268_420]
 
         bytes4[] memory functionSelectors_R = new bytes4[](1);
         functionSelectors_R[0] = 0xd8a85b48;
@@ -128,6 +157,35 @@ contract WhitelistCCIPContractsScript is Script {
             // mint() if we deployed our own Mock ERC20
             IERC20Minter(tokenL1).mint(address(receiverProxy), 3 ether);
         }
+
+        require(
+            address(agentFactoryProxy.getRestakingConnector()) == address(restakingConnectorProxy),
+            "agentFactoryProxy: missing restakingConnector"
+        );
+        require(
+            address(receiverProxy.getRestakingConnector()) == address(restakingConnectorProxy),
+            "receiverProxy: missing restakingConnector"
+        );
+        require(
+            address(restakingConnectorProxy.getAgentFactory()) == address(agentFactoryProxy),
+            "restakingConnector: missing AgentFactory"
+        );
+        require(
+            address(restakingConnectorProxy.getReceiverCCIP()) == address(receiverProxy),
+            "restakingConnector: missing ReceiverCCIP"
+        );
+        require(
+            address(eigenAgentOwner721.getAgentFactory()) == address(agentFactoryProxy),
+            "EigenAgentOwner721 NFT: missing AgentFactory"
+        );
+        require(
+            address(agentFactoryProxy.getRestakingConnector()) == address(restakingConnectorProxy),
+            "agentFactory: missing restakingConnector"
+        );
+        require(
+            address(agentFactoryProxy.erc6551Registry()) == address(registry6551),
+            "agentFactory: missing erc6551registry"
+        );
 
         vm.stopBroadcast();
     }

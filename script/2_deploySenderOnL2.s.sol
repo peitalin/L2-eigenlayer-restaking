@@ -69,11 +69,17 @@ contract DeploySenderOnL2Script is Script {
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         senderProxy.setSenderUtils(ISenderUtils(address(senderUtilsProxy)));
 
-        vm.stopBroadcast();
-
         require(
-            address(senderProxy.senderUtils()) != address(0),
-            "Check script: senderProxy missing senderUtils"
+            address(senderProxy.getSenderUtils()) != address(0),
+            "senderProxy: missing senderUtils"
+        );
+        require(
+            senderProxy.allowlistedSourceChains(EthSepolia.ChainSelector),
+            "senderProxy: must allowlist SourceChain: EthSepolia"
+        );
+        require(
+            senderProxy.allowlistedDestinationChains(EthSepolia.ChainSelector),
+            "senderProxy: must allowlist DestinationChain: EthSepolia)"
         );
 
         if (!isMockRun) {
@@ -83,6 +89,8 @@ contract DeploySenderOnL2Script is Script {
                 address(proxyAdmin)
             );
         }
+
+        vm.stopBroadcast();
 
         return ISenderCCIP(address(senderProxy));
     }

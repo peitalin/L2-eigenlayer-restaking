@@ -24,6 +24,36 @@ contract EigenlayerMsgDecoders {
      *
     */
 
+    function decodeAgentOwnerSignature(bytes memory message, uint256 sigOffset)
+        public pure
+        returns (
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        )
+    {
+
+        bytes32 r;
+        bytes32 s;
+        bytes1 v;
+
+        assembly {
+            signer := mload(add(message, sigOffset))
+            expiry := mload(add(message, add(sigOffset, 32)))
+            r := mload(add(message, add(sigOffset, 64)))
+            s := mload(add(message, add(sigOffset, 96)))
+            v := mload(add(message, add(sigOffset, 128)))
+        }
+
+        signature = abi.encodePacked(r,s,v);
+
+        return (
+            signer,
+            expiry,
+            signature
+        );
+    }
+
     function decodeDepositWithSignature6551Msg(bytes memory message)
         public pure
         returns (
@@ -56,12 +86,13 @@ contract EigenlayerMsgDecoders {
             token := mload(add(message, 132))
             amount := mload(add(message, 164))
 
-            signer := mload(add(message, 196))
-            expiry := mload(add(message, 228))
-            r := mload(add(message, 260))
-            s := mload(add(message, 292))
-            v := mload(add(message, 324))
         }
+
+        (
+            signer,
+            expiry,
+            signature
+        ) = decodeAgentOwnerSignature(message, 196); // signature starts on 196
 
         signature = abi.encodePacked(r,s,v);
 
@@ -506,9 +537,9 @@ contract EigenlayerMsgDecoders {
         // 0000000000000000000000000000000000000000000000000000000000000020
         // 0000000000000000000000000000000000000000000000000000000000000064
         // d8a85b48                                                         [96] function selector
-        // d4051832dcd7410644cd25870cdbe10efd8579e9a00f3e771b8d457c584e229a [100] withdrawal root
+        // dd900ac4d233ec9d74ac5af4ce89f87c78781d8fd9ee2aad62d312bdfdf78a14 [100] withdrawal root
         // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] agent owner
-        // 4e692baa2e5b644d9f77780b439b315bdce9c0672e7e6c45cb79875f9f754350 [164] agentOwnerRoot
+        // f07b660f0e17387b14010ccadbb6266bb80331ae061328cbcd2a4bbb62b30ac1 [164] agentOwnerRoot
         // 00000000000000000000000000000000000000000000000000000000
 
         bytes4 functionSelector;
@@ -524,6 +555,7 @@ contract EigenlayerMsgDecoders {
         }
 
         bytes32 computedRoot = HashAgentOwnerRoot.hashAgentOwnerRoot(withdrawalRoot, agentOwner);
+        // return keccak256(abi.encode(withdrawalRoot, agentOwner));
 
         return TransferToAgentOwnerMsg({
             withdrawalRoot: withdrawalRoot,

@@ -81,7 +81,7 @@ contract UpgradeReceiverOnL1Script is Script {
 
         (
             IReceiverCCIP receiverProxy,
-            IRestakingConnector restakingProxy
+            IRestakingConnector restakingConnectorProxy
         ) = fileReader.readReceiverRestakingConnector();
 
         (
@@ -103,7 +103,7 @@ contract UpgradeReceiverOnL1Script is Script {
             TransparentUpgradeableProxy(payable(address(eigenAgentOwner721Proxy))),
             address(new EigenAgentOwner721())
         );
-        eigenAgentOwner721Proxy.addToWhitelistedCallers(address(restakingProxy));
+        eigenAgentOwner721Proxy.addToWhitelistedCallers(address(restakingConnectorProxy));
 
         // deploy new 6551 Registry
         registry6551 = IERC6551Registry(address(new ERC6551Registry()));
@@ -128,25 +128,25 @@ contract UpgradeReceiverOnL1Script is Script {
         vm.startBroadcast(deployerKey);
         // Upgrade RestakingConnector proxy to new implementation
         proxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(restakingProxy))),
+            TransparentUpgradeableProxy(payable(address(restakingConnectorProxy))),
             address(new RestakingConnector())
         );
 
-        restakingProxy.setAgentFactory(address(agentFactoryProxy));
+        restakingConnectorProxy.setAgentFactory(address(agentFactoryProxy));
         eigenAgentOwner721Proxy.setAgentFactory(agentFactoryProxy);
-        restakingProxy.setReceiverCCIP(address(receiverProxy));
-        agentFactoryProxy.setRestakingConnector(address(restakingProxy));
+        restakingConnectorProxy.setReceiverCCIP(address(receiverProxy));
+        agentFactoryProxy.setRestakingConnector(address(restakingConnectorProxy));
 
         require(
             address(receiverProxy.getRestakingConnector()) != address(0),
             "upgrade receiverProxy: missing restakingConnector"
         );
         require(
-            address(restakingProxy.getAgentFactory()) != address(0),
+            address(restakingConnectorProxy.getAgentFactory()) != address(0),
             "upgrade restakingConnectorProxy: missing AgentFactory"
         );
         require(
-            address(restakingProxy.getReceiverCCIP()) != address(0),
+            address(restakingConnectorProxy.getReceiverCCIP()) != address(0),
             "upgrade restakingConnectorProxy: missing ReceiverCCIP"
         );
         require(
@@ -162,7 +162,7 @@ contract UpgradeReceiverOnL1Script is Script {
         if (!isTest) {
             fileReader.saveReceiverBridgeContracts(
                 address(receiverProxy),
-                address(restakingProxy),
+                address(restakingConnectorProxy),
                 address(agentFactoryProxy),
                 address(registry6551),
                 address(eigenAgentOwner721Proxy),

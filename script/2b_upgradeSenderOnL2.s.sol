@@ -8,6 +8,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
 import {SenderUtils} from "../src/SenderUtils.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
+import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
 
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
@@ -27,6 +28,11 @@ contract UpgradeSenderOnL2Script is Script {
         FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
 
         ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL2());
+
+        (
+            IReceiverCCIP receiverProxy,
+            // restakingConnectorProxy
+        ) = fileReader.readReceiverRestakingConnector();
 
         ISenderCCIP senderProxy = fileReader.readSenderContract();
         ISenderUtils senderUtilsProxy = fileReader.readSenderUtils();
@@ -49,11 +55,25 @@ contract UpgradeSenderOnL2Script is Script {
         /// whitelist destination chain
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
+        senderProxy.allowlistSender(address(receiverProxy), true);
+
         senderProxy.setSenderUtils(senderUtilsProxy);
 
         require(
             address(senderProxy.getSenderUtils()) != address(0),
-            "Check script: senderProxy missing senderUtils"
+            "senderProxy: missing senderUtils"
+        );
+        require(
+            senderProxy.allowlistedSenders(address(receiverProxy)),
+            "senderProxy: must allowlistSender(receiverProxy)"
+        );
+        require(
+            senderProxy.allowlistedSourceChains(EthSepolia.ChainSelector),
+            "senderProxy: must allowlist SourceChain: EthSepolia"
+        );
+        require(
+            senderProxy.allowlistedDestinationChains(EthSepolia.ChainSelector),
+            "senderProxy: must allowlist DestinationChain: EthSepolia)"
         );
 
         vm.stopBroadcast();
