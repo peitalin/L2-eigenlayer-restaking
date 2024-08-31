@@ -7,7 +7,6 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {HashAgentOwnerRoot} from "./HashAgentOwnerRoot.sol";
 
-
 struct TransferToAgentOwnerMsg {
     bytes32 withdrawalRoot;
     address agentOwner;
@@ -77,15 +76,10 @@ contract EigenlayerMsgDecoders {
         // 037e6bdadf2079e5268e5ad0000699611e63c3e015027ad7f8e7b4a252bbb9bb [292] signature s
         // 1c000000000000000000000000000000000000000000000000000000         [324] signature v
 
-        bytes32 r;
-        bytes32 s;
-        bytes1 v;
-
         assembly {
             strategy := mload(add(message, 100))
             token := mload(add(message, 132))
             amount := mload(add(message, 164))
-
         }
 
         (
@@ -93,8 +87,6 @@ contract EigenlayerMsgDecoders {
             expiry,
             signature
         ) = decodeAgentOwnerSignature(message, 196); // signature starts on 196
-
-        signature = abi.encodePacked(r,s,v);
 
         require(signature.length == 65, "decodeDepositWithSignature6551Msg: invalid signature length");
 
@@ -162,10 +154,6 @@ contract EigenlayerMsgDecoders {
             arrayQueuedWithdrawalParams[i] = wp;
         }
 
-        bytes32 r;
-        bytes32 s;
-        bytes1 v;
-
         // note: Each extra QueuedWithdrawalParam element adds 1x offset and 7 lines:
         // So when reading the signature, increase offset by 7 * i:
         //      1 element:  offset = (1 - 1) * (1 + 7) = 0
@@ -173,15 +161,11 @@ contract EigenlayerMsgDecoders {
         //      3 elements: offset = (3 - 1) * (1 + 7) = 16
         uint256 offset = (arrayLength - 1) * (1 + 7) * 32; // 32 bytes per line
 
-        assembly {
-            signer := mload(add(message, add(420, offset)))
-            expiry := mload(add(message, add(452, offset)))
-            r := mload(add(message, add(484, offset)))
-            s := mload(add(message, add(516, offset)))
-            v := mload(add(message, add(548, offset)))
-        }
-
-        signature = abi.encodePacked(r,s,v);
+        (
+            signer,
+            expiry,
+            signature
+        ) = decodeAgentOwnerSignature(message, 420 + offset); // signature starts on 420 + offset
 
         return (
             arrayQueuedWithdrawalParams,
@@ -480,9 +464,6 @@ contract EigenlayerMsgDecoders {
 
         uint256 tokensArrayLength;
         address tokensToWithdraw0;
-        bytes32 r;
-        bytes32 s;
-        bytes1 v;
 
         assembly {
             // _str_offset := mload(add(message, 32))
@@ -505,15 +486,14 @@ contract EigenlayerMsgDecoders {
             // share0 := mload(add(message, 548))
             tokensArrayLength := mload(add(message, 580))
             tokensToWithdraw0 := mload(add(message, 612))
-
-            signer := mload(add(message, 644))
-            expiry := mload(add(message, 676))
-            r := mload(add(message, 708))
-            s := mload(add(message, 740))
-            v := mload(add(message, 772))
         }
 
-        signature = abi.encodePacked(r,s,v);
+        (
+            signer,
+            expiry,
+            signature
+        ) = decodeAgentOwnerSignature(message, 644); // signature (signer) starts at 644
+
         tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = IERC20(tokensToWithdraw0);
 

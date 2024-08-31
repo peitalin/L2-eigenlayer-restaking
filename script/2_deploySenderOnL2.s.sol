@@ -15,9 +15,7 @@ import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 
 
-contract DeploySenderOnL2Script is Script {
-
-    FileReader public fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
+contract DeploySenderOnL2Script is Script, FileReader {
 
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
     address deployer = vm.addr(deployerKey);
@@ -83,7 +81,7 @@ contract DeploySenderOnL2Script is Script {
         );
 
         if (!isMockRun) {
-            fileReader.saveSenderBridgeContracts(
+            saveSenderBridgeContracts(
                 address(senderProxy),
                 address(senderUtilsProxy),
                 address(proxyAdmin)

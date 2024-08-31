@@ -9,7 +9,7 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 
 /// @dev Retrieve these struct hashes by calling Eigenlayer contracts, or storing the hash.
-contract SignatureUtilsEIP1271 is Script {
+contract ClientSigners is Script {
 
     /*
      *
@@ -69,7 +69,7 @@ contract SignatureUtilsEIP1271 is Script {
 
         return keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes("EigenLayer")), chainid, contractAddr));
         // Note: in calculating the domainSeparator:
-        // address(this) is the StrategyManager, not this contract (SignatureUtilsEIP2172)
+        // address(this) is the StrategyManager, not this contract (SignatureUtils)
         // chainid is the chain Eigenlayer is deployed on (it can fork!), not the chain you are calling this function
         // So chainid should be destination chainid in the context of L2 -> L1 restaking calls
     }

@@ -33,11 +33,9 @@ import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 
 
 
-contract DeployReceiverOnL1Script is Script {
+contract DeployReceiverOnL1Script is Script, FileReader {
 
-    FileReader public fileReader = new FileReader();
-    DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript =
-        new DeployMockEigenlayerContractsScript();
+    DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
 
     RestakingConnector public restakingProxy;
     ReceiverCCIP public receiverProxy;
@@ -59,7 +57,9 @@ contract DeployReceiverOnL1Script is Script {
     }
 
     function mockrun() public returns (IReceiverCCIPMock, IRestakingConnector, IAgentFactory) {
+
         vm.deal(deployer, 1 ether);
+
         (
             IReceiverCCIP _receiverProxy,
             IRestakingConnector _restakingConnectorProxy,
@@ -75,7 +75,8 @@ contract DeployReceiverOnL1Script is Script {
 
     function _run(bool isMockRun) internal returns (IReceiverCCIP, IRestakingConnector, IAgentFactory) {
 
-        senderContract = fileReader.readSenderContract();
+        deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
+
         (
             strategy,
             strategyManager,
@@ -85,6 +86,8 @@ contract DeployReceiverOnL1Script is Script {
             , // _rewardsCoordinator
             // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+
+        senderContract = readSenderContract();
 
         ////////////////////////////////////////////////////////////
         // begin broadcast
@@ -216,7 +219,7 @@ contract DeployReceiverOnL1Script is Script {
         vm.stopBroadcast();
 
         if (!isMockRun) {
-            fileReader.saveReceiverBridgeContracts(
+            saveReceiverBridgeContracts(
                 address(receiverProxy),
                 address(restakingProxy),
                 address(agentFactoryProxy),

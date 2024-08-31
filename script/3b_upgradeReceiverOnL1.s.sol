@@ -32,9 +32,8 @@ import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
 
 
-contract UpgradeReceiverOnL1Script is Script {
+contract UpgradeReceiverOnL1Script is Script, FileReader {
 
-    FileReader public fileReader;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
 
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
@@ -64,10 +63,7 @@ contract UpgradeReceiverOnL1Script is Script {
 
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
 
-        fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-
-        senderProxy = fileReader.readSenderContract();
 
         (
             strategy,
@@ -82,15 +78,16 @@ contract UpgradeReceiverOnL1Script is Script {
         (
             IReceiverCCIP receiverProxy,
             IRestakingConnector restakingConnectorProxy
-        ) = fileReader.readReceiverRestakingConnector();
+        ) = readReceiverRestakingConnector();
+
 
         (
             eigenAgentOwner721Proxy,
             // registry6551
-        ) = fileReader.readEigenAgent721AndRegistry();
-
-        agentFactoryProxy = fileReader.readAgentFactory();
-        proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL1());
+        ) = readEigenAgent721AndRegistry();
+        senderProxy = readSenderContract();
+        agentFactoryProxy = readAgentFactory();
+        proxyAdmin = ProxyAdmin(readProxyAdminL1());
 
         /////////////////////////////
         /// Begin Broadcast
@@ -160,7 +157,7 @@ contract UpgradeReceiverOnL1Script is Script {
 
         // Update registry6551 address, all other proxies stay the same
         if (!isTest) {
-            fileReader.saveReceiverBridgeContracts(
+            saveReceiverBridgeContracts(
                 address(receiverProxy),
                 address(restakingConnectorProxy),
                 address(agentFactoryProxy),

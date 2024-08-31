@@ -21,10 +21,10 @@ import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
 import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
-
-import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
-import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
+import {ClientSigners} from "../script/ClientSigners.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
+
+import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 
 // 6551 accounts
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
@@ -40,7 +40,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
     DeployReceiverOnL1Script public deployReceiverOnL1Script;
     DeploySenderOnL2Script public deployOnL2Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-    SignatureUtilsEIP1271 public signatureUtils;
+    ClientSigners public clientSigners;
 
     IReceiverCCIPMock public receiverContract;
     ISenderCCIPMock public senderContract;
@@ -81,7 +81,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         deployOnL2Script = new DeploySenderOnL2Script();
         deployReceiverOnL1Script = new DeployReceiverOnL1Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-        signatureUtils = new SignatureUtilsEIP1271();
+        clientSigners = new ClientSigners();
 
         l2ForkId = vm.createFork("basesepolia");        // 0
         ethForkId = vm.createSelectFork("ethsepolia"); // 1
@@ -181,7 +181,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_D = signatureUtils.signMessageForEigenAgentExecution(
+            messageWithSignature_D = clientSigners.signMessageForEigenAgentExecution(
                 bobKey,
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager),
@@ -260,7 +260,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_QW = signatureUtils.signMessageForEigenAgentExecution(
+            messageWithSignature_QW = clientSigners.signMessageForEigenAgentExecution(
                 bobKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
@@ -360,7 +360,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_CW = signatureUtils.signMessageForEigenAgentExecution(
+            messageWithSignature_CW = clientSigners.signMessageForEigenAgentExecution(
                 bobKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),

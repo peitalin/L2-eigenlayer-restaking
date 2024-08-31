@@ -8,7 +8,7 @@ import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
 
-contract CheckMintEigenAgentGasCostsScript is Script, ScriptUtils {
+contract CheckMintEigenAgentGasCostsScript is Script, ScriptUtils, FileReader {
 
     uint256 public deployerKey;
     address public deployer;
@@ -18,8 +18,7 @@ contract CheckMintEigenAgentGasCostsScript is Script, ScriptUtils {
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        FileReader fileReader = new FileReader();
-        IAgentFactory agentFactory = fileReader.readAgentFactory();
+        IAgentFactory agentFactory = readAgentFactory();
 
         // Just for testing gas costs
         // forge test --match-test test_step5c_CheckMintEigenAgentGasCosts -vvvv --gas-report

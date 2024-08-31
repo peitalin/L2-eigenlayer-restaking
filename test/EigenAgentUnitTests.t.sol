@@ -17,8 +17,7 @@ import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
-
-import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
+import {ClientSigners} from "../script/ClientSigners.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
@@ -34,7 +33,7 @@ contract EigenAgentUnitTests is Test {
 
     DeployReceiverOnL1Script public deployReceiverOnL1Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-    SignatureUtilsEIP1271 public signatureUtils;
+    ClientSigners public clientSigners;
 
     IReceiverCCIPMock public receiverContract;
     IRestakingConnector public restakingConnector;
@@ -69,7 +68,7 @@ contract EigenAgentUnitTests is Test {
 
         deployReceiverOnL1Script = new DeployReceiverOnL1Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-        signatureUtils = new SignatureUtilsEIP1271();
+        clientSigners = new ClientSigners();
 
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
@@ -120,7 +119,7 @@ contract EigenAgentUnitTests is Test {
         // encode a simple getSenderContractL2Addr call
         bytes memory data = abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector);
 
-        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
+        bytes32 digestHash = clientSigners.createEigenAgentCallDigestHash(
             address(receiverContract),
             0 ether,
             data,
@@ -134,7 +133,7 @@ contract EigenAgentUnitTests is Test {
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(bobKey, digestHash);
             signature = abi.encodePacked(r, s, v);
         }
-        signatureUtils.checkSignature_EIP1271(bob, digestHash, signature);
+        clientSigners.checkSignature_EIP1271(bob, digestHash, signature);
         vm.stopBroadcast();
 
         //////////////////////////////////////////////////////
@@ -199,7 +198,7 @@ contract EigenAgentUnitTests is Test {
                 AMOUNT,
                 execNonce0
             );
-            signatureUtils.checkSignature_EIP1271(bob, digestHash0, signature0);
+            clientSigners.checkSignature_EIP1271(bob, digestHash0, signature0);
 
             eigenAgent.executeWithSignature(
                 address(tokenL1), // CCIP-BnM token
@@ -230,7 +229,7 @@ contract EigenAgentUnitTests is Test {
                 AMOUNT,
                 execNonce1
             );
-            signatureUtils.checkSignature_EIP1271(bob, digestHash1, signature1);
+            clientSigners.checkSignature_EIP1271(bob, digestHash1, signature1);
 
             eigenAgent.executeWithSignature(
                 address(strategyManager), // strategyManager
@@ -297,7 +296,7 @@ contract EigenAgentUnitTests is Test {
                 execNonce2,
                 queuedWithdrawalParams
             );
-            signatureUtils.checkSignature_EIP1271(alice, digestHash2, signature2);
+            clientSigners.checkSignature_EIP1271(alice, digestHash2, signature2);
 
             bytes memory result = eigenAgent.executeWithSignature(
                 address(delegationManager), // delegationManager
@@ -328,7 +327,7 @@ contract EigenAgentUnitTests is Test {
             queuedWithdrawalParams
         );
 
-        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
+        bytes32 digestHash = clientSigners.createEigenAgentCallDigestHash(
             address(delegationManager), // target to call
             0 ether,
             data,
@@ -362,7 +361,7 @@ contract EigenAgentUnitTests is Test {
             amount
         );
 
-        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
+        bytes32 digestHash = clientSigners.createEigenAgentCallDigestHash(
             targetToken, // CCIP-BnM token
             0 ether,
             data,
@@ -393,7 +392,7 @@ contract EigenAgentUnitTests is Test {
             amount
         );
 
-        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
+        bytes32 digestHash = clientSigners.createEigenAgentCallDigestHash(
             address(strategyManager),
             0 ether,
             data,

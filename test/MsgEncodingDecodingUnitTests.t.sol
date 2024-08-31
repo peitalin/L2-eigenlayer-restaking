@@ -14,14 +14,14 @@ import {EigenlayerMsgDecoders} from "../src/utils/EigenlayerMsgDecoders.sol";
 import {DelegationDecoders} from "../src/utils/DelegationDecoders.sol";
 import {FunctionSelectorDecoder} from "../src/FunctionSelectorDecoder.sol";
 
-import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
+import {ClientSigners} from "../script/ClientSigners.sol";
 import {EthSepolia} from "../script/Addresses.sol";
 import {FileReader} from "../script/FileReader.sol";
 
 
 contract EigenlayerMsg_EncodingDecodingTests is Test {
 
-    SignatureUtilsEIP1271 public signatureUtils;
+    ClientSigners public signatureUtils;
     EigenlayerMsgDecoders public eigenlayerMsgDecoders;
 
     IStrategy public strategy;
@@ -37,7 +37,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
     function setUp() public {
 
-        signatureUtils = new SignatureUtilsEIP1271();
+        signatureUtils = new ClientSigners();
         eigenlayerMsgDecoders = new EigenlayerMsgDecoders();
 
         // just for deserializing, not calling these contracts

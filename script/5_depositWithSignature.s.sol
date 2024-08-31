@@ -14,23 +14,26 @@ import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
+import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
 import {ScriptUtils} from "./ScriptUtils.sol";
 import {ClientEncoders} from "./ClientEncoders.sol";
-import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
+import {ClientSigners} from "./ClientSigners.sol";
 
-import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
 
-contract DepositWithSignatureScript is Script, ScriptUtils {
+contract DepositWithSignatureScript is
+    Script,
+    ScriptUtils,
+    FileReader,
+    ClientEncoders,
+    ClientSigners
+{
 
-    FileReader public fileReader;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-    ClientEncoders public encoders;
-    SignatureUtilsEIP1271 public signatureUtils;
 
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
@@ -54,7 +57,6 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
 
-        fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
         (
@@ -67,14 +69,14 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
             // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
-        senderContract = fileReader.readSenderContract();
+        senderContract = readSenderContract();
         address senderAddr = address(senderContract);
 
         (
             receiverContract,
             restakingConnector
-        ) = fileReader.readReceiverRestakingConnector();
-        agentFactory = fileReader.readAgentFactory();
+        ) = readReceiverRestakingConnector();
+        agentFactory = readAgentFactory();
 
         tokenL1 = IERC20(address(EthSepolia.BridgeToken)); // CCIP-BnM on EthSepolia
         tokenL2 = IERC20(address(BaseSepolia.BridgeToken)); // CCIP-BnM on BaseSepolia
@@ -108,8 +110,6 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
         //////////////////////////////////////////////////////
         // Make sure we are on BaseSepolia Fork
         vm.selectFork(l2ForkId);
-        encoders = new ClientEncoders();
-        signatureUtils = new SignatureUtilsEIP1271();
 
         vm.startBroadcast(deployerKey);
 
@@ -120,14 +120,14 @@ contract DepositWithSignatureScript is Script, ScriptUtils {
 
         IERC20_CCIPBnM(address(tokenL2)).drip(deployer);
         {
-            depositMessage = encoders.encodeDepositIntoStrategyMsg(
+            depositMessage = encodeDepositIntoStrategyMsg(
                 address(strategy),
                 address(tokenL1),
                 amount
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
+            messageWithSignature = signMessageForEigenAgentExecution(
                 deployerKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 TARGET_CONTRACT, // StrategyManager is the target

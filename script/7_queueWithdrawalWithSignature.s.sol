@@ -23,19 +23,21 @@ import {FileReader} from "./FileReader.sol";
 import {ScriptUtils} from "./ScriptUtils.sol";
 
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
-import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
+import {ClientSigners} from "./ClientSigners.sol";
 import {ClientEncoders} from "./ClientEncoders.sol";
 
 
-contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
+contract QueueWithdrawalWithSignatureScript is
+    Script,
+    ScriptUtils,
+    FileReader,
+    ClientEncoders,
+    ClientSigners
+{
 
     FileReader public fileReader;
     DeployReceiverOnL1Script public deployReceiverOnL1Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-
-    // client libs
-    ClientEncoders public encoders;
-    SignatureUtilsEIP1271 public signatureUtils;
 
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
     address deployer = vm.addr(deployerKey);
@@ -99,13 +101,13 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
 
         } else {
             // otherwise if running the script, read the existing contracts on Sepolia
-            senderContract = fileReader.readSenderContract();
+            senderContract = readSenderContract();
             (
                 receiverContract,
                 restakingConnector
-            ) = fileReader.readReceiverRestakingConnector();
+            ) = readReceiverRestakingConnector();
 
-            agentFactory = fileReader.readAgentFactory();
+            agentFactory = readAgentFactory();
         }
 
         eigenAgent = agentFactory.getEigenAgent(deployer);
@@ -153,8 +155,6 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         /////////////////////////////////////////////////////////////////
 
         vm.selectFork(l2ForkId);
-        encoders = new ClientEncoders();
-        signatureUtils = new SignatureUtilsEIP1271();
 
         vm.startBroadcast(deployerKey);
 
@@ -172,12 +172,10 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         queuedWithdrawalArray[0] = queuedWithdrawal;
 
         // create the queueWithdrawal message for Eigenlayer
-        withdrawalMessage = encoders.encodeQueueWithdrawalsMsg(
-            queuedWithdrawalArray
-        );
+        withdrawalMessage = encodeQueueWithdrawalsMsg(queuedWithdrawalArray);
 
         // sign the message for EigenAgent to execute Eigenlayer command
-        messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
+        messageWithSignature = signMessageForEigenAgentExecution(
             deployerKey,
             EthSepolia.ChainId, // destination chainid where EigenAgent lives
             TARGET_CONTRACT,
@@ -211,7 +209,7 @@ contract QueueWithdrawalWithSignatureScript is Script, ScriptUtils {
         // NOTE: Tx will still be bridging after this script runs.
         // startBlock is saved after bridging completes and calls queueWithdrawal on L1.
         // Then we call getWithdrawalBlock for the correct startBlock to calculate withdrawalRoots
-        fileReader.saveWithdrawalInfo(
+        saveWithdrawalInfo(
             staker,
             delegatedTo,
             withdrawer,

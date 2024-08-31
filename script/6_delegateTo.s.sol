@@ -19,11 +19,17 @@ import {FileReader} from "./FileReader.sol";
 import {ScriptUtils} from "./ScriptUtils.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 
-import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
+import {ClientSigners} from "./ClientSigners.sol";
 import {ClientEncoders} from "./ClientEncoders.sol";
 
 
-contract DelegateToScript is Script, ScriptUtils {
+contract DelegateToScript is
+    Script,
+    ScriptUtils,
+    FileReader,
+    ClientEncoders,
+    ClientSigners
+{
 
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
@@ -32,9 +38,6 @@ contract DelegateToScript is Script, ScriptUtils {
     IERC20 public ccipBnM;
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-    FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
-    ClientEncoders public encoders;
-    SignatureUtilsEIP1271 public signatureUtils;
 
     uint256 public deployerKey;
     address public deployer;
@@ -51,7 +54,6 @@ contract DelegateToScript is Script, ScriptUtils {
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
         (
@@ -64,8 +66,8 @@ contract DelegateToScript is Script, ScriptUtils {
               // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
-        senderContract = fileReader.readSenderContract();
-        (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
+        senderContract = readSenderContract();
+        (receiverContract, restakingConnector) = readReceiverRestakingConnector();
 
         ccipBnM = IERC20(address(BaseSepolia.BridgeToken)); // BaseSepolia contract
         TARGET_CONTRACT = address(delegationManager);
@@ -109,8 +111,6 @@ contract DelegateToScript is Script, ScriptUtils {
         /////// Broadcast to L2
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
-        encoders = new ClientEncoders();
-        signatureUtils = new SignatureUtilsEIP1271();
 
         vm.startBroadcast(deployerKey);
 
@@ -125,7 +125,7 @@ contract DelegateToScript is Script, ScriptUtils {
             uint256 sig1_expiry = block.timestamp + 1 hours;
             uint256 sig2_expiry = block.timestamp + 2 hours;
 
-            bytes32 digestHash1 = signatureUtils.calculateStakerDelegationDigestHash(
+            bytes32 digestHash1 = calculateStakerDelegationDigestHash(
                 staker,
                 0,  // nonce
                 operator,
@@ -133,7 +133,7 @@ contract DelegateToScript is Script, ScriptUtils {
                 TARGET_CONTRACT,
                 EthSepolia.ChainId
             );
-            bytes32 digestHash2 = signatureUtils.calculateDelegationApprovalDigestHash(
+            bytes32 digestHash2 = calculateDelegationApprovalDigestHash(
                 staker,
                 operator,
                 operator, // _delegationApprover,
@@ -159,7 +159,7 @@ contract DelegateToScript is Script, ScriptUtils {
         }
 
         // send CCIP message to CompleteWithdrawal
-        bytes memory message = encoders.encodeDelegateToBySignature(
+        bytes memory message = encodeDelegateToBySignature(
             staker,
             operator,
             stakerSignatureAndExpiry,

@@ -15,7 +15,7 @@ import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
 
 
-contract UpgradeSenderOnL2Script is Script {
+contract UpgradeSenderOnL2Script is Script, FileReader {
 
 
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
@@ -25,17 +25,15 @@ contract UpgradeSenderOnL2Script is Script {
 
         uint256 l2ForkId = vm.createSelectFork("basesepolia");
 
-        FileReader fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
-
-        ProxyAdmin proxyAdmin = ProxyAdmin(fileReader.readProxyAdminL2());
+        ProxyAdmin proxyAdmin = ProxyAdmin(readProxyAdminL2());
 
         (
             IReceiverCCIP receiverProxy,
             // restakingConnectorProxy
-        ) = fileReader.readReceiverRestakingConnector();
+        ) = readReceiverRestakingConnector();
 
-        ISenderCCIP senderProxy = fileReader.readSenderContract();
-        ISenderUtils senderUtilsProxy = fileReader.readSenderUtils();
+        ISenderCCIP senderProxy = readSenderContract();
+        ISenderUtils senderUtilsProxy = readSenderUtils();
 
         /////////////////////////////
         /// Begin Broadcast

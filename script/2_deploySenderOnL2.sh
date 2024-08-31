@@ -8,6 +8,7 @@ forge script script/2_deploySenderOnL2.s.sol:DeploySenderOnL2Script \
     --broadcast \
     --verify \
     --etherscan-api-key $BASESCAN_API_KEY \
+    --private-key $DEPLOYER_KEY \
     -vvvv
 
 

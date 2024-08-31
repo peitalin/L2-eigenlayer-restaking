@@ -18,7 +18,7 @@ import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
 
-import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
+import {ClientSigners} from "../script/ClientSigners.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
@@ -34,7 +34,7 @@ contract CCIP_Eigen_QueueWithdrawal_6551Tests is Test {
 
     DeployReceiverOnL1Script public deployReceiverOnL1Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-    SignatureUtilsEIP1271 public signatureUtils;
+    ClientSigners public clientSigners;
 
     IReceiverCCIPMock public receiverContract;
     IRestakingConnector public restakingConnector;
@@ -66,7 +66,7 @@ contract CCIP_Eigen_QueueWithdrawal_6551Tests is Test {
 
         deployReceiverOnL1Script = new DeployReceiverOnL1Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-        signatureUtils = new SignatureUtilsEIP1271();
+        clientSigners = new ClientSigners();
 
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
@@ -149,7 +149,7 @@ contract CCIP_Eigen_QueueWithdrawal_6551Tests is Test {
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature0 = signatureUtils.signMessageForEigenAgentExecution(
+            messageWithSignature0 = clientSigners.signMessageForEigenAgentExecution(
                 bobKey,
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager for deposits
@@ -211,7 +211,7 @@ contract CCIP_Eigen_QueueWithdrawal_6551Tests is Test {
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature1 = signatureUtils.signMessageForEigenAgentExecution(
+            messageWithSignature1 = clientSigners.signMessageForEigenAgentExecution(
                 bobKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),

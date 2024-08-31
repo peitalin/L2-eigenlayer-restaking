@@ -8,7 +8,7 @@ import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
 
-contract MintEigenAgentScript is Script, ScriptUtils {
+contract MintEigenAgentScript is Script, ScriptUtils, FileReader {
 
     uint256 public deployerKey;
     address public deployer;
@@ -16,7 +16,6 @@ contract MintEigenAgentScript is Script, ScriptUtils {
     uint256 public aliceKey;
     address public alice;
 
-    FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
     IAgentFactory public agentFactory;
     IEigenAgent6551 public eigenAgent;
 
@@ -28,8 +27,7 @@ contract MintEigenAgentScript is Script, ScriptUtils {
         aliceKey = uint256(5555);
         alice = vm.addr(aliceKey);
 
-        fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
-        agentFactory = fileReader.readAgentFactory();
+        agentFactory = readAgentFactory();
 
         vm.createSelectFork("ethsepolia");
         vm.startBroadcast(deployerKey);

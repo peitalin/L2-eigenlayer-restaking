@@ -28,7 +28,7 @@ import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
 import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
 
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
-import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
+import {ClientSigners} from "../script/ClientSigners.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
@@ -38,7 +38,7 @@ contract CCIP_Eigen_DelegationTests is Test {
     DeployReceiverOnL1Script public deployReceiverOnL1Script;
     DeploySenderOnL2Script public deployOnL2Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-    SignatureUtilsEIP1271 public signatureUtils;
+    ClientSigners public clientSigners;
 
     IReceiverCCIPMock public receiverContract;
     ISenderCCIPMock public senderContract;
@@ -73,7 +73,7 @@ contract CCIP_Eigen_DelegationTests is Test {
         deployReceiverOnL1Script = new DeployReceiverOnL1Script();
         deployOnL2Script = new DeploySenderOnL2Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-        signatureUtils = new SignatureUtilsEIP1271();
+        clientSigners = new ClientSigners();
 
         l2ForkId = vm.createFork("basesepolia");        // 0
         ethForkId = vm.createSelectFork("ethsepolia"); // 1
@@ -188,7 +188,7 @@ contract CCIP_Eigen_DelegationTests is Test {
             uint256 sig1_expiry = block.timestamp + 1 hours;
             uint256 sig2_expiry = block.timestamp + 2 hours;
 
-            bytes32 digestHash1 = signatureUtils.calculateStakerDelegationDigestHash(
+            bytes32 digestHash1 = clientSigners.calculateStakerDelegationDigestHash(
                 staker,
                 0,  // nonce
                 operator,
@@ -196,7 +196,7 @@ contract CCIP_Eigen_DelegationTests is Test {
                 address(delegationManager),
                 block.chainid
             );
-            bytes32 digestHash2 = signatureUtils.calculateDelegationApprovalDigestHash(
+            bytes32 digestHash2 = clientSigners.calculateDelegationApprovalDigestHash(
                 staker,
                 operator,
                 operator, // _delegationApprover,

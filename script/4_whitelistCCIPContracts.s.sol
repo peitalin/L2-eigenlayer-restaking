@@ -19,9 +19,7 @@ import {FileReader} from "./FileReader.sol";
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 
 
-contract WhitelistCCIPContractsScript is Script {
-
-    FileReader public fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
+contract WhitelistCCIPContractsScript is Script, FileReader {
 
     IRestakingConnector public restakingConnectorProxy;
     IAgentFactory public agentFactoryProxy;
@@ -34,20 +32,20 @@ contract WhitelistCCIPContractsScript is Script {
 
     function run() public {
 
-        senderProxy = fileReader.readSenderContract();
-        senderUtilsProxy = fileReader.readSenderUtils();
+        senderProxy = readSenderContract();
+        senderUtilsProxy = readSenderUtils();
 
         (
             receiverProxy,
             restakingConnectorProxy
-        ) = fileReader.readReceiverRestakingConnector();
+        ) = readReceiverRestakingConnector();
 
-        agentFactoryProxy = fileReader.readAgentFactory();
+        agentFactoryProxy = readAgentFactory();
 
         (
             IEigenAgentOwner721 eigenAgentOwner721,
             IERC6551Registry registry6551
-        ) = fileReader.readEigenAgent721AndRegistry();
+        ) = readEigenAgent721AndRegistry();
 
         require(address(senderProxy) != address(0), "senderProxy cannot be 0");
         require(address(senderUtilsProxy) != address(0), "senderUtilsProxy cannot be 0");
@@ -74,14 +72,14 @@ contract WhitelistCCIPContractsScript is Script {
 
         // set GasLimits
         uint256[] memory gasLimits = new uint256[](7);
-        gasLimits[0] = 2_100_000; // depositIntoStrategy            [gas: 1,935,006] 1.4mil to mint agent, 500k for deposit
-        // https://sepolia.etherscan.io/tx/0xebcf428192d04fc02b1770c40feaa81429424ba6c42ac8bad6cbadb1c31b7c1c
-        gasLimits[1] = 700_000; // depositIntoStrategyWithSignature [gas: ?]
-        gasLimits[2] = 780_000; // queueWithdrawals                 [gas: 713_400]
-        gasLimits[3] = 700_000; // completeWithdrawals              [gas: 645_948]
-        gasLimits[4] = 600_000; // delegateTo                       [gas: ?]
-        gasLimits[5] = 600_000; // delegateToBySignature            [gas: ?]
-        gasLimits[6] = 400_000; // undelegate                       [gas: ?]
+        gasLimits[0] = 2_100_000; // depositIntoStrategy             [gas: 1,935,006] 1.4mil to mint agent, 500k for deposit
+        // https://sepolia.etherscan.io/tx/0x929dc3f03eb10143d2a215cd0695348bca656ea026ed959b9cf449a0af79c2c4
+        gasLimits[1] = 600_000; // depositIntoStrategyWithSignature  [gas: 545,357]
+        gasLimits[2] = 580_000; // queueWithdrawals                  [gas: 529,085]
+        gasLimits[3] = 850_000; // completeWithdrawal + transferToL2 [gas: 791,717]
+        gasLimits[4] = 600_000; // delegateTo                        [gas: ?]
+        gasLimits[5] = 600_000; // delegateToBySignature             [gas: ?]
+        gasLimits[6] = 400_000; // undelegate                        [gas: ?]
 
         bytes4[] memory functionSelectors = new bytes4[](7);
         functionSelectors[0] = 0xe7a050aa;

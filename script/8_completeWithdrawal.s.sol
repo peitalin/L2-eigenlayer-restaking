@@ -20,16 +20,19 @@ import {FileReader} from "./FileReader.sol";
 import {ScriptUtils} from "./ScriptUtils.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 
-import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
+import {ClientSigners} from "./ClientSigners.sol";
 import {ClientEncoders} from "./ClientEncoders.sol";
 
 
-contract CompleteWithdrawalScript is Script, ScriptUtils {
+contract CompleteWithdrawalScript is
+    Script,
+    ScriptUtils,
+    FileReader,
+    ClientEncoders,
+    ClientSigners
+{
 
-    FileReader public fileReader;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-    ClientEncoders public encoders;
-    SignatureUtilsEIP1271 public signatureUtils;
 
     IReceiverCCIP public receiverProxy;
     ISenderCCIP public senderProxy;
@@ -65,7 +68,6 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
 
-        fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
         (
@@ -78,11 +80,11 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
             // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
-        senderProxy = fileReader.readSenderContract();
+        senderProxy = readSenderContract();
         senderAddr = address(senderProxy);
 
-        (receiverProxy, restakingConnector) = fileReader.readReceiverRestakingConnector();
-        agentFactory = fileReader.readAgentFactory();
+        (receiverProxy, restakingConnector) = readReceiverRestakingConnector();
+        agentFactory = readAgentFactory();
 
         ccipBnM = IERC20(address(BaseSepolia.BridgeToken)); // BaseSepolia contract
         TARGET_CONTRACT = address(delegationManager);
@@ -110,7 +112,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         require(staker == withdrawer, "require: staker == withdrawer");
         require(address(eigenAgent) == withdrawer, "require withdrawer == EigenAgent");
 
-        IDelegationManager.Withdrawal memory withdrawal = fileReader.readWithdrawalInfo(
+        IDelegationManager.Withdrawal memory withdrawal = readWithdrawalInfo(
             staker,
             "script/withdrawals-queued/"
         );
@@ -141,8 +143,6 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         /////////////////////////////////////////////////////////////////
 
         vm.selectFork(l2ForkId);
-        encoders = new ClientEncoders();
-        signatureUtils = new SignatureUtilsEIP1271();
 
         vm.startBroadcast(deployerKey);
 
@@ -157,7 +157,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
         bytes memory completeWithdrawalMessage;
         bytes memory messageWithSignature;
         {
-            completeWithdrawalMessage = encoders.encodeCompleteWithdrawalMsg(
+            completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
                 withdrawal,
                 tokensToWithdraw,
                 middlewareTimesIndex,
@@ -165,7 +165,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature = signatureUtils.signMessageForEigenAgentExecution(
+            messageWithSignature = signMessageForEigenAgentExecution(
                 deployerKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 TARGET_CONTRACT,
@@ -193,7 +193,7 @@ contract CompleteWithdrawalScript is Script, ScriptUtils {
            filePath = "test/withdrawals-completed/";
         }
 
-        fileReader.saveWithdrawalInfo(
+        saveWithdrawalInfo(
             withdrawal.staker,
             withdrawal.delegatedTo,
             withdrawal.withdrawer,
