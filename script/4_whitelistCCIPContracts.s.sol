@@ -94,19 +94,8 @@ contract WhitelistCCIPContractsScript is Script {
             gasLimits
         );
 
-        uint256[] memory gasLimits_R = new uint256[](1);
-        gasLimits_R[0] = 400_000; // handleTransferToAgentOwner       [gas: 268_420]
-
-        bytes4[] memory functionSelectors_R = new bytes4[](8);
-        functionSelectors_R[0] = 0xd8a85b48;
-        // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
-
-        restakingConnectorProxy.setGasLimitsForFunctionSelectors(
-            functionSelectors_R,
-            gasLimits_R
-        );
-
         IERC20_CCIPBnM(tokenL2).drip(deployer);
+
         vm.stopBroadcast();
 
         //////////// Eth Sepolia ////////////
@@ -118,6 +107,18 @@ contract WhitelistCCIPContractsScript is Script {
         receiverProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         receiverProxy.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
         // Remember to fund L1 receiver with gas and tokens in production.
+
+        uint256[] memory gasLimits_R = new uint256[](1);
+        gasLimits_R[0] = 400_000; // handleTransferToAgentOwner       [gas: 268_420]
+
+        bytes4[] memory functionSelectors_R = new bytes4[](1);
+        functionSelectors_R[0] = 0xd8a85b48;
+        // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
+
+        restakingConnectorProxy.setGasLimitsForFunctionSelectors(
+            functionSelectors_R,
+            gasLimits_R
+        );
 
         if (block.chainid == 11155111) {
             // drip() using CCIP's BnM faucet if forking from ETH sepolia

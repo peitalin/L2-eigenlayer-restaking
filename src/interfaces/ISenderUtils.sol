@@ -17,11 +17,13 @@ interface ISenderUtils {
         address tokenL2Address
     );
 
-    function getWithdrawal(bytes32 withdrawalRoot) external view returns (WithdrawalTransfer memory);
+    function withdrawalTransferCommittments()
+        external
+        returns (ISenderUtils.WithdrawalTransfer memory);
 
-    function calculateWithdrawalRoot(
-        IDelegationManager.Withdrawal memory withdrawal
-    ) external pure returns (bytes32);
+    function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
+        external pure
+        returns (bytes32);
 
     function commitWithdrawalRootInfo(bytes memory message, address tokenDestination) external;
 

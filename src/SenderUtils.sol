@@ -83,13 +83,6 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
         );
     }
 
-    function getWithdrawal(bytes32 withdrawalRoot)
-        public view
-        returns (ISenderUtils.WithdrawalTransfer memory)
-    {
-        return withdrawalTransferCommittments[withdrawalRoot];
-    }
-
     function calculateWithdrawalRoot(
         IDelegationManager.Withdrawal memory withdrawal
     ) public pure returns (bytes32) {
