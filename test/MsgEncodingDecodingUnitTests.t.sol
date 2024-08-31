@@ -11,6 +11,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {TransferToAgentOwnerMsg} from "../src/utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {EigenlayerMsgDecoders} from "../src/utils/EigenlayerMsgDecoders.sol";
+import {DelegationDecoders} from "../src/utils/DelegationDecoders.sol";
 import {FunctionSelectorDecoder} from "../src/FunctionSelectorDecoder.sol";
 
 import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
@@ -430,7 +431,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             ISignatureUtils.SignatureWithExpiry memory _stakerSignatureAndExpiry,
             ISignatureUtils.SignatureWithExpiry memory _approverSignatureAndExpiry,
             bytes32 _approverSalt
-        ) = eigenlayerMsgDecoders.decodeDelegateToBySignatureMsg(message);
+        ) = DelegationDecoders.decodeDelegateToBySignatureMsg(message);
 
         require(staker1 == _staker, "staker incorrect");
         require(operator == _operator, "operator incorrect");
@@ -489,7 +490,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             ISignatureUtils.SignatureWithExpiry memory _stakerSignatureAndExpiry,
             ISignatureUtils.SignatureWithExpiry memory _approverSignatureAndExpiry,
             bytes32 _approverSalt
-        ) = eigenlayerMsgDecoders.decodeDelegateToBySignatureMsg(message);
+        ) = DelegationDecoders.decodeDelegateToBySignatureMsg(message);
 
         require(staker1 == _staker, "staker incorrect");
         require(operator == _operator, "operator incorrect");
@@ -567,7 +568,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             ISignatureUtils.SignatureWithExpiry memory _stakerSignatureAndExpiry,
             ISignatureUtils.SignatureWithExpiry memory _approverSignatureAndExpiry,
             bytes32 _approverSalt
-        ) = eigenlayerMsgDecoders.decodeDelegateToBySignatureMsg(message);
+        ) = DelegationDecoders.decodeDelegateToBySignatureMsg(message);
 
         require(staker1 == _staker, "staker incorrect");
         require(operator == _operator, "operator incorrect");
@@ -646,7 +647,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             ISignatureUtils.SignatureWithExpiry memory _stakerSignatureAndExpiry,
             ISignatureUtils.SignatureWithExpiry memory _approverSignatureAndExpiry,
             bytes32 _approverSalt
-        ) = eigenlayerMsgDecoders.decodeDelegateToBySignatureMsg(message);
+        ) = DelegationDecoders.decodeDelegateToBySignatureMsg(message);
 
         require(staker1 == _staker, "staker incorrect");
         require(operator == _operator, "operator incorrect");
@@ -674,7 +675,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
         address staker1 = vm.addr(0x1);
 
-        address _staker = eigenlayerMsgDecoders.decodeUndelegateMsg(
+        address _staker = DelegationDecoders.decodeUndelegateMsg(
             abi.encode(string(
                 EigenlayerMsgEncoders.encodeUndelegateMsg(staker1)
             ))

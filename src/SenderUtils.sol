@@ -7,7 +7,7 @@ import {Adminable} from "./utils/Adminable.sol";
 
 import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
 import {EigenlayerMsgDecoders, TransferToAgentOwnerMsg} from "./utils/EigenlayerMsgDecoders.sol";
-import {HashAgentOwnerRoot} from "./utils/HashAgentOwnerRoot.sol";
+import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 
 import {console} from "forge-std/Test.sol";
 
@@ -28,9 +28,8 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
     }
 
     function initialize() initializer public {
-        // depositIntoStrategy: [gas: 1_950_000]
-        // Mint EigenAgent: 1_400_000 gas
-        // Deposit tx: 550_000 gas
+
+        // depositIntoStrategy + mint agent: [gas: 1_950_000]
         _gasLimitsForFunctionSelectors[0xe7a050aa] = 2_200_000;
         // depositIntoStrategyWithSignature: [gas: 713_400]
         _gasLimitsForFunctionSelectors[0x32e89ace] = 800_000;
@@ -61,7 +60,7 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
         bytes32 agentOwnerRoot = transferToAgentOwnerMsg.agentOwnerRoot;
 
         require(
-            HashAgentOwnerRoot.hashAgentOwnerRoot(withdrawalRoot, agentOwner) == agentOwnerRoot,
+            EigenlayerMsgEncoders.hashAgentOwnerRoot(withdrawalRoot, agentOwner) == agentOwnerRoot,
             "SenderUtils.handleTransferToAgentOwner: invalid agentOwnerRoot"
         );
 

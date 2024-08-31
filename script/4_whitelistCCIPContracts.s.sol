@@ -44,7 +44,7 @@ contract WhitelistCCIPContractsScript is Script {
         require(address(senderProxy) != address(0), "senderProxy cannot be 0");
         require(address(senderUtilsProxy) != address(0), "senderUtilsProxy cannot be 0");
         require(address(receiverProxy) != address(0), "receiverProxy cannot be 0");
-        require(address(restakingConnector) != address(0), "restakingConnector cannot be 0");
+        require(address(restakingConnectorProxy) != address(0), "restakingConnectorProxy cannot be 0");
         require(address(agentFactory) != address(0), "agentFactory cannot be 0");
 
         address tokenL1 = EthSepolia.BridgeToken;

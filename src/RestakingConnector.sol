@@ -11,6 +11,7 @@ import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISi
 
 import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
+import {DelegationDecoders} from "./utils/DelegationDecoders.sol";
 import {Adminable} from "./utils/Adminable.sol";
 
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
@@ -254,7 +255,7 @@ contract RestakingConnector is
             // address signer,
             // uint256 expiry,
             // bytes memory signature
-        ) = decodeDelegateToBySignatureMsg(messageWithSignature);
+        ) = DelegationDecoders.decodeDelegateToBySignatureMsg(messageWithSignature);
 
         delegationManager.delegateToBySignature(
             staker,
