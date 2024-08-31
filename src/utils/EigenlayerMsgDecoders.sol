@@ -5,7 +5,7 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {EigenlayerMsgEncoders} from "./EigenlayerMsgEncoders.sol";
+import {HashAgentOwnerRoot} from "./HashAgentOwnerRoot.sol";
 
 
 struct TransferToAgentOwnerMsg {
@@ -523,8 +523,7 @@ contract EigenlayerMsgDecoders {
             // agentOwnerRoot := mload(add(message, 164))
         }
 
-        bytes32 computedRoot = EigenlayerMsgEncoders.hashAgentOwnerRoot(withdrawalRoot, agentOwner);
-        // require(computedRoot == agentOwnerRoot, "invalid AgentOwnerRoot");
+        bytes32 computedRoot = HashAgentOwnerRoot.hashAgentOwnerRoot(withdrawalRoot, agentOwner);
 
         return TransferToAgentOwnerMsg({
             withdrawalRoot: withdrawalRoot,

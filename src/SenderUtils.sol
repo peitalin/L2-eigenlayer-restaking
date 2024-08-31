@@ -7,7 +7,7 @@ import {Adminable} from "./utils/Adminable.sol";
 
 import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
 import {EigenlayerMsgDecoders, TransferToAgentOwnerMsg} from "./utils/EigenlayerMsgDecoders.sol";
-import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
+import {HashAgentOwnerRoot} from "./utils/HashAgentOwnerRoot.sol";
 
 import {console} from "forge-std/Test.sol";
 
@@ -61,7 +61,7 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
         bytes32 agentOwnerRoot = transferToAgentOwnerMsg.agentOwnerRoot;
 
         require(
-            EigenlayerMsgEncoders.hashAgentOwnerRoot(withdrawalRoot, agentOwner) == agentOwnerRoot,
+            HashAgentOwnerRoot.hashAgentOwnerRoot(withdrawalRoot, agentOwner) == agentOwnerRoot,
             "SenderUtils.handleTransferToAgentOwner: invalid agentOwnerRoot"
         );
 

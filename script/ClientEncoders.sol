@@ -189,7 +189,7 @@ contract ClientEncoders {
     }
 
     function hashAgentOwnerRoot(bytes32 withdrawalRoot, address agentOwner) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked(withdrawalRoot, agentOwner));
+        return keccak256(abi.encode(withdrawalRoot, agentOwner));
     }
 }
 
