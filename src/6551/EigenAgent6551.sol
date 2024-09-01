@@ -5,11 +5,11 @@ import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+// Either use reference implementation or copy of it:
+// import {ERC6551Account} from "@6551/examples/simple/ERC6551Account.sol";
 import {ERC6551Account} from "./ERC6551Account.sol";
 import {IEigenAgent6551} from "./IEigenAgent6551.sol";
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
-
-import {console} from "forge-std/Test.sol";
 
 
 contract EigenAgent6551 is ERC6551Account, IEigenAgent6551 {

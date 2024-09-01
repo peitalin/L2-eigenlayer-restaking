@@ -6,7 +6,7 @@ import {EmptyContract} from "eigenlayer-contracts/src/test/mocks/EmptyContract.s
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 
 
-contract TestDeployVerifyScript is Script {
+contract DeployVerifyScript is Script {
 
     uint256 private deployerKey = vm.envUint("DEPLOYER_KEY");
     address public deployer = vm.addr(deployerKey);

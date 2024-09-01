@@ -64,7 +64,6 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
     uint256 ethForkId;
     // call params
     uint256 expiry;
-    uint256 amount;
     uint256 balanceOfReceiverBefore;
     uint256 balanceOfEigenAgent;
 
@@ -143,6 +142,20 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
 
         }
         vm.stopBroadcast();
+    }
+
+    /*
+     *
+     *
+     *             Prepare Eigenlayer State for CompleteWithdrawals
+     *
+     *
+     */
+
+    function handler_DepositAndQueueWithdrawal(uint256 amount) public {
+
+        vm.assume(amount <= 1 ether);
+        vm.assume(amount > 0);
 
         //////////////////////////////////////////////////////
         /// L1: ReceiverCCIP -> EigenAgent -> Eigenlayer
@@ -153,7 +166,6 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         eigenAgent = agentFactory.getEigenAgent(bob); // should not exist yet
         require(address(eigenAgent) == address(0), "test assumes no EigenAgent yet");
         vm.stopBroadcast();
-
 
         console.log("bob address:", bob);
         console.log("eigenAgent:", address(eigenAgent));
@@ -167,7 +179,6 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         //// Deposit with EigenAgent
         /////////////////////////////////////
 
-        amount = 0.0333 ether;
         expiry = block.timestamp + 1 days;
         uint256 execNonce0 = 0; // no eigenAgent yet, execNonce is 0
 
@@ -304,7 +315,9 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
      *
      */
 
-    function test_CCIP_Eigenlayer_CompleteWithdrawal() public {
+    function test_CCIP_Eigenlayer_CompleteWithdrawal(uint256 amount) public {
+
+        handler_DepositAndQueueWithdrawal(amount);
 
         /////////////////////////////////////////////////////////////////
         //// [L1] Complete Queued Withdrawals

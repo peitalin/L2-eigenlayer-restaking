@@ -32,8 +32,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {EthSepolia} from "./Addresses.sol";
 
-
-
+/// @dev This deploys mock Eigenlayer contracts from the `dev` branch for the purpose
+/// of testing deposits, withdrawals, and delegation with custom ERC20 strategies only.
+/// It does not deploy and configure EigenPod and Slashing features (can add later).
 contract DeployMockEigenlayerContractsScript is Script {
 
     uint256 private deployerKey = vm.envUint("DEPLOYER_KEY");
@@ -383,9 +384,9 @@ contract DeployMockEigenlayerContractsScript is Script {
     ) public returns (StrategyBaseTVLLimits) {
         vm.startBroadcast(deployer);
 
-        require(address(_tokenERC20) != address(0), "tokenERC20 cannot be address(0)");
-        require(address(_strategyManager) != address(0), "strategyManager cannot be address(0)");
-        require(address(_pauserRegistry) != address(0), "pauserRegistry cannot be address(0)");
+        require(address(_tokenERC20) != address(0), "tokenERC20 missing");
+        require(address(_strategyManager) != address(0), "strategyManager missing");
+        require(address(_pauserRegistry) != address(0), "pauserRegistry missing");
 
         StrategyBaseTVLLimits strategyImpl = new StrategyBaseTVLLimits(_strategyManager);
 
@@ -457,12 +458,13 @@ contract DeployMockEigenlayerContractsScript is Script {
         address _rewardsCoordinator = stdJson.readAddress(deploymentData, ".addresses.RewardsCoordinator");
         address _tokenERC20 = stdJson.readAddress(deploymentData, ".addresses.TokenERC20");
 
-        require(_strategy != address(0), "readSavedEigenlayerAddresses: _strategy cannot be address(0)");
-        require(_strategyManager != address(0), "readSavedEigenlayerAddresses: _strategyManager cannot be address(0)");
-        require(_strategyFactory != address(0), "readSavedEigenlayerAddresses: _strategyFactory cannot be address(0)");
-        require(_delegationManager != address(0), "readSavedEigenlayerAddresses: _delegationManager cannot be address(0)");
-        require(_rewardsCoordinator != address(0), "readSavedEigenlayerAddresses: _rewardsCoordinator cannot be address(0)");
-        require(_pauserRegistry != address(0), "readSavedEigenlayerAddresses: _pauserRegistry cannot be address(0)");
+        require(_strategy != address(0), "readSavedEigenlayerAddresses: _strategy missing");
+        require(_strategyManager != address(0), "readSavedEigenlayerAddresses: _strategyManager missing");
+        require(_strategyFactory != address(0), "readSavedEigenlayerAddresses: _strategyFactory missing");
+        require(_delegationManager != address(0), "readSavedEigenlayerAddresses: _delegationManager missing");
+        require(_rewardsCoordinator != address(0), "readSavedEigenlayerAddresses: _rewardsCoordinator missing");
+        require(_pauserRegistry != address(0), "readSavedEigenlayerAddresses: _pauserRegistry missing");
+        require(_tokenERC20 != address(0), "readSavedEigenlayerAddresses: _tokenERC20 missing");
 
         return (
             IStrategy(_strategy),

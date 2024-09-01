@@ -29,9 +29,12 @@ interface IERC6551Executable {
         returns (bytes memory);
 }
 
-/// @dev this is a copy of ERC6551Account.sol in reference 6551 repository
-/// the only difference is renaming `state` variable to `execNonce` which we use for
-/// creating executeWithSignature digests
+// This is a copy of ERC6551Account.sol in reference 6551 repository:
+// import {ERC6551Account} from "@6551/examples/simple/ERC6551Account.sol"
+//
+// The only differences are:
+// (1) renaming `state` variable to `execNonce` for creating executeWithSignature digests, and
+// (2) add `virtual` to the execute() function to make it overridable
 contract ERC6551Account is IERC165, IERC1271, IERC6551Account, IERC6551Executable {
     uint256 public execNonce;
 

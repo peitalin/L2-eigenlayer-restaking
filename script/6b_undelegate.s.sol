@@ -13,6 +13,7 @@ import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISi
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
@@ -25,7 +26,7 @@ import {ClientSigners} from "./ClientSigners.sol";
 import {ClientEncoders} from "./ClientEncoders.sol";
 
 
-contract DelegateToScript is
+contract UndelegateScript is
     Script,
     ScriptUtils,
     FileReader,
@@ -86,27 +87,7 @@ contract DelegateToScript is
         operatorKey = vm.envUint("OPERATOR_KEY");
         operator = vm.addr(operatorKey);
 
-        if (!delegationManager.isOperator(operator)) {
-            vm.startBroadcast(deployerKey);
-            {
-                topupSenderEthBalance(operator);
-            }
-            vm.stopBroadcast();
-
-            vm.startBroadcast(operatorKey);
-            {
-                IDelegationManager.OperatorDetails memory registeringOperatorDetails =
-                    IDelegationManager.OperatorDetails({
-                        __deprecated_earningsReceiver: operator,
-                        delegationApprover: operator,
-                        stakerOptOutWindowBlocks: 4
-                    });
-
-                string memory metadataURI = "some operator";
-                delegationManager.registerAsOperator(registeringOperatorDetails, metadataURI);
-            }
-            vm.stopBroadcast();
-        }
+        require(delegationManager.isOperator(operator), "operator must be registered");
 
         //// Get User's EigenAgent
         IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(deployer);
@@ -116,6 +97,12 @@ contract DelegateToScript is
             "user's eigenAgent has no deposit in Eigenlayer"
         );
 
+        require(
+            delegationManager.delegatedTo(staker) == address(operator),
+            "eigenAgent not delegatedTo operator"
+        );
+
+        // get EigenAgent's current executionNonce
         uint256 execNonce = eigenAgent.execNonce();
         uint256 sig_expiry = block.timestamp + 2 hours;
 
@@ -126,36 +113,11 @@ contract DelegateToScript is
 
         vm.startBroadcast(deployerKey);
 
-        // Operator Approver signs the delegateTo call
-        bytes32 approverSalt = bytes32(uint256(12345678));
-        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
-        {
-            bytes32 digestHash1 = calculateDelegationApprovalDigestHash(
-                address(eigenAgent), // staker == msg.sender == eigenAgent from Eigenlayer's perspective
-                operator, // operator
-                operator, // _delegationApprover,
-                approverSalt,
-                sig_expiry,
-                address(delegationManager), // delegationManagerAddr
-                EthSepolia.ChainId
-            );
-
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(operatorKey, digestHash1);
-            bytes memory signature1 = abi.encodePacked(r, s, v);
-
-            approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
-                signature: signature1,
-                expiry: sig_expiry
-            });
-        }
-
-        // append user signature for EigenAgent execution
+        // Encode undelegate message, and append user signature for EigenAgent execution
         bytes memory messageWithSignature_DT;
         {
-            bytes memory delegateToMessage = encodeDelegateTo(
-                operator,
-                approverSignatureAndExpiry,
-                approverSalt
+            bytes memory delegateToMessage = encodeUndelegateMsg(
+                address(eigenAgent)
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command

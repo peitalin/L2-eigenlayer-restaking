@@ -99,18 +99,16 @@ contract CompleteWithdrawalScript is
         if (address(eigenAgent) != address(0)) {
             // if the user already has a EigenAgent, fetch current execution Nonce
             execNonce = eigenAgent.execNonce();
-        } else {
-            // otherwise agentFactory will spawn one for the user
-            // eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
         }
+        require(address(eigenAgent) != address(0), "user has no EigenAgent");
 
         amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
         expiry = block.timestamp + 2 hours;
         staker = address(eigenAgent); // this should be EigenAgent (as in StrategyManager)
         withdrawer = address(eigenAgent);
 
-        require(staker == withdrawer, "require: staker == withdrawer");
-        require(address(eigenAgent) == withdrawer, "require withdrawer == EigenAgent");
+        require(staker == withdrawer, "staker should be withdrawer");
+        require(address(eigenAgent) == withdrawer, "withdrawer should be EigenAgent");
 
         IDelegationManager.Withdrawal memory withdrawal = readWithdrawalInfo(
             staker,
