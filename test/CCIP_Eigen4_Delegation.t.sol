@@ -22,6 +22,7 @@ import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {ISenderCCIPMock} from "./mocks/SenderCCIPMock.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
@@ -54,26 +55,27 @@ contract CCIP_Eigen_DelegationTests is Test {
 
     uint256 deployerKey;
     address deployer;
+    IEigenAgent6551 eigenAgent;
 
-    uint256 stakerShares;
-    uint256 initialReceiverBalance = 1 ether;
-    uint256 amountToStake = 0.0091 ether;
-    address staker;
     uint256 operatorKey;
     address operator;
+    uint256 amount = 0.0091 ether;
 
     uint256 l2ForkId;
     uint256 ethForkId;
 
     function setUp() public {
 
-		deployerKey = vm.envUint("DEPLOYER_KEY");
-        deployer = vm.addr(deployerKey);
-
         deployReceiverOnL1Script = new DeployReceiverOnL1Script();
         deployOnL2Script = new DeploySenderOnL2Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         clientSigners = new ClientSigners();
+
+		deployerKey = vm.envUint("DEPLOYER_KEY");
+        deployer = vm.addr(deployerKey);
+
+        operatorKey = vm.envUint("OPERATOR_KEY");
+        operator = vm.addr(operatorKey);
 
         l2ForkId = vm.createFork("basesepolia");        // 0
         ethForkId = vm.createSelectFork("ethsepolia"); // 1
@@ -87,10 +89,6 @@ contract CCIP_Eigen_DelegationTests is Test {
             _rewardsCoordinator,
             tokenL1
         ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
-
-        staker = deployer;
-        operatorKey = vm.envUint("OPERATOR_KEY");
-        operator = vm.addr(operatorKey);
 
         //////////// Arb Sepolia ////////////
         vm.selectFork(l2ForkId);
@@ -114,51 +112,40 @@ contract CCIP_Eigen_DelegationTests is Test {
         senderContract.allowlistSender(address(receiverContract), true);
         senderContract.allowlistSender(deployer, true);
         // fund L2 sender with gas and CCIP-BnM tokens
-        vm.deal(address(senderContract), 1.333 ether); // fund for gas
+        vm.deal(address(senderContract), 1 ether); // fund for gas
         if (block.chainid == BaseSepolia.ChainId) {
             // drip() using CCIP's BnM faucet if forking from Arb Sepolia
-            for (uint256 i = 0; i < 5; ++i) {
-                IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(senderContract));
-                // each drip() gives you 1e18 coin
-            }
+            IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(senderContract));
         } else {
             // mint() if we deployed our own Mock ERC20
-            IERC20Minter(BaseSepolia.BridgeToken).mint(address(senderContract), 5 ether);
+            IERC20Minter(BaseSepolia.BridgeToken).mint(address(senderContract), 1 ether);
         }
         vm.stopBroadcast();
 
 
         //////////// Eth Sepolia ////////////
         vm.selectFork(ethForkId);
+
         vm.startBroadcast(deployerKey);
         receiverContract.allowlistSender(deployer, true);
         restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
-        console.log("block.chainid", block.chainid);
 
         // fund L1 receiver with gas and CCIP-BnM tokens
-        vm.deal(address(receiverContract), 1.111 ether); // fund for gas
-        if (block.chainid == 11155111) {
+        vm.deal(address(receiverContract), 1 ether); // fund for gas
+        if (block.chainid == EthSepolia.ChainId) {
             // drip() using CCIP's BnM faucet if forking from Eth Sepolia
-            for (uint256 i = 0; i < 5; ++i) {
-                IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
-                // each drip() gives you 1e18 coin
-            }
-            initialReceiverBalance = IERC20_CCIPBnM(address(tokenL1)).balanceOf(address(receiverContract));
-            // set initialReceiverBalancer for tests
+            IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
         } else {
             // mint() if we deployed our own Mock ERC20
-            IERC20Minter(address(tokenL1)).mint(address(receiverContract), initialReceiverBalance);
+            IERC20Minter(address(tokenL1)).mint(address(receiverContract), 1 ether);
         }
 
         vm.stopBroadcast();
 
-        // /////////////////////////////////////
-        // //// ETH: Mock deposits on Eigenlayer
-        // vm.selectFork(ethForkId);
-        // /////////////////////////////////////
+        /////////////////////////////////////
+        //// Register Operators
+        /////////////////////////////////////
 
-
-        // register Operator, to test delegation
         vm.startBroadcast(operatorKey);
         IDelegationManager.OperatorDetails memory registeringOperatorDetails =
             IDelegationManager.OperatorDetails({
@@ -172,79 +159,164 @@ contract CCIP_Eigen_DelegationTests is Test {
 
         require(delegationManager.isOperator(operator), "operator not set");
         vm.stopBroadcast();
+
+        /////////////////////////////////////
+        //// Deposit with EigenAgent
+        /////////////////////////////////////
+
+        vm.startBroadcast(deployerKey);
+
+        uint256 expiry = block.timestamp + 1 days;
+        uint256 execNonce0 = 0; // no eigenAgent yet, execNonce is 0
+
+        bytes memory depositMessage;
+        bytes memory messageWithSignature_D;
+        {
+            depositMessage = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
+                address(strategy),
+                address(tokenL1),
+                amount
+            );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature_D = clientSigners.signMessageForEigenAgentExecution(
+                deployerKey,
+                block.chainid, // destination chainid where EigenAgent lives
+                address(strategyManager),
+                depositMessage,
+                execNonce0,
+                expiry
+            );
+        }
+
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
+            amount: amount
+        });
+
+        receiverContract.mockCCIPReceive(
+            Client.Any2EVMMessage({
+                messageId: bytes32(0x0),
+                sourceChainSelector: BaseSepolia.ChainSelector,
+                sender: abi.encode(deployer),
+                destTokenAmounts: destTokenAmounts,
+                data: abi.encode(string(
+                    messageWithSignature_D
+                )) // CCIP abi.encodes a string message when sending
+            })
+        );
+
+        eigenAgent = agentFactory.getEigenAgent(deployer);
+
+        vm.stopBroadcast();
     }
 
 
     function test_Eigenlayer_DelegateTo() public {
 
-        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry;
+        // Operator Approver signs the delegateTo call
+        bytes32 approverSalt = bytes32(uint256(222222));
         ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
-
-        bytes32 approverSalt = bytes32(uint256(22));
-
-        bytes memory signature1;
-        bytes memory signature2;
         {
             uint256 sig1_expiry = block.timestamp + 1 hours;
-            uint256 sig2_expiry = block.timestamp + 2 hours;
-
-            bytes32 digestHash1 = clientSigners.calculateStakerDelegationDigestHash(
-                staker,
-                0,  // nonce
-                operator,
-                sig1_expiry,
-                address(delegationManager),
-                block.chainid
-            );
-            bytes32 digestHash2 = clientSigners.calculateDelegationApprovalDigestHash(
-                staker,
-                operator,
+            bytes32 digestHash1 = clientSigners.calculateDelegationApprovalDigestHash(
+                address(eigenAgent), // staker == msg.sender == eigenAgent from Eigenlayer's perspective
+                operator, // operator
                 operator, // _delegationApprover,
                 approverSalt,
-                sig2_expiry,
+                sig1_expiry,
                 address(delegationManager), // delegationManagerAddr
                 block.chainid
             );
 
-            (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(deployerKey, digestHash1);
-            signature1 = abi.encodePacked(r1, s1, v1);
-            stakerSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(operatorKey, digestHash1);
+            bytes memory signature1 = abi.encodePacked(r, s, v);
+            approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
                 signature: signature1,
                 expiry: sig1_expiry
             });
-
-            (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(operatorKey, digestHash2);
-            signature2 = abi.encodePacked(r2, s2, v2);
-            approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
-                signature: signature2,
-                expiry: sig2_expiry
-            });
         }
 
-        bytes memory message = EigenlayerMsgEncoders.encodeDelegateToBySignature(
-            staker,
-            operator,
-            stakerSignatureAndExpiry,
-            approverSignatureAndExpiry,
-            approverSalt
+        // append user signature for EigenAgent execution
+        bytes memory messageWithSignature_DT;
+        {
+            uint256 execNonce1 = 1;
+            uint256 expiry2 = block.timestamp + 1 hours;
+
+            bytes memory delegateToMessage = EigenlayerMsgEncoders.encodeDelegateTo(
+                operator,
+                approverSignatureAndExpiry,
+                approverSalt
+            );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature_DT = clientSigners.signMessageForEigenAgentExecution(
+                deployerKey,
+                block.chainid, // destination chainid where EigenAgent lives
+                address(delegationManager), // DelegationManager.delegateTo()
+                delegateToMessage,
+                execNonce1,
+                expiry2
+            );
+        }
+
+        vm.expectEmit(true, true, false, false);
+        emit IDelegationManager.StakerDelegated(address(eigenAgent), operator);
+
+        receiverContract.mockCCIPReceive(
+            Client.Any2EVMMessage({
+                messageId: bytes32(uint256(9999)),
+                sourceChainSelector: BaseSepolia.ChainSelector,
+                sender: abi.encode(deployer),
+                destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging any tokens
+                data: abi.encode(string(
+                    messageWithSignature_DT
+                ))
+            })
         );
 
-        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: bytes32(uint256(9999)),
-            sourceChainSelector: BaseSepolia.ChainSelector,
-            sender: abi.encode(deployer),
-            destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging any tokens
-            data: abi.encode(string(
-                message
-            ))
-        });
+        ///////////////////////////////////////
+        ///// Undelegate
+        ///////////////////////////////////////
+        vm.warp(block.timestamp + 1 hours);
+        vm.roll(block.number + (3600 / 12));
 
-        receiverContract.mockCCIPReceive(any2EvmMessage);
+        bytes memory messageWithSignature_UD;
+        {
+            uint256 execNonce2 = 2;
+            uint256 expiry = block.timestamp + 1 hours;
+            bytes memory message_UD = EigenlayerMsgEncoders.encodeUndelegateMsg(
+                address(eigenAgent)
+            );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature_UD = clientSigners.signMessageForEigenAgentExecution(
+                deployerKey,
+                block.chainid, // destination chainid where EigenAgent lives
+                address(delegationManager), // DelegationManager
+                message_UD,
+                execNonce2,
+                expiry
+            );
+        }
+
+        receiverContract.mockCCIPReceive(
+            Client.Any2EVMMessage({
+                messageId: bytes32(uint256(9999)),
+                sourceChainSelector: BaseSepolia.ChainSelector,
+                sender: abi.encode(deployer),
+                destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging any tokens
+                data: abi.encode(string(
+                    messageWithSignature_UD
+                ))
+            })
+        );
+
     }
 
     function test_Eigenlayer_Undelegate() public {
-        // DelegationManager.undelegate
+        // refactor above test into this one
     }
-
 
 }

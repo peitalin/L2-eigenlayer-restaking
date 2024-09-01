@@ -7,6 +7,7 @@ import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IS
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ISenderUtils} from "../interfaces/ISenderUtils.sol";
 import {IRestakingConnector} from "../interfaces/IRestakingConnector.sol";
+import {HashAgentOwnerRoot} from "./HashAgentOwnerRoot.sol";
 
 
 library EigenlayerMsgEncoders {
@@ -94,11 +95,10 @@ library EigenlayerMsgEncoders {
             ISenderUtils.handleTransferToAgentOwner.selector,
             withdrawalRoot,
             agentOwner,
-            hashAgentOwnerRoot(withdrawalRoot, agentOwner)
+            HashAgentOwnerRoot.hashAgentOwnerRoot(withdrawalRoot, agentOwner)
         );
         return message_bytes;
     }
-
 
     function encodeDelegateTo(
         address operator,
@@ -143,49 +143,6 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-    function encodeDelegateToBySignature(
-        address staker,
-        address operator,
-        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry,
-        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
-        bytes32 approverSalt
-    ) public pure returns (bytes memory) {
-
-        // function delegateToBySignature(
-        //     address staker,
-        //     address operator,
-        //     SignatureWithExpiry memory stakerSignatureAndExpiry,
-        //     SignatureWithExpiry memory approverSignatureAndExpiry,
-        //     bytes32 approverSalt
-        // )
-
-        // 0000000000000000000000000000000000000000000000000000000000000020
-        // 0000000000000000000000000000000000000000000000000000000000000164
-        // 0xeea9064b                                                       [96] function selector
-        // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d412eb
-        // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d41333
-        // 00000000000000000000000000000000000000000000000000000000000000a0
-        // 0000000000000000000000000000000000000000000000000000000000000100
-        // 0000000000000000000000000000000000000000000000000000000000004444
-        // 0000000000000000000000000000000000000000000000000000000000000040
-        // 0000000000000000000000000000000000000000000000000000000000000000
-        // 0000000000000000000000000000000000000000000000000000000000000000
-        // 0000000000000000000000000000000000000000000000000000000000000040
-        // 0000000000000000000000000000000000000000000000000000000000000001
-        // 0000000000000000000000000000000000000000000000000000000000000000
-
-        bytes memory message_bytes = abi.encodeWithSelector(
-            // cast sig "delegateToBySignature(address,address,(bytes,uint256),(bytes,uint256),bytes32)" == 0x7f548071
-            IDelegationManager.delegateToBySignature.selector,
-            staker,
-            operator,
-            stakerSignatureAndExpiry,
-            approverSignatureAndExpiry,
-            approverSalt
-        );
-        return message_bytes;
-    }
-
     function encodeUndelegateMsg(address staker) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
             // cast sig "undelegate(address)"
@@ -193,9 +150,5 @@ library EigenlayerMsgEncoders {
             staker
         );
         return message_bytes;
-    }
-
-    function hashAgentOwnerRoot(bytes32 withdrawalRoot, address agentOwner) public pure returns (bytes32) {
-        return keccak256(abi.encode(withdrawalRoot, agentOwner));
     }
 }

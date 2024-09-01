@@ -9,9 +9,8 @@ import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IS
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 
-import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
+import {EigenlayerMsgDecoders, DelegationDecoders} from "./utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
-import {DelegationDecoders} from "./utils/DelegationDecoders.sol";
 import {Adminable} from "./utils/Adminable.sol";
 
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
@@ -246,23 +245,48 @@ contract RestakingConnector is
     function delegateToWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
         (
             // original message
-            address staker,
             address operator,
-            ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry,
             ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
-            bytes32 approverSalt
-            // // message signature
-            // address signer,
-            // uint256 expiry,
-            // bytes memory signature
-        ) = DelegationDecoders.decodeDelegateToBySignatureMsg(messageWithSignature);
+            bytes32 approverSalt,
+            // message signature
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        ) = DelegationDecoders.decodeDelegateToMsg(messageWithSignature);
 
-        delegationManager.delegateToBySignature(
-            staker,
-            operator,
-            stakerSignatureAndExpiry,
-            approverSignatureAndExpiry,
-            approverSalt
+        IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(signer);
+
+        eigenAgent.executeWithSignature(
+            address(delegationManager),
+            0 ether,
+            EigenlayerMsgEncoders.encodeDelegateTo(
+                operator,
+                approverSignatureAndExpiry,
+                approverSalt
+            ),
+            expiry,
+            signature
+        );
+    }
+
+    function undelegateWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
+        (
+            // original message
+            address eigenAgentAddr, // staker in Eigenlayer delegating
+            // message signature
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        ) = DelegationDecoders.decodeUndelegateMsg(messageWithSignature);
+
+        IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(eigenAgentAddr));
+
+        eigenAgent.executeWithSignature(
+            address(delegationManager),
+            0 ether,
+            EigenlayerMsgEncoders.encodeUndelegateMsg(address(eigenAgent)),
+            expiry,
+            signature
         );
     }
 

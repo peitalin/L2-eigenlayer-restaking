@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
-import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
+import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
 

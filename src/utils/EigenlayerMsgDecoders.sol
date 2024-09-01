@@ -13,15 +13,8 @@ struct TransferToAgentOwnerMsg {
     bytes32 agentOwnerRoot;
 }
 
-contract EigenlayerMsgDecoders {
-
-    /*
-     *
-     *
-     *                   Deposits
-     *
-     *
-    */
+/// @dev used to decode user signatures on all CCIP messages to EigenAgents
+library AgentOwnerSignature {
 
     function decodeAgentOwnerSignature(bytes memory message, uint256 sigOffset)
         public pure
@@ -44,7 +37,7 @@ contract EigenlayerMsgDecoders {
             v := mload(add(message, add(sigOffset, 128)))
         }
 
-        signature = abi.encodePacked(r,s,v);
+        signature = abi.encodePacked(r, s, v);
 
         return (
             signer,
@@ -52,6 +45,17 @@ contract EigenlayerMsgDecoders {
             signature
         );
     }
+}
+
+contract EigenlayerMsgDecoders {
+
+    /*
+     *
+     *
+     *                   Deposits
+     *
+     *
+    */
 
     function decodeDepositWithSignature6551Msg(bytes memory message)
         public pure
@@ -86,7 +90,7 @@ contract EigenlayerMsgDecoders {
             signer,
             expiry,
             signature
-        ) = decodeAgentOwnerSignature(message, 196); // signature starts on 196
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 196); // signature starts on 196
 
         require(signature.length == 65, "decodeDepositWithSignature6551Msg: invalid signature length");
 
@@ -165,7 +169,7 @@ contract EigenlayerMsgDecoders {
             signer,
             expiry,
             signature
-        ) = decodeAgentOwnerSignature(message, 420 + offset); // signature starts on 420 + offset
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 420 + offset); // signature starts on 420 + offset
 
         return (
             arrayQueuedWithdrawalParams,
@@ -492,7 +496,7 @@ contract EigenlayerMsgDecoders {
             signer,
             expiry,
             signature
-        ) = decodeAgentOwnerSignature(message, 644); // signature (signer) starts at 644
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 644); // signature (signer) starts at 644
 
         tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = IERC20(tokensToWithdraw0);
@@ -542,5 +546,140 @@ contract EigenlayerMsgDecoders {
             agentOwner: agentOwner,
             agentOwnerRoot: computedRoot
         });
+    }
+}
+
+/*
+ *
+ *
+ *                   DelegateTo
+ *
+ *
+ */
+
+ import {console} from "forge-std/Test.sol";
+
+library DelegationDecoders {
+
+    function decodeDelegateToMsg(bytes memory message)
+        public pure
+        returns (
+            address operator,
+            ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
+            bytes32 approverSalt,
+            address signer,
+            uint256 expiryEigenAgent,
+            bytes memory signatureEigenAgent
+        )
+    {
+        // function delegateTo(
+        //     address operator,
+        //     SignatureWithExpiry memory approverSignatureAndExpiry,
+        //     bytes32 approverSalt
+        // )
+
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
+        // 0000000000000000000000000000000000000000000000000000000000000124 [64]
+        // eea9064b                                                         [96]
+        // 000000000000000000000000722551f573d58c97893286f8f00e76119501ae37 [100] operator
+        // 0000000000000000000000000000000000000000000000000000000000000060 [132] approverSigExpiry struct offset
+        // 000000000000000000000000000000000000000000000000000000000153158e [164] approverSalt
+        // 0000000000000000000000000000000000000000000000000000000000000040 [196] approverSigExpiry.sig offset
+        // 0000000000000000000000000000000000000000000000000000000066d3a91c [228] sig expiry
+        // 0000000000000000000000000000000000000000000000000000000000000041 [260] approverSigExpiry.sig length (hex 41 = 65 bytes)
+        // d2ec2451a264124b3966b82aad0e40e9517175affad9f23d600dbddfff57db4d [292] sig r
+        // 62440bdea7d1a009fb374773868853d52e7425035fddfff0256c26650dcfed34 [324] sig s
+        // 1c00000000000000000000000000000000000000000000000000000000000000 [356] sig v
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [388] eigenAgent signer
+        // 0000000000000000000000000000000000000000000000000000000066d3b834 [420] eigenAgent sig expiry
+        // e00176f55bcbdf4f335018dc3b676b349c938a51804d3f0d78d02f75f77b85c1 [452] eigenAgent sig r
+        // 78060931402acbf07ebbe20d1648a2b3072ad508523d947a0eee31cdd386d6fd [484] eigenAgent sig s
+        // 1c000000000000000000000000000000000000000000000000000000         [516] eigenAgent sig v
+
+        address operator;
+        uint256 expiry;
+
+        bytes32 r;
+        bytes32 s;
+        bytes1  v;
+
+        assembly {
+            operator := mload(add(message, 100))
+            approverSalt := mload(add(message, 164))
+
+            expiry := mload(add(message, 228))
+            r := mload(add(message, 292))
+            s := mload(add(message, 324))
+            v := mload(add(message, 356))
+        }
+
+        bytes memory signatureOperatorApprover = abi.encodePacked(r, s, v);
+
+        approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+            signature: signatureOperatorApprover,
+            expiry: expiry
+        });
+
+        (
+            signer,
+            expiryEigenAgent,
+            signatureEigenAgent
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 388); // user signature starts on 388
+
+        require(signatureEigenAgent.length == 65, "decodeDelegateToMsg: invalid signature length");
+
+        return (
+            // original message for Eigenlayer
+            operator,
+            approverSignatureAndExpiry,
+            approverSalt,
+            // signature for EigenAgent execution
+            signer,
+            expiryEigenAgent,
+            signatureEigenAgent
+        );
+    }
+
+    function decodeUndelegateMsg(bytes memory message)
+        public pure
+        returns (
+            address staker, // eigenAgent
+            address signer,
+            uint256 expiryEigenAgent,
+            bytes memory signatureEigenAgent
+        )
+    {
+
+        // 0000000000000000000000000000000000000000000000000000000000000020
+        // 00000000000000000000000000000000000000000000000000000000000000a5
+        // da8be864                                                         [96] function selector
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [100] staker address (delegating)
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] eigenAgent signer
+        // 0000000000000000000000000000000000000000000000000000000000000e11 [164] eigenAgent sig expiry
+        // b20a886dfc3208a956b14419e367c1127258b8079559b101a7d6ced1271d464f [196] eigenAgent sig r
+        // 271a38b87fd2cd30f183d542483cc71269711bdc9044b24baf2b7aa189a3d1e0 [228] eigenAgent sig s
+        // 1c000000000000000000000000000000000000000000000000000000         [260] eigenAgent sig v
+
+
+        bytes4 functionSelector;
+        address staker;
+
+        assembly {
+            functionSelector := mload(add(message, 96))
+            staker := mload(add(message, 100))
+        }
+
+        (
+            signer,
+            expiryEigenAgent,
+            signatureEigenAgent
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 132);
+
+        return (
+            staker,
+            signer,
+            expiryEigenAgent,
+            signatureEigenAgent
+        );
     }
 }

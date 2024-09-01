@@ -164,7 +164,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         console.log("balanceOf(eigenAgent):", balanceOfEigenAgent);
 
         /////////////////////////////////////
-        //// Queue Withdrawal with EigenAgent
+        //// Deposit with EigenAgent
         /////////////////////////////////////
 
         amount = 0.0333 ether;

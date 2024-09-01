@@ -39,6 +39,8 @@ interface IRestakingConnector {
 
     function delegateToWithEigenAgent(bytes memory message) external;
 
+    function undelegateWithEigenAgent(bytes memory message) external;
+
     /*
      *
      *                Eigenlayer Functions

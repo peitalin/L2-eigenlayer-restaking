@@ -7,7 +7,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 
-import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
+import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
@@ -87,7 +87,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
         address token = s_lastReceivedTokenAddress;
         uint256 amount = s_lastReceivedTokenAmount;
-        string memory textMsg = "no matching functionSelector";
+        string memory textMsg = "no matching Eigenlayer functionSelector";
 
         //////////////////////////////////
         // Deposit Into Strategy
@@ -97,6 +97,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             // approve RestakingConnector to transfer tokens to EigenAgent
             IERC20(token).approve(address(restakingConnector), amount);
             restakingConnector.depositWithEigenAgent(message);
+
             textMsg = "Approved and deposited by EigenAgent";
         }
 
@@ -106,6 +107,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         if (functionSelector == IDelegationManager.queueWithdrawals.selector) {
             // cast sig "queueWithdrawals((address[],uint256[],address)[])" == 0x0dd8dd02
             restakingConnector.queueWithdrawalsWithEigenAgent(message);
+
             textMsg = "Withdrawal queued by EigenAgent";
         }
 
@@ -114,6 +116,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         //////////////////////////////////
         if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
             // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
+
             (
                 uint256 withdrawalAmount,
                 address withdrawalToken,
@@ -130,7 +133,9 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 address(withdrawalToken), // L1 token to burn/lock
                 withdrawalAmount
             );
+
             emit BridgingWithdrawalToL2(senderContractL2Addr, withdrawalAmount);
+
             textMsg = "Complete Queued Withdrawal by EigenAgent";
         }
 
@@ -142,6 +147,16 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             restakingConnector.delegateToWithEigenAgent(message);
 
             textMsg = "DelegateTo by EigenAgent";
+        }
+
+        //////////////////////////////////
+        // undelegate
+        //////////////////////////////////
+        if (functionSelector == IDelegationManager.undelegate.selector) {
+
+            restakingConnector.undelegateWithEigenAgent(message);
+
+            textMsg = "Undelegate by EigenAgent";
         }
 
         emit MessageReceived(
