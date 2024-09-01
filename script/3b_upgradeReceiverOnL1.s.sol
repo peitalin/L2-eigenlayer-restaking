@@ -56,12 +56,11 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
     }
 
     function mockrun() public {
+        vm.createSelectFork("ethsepolia");
         return _run(true);
     }
 
     function _run(bool isTest) internal {
-
-        uint256 ethForkId = vm.createSelectFork("ethsepolia");
 
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
@@ -83,7 +82,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
 
         (
             eigenAgentOwner721Proxy,
-            // registry6551
+            registry6551
         ) = readEigenAgent721AndRegistry();
         senderProxy = readSenderContract();
         agentFactoryProxy = readAgentFactory();
@@ -101,9 +100,6 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
             address(new EigenAgentOwner721())
         );
         eigenAgentOwner721Proxy.addToWhitelistedCallers(address(restakingConnectorProxy));
-
-        // deploy new 6551 Registry
-        registry6551 = IERC6551Registry(address(new ERC6551Registry()));
 
         // upgrade agentFactoryProxy
         proxyAdmin.upgrade(
@@ -130,9 +126,12 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
         );
 
         restakingConnectorProxy.setAgentFactory(address(agentFactoryProxy));
-        eigenAgentOwner721Proxy.setAgentFactory(agentFactoryProxy);
         restakingConnectorProxy.setReceiverCCIP(address(receiverProxy));
+
+        eigenAgentOwner721Proxy.setAgentFactory(agentFactoryProxy);
+
         agentFactoryProxy.setRestakingConnector(address(restakingConnectorProxy));
+        agentFactoryProxy.set6551Registry(registry6551);
 
         require(
             address(receiverProxy.getRestakingConnector()) != address(0),

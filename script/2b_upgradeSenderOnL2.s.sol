@@ -17,13 +17,19 @@ import {FileReader} from "./FileReader.sol";
 
 contract UpgradeSenderOnL2Script is Script, FileReader {
 
-
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
     address deployer = vm.addr(deployerKey);
 
     function run() public {
+        return _run(false);
+    }
 
-        uint256 l2ForkId = vm.createSelectFork("basesepolia");
+    function mockrun() public {
+        vm.createSelectFork("basesepolia");
+        return _run(true);
+    }
+
+    function _run(bool isTest) public {
 
         ProxyAdmin proxyAdmin = ProxyAdmin(readProxyAdminL2());
 

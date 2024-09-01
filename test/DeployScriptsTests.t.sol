@@ -14,7 +14,7 @@ import {CheckMintEigenAgentGasCostsScript} from "../script/5c_checkMintEigenAgen
 import {DelegateToScript} from "../script/6_delegateTo.s.sol";
 import {QueueWithdrawalWithSignatureScript} from "../script/7_queueWithdrawalWithSignature.s.sol";
 import {CompleteWithdrawalScript} from "../script/8_completeWithdrawal.s.sol";
-import {TestDeployVerifyScript} from "../script/x_testDeployVerify.s.sol";
+import {DeployVerifyScript} from "../script/x_deployVerify.s.sol";
 import {ScriptUtils} from "../script/ScriptUtils.sol";
 
 
@@ -38,7 +38,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
     QueueWithdrawalWithSignatureScript public queueWithdrawalWithSignatureScript;
     CompleteWithdrawalScript public completeWithdrawalScript;
 
-    TestDeployVerifyScript public testDeployVerifyScript;
+    DeployVerifyScript public deployerVerifyScript;
 
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
     address deployer = vm.addr(deployerKey);
@@ -62,7 +62,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
         queueWithdrawalWithSignatureScript = new QueueWithdrawalWithSignatureScript();
         completeWithdrawalScript = new CompleteWithdrawalScript();
 
-        testDeployVerifyScript = new TestDeployVerifyScript();
+        deployerVerifyScript = new DeployVerifyScript();
 
         vm.chainId(31337); // sets isTest flag; script uses forkSelect()
         vm.deal(deployer, 1 ether);
@@ -74,7 +74,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
 
     function test_step2b_UpgradeSenderOnL2Script() public {
         // this test fails if L2 contracts have not been deployed + saved to disk
-        upgradeSenderOnL2Script.run();
+        upgradeSenderOnL2Script.mockrun();
     }
 
     function test_step3_DeployReceiverOnL1Script() public {
@@ -122,7 +122,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
     }
 
     function test_stepx_TestDeployVerify() public {
-        testDeployVerifyScript.run();
+        deployerVerifyScript.run();
     }
 }
 

@@ -557,8 +557,6 @@ contract EigenlayerMsgDecoders {
  *
  */
 
- import {console} from "forge-std/Test.sol";
-
 library DelegationDecoders {
 
     function decodeDelegateToMsg(bytes memory message)
