@@ -14,6 +14,8 @@ import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
 
 contract EigenAgent6551 is ERC6551Account, IEigenAgent6551 {
 
+    // uint256 public execNonce;
+
     /// @notice The EIP-712 typehash for the deposit struct used by the contract
     bytes32 public constant EIGEN_AGENT_EXEC_TYPEHASH = keccak256(
         "ExecuteWithSignature(address target,uint256 value,bytes data,uint256 execNonce,uint256 chainId,uint256 expiry)"

@@ -127,7 +127,9 @@ contract DelegateToScript is
         vm.startBroadcast(deployerKey);
 
         // Operator Approver signs the delegateTo call
-        bytes32 approverSalt = bytes32(uint256(12345678));
+        uint256 randomSalt = vm.randomUint();
+        bytes32 approverSalt = bytes32(randomSalt);
+
         ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
         {
             bytes32 digestHash1 = calculateDelegationApprovalDigestHash(

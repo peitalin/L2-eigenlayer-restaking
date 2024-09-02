@@ -1,0 +1,20 @@
+{
+  "chainInfo": {
+    "block": 6620126,
+    "destinationChain": 84532,
+    "sourceChain": 11155111,
+    "timestamp": 1725297396
+  },
+  "inputs": {
+    "delegatedTo": "0x722551f573D58C97893286F8F00E76119501Ae37",
+    "nonce": 2,
+    "shares": 0,
+    "staker": "0x72C14ee915790038af0764d33Bb4B1a63212fC50",
+    "startBlock": 111,
+    "strategy": "0xEe33DDcFB85e06ac1fd0A4B36F9b6958d5A7D3F0",
+    "withdrawer": "0x72C14ee915790038af0764d33Bb4B1a63212fC50"
+  },
+  "outputs": {
+    "withdrawalRoot": "0x54d21b20a38a0ca9ed5f5a6a4952799ba0e08df1c8c31ab6d7a91021c8179ebd"
+  }
+}

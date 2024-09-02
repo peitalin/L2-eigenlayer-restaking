@@ -176,66 +176,74 @@ contract RestakingConnector is
     function completeWithdrawalWithEigenAgent(bytes memory messageWithSignature)
         public onlyReceiverCCIP
         returns (
+            bool receiveAsTokens,
             uint256 withdrawalAmount,
             address withdrawalToken,
             string memory messageForL2
         )
     {
+        // scope to reduce variable count
+        {
+            (
+                // original message
+                IDelegationManager.Withdrawal memory withdrawal,
+                IERC20[] memory tokensToWithdraw,
+                uint256 middlewareTimesIndex,
+                bool _receiveAsTokens,
+                // message signature
+                address signer,
+                uint256 expiry,
+                bytes memory signature
+            ) = decodeCompleteWithdrawalMsg(messageWithSignature);
 
-        (
-            // original message
-            IDelegationManager.Withdrawal memory withdrawal,
-            IERC20[] memory tokensToWithdraw,
-            uint256 middlewareTimesIndex,
-            bool receiveAsTokens,
-            // message signature
-            address signer,
-            uint256 expiry,
-            bytes memory signature
-        ) = decodeCompleteWithdrawalMsg(messageWithSignature);
+            // eigenAgent == withdrawer == staker == msg.sender (in Eigenlayer)
+            IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawal.withdrawer));
 
-        // eigenAgent == withdrawer == staker == msg.sender (in Eigenlayer)
-        IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawal.withdrawer));
+            // (1) EigenAgent receives tokens from Eigenlayer
+            // then (2) approves RestakingConnector to (3) transfer tokens to ReceiverCCIP
+            eigenAgent.executeWithSignature(
+                address(delegationManager),
+                0 ether,
+                EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+                    withdrawal,
+                    tokensToWithdraw,
+                    middlewareTimesIndex,
+                    _receiveAsTokens
+                ),
+                expiry,
+                signature
+            );
 
-        // (1) EigenAgent receives tokens from Eigenlayer
-        // then (2) approves RestakingConnector to (3) transfer tokens to ReceiverCCIP
-        eigenAgent.executeWithSignature(
-            address(delegationManager),
-            0 ether,
-            EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
-                withdrawal,
-                tokensToWithdraw,
-                middlewareTimesIndex,
-                receiveAsTokens
-            ),
-            expiry,
-            signature
-        );
+            // DelegationManager requires(msg.sender == withdrawal.withdrawer), only EigenAgent can withdraw.
+            bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
 
-        // DelegationManager requires(msg.sender == withdrawal.withdrawer), only EigenAgent can withdraw.
-        bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
+            // assign variables to return
+            receiveAsTokens = _receiveAsTokens;
+            withdrawalAmount = withdrawal.shares[0];
+            withdrawalToken = address(tokensToWithdraw[0]);
+            messageForL2 = string(encodeHandleTransferToAgentOwnerMsg(
+                withdrawalRoot,
+                signer // signer should be eigenAgent.getAgentOwner()
+            ));
 
-        withdrawalAmount = withdrawal.shares[0];
-        withdrawalToken = address(tokensToWithdraw[0]);
-        messageForL2 = string(encodeHandleTransferToAgentOwnerMsg(
-            withdrawalRoot,
-            signer // signer should be eigenAgent.getAgentOwner()
-        ));
-
-        // (2) EigenAgent approves RestakingConnector to transfer tokens to ReceiverCCIP
-        eigenAgent.approveByWhitelistedContract(
-            address(this), // restakingConnector
-            withdrawalToken,
-            withdrawalAmount
-        );
-        // (3) RestakingConnector transfers tokens to ReceiverCCIP, to bridge tokens to Router (bridge)
-        IERC20(withdrawalToken).transferFrom(
-            address(eigenAgent),
-            _receiverCCIP,
-            withdrawalAmount
-        );
+            if (_receiveAsTokens) {
+                // (2) EigenAgent approves RestakingConnector to transfer tokens to ReceiverCCIP
+                eigenAgent.approveByWhitelistedContract(
+                    address(this), // restakingConnector
+                    withdrawalToken,
+                    withdrawalAmount
+                );
+                // (3) RestakingConnector transfers tokens to ReceiverCCIP, to bridge tokens to Router (bridge)
+                IERC20(withdrawalToken).transferFrom(
+                    address(eigenAgent),
+                    _receiverCCIP,
+                    withdrawalAmount
+                );
+            }
+        }
 
         return (
+            receiveAsTokens,
             withdrawalAmount,
             address(withdrawalToken),
             messageForL2
@@ -280,6 +288,10 @@ contract RestakingConnector is
         ) = DelegationDecoders.decodeUndelegateMsg(messageWithSignature);
 
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(eigenAgentAddr));
+
+        uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(eigenAgentAddr);
+
+        _withdrawalBlock[eigenAgentAddr][withdrawalNonce] = block.number;
 
         eigenAgent.executeWithSignature(
             address(delegationManager),

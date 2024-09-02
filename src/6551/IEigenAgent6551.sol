@@ -6,6 +6,8 @@ import {IERC6551Account} from "./ERC6551Account.sol";
 
 interface IEigenAgent6551 is IERC6551Account {
 
+    // function execNonce() external view returns (uint256);
+
     function executeWithSignature(
         address targetContract,
         uint256 value,

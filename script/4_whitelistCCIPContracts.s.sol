@@ -71,17 +71,16 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
 
         // set GasLimits
-        uint256[] memory gasLimits = new uint256[](7);
+        uint256[] memory gasLimits = new uint256[](6);
         gasLimits[0] = 2_100_000; // depositIntoStrategy             [gas: 1,935,006] 1.4mil to mint agent, 500k for deposit
         // https://sepolia.etherscan.io/tx/0x929dc3f03eb10143d2a215cd0695348bca656ea026ed959b9cf449a0af79c2c4
         gasLimits[1] = 600_000; // depositIntoStrategyWithSignature  [gas: 545,357]
         gasLimits[2] = 580_000; // queueWithdrawals                  [gas: 529,085]
         gasLimits[3] = 850_000; // completeWithdrawal + transferToL2 [gas: 791,717]
-        gasLimits[4] = 600_000; // delegateTo                        [gas: ?]
-        gasLimits[5] = 600_000; // delegateToBySignature             [gas: ?]
-        gasLimits[6] = 400_000; // undelegate                        [gas: ?]
+        gasLimits[4] = 600_000; // delegateTo                        [gas: 550,292]
+        gasLimits[5] = 400_000; // undelegate                        [gas: ?]
 
-        bytes4[] memory functionSelectors = new bytes4[](7);
+        bytes4[] memory functionSelectors = new bytes4[](6);
         functionSelectors[0] = 0xe7a050aa;
         // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
         functionSelectors[1] = 0x32e89ace;
@@ -92,9 +91,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
         functionSelectors[4] = 0xeea9064b;
         // cast sig "delegateTo(address,(bytes,uint256),bytes32)" == 0xeea9064b
-        functionSelectors[5] = 0x7f548071;
-        // cast sig "delegateToBySignature(address,address,(bytes,uint256),(bytes,uint256),bytes32)" == 0x7f548071
-        functionSelectors[6] = 0xda8be864;
+        functionSelectors[5] = 0xda8be864;
         // cast sig "undelegate(address)" == 0xda8be864
 
         senderUtilsProxy.setGasLimitsForFunctionSelectors(
@@ -136,7 +133,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         // Remember to fund L1 receiver with gas and tokens in production.
 
         uint256[] memory gasLimits_R = new uint256[](1);
-        gasLimits_R[0] = 295_000; // handleTransferToAgentOwner       [gas: 268_420]
+        gasLimits_R[0] = 295_000; // handleTransferToAgentOwner [gas: 268_420]
 
         bytes4[] memory functionSelectors_R = new bytes4[](1);
         functionSelectors_R[0] = 0xd8a85b48;
@@ -146,15 +143,6 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
             functionSelectors_R,
             gasLimits_R
         );
-
-        if (block.chainid == 11155111) {
-            // drip() using CCIP's BnM faucet if forking from ETH sepolia
-            IERC20_CCIPBnM(tokenL1).drip(address(receiverProxy));
-            // each drip() gives you 1e18 coin
-        } else {
-            // mint() if we deployed our own Mock ERC20
-            IERC20Minter(tokenL1).mint(address(receiverProxy), 3 ether);
-        }
 
         require(
             address(agentFactoryProxy.getRestakingConnector()) == address(restakingConnectorProxy),

@@ -29,18 +29,16 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
 
     function initialize() initializer public {
 
-        // depositIntoStrategy + mint agent: [gas: 1_950_000]
+        // depositIntoStrategy + mint agent: [gas: 1_950,000]
         _gasLimitsForFunctionSelectors[0xe7a050aa] = 2_200_000;
-        // depositIntoStrategyWithSignature: [gas: 713_400]
+        // depositIntoStrategyWithSignature: [gas: 713,400]
         _gasLimitsForFunctionSelectors[0x32e89ace] = 800_000;
-        // queueWithdrawals: [gas: x]
+        // queueWithdrawals: [gas: 529,085]
         _gasLimitsForFunctionSelectors[0x0dd8dd02] = 800_000;
-        // completeQueuedWithdrawals: [gas: 645_948]
+        // completeQueuedWithdrawals: [gas: 645,948]
         _gasLimitsForFunctionSelectors[0x60d7faed] = 800_000;
-        // delegateTo: [gas: ?]
+        // delegateTo: [gas: 550,292]
         _gasLimitsForFunctionSelectors[0xeea9064b] = 600_000;
-        // delegateToBySignature: [gas: ?]
-        _gasLimitsForFunctionSelectors[0x7f548071] = 600_000;
         // undelegate: [gas: ?]
         _gasLimitsForFunctionSelectors[0xda8be864] = 400_000;
 
@@ -94,34 +92,37 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
             require(tokenDestinationL2 != address(0), "cannot commit tokenL2 as address(0)");
 
             (
-                IDelegationManager.Withdrawal memory withdrawal
+                IDelegationManager.Withdrawal memory withdrawal,
                 , // tokensToWithdraw,
                 , // middlewareTimesIndex
-                , // receiveAsTokens
+                bool receiveAsTokens, // receiveAsTokens
                 , // signer
                 , // expiry
-                , // signature
+                // signature
             ) = decodeCompleteWithdrawalMsg(message);
 
-            bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
+            // only when withdrawing tokens back to L2, not for re-deposits from re-delegations
+            if (receiveAsTokens) {
+                bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
 
-            // Check for spent withdrawalRoots to prevent wasted CCIP message
-            // as it will fail to withdraw from Eigenlayer
-            require(
-                withdrawalRootsSpent[withdrawalRoot] == false,
-                "withdrawalRoot has already been used"
-            );
+                // Check for spent withdrawalRoots to prevent wasted CCIP message
+                // as it will fail to withdraw from Eigenlayer
+                require(
+                    withdrawalRootsSpent[withdrawalRoot] == false,
+                    "withdrawalRoot has already been used"
+                );
 
-            // Commit to WithdrawalTransfer(withdrawer, amount, token) before sending completeWithdrawal message,
-            // so that when the message returns with withdrawalRoot, we use it to lookup (withdrawer, amount)
-            // to transfer the bridged withdrawn funds to.
-            withdrawalTransferCommittments[withdrawalRoot] = ISenderUtils.WithdrawalTransfer({
-                withdrawer: withdrawal.withdrawer,
-                amount: withdrawal.shares[0],
-                tokenDestination: tokenDestinationL2
-            });
+                // Commit to WithdrawalTransfer(withdrawer, amount, token) before sending completeWithdrawal message,
+                // so that when the message returns with withdrawalRoot, we use it to lookup (withdrawer, amount)
+                // to transfer the bridged withdrawn funds to.
+                withdrawalTransferCommittments[withdrawalRoot] = ISenderUtils.WithdrawalTransfer({
+                    withdrawer: withdrawal.withdrawer,
+                    amount: withdrawal.shares[0],
+                    tokenDestination: tokenDestinationL2
+                });
 
-            emit WithdrawalCommitted(withdrawalRoot, withdrawal.withdrawer, withdrawal.shares[0]);
+                emit WithdrawalCommitted(withdrawalRoot, withdrawal.withdrawer, withdrawal.shares[0]);
+            }
     }
 
     function setGasLimitsForFunctionSelectors(

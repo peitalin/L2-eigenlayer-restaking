@@ -118,7 +118,6 @@ contract DepositWithSignatureScript is
         bytes memory depositMessage;
         bytes memory messageWithSignature;
 
-        IERC20_CCIPBnM(address(tokenL2)).drip(deployer);
         {
             depositMessage = encodeDepositIntoStrategyMsg(
                 address(strategy),
@@ -138,14 +137,10 @@ contract DepositWithSignatureScript is
         }
 
         topupSenderEthBalance(senderAddr);
-
-        // Check L2 CCIP-BnM ETH balances for gas
-        if (tokenL2.balanceOf(senderAddr) < 0.1 ether) {
-            tokenL2.approve(deployer, 0.1 ether);
-            tokenL2.transferFrom(deployer, senderAddr, 0.1 ether);
+        // Check L2 CCIP-BnM balances
+        if (tokenL2.balanceOf(deployer) < 1 ether) {
+            IERC20_CCIPBnM(address(tokenL2)).drip(deployer);
         }
-        // Approve L2 senderContract to send ccip-BnM tokens to Router
-        tokenL2.approve(senderAddr, amount);
 
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain

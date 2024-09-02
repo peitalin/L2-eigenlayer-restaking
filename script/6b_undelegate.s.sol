@@ -26,6 +26,13 @@ import {ClientSigners} from "./ClientSigners.sol";
 import {ClientEncoders} from "./ClientEncoders.sol";
 
 
+// UX Flow for Delegating, Undelegating, and Re-depositing:
+// 1) undelegate
+// 2) re-delegateTo another Operator
+// 3) re-deposit with completeWithdrawal(receiveAsToken=false)
+//
+// Then you will be delegated to the new operator. Steps (2) and (3) are interchangeable
+
 contract UndelegateScript is
     Script,
     ScriptUtils,
@@ -44,25 +51,24 @@ contract UndelegateScript is
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
 
-    uint256 public deployerKey;
-    address public deployer;
-    uint256 public operatorKey;
-    address public operator;
-    address public staker;
+    uint256 public l2ForkId;
+    uint256 public ethForkId;
+
+    uint256 public deployerKey = vm.envUint("DEPLOYER_KEY");
+    address public deployer = vm.addr(deployerKey);
+    uint256 public operatorKey = vm.envUint("OPERATOR_KEY");
+    address public operator = vm.addr(operatorKey);
+
     address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
 
-        uint256 l2ForkId = vm.createFork("basesepolia");
-        uint256 ethForkId = vm.createSelectFork("ethsepolia");
-
-        deployerKey = vm.envUint("DEPLOYER_KEY");
-        deployer = vm.addr(deployerKey);
+        l2ForkId = vm.createFork("basesepolia");
+        ethForkId = vm.createSelectFork("ethsepolia");
 
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-
         (
-            , // strategy
+            strategy,
             strategyManager,
             , // strategyFactory
             , // pauserRegistry
@@ -70,6 +76,47 @@ contract UndelegateScript is
             , // _rewardsCoordinator
               // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+
+        return _run(false);
+    }
+
+    function mockrun() public {
+
+        l2ForkId = vm.createFork("basesepolia");
+        ethForkId = vm.createSelectFork("ethsepolia");
+
+        deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
+        (
+            strategy,
+            strategyManager,
+            , // strategyFactory
+            , // pauserRegistry
+            delegationManager,
+            , // _rewardsCoordinator
+              // token
+        ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+
+        //////////////////////////////////////////////////////////
+        // L1: Register Operator
+        //////////////////////////////////////////////////////////
+
+        if (!delegationManager.isOperator(operator)) {
+            vm.startBroadcast(operatorKey);
+            IDelegationManager.OperatorDetails memory registeringOperatorDetails =
+                IDelegationManager.OperatorDetails({
+                    __deprecated_earningsReceiver: vm.addr(0xb0b),
+                    delegationApprover: operator,
+                    stakerOptOutWindowBlocks: 4
+                });
+
+            delegationManager.registerAsOperator(registeringOperatorDetails, "operator 1 metadata");
+            vm.stopBroadcast();
+        }
+
+        return _run(true);
+    }
+
+    function _run(bool isTest) public {
 
         senderContract = readSenderContract();
         (receiverContract, restakingConnector) = readReceiverRestakingConnector();
@@ -80,25 +127,16 @@ contract UndelegateScript is
 
         vm.selectFork(ethForkId);
 
-        //////////////////////////////////////////////////////////
-        // L1: Register Operator
-        //////////////////////////////////////////////////////////
-
-        operatorKey = vm.envUint("OPERATOR_KEY");
-        operator = vm.addr(operatorKey);
-
-        require(delegationManager.isOperator(operator), "operator must be registered");
-
-        //// Get User's EigenAgent
+        // Get User's EigenAgent
         IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(deployer);
         require(address(eigenAgent) != address(0), "User has no existing EigenAgent");
         require(
             strategyManager.stakerStrategyShares(address(eigenAgent), strategy) >= 0,
             "user's eigenAgent has no deposit in Eigenlayer"
         );
-
+        require(delegationManager.isOperator(operator), "operator must be registered");
         require(
-            delegationManager.delegatedTo(staker) == address(operator),
+            delegationManager.delegatedTo(address(eigenAgent)) == address(operator),
             "eigenAgent not delegatedTo operator"
         );
 
@@ -107,7 +145,7 @@ contract UndelegateScript is
         uint256 sig_expiry = block.timestamp + 2 hours;
 
         /////////////////////////////////////////////////////////////////
-        /////// Broadcast DelegateTo message on L2
+        /////// Broadcast Undelegate message on L2
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
@@ -131,6 +169,24 @@ contract UndelegateScript is
             );
         }
 
+        uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(address(eigenAgent));
+        address withdrawer = address(eigenAgent);
+
+        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
+        strategiesToWithdraw[0] = strategy;
+
+        uint256[] memory sharesToWithdraw = new uint256[](1);
+        sharesToWithdraw[0] = strategyManager.stakerStrategyShares(withdrawer, strategy);
+
+        ///////////////////////////////////////
+        // Withdrawals: need to record the following before dispatching undelegate call:
+        // delegatedTo
+        // nonce
+        // sharesToWithdraw
+        // strategyToWithdraw
+        // withdrawer
+        ///////////////////////////////////////
+
         topupSenderEthBalance(address(senderContract));
 
         senderContract.sendMessagePayNative(
@@ -143,6 +199,28 @@ contract UndelegateScript is
 
         vm.stopBroadcast();
 
-    }
+        /////////////////////////////////////////////////////////////////
+        /////// Save undelegate withdrawal details
+        /////////////////////////////////////////////////////////////////
+        vm.selectFork(ethForkId);
 
+        string memory filePath = "script/withdrawals-undelegated/";
+        if (isTest) {
+           filePath = "test/withdrawals-undelegated/";
+        }
+        // NOTE: Tx will still be bridging after this script runs.
+        // startBlock is saved after bridging completes and calls queueWithdrawal on L1.
+        // We must call getWithdrawalBlock for the correct startBlock to calculate withdrawalRoots
+        saveWithdrawalInfo(
+            address(eigenAgent), // staker
+            delegationManager.delegatedTo(address(eigenAgent)),
+            withdrawer,
+            withdrawalNonce,
+            0, // startBlock is created later in Eigenlayer
+            strategiesToWithdraw,
+            sharesToWithdraw,
+            bytes32(0x0), // withdrawalRoot is created later (requires startBlock)
+            filePath
+        );
+    }
 }

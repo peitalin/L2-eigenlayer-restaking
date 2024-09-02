@@ -118,25 +118,34 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
 
             (
+                bool receiveAsTokens,
                 uint256 withdrawalAmount,
                 address withdrawalToken,
                 string memory messageForL2
             ) = restakingConnector.completeWithdrawalWithEigenAgent(message);
-            // (3) ReceiverCCIP should have received tokens back from EigenAgent after completeWithdrawal
 
-            /// Send handleTransferToAgentOwner message to bridge tokens back to L2.
-            /// L2 SenderCCIP transfers tokens to AgentOwner.
-            this.sendMessagePayNative(
-                BaseSepolia.ChainSelector, // destination chain
-                senderContractL2Addr,
-                messageForL2,
-                address(withdrawalToken), // L1 token to burn/lock
-                withdrawalAmount
-            );
+            if (receiveAsTokens) {
+                /// if `receiveAsTokens == true`, ReceiverCCIP should have received tokens
+                /// back from EigenAgent after completeWithdrawal
+                ///
+                /// Send handleTransferToAgentOwner message to bridge tokens back to L2.
+                /// L2 SenderCCIP transfers tokens to AgentOwner.
+                this.sendMessagePayNative(
+                    BaseSepolia.ChainSelector, // destination chain
+                    senderContractL2Addr,
+                    messageForL2,
+                    withdrawalToken, // L1 token to burn/lock
+                    withdrawalAmount
+                );
 
-            emit BridgingWithdrawalToL2(senderContractL2Addr, withdrawalAmount);
+                emit BridgingWithdrawalToL2(senderContractL2Addr, withdrawalAmount);
 
-            textMsg = "Complete Queued Withdrawal by EigenAgent";
+                textMsg = "Complete Queued Withdrawal by EigenAgent";
+            } else {
+                /// Otherwise if `receiveAsTokens == false`, withdrawal is redeposited in Eigenlayer
+                /// as shares, re-delegated to a new Operator as part of the `undelegate` flow.
+                /// We do not need to do anything in thise case.
+            }
         }
 
         //////////////////////////////////

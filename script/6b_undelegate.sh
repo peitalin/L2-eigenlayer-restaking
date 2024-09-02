@@ -1,14 +1,14 @@
 #!/bin/bash
 source .env
 
-echo forge script script/6_delegateTo.s.sol:DelegateToScript --rpc-url basesepolia --broadcast -vvvv
+echo forge script script/6b_undelegate.s.sol:UndelegateScript --rpc-url basesepolia --broadcast -vvvv
 
-forge script script/6_delegateTo.s.sol:DelegateToScript  \
+forge script script/6b_undelegate.s.sol:UndelegateScript  \
     --rpc-url basesepolia \
     --broadcast \
     --private-key $DEPLOYER_KEY \
     -vvvv
 
 
-## Example DelegateTo CCIP message:
-# https://ccip.chain.link/msg/0x09c9dd5a62626f6d6c9e3e8335809ca2ae5521528c9ed0c3069373f7f50bcc2f
+## Example Undelegate CCIP message:
+# https://ccip.chain.link/msg/0x9d34c12c061307aac296870ac5e14ec885463f3a8bbb9486c75373e8e662fae4

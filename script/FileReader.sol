@@ -127,6 +127,14 @@ contract FileReader is Script {
         address eigenAgentOwner721,
         address proxyAdminL1
     ) public {
+
+        require(receiverCCIP != address(0), "receiverCCIP cannot be null");
+        require(restakingConnector != address(0), "restakingConnector cannot be null");
+        require(agentFactory != address(0), "agentFactory cannot be null");
+        require(registry6551 != address(0), "registry6551 cannot be null");
+        require(eigenAgentOwner721 != address(0), "eigenAgentOwner721 cannot be null");
+        require(proxyAdminL1 != address(0), "proxyAdminL1 cannot be null");
+
         // { "inputs": <inputs_data>}
         /////////////////////////////////////////////////
         vm.serializeAddress("contracts" , "receiverCCIP", receiverCCIP);
@@ -174,6 +182,10 @@ contract FileReader is Script {
         bytes32 _withdrawalRoot,
         string memory _filePath
     ) public {
+
+        require(_staker != address(0), "staker cannot be null");
+        require(_withdrawer != address(0), "withdrawer cannot be null");
+        require(address(_strategies[0]) != address(0), "strategies[0] cannot be null");
 
         // { "inputs": <inputs_data>}
         /////////////////////////////////////////////////

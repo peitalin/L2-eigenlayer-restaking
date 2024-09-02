@@ -594,8 +594,7 @@ library DelegationDecoders {
         // 78060931402acbf07ebbe20d1648a2b3072ad508523d947a0eee31cdd386d6fd [484] eigenAgent sig s
         // 1c000000000000000000000000000000000000000000000000000000         [516] eigenAgent sig v
 
-        address operator;
-        uint256 expiry;
+        uint256 sigExpiry;
 
         bytes32 r;
         bytes32 s;
@@ -605,7 +604,7 @@ library DelegationDecoders {
             operator := mload(add(message, 100))
             approverSalt := mload(add(message, 164))
 
-            expiry := mload(add(message, 228))
+            sigExpiry := mload(add(message, 228))
             r := mload(add(message, 292))
             s := mload(add(message, 324))
             v := mload(add(message, 356))
@@ -615,7 +614,7 @@ library DelegationDecoders {
 
         approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
             signature: signatureOperatorApprover,
-            expiry: expiry
+            expiry: sigExpiry
         });
 
         (
@@ -660,7 +659,6 @@ library DelegationDecoders {
 
 
         bytes4 functionSelector;
-        address staker;
 
         assembly {
             functionSelector := mload(add(message, 96))

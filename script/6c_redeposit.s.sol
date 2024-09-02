@@ -24,7 +24,7 @@ import {ClientSigners} from "./ClientSigners.sol";
 import {ClientEncoders} from "./ClientEncoders.sol";
 
 
-contract CompleteWithdrawalScript is
+contract RedepositScript is
     Script,
     ScriptUtils,
     FileReader,
@@ -43,6 +43,7 @@ contract CompleteWithdrawalScript is
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
     IStrategy public strategy;
+    IERC20 public token;
     IERC20 public tokenL2;
 
     uint256 public deployerKey;
@@ -50,7 +51,7 @@ contract CompleteWithdrawalScript is
     address public staker;
     address public withdrawer;
     uint256 public amount;
-    uint256 public expiry;
+    uint256 public sig_expiry;
     uint256 public middlewareTimesIndex; // not used yet, for slashing
     bool public receiveAsTokens;
 
@@ -83,7 +84,7 @@ contract CompleteWithdrawalScript is
             , // pauserRegistry
             delegationManager,
             , // _rewardsCoordinator
-            // tokenL1
+            // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
         senderProxy = readSenderContract();
@@ -108,9 +109,9 @@ contract CompleteWithdrawalScript is
         }
         require(address(eigenAgent) != address(0), "user has no EigenAgent");
 
-        amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
-        expiry = block.timestamp + 2 hours;
-        staker = address(eigenAgent); // this should be EigenAgent (as in StrategyManager)
+        amount = 0 ether; // only sending message, not bridging tokens.
+        sig_expiry = block.timestamp + 2 hours;
+        staker = address(eigenAgent); // this should be EigenAgent
         withdrawer = address(eigenAgent);
 
         require(staker == withdrawer, "staker should be withdrawer");
@@ -118,18 +119,8 @@ contract CompleteWithdrawalScript is
 
         IDelegationManager.Withdrawal memory withdrawal = readWithdrawalInfo(
             staker,
-            "script/withdrawals-queued/"
+            "script/withdrawals-undelegated/"
         );
-
-        if (isTest) {
-            // mock save a queueWithdrawalBlock
-            vm.prank(deployer);
-            restakingConnector.setQueueWithdrawalBlock(
-                withdrawal.staker,
-                withdrawal.nonce,
-                111
-            );
-        }
 
         // Fetch the correct withdrawal.startBlock and withdrawalRoot
         withdrawal.startBlock = uint32(restakingConnector.getQueueWithdrawalBlock(
@@ -156,7 +147,14 @@ contract CompleteWithdrawalScript is
         );
 
         middlewareTimesIndex = 0; // not used yet, for slashing
-        receiveAsTokens = true;
+        receiveAsTokens = false;
+        // receiveAsTokens == false to redeposit queuedWithdrawal (from undelegating)
+        // back into Eigenlayer.
+
+        require(
+            receiveAsTokens == false,
+            "receiveAsTokens must be false to re-deposit undelegated deposit back in Eigenlayer"
+        );
 
         bytes memory completeWithdrawalMessage;
         bytes memory messageWithSignature;
@@ -175,11 +173,12 @@ contract CompleteWithdrawalScript is
                 TARGET_CONTRACT,
                 completeWithdrawalMessage,
                 execNonce,
-                expiry
+                sig_expiry
             );
         }
 
         topupSenderEthBalance(senderAddr);
+
         senderProxy.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
             address(receiverProxy),
@@ -192,9 +191,9 @@ contract CompleteWithdrawalScript is
 
 
         vm.selectFork(ethForkId);
-        string memory filePath = "script/withdrawals-completed/";
+        string memory filePath = "script/withdrawals-redeposited/";
         if (isTest) {
-           filePath = "test/withdrawals-completed/";
+           filePath = "test/withdrawals-redeposited/";
         }
 
         saveWithdrawalInfo(

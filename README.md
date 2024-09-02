@@ -199,3 +199,26 @@ Copy and paste the `messageId` back into the CCIP explorer to track the L1 -> L2
 
 When the withdrawn funds arrive on L2, they are transferred back to the original user's address:
 [https://sepolia.basescan.org/tx/0x8e19a09c3e8d8a56bff89c4a54221cecc8f78bada6e2db4164198c4f7cc3f1a5](https://sepolia.basescan.org/tx/0x8e19a09c3e8d8a56bff89c4a54221cecc8f78bada6e2db4164198c4f7cc3f1a5)
+
+
+
+#### 5a. DelegateTo
+
+[Successful delegateTo call](https://ccip.chain.link/msg/0x241da6f1da5d9a8262c6767486a0134de9e12db1ac3d49e4f8e8ff364c7b6236)
+
+#### 5b. Undelegate
+
+Undelegating also cues the staker for withdrawal and produces withdrawalRoots.
+
+You can either:
+(1) completeWithdrawals and receive your withdrawal as tokens, or
+(2) completeWithdrawals and receive your withdrawal as shares in the vault (which can be re-delegated)
+
+The `receiveAsTokens` flag in `completeWithdrawals` call determines this.
+
+[Undelegate call](https://ccip.chain.link/msg/0xd47a04c1d4aa55082e3471669673e07b78475fe870c555075defeecb1b6f581e)
+
+
+#### 5c. Re-deposit (after re-delegating)
+
+[Redeposit Message](https://ccip.chain.link/msg/0x3857a387fdcd0d87a1f7c48ac7cdfc26c19cf21ec2b069acf4d67d93e9d94cd7)
