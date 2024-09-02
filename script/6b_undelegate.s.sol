@@ -140,15 +140,29 @@ contract UndelegateScript is
             "eigenAgent not delegatedTo operator"
         );
 
-        // get EigenAgent's current executionNonce
+        ///////////////////////////////////////
+        // Valid withdrawalRoots: record the following before sending undelegate message:
+        //     delegatedTo
+        //     nonce
+        //     sharesToWithdraw
+        //     strategyToWithdraw
+        //     withdrawer
+        ///////////////////////////////////////
+
         uint256 execNonce = eigenAgent.execNonce();
         uint256 sig_expiry = block.timestamp + 2 hours;
+        uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(address(eigenAgent));
+        address withdrawer = address(eigenAgent);
+
+        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
+        uint256[] memory sharesToWithdraw = new uint256[](1);
+        strategiesToWithdraw[0] = strategy;
+        sharesToWithdraw[0] = strategyManager.stakerStrategyShares(withdrawer, strategy);
 
         /////////////////////////////////////////////////////////////////
         /////// Broadcast Undelegate message on L2
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
-
         vm.startBroadcast(deployerKey);
 
         // Encode undelegate message, and append user signature for EigenAgent execution
@@ -168,24 +182,6 @@ contract UndelegateScript is
                 sig_expiry
             );
         }
-
-        uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(address(eigenAgent));
-        address withdrawer = address(eigenAgent);
-
-        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
-        strategiesToWithdraw[0] = strategy;
-
-        uint256[] memory sharesToWithdraw = new uint256[](1);
-        sharesToWithdraw[0] = strategyManager.stakerStrategyShares(withdrawer, strategy);
-
-        ///////////////////////////////////////
-        // Withdrawals: need to record the following before dispatching undelegate call:
-        // delegatedTo
-        // nonce
-        // sharesToWithdraw
-        // strategyToWithdraw
-        // withdrawer
-        ///////////////////////////////////////
 
         topupSenderEthBalance(address(senderContract));
 

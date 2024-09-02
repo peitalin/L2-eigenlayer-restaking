@@ -8,15 +8,17 @@ import {UpgradeSenderOnL2Script} from "../script/2b_upgradeSenderOnL2.s.sol";
 import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
 import {UpgradeReceiverOnL1Script} from "../script/3b_upgradeReceiverOnL1.s.sol";
 import {WhitelistCCIPContractsScript} from "../script/4_whitelistCCIPContracts.s.sol";
-import {DepositWithSignatureScript} from "../script/5_depositWithSignature.s.sol";
-import {MintEigenAgentScript} from "../script/5b_mintEigenAgent.s.sol";
-import {CheckMintEigenAgentGasCostsScript} from "../script/5c_checkMintEigenAgentGasCosts.s.sol";
+
+import {DepositAndMintEigenAgentScript} from "../script/5_depositAndMintEigenAgent.s.sol";
+import {DepositIntoStrategyScript} from "../script/5b_depositIntoStrategy.s.sol";
+import {MintEigenAgentScript} from "../script/5c_mintEigenAgent.s.sol";
+import {CheckMintEigenAgentGasCostsScript} from "../script/5d_checkMintEigenAgentGasCosts.s.sol";
 
 import {DelegateToScript} from "../script/6_delegateTo.s.sol";
 import {UndelegateScript} from "../script/6b_undelegate.s.sol";
 import {RedepositScript} from "../script/6c_redeposit.s.sol";
 
-import {QueueWithdrawalWithSignatureScript} from "../script/7_queueWithdrawalWithSignature.s.sol";
+import {QueueWithdrawalScript} from "../script/7_queueWithdrawal.s.sol";
 import {CompleteWithdrawalScript} from "../script/8_completeWithdrawal.s.sol";
 import {DeployVerifyScript} from "../script/x_deployVerify.s.sol";
 import {ScriptUtils} from "../script/ScriptUtils.sol";
@@ -24,26 +26,29 @@ import {ScriptUtils} from "../script/ScriptUtils.sol";
 
 contract DeployScriptsTests is Test, ScriptUtils {
 
-    // deploy scripts
+    ///////////// Deploy scripts /////////////
+    // 2
     DeploySenderOnL2Script public deploySenderOnL2Script;
     UpgradeSenderOnL2Script public upgradeSenderOnL2Script;
-
+    // 3
     DeployReceiverOnL1Script public deployReceiverOnL1Script;
     UpgradeReceiverOnL1Script public upgradeReceiverOnL1Script;
-
+    // 4
     WhitelistCCIPContractsScript public whitelistCCIPContractsScript;
-
-    DepositWithSignatureScript public depositWithSignatureScript;
+    // 5
+    DepositAndMintEigenAgentScript public depositAndMintEigenAgentScript;
+    DepositIntoStrategyScript public depositIntoStrategyScript;
     MintEigenAgentScript public mintEigenAgentScript;
     CheckMintEigenAgentGasCostsScript public checkMintEigenAgentGasCostsScript;
-
+    // 6
     DelegateToScript public delegateToScript;
     UndelegateScript public undelegateScript;
     RedepositScript public redepositScript;
-
-    QueueWithdrawalWithSignatureScript public queueWithdrawalWithSignatureScript;
+    // 7
+    QueueWithdrawalScript public queueWithdrawalScript;
+    // 8
     CompleteWithdrawalScript public completeWithdrawalScript;
-
+    // x
     DeployVerifyScript public deployerVerifyScript;
 
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
@@ -59,7 +64,8 @@ contract DeployScriptsTests is Test, ScriptUtils {
 
         whitelistCCIPContractsScript = new WhitelistCCIPContractsScript();
 
-        depositWithSignatureScript = new DepositWithSignatureScript();
+        depositAndMintEigenAgentScript = new DepositAndMintEigenAgentScript();
+        depositIntoStrategyScript = new DepositIntoStrategyScript();
         mintEigenAgentScript = new MintEigenAgentScript();
         checkMintEigenAgentGasCostsScript = new CheckMintEigenAgentGasCostsScript();
 
@@ -67,7 +73,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
         undelegateScript = new UndelegateScript();
         redepositScript = new RedepositScript();
 
-        queueWithdrawalWithSignatureScript = new QueueWithdrawalWithSignatureScript();
+        queueWithdrawalScript = new QueueWithdrawalScript();
         completeWithdrawalScript = new CompleteWithdrawalScript();
 
         deployerVerifyScript = new DeployVerifyScript();
@@ -100,15 +106,19 @@ contract DeployScriptsTests is Test, ScriptUtils {
         whitelistCCIPContractsScript.run();
     }
 
-    function test_step5_DepositWithSignatureScript() public {
-        depositWithSignatureScript.run();
+    function test_step5_DepositAndMintEigenAgentScript() public {
+        depositAndMintEigenAgentScript.mockrun();
     }
 
-    function test_step5b_MintEigenAgent() public {
+    function test_step5b_DepositIntoStrategyScript() public {
+        depositIntoStrategyScript.run();
+    }
+
+    function test_step5c_MintEigenAgent() public {
         mintEigenAgentScript.run();
     }
 
-    function test_step5c_CheckMintEigenAgentGasCosts() public {
+    function test_step5d_CheckMintEigenAgentGasCosts() public {
         checkMintEigenAgentGasCostsScript.run();
     }
 
@@ -126,6 +136,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
                 console.log(reason);
             }
         } catch (bytes memory reason) {
+            console.log(abi.decode(reason, (string)));
             revert(abi.decode(reason, (string)));
         }
     }
@@ -141,14 +152,15 @@ contract DeployScriptsTests is Test, ScriptUtils {
                 console.log(reason);
             }
         } catch (bytes memory reason) {
+            console.log(abi.decode(reason, (string)));
             revert(abi.decode(reason, (string)));
         }
     }
 
-    function test_step7_QueueWithdrawalWithSignatureScript() public {
+    function test_step7_QueueWithdrawalScript() public {
         // Note II: If step8 has completed withdrawal, this test may warn it failed with:
         // "revert: withdrawalRoot has already been used"
-        queueWithdrawalWithSignatureScript.run();
+        queueWithdrawalScript.run();
         // writes new json files: withdrawalRoots
     }
 

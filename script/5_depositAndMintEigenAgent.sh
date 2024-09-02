@@ -1,9 +1,9 @@
 #!/bin/bash
 source .env
 
-echo forge script script/5_depositWithSignature.s.sol:DepositWithSignatureScript --rpc-url basesepolia --broadcast -vvvv
+echo forge script script/5_depositAndMintEigenAgent.s.sol:DepositAndMintEigenAgentScript --rpc-url basesepolia --broadcast -vvvv
 
-forge script script/5_depositWithSignature.s.sol:DepositWithSignatureScript  \
+forge script script/5_depositAndMintEigenAgent.s.sol:DepositAndMintEigenAgentScript  \
     --rpc-url basesepolia \
     --broadcast \
     --verify \

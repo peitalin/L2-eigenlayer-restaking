@@ -25,7 +25,7 @@ import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
 
-contract DepositWithSignatureScript is
+contract DepositAndMintEigenAgentScript is
     Script,
     ScriptUtils,
     FileReader,
@@ -53,6 +53,17 @@ contract DepositWithSignatureScript is
     address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
+        return _run();
+    }
+
+    function mockrun() public {
+        // ensure new user every mockrun
+        deployerKey = vm.randomUint();
+        deployer = vm.addr(deployerKey);
+        return _run();
+    }
+
+    function _run() public {
 
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
@@ -90,19 +101,16 @@ contract DepositWithSignatureScript is
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployerKey);
 
-        uint256 execNonce = 0;
-        /// ReceiverCCIP spawns an EigenAgent when CCIP message reaches L1
-        /// if user does not already have an EigenAgent NFT on L1.  Nonce is then 0.
         eigenAgent = agentFactory.getEigenAgent(deployer);
-        if (address(eigenAgent) != address(0)) {
-            // if the user already has a EigenAgent, fetch current execution Nonce
-            execNonce = eigenAgent.execNonce();
-        } else {
-            // otherwise agentFactory will spawn one for the user after bridging.
-            ///// For testing only:
-            // eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
-        }
-        console.log("eigenAgent:", address(eigenAgent));
+        require(
+            address(eigenAgent) == address(0),
+            "depositAndMintEigenAgent script: user already has an EigenAgent"
+        );
+        /// agentFactory will spawn an EigenAgent after bridging automatically
+        /// if user does not already have an EigenAgent NFT on L1.
+        /// but this costs more gas to be sent up-front for CCIP
+        /// Nonce is then 0.
+        uint256 execNonce = 0;
         vm.stopBroadcast();
 
         //////////////////////////////////////////////////////
@@ -113,7 +121,7 @@ contract DepositWithSignatureScript is
 
         vm.startBroadcast(deployerKey);
 
-        uint256 amount = 0.00333 ether;
+        uint256 amount = 0.0619 ether;
         uint256 expiry = block.timestamp + 3 hours;
         bytes memory depositMessage;
         bytes memory messageWithSignature;

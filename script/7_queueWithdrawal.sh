@@ -1,9 +1,9 @@
 #!/bin/bash
 source .env
 
-echo forge script script/7_queueWithdrawalWithSignature.s.sol:QueueWithdrawalWithSignature --rpc-url basesepolia --broadcast -vvvv
+echo forge script script/7_queueWithdrawal.s.sol:QueueWithdrawal --rpc-url basesepolia --broadcast -vvvv
 
-forge script script/7_queueWithdrawalWithSignature.s.sol:QueueWithdrawalWithSignatureScript  \
+forge script script/7_queueWithdrawal.s.sol:QueueWithdrawalScript  \
     --rpc-url basesepolia \
     --broadcast \
     --private-key $DEPLOYER_KEY \

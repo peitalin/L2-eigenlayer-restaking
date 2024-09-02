@@ -27,7 +27,7 @@ import {ClientSigners} from "./ClientSigners.sol";
 import {ClientEncoders} from "./ClientEncoders.sol";
 
 
-contract QueueWithdrawalWithSignatureScript is
+contract QueueWithdrawalScript is
     Script,
     ScriptUtils,
     FileReader,

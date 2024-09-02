@@ -16,3 +16,5 @@ docs/
 # ignore test outputs
 /test/withdrawals-completed/*
 /test/withdrawals-queued/*
+/test/withdrawals-redeposited/*
+/test/withdrawals-undelegated/*
