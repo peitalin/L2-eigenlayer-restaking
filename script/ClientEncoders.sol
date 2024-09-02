@@ -86,16 +86,14 @@ contract ClientEncoders {
         return message_bytes;
     }
 
-    function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalRoot,
-        address agentOwner
-    ) public pure returns (bytes memory) {
+    function encodeHandleTransferToAgentOwnerMsg(bytes32 withdrawalRoot)
+        public pure
+        returns (bytes memory)
+    {
         bytes memory message_bytes = abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderUtils.handleTransferToAgentOwner.selector,
-            withdrawalRoot,
-            agentOwner,
-            hashAgentOwnerRoot(withdrawalRoot, agentOwner)
+            withdrawalRoot
         );
         return message_bytes;
     }

@@ -9,6 +9,7 @@ interface ISenderUtils {
         address withdrawer;
         uint256 amount;
         address tokenDestination;
+        address agentOwner;
     }
 
     function handleTransferToAgentOwner(bytes memory message) external returns (

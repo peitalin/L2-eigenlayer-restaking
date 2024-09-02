@@ -8,14 +8,13 @@ import {Adminable} from "./utils/Adminable.sol";
 import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
 import {EigenlayerMsgDecoders, TransferToAgentOwnerMsg} from "./utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
-import {HashAgentOwnerRoot} from "./utils/HashAgentOwnerRoot.sol";
 
 
 
 contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
 
-    event SendingWithdrawalToAgentOwner(address indexed, uint256 indexed, address indexed);
-    event WithdrawalCommitted(bytes32 indexed, address indexed, uint256 indexed);
+    event SendingWithdrawalToAgentOwner(address indexed, uint256 indexed, address indexed, address);
+    event WithdrawalCommitted(bytes32 indexed, address indexed, uint256 indexed, address);
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
 
     mapping(bytes32 => ISenderUtils.WithdrawalTransfer) public withdrawalTransferCommittments;
@@ -29,10 +28,12 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
 
     function initialize() initializer public {
 
-        // depositIntoStrategy + mint agent: [gas: 1_950,000]
+        // depositIntoStrategy + mint EigenAgent: [gas: 1_950,000]
         _gasLimitsForFunctionSelectors[0xe7a050aa] = 2_200_000;
+
         // depositIntoStrategyWithSignature: [gas: 713,400]
         _gasLimitsForFunctionSelectors[0x32e89ace] = 800_000;
+
         // queueWithdrawals: [gas: 529,085]
         _gasLimitsForFunctionSelectors[0x0dd8dd02] = 800_000;
         // completeQueuedWithdrawals: [gas: 645,948]
@@ -54,30 +55,24 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
         TransferToAgentOwnerMsg memory transferToAgentOwnerMsg = decodeTransferToAgentOwnerMsg(message);
 
         bytes32 withdrawalRoot = transferToAgentOwnerMsg.withdrawalRoot;
-        address agentOwner = transferToAgentOwnerMsg.agentOwner;
-        bytes32 agentOwnerRoot = transferToAgentOwnerMsg.agentOwnerRoot;
 
-        require(
-            HashAgentOwnerRoot.hashAgentOwnerRoot(withdrawalRoot, agentOwner) == agentOwnerRoot,
-            "SenderUtils.handleTransferToAgentOwner: invalid agentOwnerRoot"
-        );
+        ISenderUtils.WithdrawalTransfer memory withdrawalTransfer =
+            withdrawalTransferCommittments[withdrawalRoot];
 
-        ISenderUtils.WithdrawalTransfer memory withdrawalTransfer = withdrawalTransferCommittments[withdrawalRoot];
-
-        // mark the withdrawalRoot as spent to prevent multiple withdrawals
+        // mark withdrawalRoot as spent to prevent multiple withdrawals
         withdrawalRootsSpent[withdrawalRoot] = true;
         delete withdrawalTransferCommittments[withdrawalRoot];
 
         emit SendingWithdrawalToAgentOwner(
-            agentOwner,
-            withdrawalTransfer.amount, // amount
-            withdrawalTransfer.tokenDestination // tokenL2Address
+            withdrawalTransfer.agentOwner,
+            withdrawalTransfer.amount,
+            withdrawalTransfer.tokenDestination
         );
 
         return (
-            agentOwner,
-            withdrawalTransfer.amount, // amount
-            withdrawalTransfer.tokenDestination // tokenL2Address
+            withdrawalTransfer.agentOwner,
+            withdrawalTransfer.amount,
+            withdrawalTransfer.tokenDestination
         );
     }
 
@@ -96,7 +91,7 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
                 , // tokensToWithdraw,
                 , // middlewareTimesIndex
                 bool receiveAsTokens, // receiveAsTokens
-                , // signer
+                address signer, // signer
                 , // expiry
                 // signature
             ) = decodeCompleteWithdrawalMsg(message);
@@ -118,10 +113,16 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
                 withdrawalTransferCommittments[withdrawalRoot] = ISenderUtils.WithdrawalTransfer({
                     withdrawer: withdrawal.withdrawer,
                     amount: withdrawal.shares[0],
-                    tokenDestination: tokenDestinationL2
+                    tokenDestination: tokenDestinationL2,
+                    agentOwner: signer
                 });
 
-                emit WithdrawalCommitted(withdrawalRoot, withdrawal.withdrawer, withdrawal.shares[0]);
+                emit WithdrawalCommitted(
+                    withdrawalRoot,
+                    withdrawal.withdrawer,
+                    withdrawal.shares[0],
+                    signer
+                );
             }
     }
 

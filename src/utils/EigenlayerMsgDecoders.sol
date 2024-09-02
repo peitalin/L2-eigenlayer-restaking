@@ -5,12 +5,9 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {HashAgentOwnerRoot} from "./HashAgentOwnerRoot.sol";
 
 struct TransferToAgentOwnerMsg {
     bytes32 withdrawalRoot;
-    address agentOwner;
-    bytes32 agentOwnerRoot;
 }
 
 /// @dev used to decode user signatures on all CCIP messages to EigenAgents
@@ -522,29 +519,22 @@ contract EigenlayerMsgDecoders {
         // 0000000000000000000000000000000000000000000000000000000000000064
         // d8a85b48                                                         [96] function selector
         // dd900ac4d233ec9d74ac5af4ce89f87c78781d8fd9ee2aad62d312bdfdf78a14 [100] withdrawal root
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] agent owner
-        // f07b660f0e17387b14010ccadbb6266bb80331ae061328cbcd2a4bbb62b30ac1 [164] agentOwnerRoot
         // 00000000000000000000000000000000000000000000000000000000
 
         bytes4 functionSelector;
         bytes32 withdrawalRoot;
-        address agentOwner;
+        // address agentOwner;
         // bytes32 agentOwnerRoot;
 
         assembly {
             functionSelector := mload(add(message, 96))
             withdrawalRoot := mload(add(message, 100))
-            agentOwner := mload(add(message, 132))
+            // agentOwner := mload(add(message, 132))
             // agentOwnerRoot := mload(add(message, 164))
         }
 
-        bytes32 computedRoot = HashAgentOwnerRoot.hashAgentOwnerRoot(withdrawalRoot, agentOwner);
-        // return keccak256(abi.encode(withdrawalRoot, agentOwner));
-
         return TransferToAgentOwnerMsg({
-            withdrawalRoot: withdrawalRoot,
-            agentOwner: agentOwner,
-            agentOwnerRoot: computedRoot
+            withdrawalRoot: withdrawalRoot
         });
     }
 }

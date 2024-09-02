@@ -59,9 +59,9 @@ contract RestakingConnector is
 
         agentFactory = newAgentFactory;
 
-        // handleTransferToAgentOwner: [gas: 268_420]
         // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
-        _gasLimitsForFunctionSelectors[0xd8a85b48] = 500_000;
+        // [gas: 268_420]
+        _gasLimitsForFunctionSelectors[0xd8a85b48] = 290_000;
 
         __Adminable_init();
     }
@@ -221,10 +221,7 @@ contract RestakingConnector is
             receiveAsTokens = _receiveAsTokens;
             withdrawalAmount = withdrawal.shares[0];
             withdrawalToken = address(tokensToWithdraw[0]);
-            messageForL2 = string(encodeHandleTransferToAgentOwnerMsg(
-                withdrawalRoot,
-                signer // signer should be eigenAgent.getAgentOwner()
-            ));
+            messageForL2 = string(encodeHandleTransferToAgentOwnerMsg(withdrawalRoot));
 
             if (_receiveAsTokens) {
                 // (2) EigenAgent approves RestakingConnector to transfer tokens to ReceiverCCIP
@@ -309,11 +306,11 @@ contract RestakingConnector is
      *
     */
 
-    function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalRoot,
-        address agentOwner
-    ) public pure returns (bytes memory) {
-        return EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(withdrawalRoot, agentOwner);
+    function encodeHandleTransferToAgentOwnerMsg(bytes32 withdrawalRoot)
+        public pure
+        returns (bytes memory)
+    {
+        return EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(withdrawalRoot);
     }
 
     function getQueueWithdrawalBlock(address staker, uint256 nonce) public view returns (uint256) {

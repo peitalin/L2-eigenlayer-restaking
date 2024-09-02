@@ -7,7 +7,6 @@ import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IS
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ISenderUtils} from "../interfaces/ISenderUtils.sol";
 import {IRestakingConnector} from "../interfaces/IRestakingConnector.sol";
-import {HashAgentOwnerRoot} from "./HashAgentOwnerRoot.sol";
 
 
 library EigenlayerMsgEncoders {
@@ -86,16 +85,14 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-    function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalRoot,
-        address agentOwner
-    ) public pure returns (bytes memory) {
+    function encodeHandleTransferToAgentOwnerMsg(bytes32 withdrawalRoot)
+        public pure
+        returns (bytes memory)
+    {
         bytes memory message_bytes = abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderUtils.handleTransferToAgentOwner.selector,
-            withdrawalRoot,
-            agentOwner,
-            HashAgentOwnerRoot.hashAgentOwnerRoot(withdrawalRoot, agentOwner)
+            withdrawalRoot
         );
         return message_bytes;
     }
