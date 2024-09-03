@@ -396,17 +396,21 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
     function test_Decode_TransferToAgentOwnerMsg() public view {
 
-        bytes32 withdrawalRoot1 = 0x8c20d3a37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7d8ec77;
+        bytes32 withdrawalRoot = 0x8c20d3a37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7d8ec77;
+
+        address bob = vm.addr(8881);
+        bytes32 withdrawalAgentOwnerRoot = keccak256(abi.encode(withdrawalRoot, bob));
 
         TransferToAgentOwnerMsg memory tta_msg = eigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(
             abi.encode(string(
                 EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
-                    withdrawalRoot1
+                    withdrawalRoot,
+                    bob
                 )
             ))
         );
 
-        require(tta_msg.withdrawalRoot == withdrawalRoot1, "incorrect withdrawalRoot");
+        require(tta_msg.withdrawalAgentOwnerRoot == withdrawalAgentOwnerRoot, "incorrect withdrawalAgentOwnerRoot");
     }
 
     /*

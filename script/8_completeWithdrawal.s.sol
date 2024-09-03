@@ -11,6 +11,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
+import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
@@ -36,6 +37,7 @@ contract CompleteWithdrawalScript is
 
     IReceiverCCIP public receiverProxy;
     ISenderCCIP public senderProxy;
+    ISenderUtils public senderUtilsProxy;
     IRestakingConnector public restakingConnector;
     IAgentFactory public agentFactory;
     address public senderAddr;
@@ -88,6 +90,7 @@ contract CompleteWithdrawalScript is
 
         senderProxy = readSenderContract();
         senderAddr = address(senderProxy);
+        senderUtilsProxy = readSenderUtils();
 
         (receiverProxy, restakingConnector) = readReceiverRestakingConnector();
         agentFactory = readAgentFactory();
@@ -137,7 +140,11 @@ contract CompleteWithdrawalScript is
             withdrawal.nonce
         ));
 
-        bytes32 withdrawalRootCalculated = delegationManager.calculateWithdrawalRoot(withdrawal);
+        bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
+        // Create a withdrawalAgentOwnerRoot and commit to it on L2.
+        // So that when the withdrawal returns, we can
+        // verify which user (AgentOwner) to transfer withdrawals to
+        bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalAgentOwnerRoot(withdrawalRoot, deployer);
 
         IERC20[] memory tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = withdrawal.strategies[0].underlyingToken();
@@ -206,7 +213,8 @@ contract CompleteWithdrawalScript is
             withdrawal.startBlock,
             withdrawal.strategies,
             withdrawal.shares,
-            withdrawalRootCalculated,
+            withdrawalRoot,
+            withdrawalAgentOwnerRoot,
             filePath
         );
 

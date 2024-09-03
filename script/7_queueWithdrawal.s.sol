@@ -218,7 +218,8 @@ contract QueueWithdrawalScript is
             0, // startBlock is created later in Eigenlayer
             strategiesToWithdraw,
             sharesToWithdraw,
-            bytes32(0x0), // withdrawalRoot is created later
+            bytes32(0x0), // withdrawalRoot is created later when completeWithdrawal
+            bytes32(0x0), // withdrawalAgentOwnerRoot is created later
             filePath
         );
     }

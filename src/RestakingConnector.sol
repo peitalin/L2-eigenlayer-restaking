@@ -235,7 +235,10 @@ contract RestakingConnector is
             receiveAsTokens = _receiveAsTokens;
             withdrawalAmount = withdrawal.shares[0];
             withdrawalToken = address(tokensToWithdraw[0]);
-            messageForL2 = string(encodeHandleTransferToAgentOwnerMsg(withdrawalRoot));
+            messageForL2 = string(EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
+                withdrawalRoot,
+                signer
+            ));
 
             if (_receiveAsTokens) {
                 // (2) EigenAgent approves RestakingConnector to transfer tokens to ReceiverCCIP
@@ -319,13 +322,6 @@ contract RestakingConnector is
      *
      *
     */
-
-    function encodeHandleTransferToAgentOwnerMsg(bytes32 withdrawalRoot)
-        public pure
-        returns (bytes memory)
-    {
-        return EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(withdrawalRoot);
-    }
 
     function getQueueWithdrawalBlock(address staker, uint256 nonce) public view returns (uint256) {
         return _withdrawalBlock[staker][nonce];

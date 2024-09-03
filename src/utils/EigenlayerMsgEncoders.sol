@@ -85,14 +85,23 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-    function encodeHandleTransferToAgentOwnerMsg(bytes32 withdrawalRoot)
-        public pure
-        returns (bytes memory)
-    {
+    function calculateWithdrawalAgentOwnerRoot(
+        bytes32 withdrawalRoot,
+        address agentOwner // signer
+    ) public pure returns (bytes32) {
+        // encode signer into withdrawalAgentOwnerRoot
+        return keccak256(abi.encode(withdrawalRoot, agentOwner));
+    }
+
+    function encodeHandleTransferToAgentOwnerMsg(
+        bytes32 withdrawalRoot,
+        address signer
+    ) public pure returns (bytes memory) {
+
         bytes memory message_bytes = abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderUtils.handleTransferToAgentOwner.selector,
-            withdrawalRoot
+            calculateWithdrawalAgentOwnerRoot(withdrawalRoot, signer)
         );
         return message_bytes;
     }

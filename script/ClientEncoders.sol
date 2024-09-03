@@ -86,18 +86,31 @@ contract ClientEncoders {
         return message_bytes;
     }
 
-    function encodeHandleTransferToAgentOwnerMsg(bytes32 withdrawalRoot)
-        public pure
-        returns (bytes memory)
-    {
+    function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
+        public
+        pure
+        returns (bytes32) {
+        return keccak256(abi.encode(withdrawal));
+    }
+
+    function calculateWithdrawalAgentOwnerRoot(bytes32 withdrawalRoot, address agentOwner)
+        public
+        pure
+        returns (bytes32) {
+        return keccak256(abi.encode(withdrawalRoot, agentOwner));
+    }
+
+    function encodeHandleTransferToAgentOwnerMsg(
+        bytes32 withdrawalRoot,
+        address agentOwner
+    ) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderUtils.handleTransferToAgentOwner.selector,
-            withdrawalRoot
+            calculateWithdrawalAgentOwnerRoot(withdrawalRoot, agentOwner)
         );
         return message_bytes;
     }
-
 
     function encodeDelegateTo(
         address operator,

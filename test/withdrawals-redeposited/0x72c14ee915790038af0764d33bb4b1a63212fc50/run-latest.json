@@ -1,9 +1,9 @@
 {
   "chainInfo": {
-    "block": 6625658,
+    "block": 6626719,
     "destinationChain": 84532,
     "sourceChain": 11155111,
-    "timestamp": 1725373212
+    "timestamp": 1725387984
   },
   "inputs": {
     "delegatedTo": "0x722551f573D58C97893286F8F00E76119501Ae37",
@@ -15,6 +15,7 @@
     "withdrawer": "0x72C14ee915790038af0764d33Bb4B1a63212fC50"
   },
   "outputs": {
+    "withdrawalAgentOwnerRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
     "withdrawalRoot": "0x205c6624d7b813b2e30411e2f7dc491adf4d701571aa82d2a6748229865fd951"
   }
 }

@@ -30,11 +30,9 @@ interface ISenderUtils {
         external
         returns (ISenderUtils.WithdrawalTransfer memory);
 
-    function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
+    function calculateWithdrawalAgentOwnerRoot(IDelegationManager.Withdrawal memory withdrawal)
         external pure
         returns (bytes32);
-
-    function commitWithdrawalRootInfo(bytes memory message, address tokenDestination) external;
 
     function setFunctionSelectorName(bytes4 functionSelector, string memory _name) external;
 

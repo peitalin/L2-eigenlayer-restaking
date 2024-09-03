@@ -458,7 +458,8 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
                 sender: abi.encode(deployer),
                 data: abi.encode(string(
                     EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
-                        withdrawalRoot
+                        withdrawalRoot,
+                        deployer
                     )
                 )), // CCIP abi.encodes a string message when sending
                 destTokenAmounts: new Client.EVMTokenAmount[](0)

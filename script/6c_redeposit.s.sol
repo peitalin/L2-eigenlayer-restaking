@@ -206,6 +206,7 @@ contract RedepositScript is
             withdrawal.strategies,
             withdrawal.shares,
             withdrawalRootCalculated,
+            bytes32(0x0), // withdrawalAgenOwnerRoot not used in delegations
             filePath
         );
 

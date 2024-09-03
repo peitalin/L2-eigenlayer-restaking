@@ -74,10 +74,6 @@ interface IRestakingConnector {
      *
     */
 
-    function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalRoot
-    ) external returns (bytes memory);
-
     function setGasLimitsForFunctionSelectors(
         bytes4[] memory functionSelectors,
         uint256[] memory gasLimits

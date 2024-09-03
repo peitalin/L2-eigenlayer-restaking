@@ -7,7 +7,7 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 struct TransferToAgentOwnerMsg {
-    bytes32 withdrawalRoot;
+    bytes32 withdrawalAgentOwnerRoot;
 }
 
 /// @dev used to decode user signatures on all CCIP messages to EigenAgents
@@ -546,7 +546,6 @@ contract EigenlayerMsgDecoders {
         public pure
         returns (TransferToAgentOwnerMsg memory transferToAgentOwnerMsg)
     {
-
         // 0000000000000000000000000000000000000000000000000000000000000020
         // 0000000000000000000000000000000000000000000000000000000000000064
         // d8a85b48                                                         [96] function selector
@@ -554,19 +553,15 @@ contract EigenlayerMsgDecoders {
         // 00000000000000000000000000000000000000000000000000000000
 
         bytes4 functionSelector;
-        bytes32 withdrawalRoot;
-        // address agentOwner;
-        // bytes32 agentOwnerRoot;
+        bytes32 withdrawalAgentOwnerRoot;
 
         assembly {
             functionSelector := mload(add(message, 96))
-            withdrawalRoot := mload(add(message, 100))
-            // agentOwner := mload(add(message, 132))
-            // agentOwnerRoot := mload(add(message, 164))
+            withdrawalAgentOwnerRoot := mload(add(message, 100))
         }
 
         return TransferToAgentOwnerMsg({
-            withdrawalRoot: withdrawalRoot
+            withdrawalAgentOwnerRoot: withdrawalAgentOwnerRoot
         });
     }
 }
