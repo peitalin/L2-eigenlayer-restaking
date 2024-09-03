@@ -158,7 +158,8 @@ contract DepositIntoStrategyScript is
             address(receiverContract),
             string(messageWithSignature),
             address(tokenL2),
-            amount
+            amount,
+            800_000 // use lower gasLimit if user does not already have an eigenAgent
         );
 
         vm.stopBroadcast();

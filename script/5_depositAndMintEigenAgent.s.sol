@@ -155,7 +155,8 @@ contract DepositAndMintEigenAgentScript is
             address(receiverContract),
             string(messageWithSignature),
             address(tokenL2),
-            amount
+            amount,
+            0 // use default gasLimit (2,100,000 for deposit + mint EigenAgent)
         );
 
         vm.stopBroadcast();

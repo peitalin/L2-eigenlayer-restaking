@@ -118,26 +118,29 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     /// @param _text string data to be sent.
     /// @param _token token address.
     /// @param _amount token amount.
+    /// @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
     /// @return messageId ID of the CCIP message that was sent.
     function sendMessagePayNative(
         uint64 _destinationChainSelector,
         address _receiver,
         string calldata _text,
         address _token,
-        uint256 _amount
+        uint256 _amount,
+        uint256 _overrideGasLimit
     )
         external
         onlyAllowlistedDestinationChain(_destinationChainSelector)
         validateReceiver(_receiver)
         returns (bytes32 messageId)
     {
-        // address(0) means fees are paid in native gas
+
         Client.EVM2AnyMessage memory evm2AnyMessage = _buildCCIPMessage(
             _receiver,
             _text,
             _token,
             _amount,
-            address(0)
+            address(0), // address(0) means fees are paid in native gas
+            _overrideGasLimit
         );
 
         IRouterClient router = IRouterClient(this.getRouter());
@@ -154,11 +157,13 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
             evm2AnyMessage
         );
 
+        string memory text_msg = "dispatched call";
+
         emit MessageSent(
             messageId,
             _destinationChainSelector,
             _receiver,
-            _text,
+            text_msg,
             _token,
             _amount,
             address(0),
@@ -182,7 +187,8 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         string calldata _text,
         address _token,
         uint256 _amount,
-        address _feeTokenAddress
+        address _feeTokenAddress,
+        uint256 _overrideGasLimit
     ) internal virtual returns (Client.EVM2AnyMessage memory) {
 
         Client.EVMTokenAmount[] memory tokenAmounts;
@@ -200,6 +206,9 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
         bytes memory message = abi.encode(_text);
         uint256 gasLimit = 600_000;
+        if (_overrideGasLimit >= 0) {
+            gasLimit = _overrideGasLimit;
+        }
 
         return
             Client.EVM2AnyMessage({

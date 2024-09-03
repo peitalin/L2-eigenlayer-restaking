@@ -54,7 +54,7 @@ contract EigenlayerMsgDecoders {
      *
     */
 
-    function decodeDepositWithSignature6551Msg(bytes memory message)
+    function decodeDepositIntoStrategyMsg(bytes memory message)
         public pure
         returns (
             address strategy,
@@ -89,12 +89,44 @@ contract EigenlayerMsgDecoders {
             signature
         ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 196); // signature starts on 196
 
-        require(signature.length == 65, "decodeDepositWithSignature6551Msg: invalid signature length");
+        require(signature.length == 65, "decodeDepositIntoStrategyMsg: invalid signature length");
 
         return (
             strategy,
             token,
             amount,
+            signer,
+            expiry,
+            signature
+        );
+    }
+
+    function decodeMintEigenAgent(bytes memory message)
+        public pure
+        returns (
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        )
+    {
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
+        // 00000000000000000000000000000000000000000000000000000000000000e5 [64] string length
+        // e7a050aa                                                         [96] function selector
+        // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [100] signer (original staker)
+        // 0000000000000000000000000000000000000000000000000000000066d063d4 [132] expiry (signature)
+        // b65bb77203b002de051363fd17437187540d5c6a0cfcb75c31dfffff9108e41d [164] signature r
+        // 037e6bdadf2079e5268e5ad0000699611e63c3e015027ad7f8e7b4a252bbb9bb [196] signature s
+        // 1c000000000000000000000000000000000000000000000000000000         [228] signature v
+
+        (
+            signer,
+            expiry,
+            signature
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 100); // signature starts on 196
+
+        require(signature.length == 65, "decodeDepositIntoStrategyMsg: invalid signature length");
+
+        return (
             signer,
             expiry,
             signature

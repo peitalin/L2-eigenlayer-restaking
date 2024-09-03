@@ -29,6 +29,8 @@ interface IRestakingConnector {
 
     function depositWithEigenAgent(bytes memory message) external;
 
+    function mintEigenAgent(bytes memory message) external;
+
     function queueWithdrawalsWithEigenAgent(bytes memory message) external;
 
     function completeWithdrawalWithEigenAgent(bytes memory message) external returns (
@@ -73,8 +75,7 @@ interface IRestakingConnector {
     */
 
     function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalRoot,
-        address agentOwner
+        bytes32 withdrawalRoot
     ) external returns (bytes memory);
 
     function setGasLimitsForFunctionSelectors(

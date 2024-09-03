@@ -87,18 +87,28 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
         address token = s_lastReceivedTokenAddress;
         uint256 amount = s_lastReceivedTokenAmount;
-        string memory textMsg = "no matching Eigenlayer functionSelector";
 
+        string memory textMsg = "no matching Eigenlayer functionSelector";
         //////////////////////////////////
         // Deposit Into Strategy
         //////////////////////////////////
         if (functionSelector == IStrategyManager.depositIntoStrategy.selector) {
             // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
-            // approve RestakingConnector to transfer tokens to EigenAgent
+
             IERC20(token).approve(address(restakingConnector), amount);
+            // approve RestakingConnector to transfer tokens to EigenAgent
             restakingConnector.depositWithEigenAgent(message);
 
-            textMsg = "Approved and deposited by EigenAgent";
+            textMsg = "Deposited by EigenAgent";
+        }
+
+        //////////////////////////////////
+        // Mint EigenAgent
+        //////////////////////////////////
+        if (functionSelector == IRestakingConnector.mintEigenAgent.selector) {
+            // cast sig "mintEigenAgent(bytes)" == 0xcc15a557
+            restakingConnector.mintEigenAgent(message);
+            textMsg = "called mintEigenAgent";
         }
 
         //////////////////////////////////
@@ -135,7 +145,8 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                     senderContractL2Addr,
                     messageForL2,
                     withdrawalToken, // L1 token to burn/lock
-                    withdrawalAmount
+                    withdrawalAmount,
+                    0 // use default gasLimit for
                 );
 
                 emit BridgingWithdrawalToL2(senderContractL2Addr, withdrawalAmount);
@@ -155,7 +166,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
             restakingConnector.delegateToWithEigenAgent(message);
 
-            textMsg = "DelegateTo by EigenAgent";
+            textMsg = "Delegated to Operator by EigenAgent";
         }
 
         //////////////////////////////////
@@ -165,7 +176,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
             restakingConnector.undelegateWithEigenAgent(message);
 
-            textMsg = "Undelegate by EigenAgent";
+            textMsg = "Undelegated by EigenAgent";
         }
 
         emit MessageReceived(
@@ -183,13 +194,15 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     /// @param _token The token to be transferred.
     /// @param _amount The amount of the token to be transferred.
     /// @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
+    /// @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
     /// @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
     function _buildCCIPMessage(
         address _receiver,
         string calldata _text,
         address _token,
         uint256 _amount,
-        address _feeTokenAddress
+        address _feeTokenAddress,
+        uint256 _overrideGasLimit
     ) internal override returns (Client.EVM2AnyMessage memory) {
 
         Client.EVMTokenAmount[] memory tokenAmounts;
@@ -208,7 +221,12 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         bytes memory message = abi.encode(_text);
 
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
+
         uint256 gasLimit = restakingConnector.getGasLimitForFunctionSelector(functionSelector);
+
+        if (_overrideGasLimit >= 0) {
+            gasLimit = _overrideGasLimit;
+        }
 
         return
             Client.EVM2AnyMessage({

@@ -12,11 +12,19 @@ interface ISenderUtils {
         address agentOwner;
     }
 
-    function handleTransferToAgentOwner(bytes memory message) external returns (
-        address agentOwner,
-        uint256 amount,
-        address tokenL2Address
-    );
+    function getSenderCCIP() external view returns (address);
+
+    function setSenderCCIP(address newSenderCCIP) external;
+
+    function handleTransferToAgentOwner(bytes memory message)
+        external
+        returns (
+            address agentOwner,
+            uint256 amount,
+            address tokenL2Address
+        );
+
+    function beforeSendCCIPMessage(bytes memory message, address tokenL2) external;
 
     function withdrawalTransferCommittments()
         external
@@ -30,14 +38,18 @@ interface ISenderUtils {
 
     function setFunctionSelectorName(bytes4 functionSelector, string memory _name) external;
 
-    function getFunctionSelectorName(bytes4 functionSelector) external returns (string memory);
+    function getFunctionSelectorName(bytes4 functionSelector)
+        external
+        returns (string memory);
 
     function setGasLimitsForFunctionSelectors(
         bytes4[] memory functionSelectors,
         uint256[] memory gasLimits
     ) external;
 
-    function getGasLimitForFunctionSelector(bytes4 functionSelector) external returns (uint256);
+    function getGasLimitForFunctionSelector(bytes4 functionSelector)
+        external
+        returns (uint256);
 }
 
 

@@ -388,7 +388,8 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             address(receiverContract),
             string(messageWithSignature_CW),
             address(BaseSepolia.BridgeToken), // destination token
-            0 // not sending tokens, just message
+            0, // not sending tokens, just message
+            0 // use default gasLimit for this function
         );
         vm.stopBroadcast();
 
@@ -457,8 +458,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
                 sender: abi.encode(deployer),
                 data: abi.encode(string(
                     EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
-                        withdrawalRoot,
-                        bob
+                        withdrawalRoot
                     )
                 )), // CCIP abi.encodes a string message when sending
                 destTokenAmounts: new Client.EVMTokenAmount[](0)

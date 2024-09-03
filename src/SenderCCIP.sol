@@ -16,8 +16,6 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
     event MatchedReceivedFunctionSelector(bytes4 indexed);
 
-    event MatchedSentFunctionSelector(bytes4 indexed);
-
     ISenderUtils public senderUtils;
 
     /// @param _router address of the router contract.
@@ -70,10 +68,9 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
             ) = senderUtils.handleTransferToAgentOwner(message);
 
             bool success = IERC20(tokenL2Address).transfer(agentOwner, amount);
-
             require(success, "SenderCCIP: failed to transfer token to agentOwner");
 
-            text_msg = "completed eigenlayer withdrawal and transferred token to L2 staker";
+            text_msg = "Completed withdrawal and sent tokens to EigenAgent owner";
 
         } else {
 
@@ -96,13 +93,15 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
     /// @param _token The token to be transferred.
     /// @param _amount The amount of the token to be transferred.
     /// @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
+    /// @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
     /// @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
     function _buildCCIPMessage(
         address _receiver,
         string calldata _text,
         address _token,
         uint256 _amount,
-        address _feeTokenAddress
+        address _feeTokenAddress,
+        uint256 _overrideGasLimit
     ) internal override returns (Client.EVM2AnyMessage memory) {
 
         Client.EVMTokenAmount[] memory tokenAmounts;
@@ -122,20 +121,13 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
-        // When User sends a message to CompleteQueuedWithdrawal from L2 to L1
-        if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
-            // 0x60d7faed = abi.encode(keccask256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)"))
-            senderUtils.commitWithdrawalRootInfo(
-                message,
-                _token // token on L2 for TransferToAgentOwner callback
-            );
+        uint256 gasLimit = senderUtils.getGasLimitForFunctionSelector(functionSelector);
 
-        } else {
-
-            emit MatchedSentFunctionSelector(functionSelector);
+        if (_overrideGasLimit >= 0) {
+            gasLimit = _overrideGasLimit;
         }
 
-        uint256 gasLimit = senderUtils.getGasLimitForFunctionSelector(functionSelector);
+        senderUtils.beforeSendCCIPMessage(message, _token);
 
         return
             Client.EVM2AnyMessage({

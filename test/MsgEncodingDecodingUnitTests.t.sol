@@ -99,7 +99,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             address _signer,
             uint256 _expiry,
             bytes memory _signature
-        ) = eigenlayerMsgDecoders.decodeDepositWithSignature6551Msg(
+        ) = eigenlayerMsgDecoders.decodeDepositIntoStrategyMsg(
             // CCIP string and encodes message when sending
             abi.encode(string(messageWithSignature))
         );
@@ -158,15 +158,15 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             address _signer,
             uint256 _expiry,
             bytes memory _signature
-        ) = eigenlayerMsgDecoders.decodeDepositWithSignature6551Msg(messageWithSignatureCCIP);
+        ) = eigenlayerMsgDecoders.decodeDepositIntoStrategyMsg(messageWithSignatureCCIP);
 
         require(_signature.length == 65, "invalid signature length");
         require(_signer == staker, "staker does not match");
-        require(expiry == _expiry, "expiry error: decodeDepositWithSignature6551Msg");
+        require(expiry == _expiry, "expiry error: decodeDepositIntoStrategyMsg");
 
         require(address(_strategy) == address(strategy), "strategy does not match");
-        require(address(token) == _token, "token error: decodeDepositWithSignature6551Msg");
-        require(amount == _amount, "amount error: decodeDepositWithSignature6551Msg");
+        require(address(token) == _token, "token error: decodeDepositIntoStrategyMsg");
+        require(amount == _amount, "amount error: decodeDepositIntoStrategyMsg");
     }
 
     /*
@@ -397,13 +397,11 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
     function test_Decode_TransferToAgentOwnerMsg() public view {
 
         bytes32 withdrawalRoot1 = 0x8c20d3a37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7d8ec77;
-        address agentOwner = vm.addr(0x02);
 
         TransferToAgentOwnerMsg memory tta_msg = eigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(
             abi.encode(string(
                 EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
-                    withdrawalRoot1,
-                    agentOwner
+                    withdrawalRoot1
                 )
             ))
         );

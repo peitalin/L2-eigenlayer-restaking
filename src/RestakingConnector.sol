@@ -34,6 +34,7 @@ contract RestakingConnector is
     IAgentFactory public agentFactory;
 
     error AddressZero(string msg);
+    error NoExistingEigenAgent(string msg);
 
     event SetQueueWithdrawalBlock(address indexed, uint256 indexed, uint256 indexed);
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
@@ -97,6 +98,9 @@ contract RestakingConnector is
      *
     */
 
+    // Mints an EigenAgent before depositing if a user does not already have one.
+    // If the user already has an EigenAgent this call will continue depositing
+    // It will not mint a new EigenAgent if a user already has one. Users can only own one.
     function depositWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
 
         (
@@ -108,7 +112,7 @@ contract RestakingConnector is
             address signer, // original_staker
             uint256 expiry,
             bytes memory signature // signature from original_staker
-        ) = decodeDepositWithSignature6551Msg(messageWithSignature);
+        ) = decodeDepositIntoStrategyMsg(messageWithSignature);
 
         // get original_staker's EigenAgent, or spawn one.
         IEigenAgent6551 eigenAgent = agentFactory.tryGetEigenAgentOrSpawn(signer);
@@ -119,8 +123,7 @@ contract RestakingConnector is
             amount
         );
 
-        // Note I: Token flow:
-        // ReceiverCCIP approves RestakingConnector to move tokens to EigenAgent,
+        // Token flow: ReceiverCCIP approves RestakingConnector to move tokens to EigenAgent,
         // then EigenAgent approves StrategyManager to move tokens into Eigenlayer
         eigenAgent.approveByWhitelistedContract(
             address(strategyManager), // strategyManager
@@ -144,6 +147,18 @@ contract RestakingConnector is
         );
     }
 
+    function mintEigenAgent(bytes memory message) public onlyReceiverCCIP {
+        // Mint a EigenAgent manually
+        (
+            // message signature
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        ) = decodeMintEigenAgent(message);
+
+        agentFactory.tryGetEigenAgentOrSpawn(signer);
+    }
+
     function queueWithdrawalsWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
 
         (
@@ -156,7 +171,6 @@ contract RestakingConnector is
         ) = decodeQueueWithdrawalsMsg(messageWithSignature);
 
         address withdrawer = QWPArray[0].withdrawer;
-        /// @note: DelegationManager.queueWithdrawals requires:
         /// msg.sender == withdrawer == staker (EigenAgent is all three)
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawer));
 

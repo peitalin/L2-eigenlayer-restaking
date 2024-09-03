@@ -62,10 +62,15 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
         senderProxy.allowlistSender(address(receiverProxy), true);
 
         senderProxy.setSenderUtils(senderUtilsProxy);
+        senderUtilsProxy.setSenderCCIP(address(senderProxy));
 
         require(
             address(senderProxy.getSenderUtils()) != address(0),
             "senderProxy: missing senderUtils"
+        );
+        require(
+            address(senderUtilsProxy.getSenderCCIP()) != address(0),
+            "senderUtilsProxy: missing senderCCIP"
         );
         require(
             senderProxy.allowlistedSenders(address(receiverProxy)),

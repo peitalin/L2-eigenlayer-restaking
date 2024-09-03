@@ -184,7 +184,8 @@ contract RedepositScript is
             address(receiverProxy),
             string(messageWithSignature),
             address(tokenL2),
-            amount
+            amount,
+            0 // use default gasLimit for this function
         );
 
         vm.stopBroadcast();

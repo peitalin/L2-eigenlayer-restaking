@@ -190,7 +190,8 @@ contract UndelegateScript is
             address(receiverContract),
             string(messageWithSignature_DT),
             address(tokenL2),
-            0 // not bridging, just sending message
+            0, // not bridging, just sending message
+            0 // use default gasLimit for this function
         );
 
         vm.stopBroadcast();

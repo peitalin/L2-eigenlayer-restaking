@@ -67,9 +67,15 @@ contract DeploySenderOnL2Script is Script, FileReader {
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         senderProxy.setSenderUtils(ISenderUtils(address(senderUtilsProxy)));
 
+        senderUtilsProxy.setSenderCCIP(address(senderProxy));
+
         require(
             address(senderProxy.getSenderUtils()) != address(0),
             "senderProxy: missing senderUtils"
+        );
+        require(
+            address(senderUtilsProxy.getSenderCCIP()) != address(0),
+            "senderUtilsProxy: missing senderCCIP"
         );
         require(
             senderProxy.allowlistedSourceChains(EthSepolia.ChainSelector),
