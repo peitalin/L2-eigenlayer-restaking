@@ -205,8 +205,9 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         }
 
         bytes memory message = abi.encode(_text);
+
         uint256 gasLimit = 600_000;
-        if (_overrideGasLimit >= 0) {
+        if (_overrideGasLimit > 0) {
             gasLimit = _overrideGasLimit;
         }
 
