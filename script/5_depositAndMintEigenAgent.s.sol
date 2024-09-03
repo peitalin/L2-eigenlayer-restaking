@@ -46,24 +46,26 @@ contract DepositAndMintEigenAgentScript is
     IERC20 public tokenL1;
     IERC20 public tokenL2;
 
-    uint256 public deployerKey = vm.envUint("DEPLOYER_KEY");
-    address public deployer = vm.addr(deployerKey);
+    uint256 public deployerKey;
+    address public deployer;
 
     IEigenAgent6551 public eigenAgent;
     address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
-        return _run();
-    }
-
-    function mockrun() public {
-        // ensure new user every mockrun
-        deployerKey = vm.randomUint();
+        deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
-        return _run();
+        return _run(false);
     }
 
-    function _run() public {
+    function mockrun(uint256 mockKey) public {
+        deployerKey = mockKey;
+        deployer = vm.addr(deployerKey);
+        vm.deal(deployer, 1 ether);
+        return _run(true);
+    }
+
+    function _run(bool isTest) public {
 
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
@@ -118,7 +120,6 @@ contract DepositAndMintEigenAgentScript is
         //////////////////////////////////////////////////////
         // Make sure we are on BaseSepolia Fork
         vm.selectFork(l2ForkId);
-
         vm.startBroadcast(deployerKey);
 
         uint256 amount = 0.0619 ether;
@@ -144,10 +145,13 @@ contract DepositAndMintEigenAgentScript is
             );
         }
 
-        topupSenderEthBalance(senderAddr);
         // Check L2 CCIP-BnM balances
         if (tokenL2.balanceOf(deployer) < 1 ether) {
             IERC20_CCIPBnM(address(tokenL2)).drip(deployer);
+            IERC20_CCIPBnM(address(tokenL2)).drip(senderAddr);
+        }
+        if (!isTest) {
+            topupSenderEthBalance(senderAddr);
         }
 
         senderContract.sendMessagePayNative(

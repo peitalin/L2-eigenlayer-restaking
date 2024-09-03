@@ -231,10 +231,11 @@ contract RestakingConnector is
             // DelegationManager requires(msg.sender == withdrawal.withdrawer), only EigenAgent can withdraw.
             bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
 
-            // assign variables to return
+            // assign variables to return to L2
             receiveAsTokens = _receiveAsTokens;
             withdrawalAmount = withdrawal.shares[0];
             withdrawalToken = address(tokensToWithdraw[0]);
+            // hash(withdrawalRoot, signer) to make withdrawalAgentOwnerRoot for L2 transfer
             messageForL2 = string(EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
                 withdrawalRoot,
                 signer

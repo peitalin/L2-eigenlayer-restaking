@@ -107,7 +107,10 @@ contract DeployScriptsTests is Test, ScriptUtils {
     }
 
     function test_step5_DepositAndMintEigenAgentScript() public {
-        depositAndMintEigenAgentScript.mockrun();
+        // vm.assume(_deployerKey < type(uint256).max / 2);
+        // EIP-2: secp256k1 curve order / 2
+        uint256 mockKey = (vm.randomUint() / 2) + 1;
+        depositAndMintEigenAgentScript.mockrun(mockKey);
     }
 
     function test_step5b_DepositIntoStrategyScript() public {

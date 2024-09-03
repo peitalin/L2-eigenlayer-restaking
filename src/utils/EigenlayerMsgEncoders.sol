@@ -98,10 +98,12 @@ library EigenlayerMsgEncoders {
         address signer
     ) public pure returns (bytes memory) {
 
+        bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalAgentOwnerRoot(withdrawalRoot, signer);
+
         bytes memory message_bytes = abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderUtils.handleTransferToAgentOwner.selector,
-            calculateWithdrawalAgentOwnerRoot(withdrawalRoot, signer)
+            withdrawalAgentOwnerRoot
         );
         return message_bytes;
     }

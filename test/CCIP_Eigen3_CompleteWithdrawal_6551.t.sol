@@ -219,7 +219,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
 
         vm.startBroadcast(deployerKey);
 
-        vm.expectEmit(true, false, true, false); // don't check EigenAgent address
+        vm.expectEmit(true, false, true, false); // don't check topic[2] EigenAgent address
         emit AgentFactory.AgentCreated(bob, vm.addr(1111), 1);
         receiverContract.mockCCIPReceive(any2EvmMessage);
 
@@ -448,7 +448,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         //// 3. [L2] Mock receiving CompleteWithdrawals message from L1
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
-        vm.startBroadcast(deployerKey);
+        vm.startBroadcast(bobKey);
 
         // Mock SenderContract on L2 receiving the tokens and TransferToAgentOwner CCIP message from L1
         senderContract.mockCCIPReceive(
@@ -459,7 +459,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
                 data: abi.encode(string(
                     EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
                         withdrawalRoot,
-                        deployer
+                        bob
                     )
                 )), // CCIP abi.encodes a string message when sending
                 destTokenAmounts: new Client.EVMTokenAmount[](0)
