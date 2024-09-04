@@ -410,8 +410,12 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
 
         // Mock L1 bridge receiving CCIP message and calling CompleteWithdrawal on Eigenlayer
         // topic [1] event check is false: senderContract is test deployed address
-        vm.expectEmit(false, true, false, false);
-        emit ReceiverCCIP.BridgingWithdrawalToL2(address(senderContract), amount);
+        vm.expectEmit(false, true, true, false);
+        emit ReceiverCCIP.BridgingWithdrawalToL2(
+            address(senderContract),
+            EigenlayerMsgEncoders.calculateWithdrawalAgentOwnerRoot(withdrawalRoot, bob), // withdrawalAgentOwnerRoot
+            amount
+        );
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),

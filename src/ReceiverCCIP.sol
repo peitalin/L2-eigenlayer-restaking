@@ -18,18 +18,24 @@ import {BaseSepolia} from "../script/Addresses.sol";
 contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
     IRestakingConnector public restakingConnector;
-    address public senderContractL2Addr;
+    address public senderContractL2;
 
     error InvalidContractAddress(string msg);
 
-    event BridgingWithdrawalToL2(address indexed senderContractL2, uint256 indexed withdrawalAmount);
+    event BridgingWithdrawalToL2(
+        address indexed senderContractL2,
+        bytes32 indexed withdrawalAgentOwnerRoot,
+        uint256 indexed withdrawalAmount
+    );
 
-    /// @param _router The address of the router contract.
-    /// @param _link The address of the link contract.
+    /// @param _router address of the router contract.
+    /// @param _link address of the link contract.
     constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {
         _disableInitializers();
     }
 
+    /// @param _restakingConnector address of the restakingConnector contract.
+    /// @param _senderContractL2 address of the senderCCIP contract on L2
     function initialize(
         IRestakingConnector _restakingConnector,
         ISenderCCIP _senderContractL2
@@ -42,17 +48,17 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             revert InvalidContractAddress("SenderCCIP cannot be address(0)");
 
         restakingConnector = _restakingConnector;
-        senderContractL2Addr = address(_senderContractL2);
+        senderContractL2 = address(_senderContractL2);
 
         BaseMessengerCCIP.__BaseMessengerCCIP_init();
     }
 
     function getSenderContractL2Addr() public view returns (address) {
-        return senderContractL2Addr;
+        return senderContractL2;
     }
 
     function setSenderContractL2Addr(address _senderContractL2) public onlyOwner {
-        senderContractL2Addr = _senderContractL2;
+        senderContractL2 = _senderContractL2;
     }
 
     function getRestakingConnector() public view returns (IRestakingConnector) {
@@ -131,7 +137,8 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 bool receiveAsTokens,
                 uint256 withdrawalAmount,
                 address withdrawalToken,
-                string memory messageForL2
+                string memory messageForL2,
+                bytes32 withdrawalAgentOwnerRoot
             ) = restakingConnector.completeWithdrawalWithEigenAgent(message);
 
             if (receiveAsTokens) {
@@ -142,14 +149,18 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 /// L2 SenderCCIP transfers tokens to AgentOwner.
                 this.sendMessagePayNative(
                     BaseSepolia.ChainSelector, // destination chain
-                    senderContractL2Addr,
+                    senderContractL2,
                     messageForL2,
                     withdrawalToken, // L1 token to burn/lock
                     withdrawalAmount,
                     0 // use default gasLimit for
                 );
 
-                emit BridgingWithdrawalToL2(senderContractL2Addr, withdrawalAmount);
+                emit BridgingWithdrawalToL2(
+                    senderContractL2,
+                    withdrawalAgentOwnerRoot,
+                    withdrawalAmount
+                );
 
                 textMsg = "Complete Queued Withdrawal by EigenAgent";
             } else {

@@ -76,7 +76,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         // https://sepolia.etherscan.io/tx/0x929dc3f03eb10143d2a215cd0695348bca656ea026ed959b9cf449a0af79c2c4
         gasLimits[1] = 700_000; // mintEigenAgent                    [gas: 1,500,000?]
         gasLimits[2] = 580_000; // queueWithdrawals                  [gas: 529,085]
-        gasLimits[3] = 850_000; // completeWithdrawal + transferToL2 [gas: 791,717]
+        gasLimits[3] = 840_000; // completeWithdrawal + transferToL2 [gas: 791,717]
         gasLimits[4] = 600_000; // delegateTo                        [gas: 550,292]
         gasLimits[5] = 400_000; // undelegate                        [gas: ?]
 

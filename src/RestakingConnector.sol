@@ -193,7 +193,8 @@ contract RestakingConnector is
             bool receiveAsTokens,
             uint256 withdrawalAmount,
             address withdrawalToken,
-            string memory messageForL2
+            string memory messageForL2,
+            bytes32 withdrawalAgentOwnerRoot
         )
     {
         // scope to reduce variable count
@@ -228,16 +229,13 @@ contract RestakingConnector is
                 signature
             );
 
-            // DelegationManager requires(msg.sender == withdrawal.withdrawer), only EigenAgent can withdraw.
-            bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
-
             // assign variables to return to L2
             receiveAsTokens = _receiveAsTokens;
             withdrawalAmount = withdrawal.shares[0];
             withdrawalToken = address(tokensToWithdraw[0]);
             // hash(withdrawalRoot, signer) to make withdrawalAgentOwnerRoot for L2 transfer
             messageForL2 = string(EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
-                withdrawalRoot,
+                delegationManager.calculateWithdrawalRoot(withdrawal), // withdrawal root
                 signer
             ));
 
@@ -261,7 +259,8 @@ contract RestakingConnector is
             receiveAsTokens,
             withdrawalAmount,
             address(withdrawalToken),
-            messageForL2
+            messageForL2,
+            withdrawalAgentOwnerRoot
         );
     }
 

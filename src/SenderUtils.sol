@@ -41,8 +41,8 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
         _gasLimitsForFunctionSelectors[0xcc15a557] = 1_600_000;
         // queueWithdrawals: [gas: 529,085]
         _gasLimitsForFunctionSelectors[0x0dd8dd02] = 800_000;
-        // completeQueuedWithdrawals: [gas: 645,948]
-        _gasLimitsForFunctionSelectors[0x60d7faed] = 800_000;
+        // completeQueuedWithdrawals: [gas: 769,478]
+        _gasLimitsForFunctionSelectors[0x60d7faed] = 840_000;
         // delegateTo: [gas: 550,292]
         _gasLimitsForFunctionSelectors[0xeea9064b] = 600_000;
         // undelegate: [gas: ?]
