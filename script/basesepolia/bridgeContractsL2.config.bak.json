@@ -1,12 +1,12 @@
 {
   "chainInfo": {
-    "block": 14546701,
+    "block": 14647765,
     "chainid": 84532,
-    "timestamp": 1724861690
+    "timestamp": 1725063818
   },
   "contracts": {
-    "proxyAdminL2": "0xDb5a1cD543885B8Bb5c84EbB59d8123834F60A61",
-    "senderCCIP": "0xc2De32c5ac23daB37321F80aAea51CD83558B1b8",
-    "senderUtils": "0xc47f36D7b6437cc0c7b9F5D0Ef3688aa286d787B"
+    "proxyAdminL2": "0x673430D3601557fcdEaDfBBe1bb513A3Fc777984",
+    "senderCCIP": "0x1D52bC3415AAe68806E3Fd44D4cdb0b63E68068A",
+    "senderHooks": "0x205e359BDEF6E0fF3E1d820668bBf7ce68D14d08"
   }
 }

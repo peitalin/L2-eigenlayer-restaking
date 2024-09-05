@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-
 import {ERC721URIStorageUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
-import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
@@ -11,10 +9,11 @@ import {Adminable} from "../utils/Adminable.sol";
 import {IAgentFactory} from "./IAgentFactory.sol";
 
 
-contract EigenAgentOwner721 is Initializable, IERC721Receiver, ERC721URIStorageUpgradeable, Adminable {
+contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Adminable {
 
     uint256 private _tokenIdCounter;
     IAgentFactory public agentFactory;
+
     mapping(address contracts => bool whitelisted) public whitelistedCallers;
 
     function initialize(
@@ -59,10 +58,6 @@ contract EigenAgentOwner721 is Initializable, IERC721Receiver, ERC721URIStorageU
         return _mint(user);
     }
 
-    function mintAdmin(address user) public onlyAdminOrOwner returns (uint256) {
-        return _mint(user);
-    }
-
     function _mint(address user) internal returns (uint256) {
         uint256 tokenId = _tokenIdCounter;
         _safeMint(user, tokenId);
@@ -71,6 +66,7 @@ contract EigenAgentOwner721 is Initializable, IERC721Receiver, ERC721URIStorageU
         return tokenId;
     }
 
+    /// @dev callback to update EigenAgentOwner721 NFT ow
     function _afterTokenTransfer(
         address from,
         address to,
@@ -78,14 +74,4 @@ contract EigenAgentOwner721 is Initializable, IERC721Receiver, ERC721URIStorageU
     ) internal override virtual {
         agentFactory.updateEigenAgentOwnerTokenId(from, to, tokenId);
     }
-
-    function onERC721Received(
-        address operator,
-        address from,
-        uint256 tokenId,
-        bytes calldata data
-    ) external pure override returns (bytes4) {
-        return IERC721Receiver.onERC721Received.selector;
-    }
-
 }

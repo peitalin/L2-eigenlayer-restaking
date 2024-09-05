@@ -4,21 +4,18 @@ pragma solidity 0.8.22;
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
-import {FunctionSelectorDecoder} from "./FunctionSelectorDecoder.sol";
+import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
-import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
+import {ISenderHooks} from "./interfaces/ISenderHooks.sol";
 
 
-
+/// @title L2 Messenger Contract: sends Eigenlayer messages to CCIP Router
 contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
     event MatchedReceivedFunctionSelector(bytes4 indexed);
 
-    event MatchedSentFunctionSelector(bytes4 indexed);
-
-    ISenderUtils public senderUtils;
+    ISenderHooks public senderHooks;
 
     /// @param _router address of the router contract.
     /// @param _link address of the link contract.
@@ -30,19 +27,13 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
         BaseMessengerCCIP.__BaseMessengerCCIP_init();
     }
 
-    function getSenderUtils() public view returns (ISenderUtils) {
-        return senderUtils;
+    function getSenderHooks() public view returns (ISenderHooks) {
+        return senderHooks;
     }
 
-    function setSenderUtils(ISenderUtils _senderUtils) external onlyOwner {
-        require(address(_senderUtils) != address(0), "_senderUtils cannot be address(0)");
-        senderUtils = _senderUtils;
-    }
-
-    function mockCCIPReceive(
-        Client.Any2EVMMessage memory any2EvmMessage
-    ) public {
-        _ccipReceive(any2EvmMessage);
+    function setSenderHooks(ISenderHooks _senderHooks) external onlyOwner {
+        require(address(_senderHooks) != address(0), "_senderHooks cannot be address(0)");
+        senderHooks = _senderHooks;
     }
 
     function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage)
@@ -54,7 +45,6 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
             abi.decode(any2EvmMessage.sender, (address))
         )
     {
-
         if (any2EvmMessage.destTokenAmounts.length > 0) {
             s_lastReceivedTokenAddress = any2EvmMessage.destTokenAmounts[0].token;
             s_lastReceivedTokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
@@ -63,38 +53,47 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
             s_lastReceivedTokenAmount = 0;
         }
 
-        bytes memory message = any2EvmMessage.data;
-        string memory text_msg;
-        bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
-
-        if (functionSelector == ISenderUtils.handleTransferToAgentOwner.selector) {
-            // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
-            (
-                address agentOwner,
-                uint256 amount,
-                address tokenL2Address
-            ) = senderUtils.handleTransferToAgentOwner(message);
-
-            bool success = IERC20(tokenL2Address).transfer(agentOwner, amount);
-
-            require(success, "SenderCCIP: failed to transfer token to agentOwner");
-
-            text_msg = "completed eigenlayer withdrawal and transferred token to L2 staker";
-
-        } else {
-
-            emit MatchedReceivedFunctionSelector(functionSelector);
-            text_msg = "unknown message";
-        }
+        string memory text_msg = _afterCCIPReceiveMessage(any2EvmMessage);
 
         emit MessageReceived(
             any2EvmMessage.messageId,
             any2EvmMessage.sourceChainSelector,
             abi.decode(any2EvmMessage.sender, (address)),
             text_msg,
-            s_lastReceivedTokenAddress = address(0),
-            s_lastReceivedTokenAmount = 0
+            s_lastReceivedTokenAddress,
+            s_lastReceivedTokenAmount
         );
+    }
+
+    function _afterCCIPReceiveMessage(Client.Any2EVMMessage memory any2EvmMessage)
+        internal
+        returns (string memory textMsg)
+    {
+        bytes memory message = any2EvmMessage.data;
+        bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
+
+        if (functionSelector == ISenderHooks.handleTransferToAgentOwner.selector) {
+            // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
+            (
+                address agentOwner,
+                uint256 amount,
+                address tokenL2Address
+            ) = senderHooks.handleTransferToAgentOwner(message);
+
+            // agentOwner is the signer, first committed when sending completeWithdrawal
+            // message and generating the withdrawalAgentOwnerRoot.
+            // completeWithdrawal only succeeds for the rightful signer/owner of the EigenAgent
+            IERC20(tokenL2Address).transfer(agentOwner, amount);
+
+            textMsg = "Completed withdrawal and sent tokens to EigenAgent owner";
+
+        } else {
+
+            emit MatchedReceivedFunctionSelector(functionSelector);
+            textMsg = "unknown message";
+        }
+
+        return textMsg;
     }
 
     /// @param _receiver The address of the receiver.
@@ -102,13 +101,15 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
     /// @param _token The token to be transferred.
     /// @param _amount The amount of the token to be transferred.
     /// @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
+    /// @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
     /// @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
     function _buildCCIPMessage(
         address _receiver,
         string calldata _text,
         address _token,
         uint256 _amount,
-        address _feeTokenAddress
+        address _feeTokenAddress,
+        uint256 _overrideGasLimit
     ) internal override returns (Client.EVM2AnyMessage memory) {
 
         Client.EVMTokenAmount[] memory tokenAmounts;
@@ -128,20 +129,12 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
-        // When User sends a message to CompleteQueuedWithdrawal from L2 to L1
-        if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
-            // 0x60d7faed = abi.encode(keccask256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)"))
-            senderUtils.commitWithdrawalRootInfo(
-                message,
-                _token // token on L2 for TransferToAgentOwner callback
-            );
-
-        } else {
-
-            emit MatchedSentFunctionSelector(functionSelector);
+        uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(functionSelector);
+        if (_overrideGasLimit > 0) {
+            gasLimit = _overrideGasLimit;
         }
 
-        uint256 gasLimit = senderUtils.getGasLimitForFunctionSelector(functionSelector);
+        senderHooks.beforeSendCCIPMessage(message, _token);
 
         return
             Client.EVM2AnyMessage({

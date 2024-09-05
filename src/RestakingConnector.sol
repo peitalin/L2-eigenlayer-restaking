@@ -9,7 +9,7 @@ import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IS
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 
-import {EigenlayerMsgDecoders} from "./utils/EigenlayerMsgDecoders.sol";
+import {EigenlayerMsgDecoders, DelegationDecoders} from "./utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 import {Adminable} from "./utils/Adminable.sol";
 
@@ -34,13 +34,13 @@ contract RestakingConnector is
     IAgentFactory public agentFactory;
 
     error AddressZero(string msg);
+    error NoExistingEigenAgent(string msg);
 
     event SetQueueWithdrawalBlock(address indexed, uint256 indexed, uint256 indexed);
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
 
     mapping(address user => mapping(uint256 nonce => uint256 withdrawalBlock)) private _withdrawalBlock;
     mapping(bytes4 => uint256) internal _gasLimitsForFunctionSelectors;
-    mapping(bytes4 => string) internal _functionSelectorNames;
 
     /*
      *
@@ -60,10 +60,9 @@ contract RestakingConnector is
 
         agentFactory = newAgentFactory;
 
-        // handleTransferToAgentOwner: [gas: 268_420]
-        // bytes4(keccak256("handleTransferToAgentOwner(bytes32,address,bytes32)")) == 0x17f23aea
-        _gasLimitsForFunctionSelectors[0x17f23aea] = 400_000;
-        _functionSelectorNames[0x17f23aea] = "handleTransferToAgentOwner";
+        // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
+        // [gas: 268_420]
+        _gasLimitsForFunctionSelectors[0xd8a85b48] = 290_000;
 
         __Adminable_init();
     }
@@ -99,6 +98,9 @@ contract RestakingConnector is
      *
     */
 
+    // Mints an EigenAgent before depositing if a user does not already have one.
+    // If the user already has an EigenAgent this call will continue depositing
+    // It will not mint a new EigenAgent if a user already has one. Users can only own one.
     function depositWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
 
         (
@@ -110,7 +112,7 @@ contract RestakingConnector is
             address signer, // original_staker
             uint256 expiry,
             bytes memory signature // signature from original_staker
-        ) = decodeDepositWithSignature6551Msg(messageWithSignature);
+        ) = decodeDepositIntoStrategyMsg(messageWithSignature);
 
         // get original_staker's EigenAgent, or spawn one.
         IEigenAgent6551 eigenAgent = agentFactory.tryGetEigenAgentOrSpawn(signer);
@@ -121,8 +123,7 @@ contract RestakingConnector is
             amount
         );
 
-        // Note I: Token flow:
-        // ReceiverCCIP approves RestakingConnector to move tokens to EigenAgent,
+        // Token flow: ReceiverCCIP approves RestakingConnector to move tokens to EigenAgent,
         // then EigenAgent approves StrategyManager to move tokens into Eigenlayer
         eigenAgent.approveByWhitelistedContract(
             address(strategyManager), // strategyManager
@@ -146,6 +147,18 @@ contract RestakingConnector is
         );
     }
 
+    function mintEigenAgent(bytes memory message) public onlyReceiverCCIP {
+        // Mint a EigenAgent manually
+        (
+            // message signature
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        ) = decodeMintEigenAgent(message);
+
+        agentFactory.tryGetEigenAgentOrSpawn(signer);
+    }
+
     function queueWithdrawalsWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
 
         (
@@ -158,7 +171,6 @@ contract RestakingConnector is
         ) = decodeQueueWithdrawalsMsg(messageWithSignature);
 
         address withdrawer = QWPArray[0].withdrawer;
-        /// @note: DelegationManager.queueWithdrawals requires:
         /// msg.sender == withdrawer == staker (EigenAgent is all three)
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawer));
 
@@ -178,92 +190,132 @@ contract RestakingConnector is
     function completeWithdrawalWithEigenAgent(bytes memory messageWithSignature)
         public onlyReceiverCCIP
         returns (
+            bool receiveAsTokens,
             uint256 withdrawalAmount,
             address withdrawalToken,
-            string memory messageForL2
+            string memory messageForL2,
+            bytes32 withdrawalAgentOwnerRoot
         )
     {
+        // scope to reduce variable count
+        {
+            (
+                // original message
+                IDelegationManager.Withdrawal memory withdrawal,
+                IERC20[] memory tokensToWithdraw,
+                uint256 middlewareTimesIndex,
+                bool _receiveAsTokens,
+                // message signature
+                address signer,
+                uint256 expiry,
+                bytes memory signature
+            ) = decodeCompleteWithdrawalMsg(messageWithSignature);
 
-        (
-            // original message
-            IDelegationManager.Withdrawal memory withdrawal,
-            IERC20[] memory tokensToWithdraw,
-            uint256 middlewareTimesIndex,
-            bool receiveAsTokens,
-            // message signature
-            address signer,
-            uint256 expiry,
-            bytes memory signature
-        ) = decodeCompleteWithdrawalMsg(messageWithSignature);
+            // eigenAgent == withdrawer == staker == msg.sender (in Eigenlayer)
+            IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawal.withdrawer));
 
-        // eigenAgent == withdrawer == staker == msg.sender (in Eigenlayer)
-        IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawal.withdrawer));
+            // (1) EigenAgent receives tokens from Eigenlayer
+            // then (2) approves RestakingConnector to (3) transfer tokens to ReceiverCCIP
+            eigenAgent.executeWithSignature(
+                address(delegationManager),
+                0 ether,
+                EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+                    withdrawal,
+                    tokensToWithdraw,
+                    middlewareTimesIndex,
+                    _receiveAsTokens
+                ),
+                expiry,
+                signature
+            );
 
-        // (1) EigenAgent receives tokens from Eigenlayer
-        // then (2) approves RestakingConnector to (3) transfer tokens to ReceiverCCIP
-        eigenAgent.executeWithSignature(
-            address(delegationManager),
-            0 ether,
-            EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
-                withdrawal,
-                tokensToWithdraw,
-                middlewareTimesIndex,
-                receiveAsTokens
-            ),
-            expiry,
-            signature
-        );
+            // assign variables to return to L2
+            receiveAsTokens = _receiveAsTokens;
+            withdrawalAmount = withdrawal.shares[0];
+            withdrawalToken = address(tokensToWithdraw[0]);
+            withdrawalAgentOwnerRoot = EigenlayerMsgEncoders.calculateWithdrawalAgentOwnerRoot(
+                delegationManager.calculateWithdrawalRoot(withdrawal), // withdrawalRoot
+                signer
+            );
+            // hash(withdrawalRoot, signer) to make withdrawalAgentOwnerRoot for L2 transfer
+            messageForL2 = string(EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
+                withdrawalAgentOwnerRoot
+            ));
 
-        // DelegationManager requires(msg.sender == withdrawal.withdrawer), only EigenAgent can withdraw.
-        bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
-
-        withdrawalAmount = withdrawal.shares[0];
-        withdrawalToken = address(tokensToWithdraw[0]);
-        messageForL2 = string(encodeHandleTransferToAgentOwnerMsg(
-            withdrawalRoot,
-            signer // signer should be eigenAgent.getAgentOwner()
-        ));
-
-        // (2) EigenAgent approves RestakingConnector to transfer tokens to ReceiverCCIP
-        eigenAgent.approveByWhitelistedContract(
-            address(this), // restakingConnector
-            withdrawalToken,
-            withdrawalAmount
-        );
-        // (3) RestakingConnector transfers tokens to ReceiverCCIP, to bridge tokens to Router (bridge)
-        IERC20(withdrawalToken).transferFrom(
-            address(eigenAgent),
-            _receiverCCIP,
-            withdrawalAmount
-        );
+            if (_receiveAsTokens) {
+                // (2) EigenAgent approves RestakingConnector to transfer tokens to ReceiverCCIP
+                eigenAgent.approveByWhitelistedContract(
+                    address(this), // restakingConnector
+                    withdrawalToken,
+                    withdrawalAmount
+                );
+                // (3) RestakingConnector transfers tokens to ReceiverCCIP, to bridge tokens to Router (bridge)
+                IERC20(withdrawalToken).transferFrom(
+                    address(eigenAgent),
+                    _receiverCCIP,
+                    withdrawalAmount
+                );
+            }
+        }
 
         return (
+            receiveAsTokens,
             withdrawalAmount,
             address(withdrawalToken),
-            messageForL2
+            messageForL2,
+            withdrawalAgentOwnerRoot
         );
     }
 
     function delegateToWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
         (
             // original message
-            address staker,
             address operator,
-            ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry,
             ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
-            bytes32 approverSalt
-            // // message signature
-            // address signer,
-            // uint256 expiry,
-            // bytes memory signature
-        ) = decodeDelegateToBySignatureMsg(messageWithSignature);
+            bytes32 approverSalt,
+            // message signature
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        ) = DelegationDecoders.decodeDelegateToMsg(messageWithSignature);
 
-        delegationManager.delegateToBySignature(
-            staker,
-            operator,
-            stakerSignatureAndExpiry,
-            approverSignatureAndExpiry,
-            approverSalt
+        IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(signer);
+
+        eigenAgent.executeWithSignature(
+            address(delegationManager),
+            0 ether,
+            EigenlayerMsgEncoders.encodeDelegateTo(
+                operator,
+                approverSignatureAndExpiry,
+                approverSalt
+            ),
+            expiry,
+            signature
+        );
+    }
+
+    function undelegateWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
+        (
+            // original message
+            address eigenAgentAddr, // staker in Eigenlayer delegating
+            // message signature
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        ) = DelegationDecoders.decodeUndelegateMsg(messageWithSignature);
+
+        IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(eigenAgentAddr));
+
+        uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(eigenAgentAddr);
+
+        _withdrawalBlock[eigenAgentAddr][withdrawalNonce] = block.number;
+
+        eigenAgent.executeWithSignature(
+            address(delegationManager),
+            0 ether,
+            EigenlayerMsgEncoders.encodeUndelegateMsg(address(eigenAgent)),
+            expiry,
+            signature
         );
     }
 
@@ -273,13 +325,6 @@ contract RestakingConnector is
      *
      *
     */
-
-    function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalRoot,
-        address agentOwner
-    ) public pure returns (bytes memory) {
-        return EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(withdrawalRoot, agentOwner);
-    }
 
     function getQueueWithdrawalBlock(address staker, uint256 nonce) public view returns (uint256) {
         return _withdrawalBlock[staker][nonce];

@@ -5,13 +5,43 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {EigenlayerMsgEncoders} from "./EigenlayerMsgEncoders.sol";
-
 
 struct TransferToAgentOwnerMsg {
-    bytes32 withdrawalRoot;
-    address agentOwner;
-    bytes32 agentOwnerRoot;
+    bytes32 withdrawalAgentOwnerRoot;
+}
+
+/// @dev used to decode user signatures on all CCIP messages to EigenAgents
+library AgentOwnerSignature {
+
+    function decodeAgentOwnerSignature(bytes memory message, uint256 sigOffset)
+        public pure
+        returns (
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        )
+    {
+
+        bytes32 r;
+        bytes32 s;
+        bytes1 v;
+
+        assembly {
+            signer := mload(add(message, sigOffset))
+            expiry := mload(add(message, add(sigOffset, 32)))
+            r := mload(add(message, add(sigOffset, 64)))
+            s := mload(add(message, add(sigOffset, 96)))
+            v := mload(add(message, add(sigOffset, 128)))
+        }
+
+        signature = abi.encodePacked(r, s, v);
+
+        return (
+            signer,
+            expiry,
+            signature
+        );
+    }
 }
 
 contract EigenlayerMsgDecoders {
@@ -24,7 +54,7 @@ contract EigenlayerMsgDecoders {
      *
     */
 
-    function decodeDepositWithSignature6551Msg(bytes memory message)
+    function decodeDepositIntoStrategyMsg(bytes memory message)
         public pure
         returns (
             address strategy,
@@ -47,34 +77,40 @@ contract EigenlayerMsgDecoders {
         // 037e6bdadf2079e5268e5ad0000699611e63c3e015027ad7f8e7b4a252bbb9bb [292] signature s
         // 1c000000000000000000000000000000000000000000000000000000         [324] signature v
 
-        bytes32 r;
-        bytes32 s;
-        bytes1 v;
-
         assembly {
             strategy := mload(add(message, 100))
             token := mload(add(message, 132))
             amount := mload(add(message, 164))
-
-            signer := mload(add(message, 196))
-            expiry := mload(add(message, 228))
-            r := mload(add(message, 260))
-            s := mload(add(message, 292))
-            v := mload(add(message, 324))
         }
 
-        signature = abi.encodePacked(r,s,v);
-
-        require(signature.length == 65, "decodeDepositWithSignature6551Msg: invalid signature length");
-
-        return (
-            strategy,
-            token,
-            amount,
+        (
             signer,
             expiry,
             signature
-        );
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 196); // signature starts on 196
+    }
+
+    function decodeMintEigenAgent(bytes memory message)
+        public pure
+        returns (
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        )
+    {
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
+        // 00000000000000000000000000000000000000000000000000000000000000e5 [64] string length
+        // 0xcc15a557                                                       [96] function selector
+        // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [100] signer (original staker)
+        // 0000000000000000000000000000000000000000000000000000000066d063d4 [132] expiry (signature)
+        // b65bb77203b002de051363fd17437187540d5c6a0cfcb75c31dfffff9108e41d [164] signature r
+        // 037e6bdadf2079e5268e5ad0000699611e63c3e015027ad7f8e7b4a252bbb9bb [196] signature s
+        // 1c000000000000000000000000000000000000000000000000000000         [228] signature v
+        (
+            signer,
+            expiry,
+            signature
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 100); // signature starts on 100
     }
 
     /*
@@ -131,10 +167,6 @@ contract EigenlayerMsgDecoders {
             arrayQueuedWithdrawalParams[i] = wp;
         }
 
-        bytes32 r;
-        bytes32 s;
-        bytes1 v;
-
         // note: Each extra QueuedWithdrawalParam element adds 1x offset and 7 lines:
         // So when reading the signature, increase offset by 7 * i:
         //      1 element:  offset = (1 - 1) * (1 + 7) = 0
@@ -142,15 +174,11 @@ contract EigenlayerMsgDecoders {
         //      3 elements: offset = (3 - 1) * (1 + 7) = 16
         uint256 offset = (arrayLength - 1) * (1 + 7) * 32; // 32 bytes per line
 
-        assembly {
-            signer := mload(add(message, add(420, offset)))
-            expiry := mload(add(message, add(452, offset)))
-            r := mload(add(message, add(484, offset)))
-            s := mload(add(message, add(516, offset)))
-            v := mload(add(message, add(548, offset)))
-        }
-
-        signature = abi.encodePacked(r,s,v);
+        (
+            signer,
+            expiry,
+            signature
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 420 + offset); // signature starts on 420 + offset
 
         return (
             arrayQueuedWithdrawalParams,
@@ -166,23 +194,22 @@ contract EigenlayerMsgDecoders {
     {
         /// @dev: expect to use this in a for-loop with i iteration variable
 
-        //////////////////////////////////////////////////
-        //// Deserializing messages: offsets for assembly
-        //////////////////////////////////////////////////
+        //////////////////////////////////////////////
+        // Message offsets
+        //////////////////////////////////////////////
         //
-        // functionSelector signature:
-        // bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
-        //
+        // Function Selector signature:
+        //     bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
         // Params:
-        // queuedWithdrawal = IDelegationManager.QueuedWithdrawalParams({
-        //     strategies: strategiesToWithdraw,
-        //     shares: sharesToWithdraw,
-        //     withdrawer: withdrawer
-        // });
+        //     IDelegationManager.QueuedWithdrawalParams({
+        //         strategies: strategiesToWithdraw,
+        //         shares: sharesToWithdraw,
+        //         withdrawer: withdrawer
+        //     });
 
-        ////////////////////////////////////////////////////////////////////////
-        //// An example with 2 elements in QueuedWithdrawalParams[]
-        ////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////
+        // Example with 2 elements in QueuedWithdrawalParams[]
+        //////////////////////////////////////////////////////
         // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
         // 0000000000000000000000000000000000000000000000000000000000000244 [64] string length
         // 0dd8dd02                                                         [96] function selector
@@ -214,7 +241,6 @@ contract EigenlayerMsgDecoders {
         // Every extra element in the QueueWithdrawalParams[] array adds
         // 1x struct offset (1 line) and (7 lines), so shift everything down by:
         uint256 offset = (arrayLength - 1) + (7 * i);
-
         // So when reading the ith element, increase offset by 7 * i:
         //      1 element:  offset = (1 - 1) + (7 * 0) = 0
         //      2 elements: offset = (2 - 1) + (7 * 1) = 8
@@ -274,35 +300,22 @@ contract EigenlayerMsgDecoders {
             bytes memory signature
         )
     {
-        // Note: assumes we are withdrawing 1 token, tokensToWithdraw.length == 1
-        withdrawal = _decodeCompleteWithdrawalMsgPart1(message);
-
-        (
-            tokensToWithdraw,
-            middlewareTimesIndex,
-            receiveAsTokens,
-            signer,
-            expiry,
-            signature
-        ) = _decodeCompleteWithdrawalMsgPart2(message);
-
-        return (
-            withdrawal,
-            tokensToWithdraw,
-            middlewareTimesIndex,
-            receiveAsTokens,
-            signer,
-            expiry,
-            signature
-        );
-    }
-
-    function _decodeCompleteWithdrawalMsgPart1(bytes memory message)
-        internal pure
-        returns (IDelegationManager.Withdrawal memory)
-    {
-        /// @note decodes the first half of the CompleteWithdrawalMsg as we run into
-        /// a "stack to deep" error with more than 16 variables in the function.
+        //////////////////////////////////////////////
+        // Message offsets
+        //////////////////////////////////////////////
+        //
+        // Function Selector signature:
+        //     bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
+        // Params:
+        //     struct Withdrawal {
+        //         address staker;
+        //         address delegatedTo;
+        //         address withdrawer;
+        //         uint256 nonce;
+        //         uint32 startBlock;
+        //         IStrategy[] strategies;
+        //         uint256[] shares;
+        //     }
 
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
         // 00000000000000000000000000000000000000000000000000000000000002a5 [64]
@@ -324,36 +337,40 @@ contract EigenlayerMsgDecoders {
         // 000000000000000000000000000000000000000000000000002f40478f834000 [548] shares[0] value
         // 0000000000000000000000000000000000000000000000000000000000000001 [580] tokens[] length
         // 000000000000000000000000fd57b4ddbf88a4e07ff4e34c487b99af2fe82a05 [612] tokens[0] value
-        // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [644] signer (orignal staker, EigenAgent owner)
+        // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [644] signer (original staker, EigenAgent owner)
         // 0000000000000000000000000000000000000000000000000000000066d06d10 [676] expiry
         // 7248f3afe32860eb361e7e4f5d43d67fe7a93961c22f23d3121bbd5c23a18f7d [708] signature r
         // 7dc2083830eb5273eff83f1741080f1530162a10eafcdb848c05dcf146a9ab1f [740] signature s
         // 1b000000000000000000000000000000000000000000000000000000         [772] signature v
 
-        // struct Withdrawal {
-        //     address staker;
-        //     address delegatedTo;
-        //     address withdrawer;
-        //     uint256 nonce;
-        //     uint32 startBlock;
-        //     IStrategy[] strategies;
-        //     uint256[] shares;
-        // }
+        // Note: assumes we are withdrawing 1 token, tokensToWithdraw.length == 1
+        withdrawal = _decodeCompleteWithdrawalMsgPart1(message);
 
-        // bytes32 _str_offset;
-        // bytes32 _str_length;
-        // bytes4 functionSelector;
-        // uint256 withdrawalStructOffset;
-        // uint256 tokensArrayOffset;
-        // uint256 middlewareTimesIndex;
-        // bool receiveAsTokens;
+        (
+            tokensToWithdraw,
+            middlewareTimesIndex,
+            receiveAsTokens
+        ) = _decodeCompleteWithdrawalMsgPart2(message);
+
+        (
+            signer,
+            expiry,
+            signature
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 644); // signature (signer) starts at 644
+    }
+
+    function _decodeCompleteWithdrawalMsgPart1(bytes memory message)
+        internal pure
+        returns (IDelegationManager.Withdrawal memory)
+    {
+        /// @note decodes the first half of the CompleteWithdrawalMsg as we run into
+        /// a "stack too deep" error with more than 16 variables in the function.
 
         address staker;
         address delegatedTo;
         address withdrawer;
         uint256 nonce;
         uint32 startBlock;
-
         // uint256 strategies_offset;
         // uint256 shares_offset;
         uint256 strategies_length;
@@ -371,13 +388,11 @@ contract EigenlayerMsgDecoders {
             // tokensArrayOffset := mload(add(message, 132))
             // middlewareTimesIndex := mload(add(message, 164))
             // receiveAsTokens := mload(add(message, 196))
-
             staker := mload(add(message, 228))
             delegatedTo := mload(add(message, 260))
             withdrawer := mload(add(message, 292))
             nonce := mload(add(message, 324))
             startBlock := mload(add(message, 356))
-
             // strategies_offset := mload(add(message, 388))
             // shares_offset := mload(add(message, 420))
             strategies_length := mload(add(message, 452))
@@ -412,46 +427,14 @@ contract EigenlayerMsgDecoders {
         returns (
             IERC20[] memory tokensToWithdraw,
             uint256 middlewareTimesIndex,
-            bool receiveAsTokens,
-            address signer,
-            uint256 expiry,
-            bytes memory signature
+            bool receiveAsTokens
         )
     {
         /// @note decodes the second half of the CompleteWithdrawalMsg to avoid
         /// a "stack to deep" error with too many variables in the function.
 
-        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
-        // 00000000000000000000000000000000000000000000000000000000000002a5 [64]
-        // 60d7faed                                                         [96]
-        // 0000000000000000000000000000000000000000000000000000000000000080 [100] withdrawal struct offset (129 bytes = 4 lines)
-        // 00000000000000000000000000000000000000000000000000000000000001e0 [132] tokens array offset (480 bytes = 15 lines)
-        // 0000000000000000000000000000000000000000000000000000000000000000 [164] middlewareTimesIndex (static var)
-        // 0000000000000000000000000000000000000000000000000000000000000001 [196] receiveAsTokens (static var)
-        // 000000000000000000000000b6b60fb7c880824a3a98d3ddc783662afb1f34cb [228] struct_field_1: staker
-        // 0000000000000000000000000000000000000000000000000000000000000000 [260] struct_field_2: delegatedTo
-        // 000000000000000000000000b6b60fb7c880824a3a98d3ddc783662afb1f34cb [292] struct_field_3: withdrawer
-        // 0000000000000000000000000000000000000000000000000000000000000000 [324] struct_field_4: nonce
-        // 000000000000000000000000000000000000000000000000000000000064844f [356] struct_field_5: startBlock
-        // 00000000000000000000000000000000000000000000000000000000000000e0 [388] struct_field_6: strategies[] offset (224 bytes = 7 lines)
-        // 0000000000000000000000000000000000000000000000000000000000000120 [420] struct_field_7: shares[] offset (9 lines)
-        // 0000000000000000000000000000000000000000000000000000000000000001 [452] strategies[] length
-        // 000000000000000000000000e642c43b2a7d4510233a30f7695f437878bfee09 [484] strategies[0] value
-        // 0000000000000000000000000000000000000000000000000000000000000001 [516] shares[] length
-        // 000000000000000000000000000000000000000000000000002f40478f834000 [548] shares[0] value
-        // 0000000000000000000000000000000000000000000000000000000000000001 [580] tokens[] length
-        // 000000000000000000000000fd57b4ddbf88a4e07ff4e34c487b99af2fe82a05 [612] tokens[0] value
-        // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [644] signer (original staker, EigenAgent owner)
-        // 0000000000000000000000000000000000000000000000000000000066d06d10 [676] expiry
-        // 7248f3afe32860eb361e7e4f5d43d67fe7a93961c22f23d3121bbd5c23a18f7d [708] signature r
-        // 7dc2083830eb5273eff83f1741080f1530162a10eafcdb848c05dcf146a9ab1f [740] signature s
-        // 1b000000000000000000000000000000000000000000000000000000         [772] signature v
-
         uint256 tokensArrayLength;
         address tokensToWithdraw0;
-        bytes32 r;
-        bytes32 s;
-        bytes1 v;
 
         assembly {
             // _str_offset := mload(add(message, 32))
@@ -474,25 +457,15 @@ contract EigenlayerMsgDecoders {
             // share0 := mload(add(message, 548))
             tokensArrayLength := mload(add(message, 580))
             tokensToWithdraw0 := mload(add(message, 612))
-
-            signer := mload(add(message, 644))
-            expiry := mload(add(message, 676))
-            r := mload(add(message, 708))
-            s := mload(add(message, 740))
-            v := mload(add(message, 772))
         }
 
-        signature = abi.encodePacked(r,s,v);
         tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = IERC20(tokensToWithdraw0);
 
         return (
             tokensToWithdraw,
             middlewareTimesIndex,
-            receiveAsTokens,
-            signer,
-            expiry,
-            signature
+            receiveAsTokens
         );
     }
 
@@ -502,244 +475,150 @@ contract EigenlayerMsgDecoders {
         public pure
         returns (TransferToAgentOwnerMsg memory transferToAgentOwnerMsg)
     {
-        // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
-        // 0000000000000000000000000000000000000000000000000000000000000024 [64] string length
-        // 27167d10                                                         [96] function selector
-        // 8c20d3a37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7d8ec77 [100] withdrawalRoot
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] agent owner
+        // 0000000000000000000000000000000000000000000000000000000000000020
+        // 0000000000000000000000000000000000000000000000000000000000000064
+        // d8a85b48                                                         [96] function selector
+        // dd900ac4d233ec9d74ac5af4ce89f87c78781d8fd9ee2aad62d312bdfdf78a14 [100] withdrawal root
         // 00000000000000000000000000000000000000000000000000000000
 
         bytes4 functionSelector;
-        bytes32 withdrawalRoot;
-        address agentOwner;
+        bytes32 withdrawalAgentOwnerRoot;
 
         assembly {
             functionSelector := mload(add(message, 96))
-            withdrawalRoot := mload(add(message, 100))
-            agentOwner := mload(add(message, 132))
+            withdrawalAgentOwnerRoot := mload(add(message, 100))
         }
 
-        bytes32 agentOwnerRoot = EigenlayerMsgEncoders.calculateAgentOwnerRoot(withdrawalRoot, agentOwner);
-
         return TransferToAgentOwnerMsg({
-            withdrawalRoot: withdrawalRoot,
-            agentOwner: agentOwner,
-            agentOwnerRoot: agentOwnerRoot
+            withdrawalAgentOwnerRoot: withdrawalAgentOwnerRoot
         });
     }
+}
 
-    /*
-     *
-     *
-     *                   DelegateTo
-     *
-     *
-    */
+/*
+ *
+ *
+ *                   DelegateTo
+ *
+ *
+ */
 
-    function decodeDelegateToBySignatureMsg(bytes memory message)
+library DelegationDecoders {
+
+    function decodeDelegateToMsg(bytes memory message)
         public pure
         returns (
-            address,
-            address,
-            ISignatureUtils.SignatureWithExpiry memory,
-            ISignatureUtils.SignatureWithExpiry memory,
-            bytes32
+            address operator,
+            ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
+            bytes32 approverSalt,
+            address signer,
+            uint256 expiryEigenAgent,
+            bytes memory signatureEigenAgent
         )
     {
-        // function delegateToBySignature(
-        //     address staker,
+        // function delegateTo(
         //     address operator,
-        //     SignatureWithExpiry memory stakerSignatureAndExpiry,
         //     SignatureWithExpiry memory approverSignatureAndExpiry,
         //     bytes32 approverSalt
         // )
 
-        ////// 2x ECDSA signatures, 65 length each
-        // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
-        // 0000000000000000000000000000000000000000000000000000000000000224 [64] string length
-        // 7f548071                                                         [96] function selector
-        // 0000000000000000000000007e5f4552091a69125d5dfcb7b8c2659029395bdf [100] staker
-        // 0000000000000000000000002b5ad5c4795c026514f8317c7a215e218dccd6cf [132] operator
-        // 00000000000000000000000000000000000000000000000000000000000000a0 [164] staker_sig_struct offset [5 lines]
-        // 0000000000000000000000000000000000000000000000000000000000000160 [196] approver_sig_struct offset [11 lines]
-        // 0000000000000000000000000000000000000000000000000000000000004444 [228] approver salt
-        // 0000000000000000000000000000000000000000000000000000000000000040 [260] staker_sig offset
-        // 0000000000000000000000000000000000000000000000000000000000000005 [292] staker_sig expiry
-        // 0000000000000000000000000000000000000000000000000000000000000041 [324] staker_sig length (hex 0x41 = 65 bytes)
-        // bfb59bee8b02985b56e9c5b7cea3a900d54440b7ef0e3b41a56e6613a8bb7ead [356] staker_sig r
-        // 4e082b1bb02486715bfb87b4a7202becd6df26dd4a6addb214e6748188d5e02e [388] staker_sig s
-        // 1c00000000000000000000000000000000000000000000000000000000000000 [420] staker_sig v
-        // 0000000000000000000000000000000000000000000000000000000000000040 [452] approver_sig offset
-        // 0000000000000000000000000000000000000000000000000000000000000006 [484] approver_sig expiry
-        // 0000000000000000000000000000000000000000000000000000000000000041 [516] approver_sig length (hex 41 = 65 bytes)
-        // 71d0163eec33ce78295b1b94a3a43a2ea4db2219973c68ab02f16a2d88b94ce5 [548] approver_sig r
-        // 3c3336c813404285f90c817c830a47facefa2a826dd33f69e14c076fbdf444b7 [580] approver_sig s
-        // 1c00000000000000000000000000000000000000000000000000000000000000 [612] approver_sig v
-        // 00000000000000000000000000000000000000000000000000000000
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
+        // 0000000000000000000000000000000000000000000000000000000000000124 [64]
+        // eea9064b                                                         [96]
+        // 000000000000000000000000722551f573d58c97893286f8f00e76119501ae37 [100] operator
+        // 0000000000000000000000000000000000000000000000000000000000000060 [132] approverSigExpiry struct offset
+        // 000000000000000000000000000000000000000000000000000000000153158e [164] approverSalt
+        // 0000000000000000000000000000000000000000000000000000000000000040 [196] approverSigExpiry.sig offset
+        // 0000000000000000000000000000000000000000000000000000000066d3a91c [228] sig expiry
+        // 0000000000000000000000000000000000000000000000000000000000000041 [260] approverSigExpiry.sig length (hex 41 = 65 bytes)
+        // d2ec2451a264124b3966b82aad0e40e9517175affad9f23d600dbddfff57db4d [292] sig r
+        // 62440bdea7d1a009fb374773868853d52e7425035fddfff0256c26650dcfed34 [324] sig s
+        // 1c00000000000000000000000000000000000000000000000000000000000000 [356] sig v
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [388] eigenAgent signer
+        // 0000000000000000000000000000000000000000000000000000000066d3b834 [420] eigenAgent sig expiry
+        // e00176f55bcbdf4f335018dc3b676b349c938a51804d3f0d78d02f75f77b85c1 [452] eigenAgent sig r
+        // 78060931402acbf07ebbe20d1648a2b3072ad508523d947a0eee31cdd386d6fd [484] eigenAgent sig s
+        // 1c000000000000000000000000000000000000000000000000000000         [516] eigenAgent sig v
 
-        uint256 msg_length;
-        uint256 staker_sig_offset;
-        uint256 approver_sig_offset;
-        assembly {
-            msg_length := mload(add(message, 64))
-            staker_sig_offset := mload(add(message, 164))
-            approver_sig_offset := mload(add(message, 196))
-        }
+        uint256 sigExpiry;
 
-        address staker;
-        address operator;
-        bytes32 approverSalt;
-        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry;
-        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
+        bytes32 r;
+        bytes32 s;
+        bytes1  v;
 
         assembly {
-            staker := mload(add(message, 100))
-            operator := mload(add(message, 132))
-            approverSalt := mload(add(message, 228))
+            operator := mload(add(message, 100))
+            approverSalt := mload(add(message, 164))
+
+            sigExpiry := mload(add(message, 228))
+            r := mload(add(message, 292))
+            s := mload(add(message, 324))
+            v := mload(add(message, 356))
         }
 
-        if (msg_length == 356) {
-            // staker_sig: 0
-            // approver_sig: 0
-            stakerSignatureAndExpiry = _getDelegationNullSignature(message, 0);
-            approverSignatureAndExpiry = _getDelegationNullSignature(message, 96);
+        bytes memory signatureOperatorApprover = abi.encodePacked(r, s, v);
 
-        } else if (msg_length == 452 && approver_sig_offset == 352) {
-            // staker_sig: 1
-            // approver_sig: 0
+        approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+            signature: signatureOperatorApprover,
+            expiry: sigExpiry
+        });
 
-            // 0000000000000000000000000000000000000000000000000000000000000020
-            // 00000000000000000000000000000000000000000000000000000000000001c4
-            // 7f548071
-            // 0000000000000000000000007e5f4552091a69125d5dfcb7b8c2659029395bdf
-            // 0000000000000000000000002b5ad5c4795c026514f8317c7a215e218dccd6cf
-            // 00000000000000000000000000000000000000000000000000000000000000a0 [164] staker_sig_struct offset [5 lines]
-            // 0000000000000000000000000000000000000000000000000000000000000160 [196] approver_sig_struct offset [11 lines]
-            // 0000000000000000000000000000000000000000000000000000000000004444 [228]
-            // 0000000000000000000000000000000000000000000000000000000000000040 [260] staker_sig offset
-            // 0000000000000000000000000000000000000000000000000000000000000005 [292]
-            // 0000000000000000000000000000000000000000000000000000000000000041 [324] staker_sig length
-            // bfb59bee8b02985b56e9c5b7cea3a900d54440b7ef0e3b41a56e6613a8bb7ead
-            // 4e082b1bb02486715bfb87b4a7202becd6df26dd4a6addb214e6748188d5e02e
-            // 1c00000000000000000000000000000000000000000000000000000000000000
-            // 0000000000000000000000000000000000000000000000000000000000000040 [452] approver_sig offset
-            // 0000000000000000000000000000000000000000000000000000000000000006
-            // 0000000000000000000000000000000000000000000000000000000000000000
-            // 00000000000000000000000000000000000000000000000000000000
-
-            stakerSignatureAndExpiry = _getDelegationSignature(message, 0);
-            approverSignatureAndExpiry = _getDelegationNullSignature(message, 192); // 96 offset more
-
-        } else if (msg_length == 452 && approver_sig_offset == 256) {
-            // staker_sig: 0
-            // approver_sig: 1
-            stakerSignatureAndExpiry = _getDelegationNullSignature(message, 0);
-            approverSignatureAndExpiry = _getDelegationSignature(message, 96);
-
-        } else if (msg_length == 548) {
-            // staker_sig: 1
-            // approver_sig: 1
-            stakerSignatureAndExpiry = _getDelegationSignature(message, 0);
-            // 192 offset for approver signature
-            approverSignatureAndExpiry = _getDelegationSignature(message, 192);
-        }
+        (
+            signer,
+            expiryEigenAgent,
+            signatureEigenAgent
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 388); // user signature starts on 388
 
         return (
-            staker,
+            // original message for Eigenlayer
             operator,
-            stakerSignatureAndExpiry,
             approverSignatureAndExpiry,
-            approverSalt
+            approverSalt,
+            // signature for EigenAgent execution
+            signer,
+            expiryEigenAgent,
+            signatureEigenAgent
         );
     }
 
-
-    function _getDelegationSignature(bytes memory message, uint256 offset)
-        internal pure
-        returns (ISignatureUtils.SignatureWithExpiry memory)
-    {
-
-        uint256 expiry;
-        bytes memory signature;
-        bytes32 r;
-        bytes32 s;
-        bytes1 v;
-
-        assembly {
-            expiry := mload(add(message, add(292, offset)))
-            r := mload(add(message, add(356, offset)))
-            s := mload(add(message, add(388, offset)))
-            v := mload(add(message, add(420, offset)))
-        }
-
-        signature = abi.encodePacked(r, s, v);
-
-        ISignatureUtils.SignatureWithExpiry memory signatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
-            signature: signature,
-            expiry: expiry
-        });
-
-        return signatureAndExpiry;
-    }
-
-
-    function _getDelegationNullSignature(bytes memory message, uint256 offset)
-        internal pure
-        returns (ISignatureUtils.SignatureWithExpiry memory)
-    {
-
-        ///// Null signatures:
-        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
-        // 0000000000000000000000000000000000000000000000000000000000000164 [64]
-        // 7f548071                                                         [96]
-        // 0000000000000000000000007e5f4552091a69125d5dfcb7b8c2659029395bdf [100] staker
-        // 0000000000000000000000002b5ad5c4795c026514f8317c7a215e218dccd6cf [132] operator
-        // 00000000000000000000000000000000000000000000000000000000000000a0 [164] staker_sig_struct offset [5 lines]
-        // 0000000000000000000000000000000000000000000000000000000000000100 [196] approver_sig_struct offset [8 lines]
-        // 0000000000000000000000000000000000000000000000000000000000004444 [228] approverSalt
-        // 0000000000000000000000000000000000000000000000000000000000000040 [260] staker_sig offset (bytes has a offset and length)
-        // 0000000000000000000000000000000000000000000000000000000000000005 [292] staker_sig expiry
-        // 0000000000000000000000000000000000000000000000000000000000000000 [324] staker_signature
-        // 0000000000000000000000000000000000000000000000000000000000000040 [356] approver_sig offset
-        // 0000000000000000000000000000000000000000000000000000000000000006 [388] approver_sig expiry
-        // 0000000000000000000000000000000000000000000000000000000000000000 [420] approver_signature
-        // 00000000000000000000000000000000000000000000000000000000
-
-        uint256 expiry;
-        bytes memory signature;
-
-        assembly {
-            expiry := mload(add(message, add(292, offset)))
-            signature := mload(add(message, add(324, offset)))
-        }
-
-        ISignatureUtils.SignatureWithExpiry memory signatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
-            signature: signature,
-            expiry: expiry
-        });
-
-        return signatureAndExpiry;
-    }
-
-
     function decodeUndelegateMsg(bytes memory message)
         public pure
-        returns (address)
+        returns (
+            address staker, // eigenAgent
+            address signer,
+            uint256 expiryEigenAgent,
+            bytes memory signatureEigenAgent
+        )
     {
-        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
-        // 0000000000000000000000000000000000000000000000000000000000000224 [64]
-        // 54b2bf29                                                         [96]
-        // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d412eb [100] address
-        // 00000000000000000000000000000000000000000000000000000000
+
+        // 0000000000000000000000000000000000000000000000000000000000000020
+        // 00000000000000000000000000000000000000000000000000000000000000a5
+        // da8be864                                                         [96] function selector
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [100] staker address (delegating)
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] eigenAgent signer
+        // 0000000000000000000000000000000000000000000000000000000000000e11 [164] eigenAgent sig expiry
+        // b20a886dfc3208a956b14419e367c1127258b8079559b101a7d6ced1271d464f [196] eigenAgent sig r
+        // 271a38b87fd2cd30f183d542483cc71269711bdc9044b24baf2b7aa189a3d1e0 [228] eigenAgent sig s
+        // 1c000000000000000000000000000000000000000000000000000000         [260] eigenAgent sig v
 
         bytes4 functionSelector;
-        address staker;
 
         assembly {
             functionSelector := mload(add(message, 96))
             staker := mload(add(message, 100))
         }
 
-        return staker;
+        (
+            signer,
+            expiryEigenAgent,
+            signatureEigenAgent
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 132);
+
+        return (
+            staker,
+            signer,
+            expiryEigenAgent,
+            signatureEigenAgent
+        );
     }
 }

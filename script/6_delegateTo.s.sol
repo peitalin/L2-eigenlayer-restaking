@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, stdJson, console} from "forge-std/Script.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {Script, console} from "forge-std/Script.sol";
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
@@ -13,28 +12,35 @@ import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISi
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
 import {ScriptUtils} from "./ScriptUtils.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 
-import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
+import {ClientSigners} from "./ClientSigners.sol";
 import {ClientEncoders} from "./ClientEncoders.sol";
 
 
-contract DelegateToScript is Script, ScriptUtils {
-
+contract DelegateToScript is
+    Script,
+    ScriptUtils,
+    FileReader,
+    ClientEncoders,
+    ClientSigners
+{
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
     IRestakingConnector public restakingConnector;
+
+    IStrategy public strategy;
+    IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
-    IERC20 public ccipBnM;
+    IERC20 public tokenL2;
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-    FileReader public fileReader; // keep outside vm.startBroadcast() to avoid deploying
-    ClientEncoders public encoders;
-    SignatureUtilsEIP1271 public signatureUtils;
 
     uint256 public deployerKey;
     address public deployer;
@@ -44,6 +50,14 @@ contract DelegateToScript is Script, ScriptUtils {
     address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
+        return _run(false);
+    }
+
+    function mockrun(uint256 mockKey) public {
+        return _run(true);
+    }
+
+    function _run(bool isTest) public {
 
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
@@ -51,12 +65,11 @@ contract DelegateToScript is Script, ScriptUtils {
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        fileReader = new FileReader(); // keep outside vm.startBroadcast() to avoid deploying
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
         (
             , // strategy
-            , // strategyManager,
+            strategyManager,
             , // strategyFactory
             , // pauserRegistry
             delegationManager,
@@ -64,116 +77,116 @@ contract DelegateToScript is Script, ScriptUtils {
               // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
-        senderContract = fileReader.readSenderContract();
-        (receiverContract, restakingConnector) = fileReader.readReceiverRestakingConnector();
+        senderContract = readSenderContract();
+        (receiverContract, restakingConnector) = readReceiverRestakingConnector();
+        IAgentFactory agentFactory = readAgentFactory();
 
-        ccipBnM = IERC20(address(BaseSepolia.CcipBnM)); // BaseSepolia contract
+        tokenL2 = IERC20(address(BaseSepolia.BridgeToken)); // BaseSepolia contract
         TARGET_CONTRACT = address(delegationManager);
-
-        //////////////////////////////////////////////////////////
-        /// Create message and signature
-        //////////////////////////////////////////////////////////
 
         vm.selectFork(ethForkId);
 
         //////////////////////////////////////////////////////////
-        // Register Operator
+        // L1: Register Operator
         //////////////////////////////////////////////////////////
 
         operatorKey = vm.envUint("OPERATOR_KEY");
         operator = vm.addr(operatorKey);
 
         if (!delegationManager.isOperator(operator)) {
-
             vm.startBroadcast(deployerKey);
-            topupSenderEthBalance(operator);
+            {
+                topupSenderEthBalance(operator, isTest);
+            }
             vm.stopBroadcast();
 
             vm.startBroadcast(operatorKey);
             {
                 IDelegationManager.OperatorDetails memory registeringOperatorDetails =
                     IDelegationManager.OperatorDetails({
-                        __deprecated_earningsReceiver: vm.addr(0xb0b),
+                        __deprecated_earningsReceiver: operator,
                         delegationApprover: operator,
                         stakerOptOutWindowBlocks: 4
                     });
 
                 string memory metadataURI = "some operator";
                 delegationManager.registerAsOperator(registeringOperatorDetails, metadataURI);
-
             }
             vm.stopBroadcast();
         }
 
+        //// Get User's EigenAgent
+        IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(deployer);
+        require(address(eigenAgent) != address(0), "User has no existing EigenAgent");
+        require(
+            strategyManager.stakerStrategyShares(address(eigenAgent), strategy) >= 0,
+            "user's eigenAgent has no deposit in Eigenlayer"
+        );
+
+        uint256 execNonce = eigenAgent.execNonce();
+        uint256 sig_expiry = block.timestamp + 2 hours;
+
         /////////////////////////////////////////////////////////////////
-        /////// Broadcast to L2
+        /////// Broadcast DelegateTo message on L2
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
-        encoders = new ClientEncoders();
-        signatureUtils = new SignatureUtilsEIP1271();
 
         vm.startBroadcast(deployerKey);
 
-        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry;
+        // Operator Approver signs the delegateTo call
+        uint256 randomSalt = vm.randomUint();
+        bytes32 approverSalt = bytes32(randomSalt);
+
         ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
-
-        bytes32 approverSalt = bytes32(uint256(24)); // generate some random number/salt
-
-        bytes memory signature1;
-        bytes memory signature2;
         {
-            uint256 sig1_expiry = block.timestamp + 1 hours;
-            uint256 sig2_expiry = block.timestamp + 2 hours;
-
-            bytes32 digestHash1 = signatureUtils.calculateStakerDelegationDigestHash(
-                staker,
-                0,  // nonce
-                operator,
-                sig1_expiry,
-                TARGET_CONTRACT,
-                EthSepolia.ChainId
-            );
-            bytes32 digestHash2 = signatureUtils.calculateDelegationApprovalDigestHash(
-                staker,
-                operator,
+            bytes32 digestHash1 = calculateDelegationApprovalDigestHash(
+                address(eigenAgent), // staker == msg.sender == eigenAgent from Eigenlayer's perspective
+                operator, // operator
                 operator, // _delegationApprover,
                 approverSalt,
-                sig2_expiry,
-                TARGET_CONTRACT, // delegationManagerAddr
+                sig_expiry,
+                address(delegationManager), // delegationManagerAddr
                 EthSepolia.ChainId
             );
 
-            (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(deployerKey, digestHash1);
-            signature1 = abi.encodePacked(r1, s1, v1);
-            stakerSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
-                signature: signature1,
-                expiry: sig1_expiry
-            });
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(operatorKey, digestHash1);
+            bytes memory signature1 = abi.encodePacked(r, s, v);
 
-            (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(operatorKey, digestHash2);
-            signature2 = abi.encodePacked(r2, s2, v2);
             approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
-                signature: signature2,
-                expiry: sig2_expiry
+                signature: signature1,
+                expiry: sig_expiry
             });
         }
 
-        // send CCIP message to CompleteWithdrawal
-        bytes memory message = encoders.encodeDelegateToBySignature(
-            staker,
-            operator,
-            stakerSignatureAndExpiry,
-            approverSignatureAndExpiry,
-            approverSalt
-        );
+        // append user signature for EigenAgent execution
+        bytes memory messageWithSignature_DT;
+        {
+            bytes memory delegateToMessage = encodeDelegateTo(
+                operator,
+                approverSignatureAndExpiry,
+                approverSalt
+            );
 
-        topupSenderEthBalance(address(senderContract));
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature_DT = signMessageForEigenAgentExecution(
+                deployerKey,
+                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                address(delegationManager), // DelegationManager.delegateTo()
+                delegateToMessage,
+                execNonce,
+                sig_expiry
+            );
+        }
+
+        topupSenderEthBalance(address(senderContract), isTest);
+
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
-            string(message),
-            address(ccipBnM),
-            0 // not bridging, just sending message
+            string(messageWithSignature_DT),
+            address(tokenL2),
+            0, // not bridging, just sending message
+            0 // use default gasLimit for this function
         );
 
         vm.stopBroadcast();

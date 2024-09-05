@@ -5,10 +5,6 @@ import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IS
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 
-import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
-import {IEigenAgent6551} from "../../src/6551/IEigenAgent6551.sol";
-import {IEigenAgentOwner721} from "../../src/6551/IEigenAgentOwner721.sol";
-
 
 interface IRestakingConnector {
 
@@ -29,15 +25,21 @@ interface IRestakingConnector {
 
     function depositWithEigenAgent(bytes memory message) external;
 
+    function mintEigenAgent(bytes memory message) external;
+
     function queueWithdrawalsWithEigenAgent(bytes memory message) external;
 
     function completeWithdrawalWithEigenAgent(bytes memory message) external returns (
-        uint256,
-        address,
-        string memory // CCIP message for transferToAgentOwner on L2
+        bool receiveAsTokens,
+        uint256 withdrawalAmount,
+        address withdrawalToken,
+        string memory messageForL2, // CCIP message for transferToAgentOwner on L2
+        bytes32 withdrawalAgentOwnerRoot
     );
 
     function delegateToWithEigenAgent(bytes memory message) external;
+
+    function undelegateWithEigenAgent(bytes memory message) external;
 
     /*
      *
@@ -68,11 +70,6 @@ interface IRestakingConnector {
      *
      *
     */
-
-    function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalRoot,
-        address agentOwner
-    ) external returns (bytes memory);
 
     function setGasLimitsForFunctionSelectors(
         bytes4[] memory functionSelectors,

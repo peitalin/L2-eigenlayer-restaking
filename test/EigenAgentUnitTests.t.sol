@@ -3,7 +3,6 @@ pragma solidity 0.8.22;
 
 import {Test, console} from "forge-std/Test.sol";
 
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 
@@ -12,60 +11,52 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
+import {IReceiverCCIPMock} from "./mocks/ReceiverCCIPMock.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
-
-import {SignatureUtilsEIP1271} from "../src/utils/SignatureUtilsEIP1271.sol";
+import {ClientSigners} from "../script/ClientSigners.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 
-// 6551 accounts
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
-import {EigenAgent6551TestUpgrade} from "./mocks/EigenAgent6551TestUpgrade.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 
 
 
-contract CCIP_EigenAgentTests is Test {
+contract EigenAgentUnitTests is Test {
 
     DeployReceiverOnL1Script public deployReceiverOnL1Script;
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-    SignatureUtilsEIP1271 public signatureUtils;
+    ClientSigners public clientSigners;
 
-    bool isTest = block.chainid == 31337;
-    uint256 public deployerKey;
-    address public deployer;
-    uint256 public bobKey;
-    address public bob;
-    uint256 public aliceKey;
-    address public alice;
-
-    IReceiverCCIP public receiverContract;
+    IReceiverCCIPMock public receiverContract;
     IRestakingConnector public restakingConnector;
     IAgentFactory public agentFactory;
-    IERC20_CCIPBnM public erc20Drip; // has drip faucet functions
-    IERC20 public token;
 
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
     IStrategy public strategy;
-    ProxyAdmin public proxyAdmin;
+    IERC20 public tokenL1;
+
+    bool isTest = block.chainid == 31337;
+    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+    address deployer = vm.addr(deployerKey);
+    uint256 bobKey;
+    address bob;
+    uint256 aliceKey;
+    address alice;
 
     // call params
-    uint256 _expiry;
-    uint256 _nonce;
-    uint256 _amount;
+    uint256 EXPIRY;
+    uint256 AMOUNT;
 
     function setUp() public {
-
-		deployerKey = vm.envUint("DEPLOYER_KEY");
-        deployer = vm.addr(deployerKey);
 
         bobKey = uint256(56789);
         bob = vm.addr(bobKey);
@@ -77,7 +68,7 @@ contract CCIP_EigenAgentTests is Test {
 
         deployReceiverOnL1Script = new DeployReceiverOnL1Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-        signatureUtils = new SignatureUtilsEIP1271();
+        clientSigners = new ClientSigners();
 
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
@@ -90,7 +81,7 @@ contract CCIP_EigenAgentTests is Test {
             , // pauserRegistry
             delegationManager,
             , // rewardsCoordinator
-            token
+            tokenL1
         ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
         //// Configure CCIP contracts
@@ -98,21 +89,20 @@ contract CCIP_EigenAgentTests is Test {
             receiverContract,
             restakingConnector,
             agentFactory
-        ) = deployReceiverOnL1Script.testrun();
+        ) = deployReceiverOnL1Script.mockrun();
 
-        erc20Drip = IERC20_CCIPBnM(address(token));
 
         //// Configure CCIP contracts
         vm.startBroadcast(deployerKey);
+
         restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
-        erc20Drip.drip(address(receiverContract));
-        erc20Drip.drip(address(receiverContract));
-        erc20Drip.drip(address(bob));
         receiverContract.allowlistSender(deployer, true);
 
-        _expiry = block.timestamp + 1 hours;
-        _nonce = 0;
-        _amount = 0.0013 ether;
+        IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
+        IERC20_CCIPBnM(address(tokenL1)).drip(address(bob));
+
+        EXPIRY = block.timestamp + 1 hours;
+        AMOUNT = 0.0013 ether;
 
         vm.stopBroadcast();
     }
@@ -125,18 +115,17 @@ contract CCIP_EigenAgentTests is Test {
 
         vm.startBroadcast(bobKey);
 
-        _nonce = eigenAgent.getExecNonce();
-
+        uint256 execNonce0 = eigenAgent.execNonce();
         // encode a simple getSenderContractL2Addr call
         bytes memory data = abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector);
 
-        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
+        bytes32 digestHash = clientSigners.createEigenAgentCallDigestHash(
             address(receiverContract),
             0 ether,
             data,
-            _nonce,
+            execNonce0,
             block.chainid,
-            _expiry
+            EXPIRY
         );
         bytes memory signature;
         {
@@ -144,7 +133,7 @@ contract CCIP_EigenAgentTests is Test {
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(bobKey, digestHash);
             signature = abi.encodePacked(r, s, v);
         }
-        signatureUtils.checkSignature_EIP1271(bob, digestHash, signature);
+        clientSigners.checkSignature_EIP1271(bob, digestHash, signature);
         vm.stopBroadcast();
 
         //////////////////////////////////////////////////////
@@ -157,7 +146,7 @@ contract CCIP_EigenAgentTests is Test {
             address(receiverContract),
             0 ether,
             data,
-            _expiry,
+            EXPIRY,
             signature
         );
 
@@ -170,7 +159,7 @@ contract CCIP_EigenAgentTests is Test {
 
         // should fail if anyone else tries to call with Bob's EigenAgent without Bob's signature
         vm.startBroadcast(address(receiverContract));
-        vm.expectRevert("Caller is not owner");
+        vm.expectRevert("Invalid signer");
         EigenAgent6551(payable(address(eigenAgent))).execute(
             address(receiverContract),
             0 ether,
@@ -182,50 +171,7 @@ contract CCIP_EigenAgentTests is Test {
     }
 
 
-    // function test_EigenAgent_TestUpgrade() public {
-    //     // Note: 6551 upgrades must be initiated by the NFT owner
-    //     // Unlike UpgradeableBeacons, admin cannot upgrade the implementation for everyone.
-    //     //
-    //     // 6551 uses ERC1167 minimal proxies to save gas, which are not compatible with this flow:
-    //     // Minimal Proxy -> Upgradeable BeaconProxy -> Logic contract
-    //     // See: https://forum.openzeppelin.com/t/using-eip1167-with-upgradability/3217/3
-    //     //
-    //     // We would have to replace 6551 with something that combines:
-    //     // UpgradeableBeacon +
-    //     // Create2 deterministic account creation + registry
-    //     // remove the NFT requirement
-
-    //     vm.startBroadcast(deployerKey);
-
-    //     EigenAgent6551 eigenAgentBob = EigenAgent6551(payable(address(
-    //         agentFactory.spawnEigenAgentOnlyOwner(bob)
-    //     )));
-    //     EigenAgent6551 eigenAgentDeployer = EigenAgent6551(payable(address(
-    //         agentFactory.spawnEigenAgentOnlyOwner(deployer)
-    //     )));
-
-    //     ///// create new implementation and upgrade
-    //     EigenAgent6551TestUpgrade eigenAgentUpgradedImpl = new EigenAgent6551TestUpgrade();
-
-    //     vm.expectRevert("Caller is not owner");
-    //     eigenAgentBob.upgrade(address(eigenAgentUpgradedImpl));
-
-    //     eigenAgentDeployer.upgrade(address(eigenAgentUpgradedImpl));
-
-    //     require(
-    //         eigenAgentBob.agentImplVersion() == 1,
-    //         "EigenAgentBob should fail to upgrade to new implementation"
-    //     );
-    //     // check if both eigenAgents have been upgraded to new implementation, or just one?
-    //     require(
-    //         eigenAgentDeployer.agentImplVersion() == 2,
-    //         "EigenAgentDeployer should have upgraded to new implementation"
-    //     );
-    //     vm.stopBroadcast();
-    // }
-
-
-    function test_CCIP_EigenAgent_DepositTransferThenWithdraw() public {
+    function test_EigenAgent_DepositTransferThenWithdraw() public {
 
         //////////////////////////////////////////////////////
         /// Receiver -> EigenAgent -> Eigenlayer calls
@@ -235,65 +181,62 @@ contract CCIP_EigenAgentTests is Test {
         IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
         vm.stopBroadcast();
 
-        vm.startBroadcast(bobKey);
-        _nonce = eigenAgent.getExecNonce();
-        vm.stopBroadcast();
-
         //////////////////////////////////////////////////////
         //// 1) EigenAgent approves StrategyManager to transfer tokens
         //////////////////////////////////////////////////////
+        uint256 execNonce0 = eigenAgent.execNonce();
         {
             vm.startBroadcast(address(receiverContract));
             (
-                bytes memory data1,
-                bytes32 digestHash1,
-                bytes memory signature1
+                bytes memory data0,
+                bytes32 digestHash0,
+                bytes memory signature0
             ) = createEigenAgentERC20ApproveSignature(
                 bobKey,
-                address(erc20Drip),
+                address(tokenL1),
                 address(strategyManager),
-                _amount,
-                _expiry
+                AMOUNT,
+                execNonce0
             );
-            signatureUtils.checkSignature_EIP1271(bob, digestHash1, signature1);
+            clientSigners.checkSignature_EIP1271(bob, digestHash0, signature0);
 
             eigenAgent.executeWithSignature(
-                address(erc20Drip), // CCIP-BnM token
+                address(tokenL1), // CCIP-BnM token
                 0 ether, // value
-                data1,
-                _expiry,
-                signature1
+                data0,
+                EXPIRY,
+                signature0
             );
 
             // receiver sends eigenAgent tokens
-            erc20Drip.transfer(address(eigenAgent), _amount);
+            tokenL1.transfer(address(eigenAgent), AMOUNT);
             vm.stopBroadcast();
         }
 
         //////////////////////////////////////////////////////
         //// 2) EigenAgent Deposits into StrategyManager
         //////////////////////////////////////////////////////
+        uint256 execNonce1 = eigenAgent.execNonce();
         {
             vm.startBroadcast(address(receiverContract));
 
             (
-                bytes memory data2,
-                bytes32 digestHash2,
-                bytes memory signature2
+                bytes memory data1,
+                bytes32 digestHash1,
+                bytes memory signature1
             ) = createEigenAgentDepositSignature(
                 bobKey,
-                _amount,
-                _nonce,
-                _expiry
+                AMOUNT,
+                execNonce1
             );
-            signatureUtils.checkSignature_EIP1271(bob, digestHash2, signature2);
+            clientSigners.checkSignature_EIP1271(bob, digestHash1, signature1);
 
             eigenAgent.executeWithSignature(
                 address(strategyManager), // strategyManager
                 0,
-                data2, // encodeDepositIntoStrategyMsg
-                _expiry,
-                signature2
+                data1, // encodeDepositIntoStrategyMsg
+                EXPIRY,
+                signature1
             );
             vm.stopBroadcast();
         }
@@ -305,7 +248,7 @@ contract CCIP_EigenAgentTests is Test {
             vm.startBroadcast(bob);
 
             uint256 transferredTokenId = agentFactory.getEigenAgentOwnerTokenId(bob);
-            IEigenAgentOwner721 eigenAgentOwnerNft = agentFactory.getEigenAgentOwner721();
+            IEigenAgentOwner721 eigenAgentOwnerNft = agentFactory.eigenAgentOwner721();
             eigenAgentOwnerNft.approve(alice, transferredTokenId);
 
             vm.expectEmit(true, true, true, true);
@@ -331,7 +274,7 @@ contract CCIP_EigenAgentTests is Test {
             strategiesToWithdraw[0] = strategy;
 
             uint256[] memory sharesToWithdraw = new uint256[](1);
-            sharesToWithdraw[0] = _amount;
+            sharesToWithdraw[0] = AMOUNT;
 
             IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal =
                 IDelegationManager.QueuedWithdrawalParams({
@@ -343,22 +286,24 @@ contract CCIP_EigenAgentTests is Test {
             queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](1);
             queuedWithdrawalParams[0] = queuedWithdrawal;
 
+            uint256 execNonce2 = eigenAgent.execNonce();
             (
-                bytes memory data3,
-                bytes32 digestHash3,
-                bytes memory signature3
+                bytes memory data2,
+                bytes32 digestHash2,
+                bytes memory signature2
             ) = createEigenAgentQueueWithdrawalsSignature(
                 aliceKey,
+                execNonce2,
                 queuedWithdrawalParams
             );
-            signatureUtils.checkSignature_EIP1271(alice, digestHash3, signature3);
+            clientSigners.checkSignature_EIP1271(alice, digestHash2, signature2);
 
             bytes memory result = eigenAgent.executeWithSignature(
                 address(delegationManager), // delegationManager
                 0,
-                data3, // encodeQueueWithdrawals
-                _expiry,
-                signature3
+                data2, // encodeQueueWithdrawals
+                EXPIRY,
+                signature2
             );
 
             bytes32[] memory withdrawalRoots = abi.decode(result, (bytes32[]));
@@ -374,6 +319,7 @@ contract CCIP_EigenAgentTests is Test {
 
     function createEigenAgentQueueWithdrawalsSignature(
         uint256 signerKey,
+        uint256 execNonce,
         IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
     ) public view returns (bytes memory, bytes32, bytes memory) {
 
@@ -381,13 +327,13 @@ contract CCIP_EigenAgentTests is Test {
             queuedWithdrawalParams
         );
 
-        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
+        bytes32 digestHash = clientSigners.createEigenAgentCallDigestHash(
             address(delegationManager), // target to call
             0 ether,
             data,
-            _nonce,
+            execNonce,
             block.chainid,
-            _expiry
+            EXPIRY
         );
 
         bytes memory signature;
@@ -405,7 +351,7 @@ contract CCIP_EigenAgentTests is Test {
         address targetToken,
         address to,
         uint256 amount,
-        uint256 expiry
+        uint256 execNonce
     ) public view returns (bytes memory, bytes32, bytes memory) {
 
         bytes memory data = abi.encodeWithSelector(
@@ -415,13 +361,13 @@ contract CCIP_EigenAgentTests is Test {
             amount
         );
 
-        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
+        bytes32 digestHash = clientSigners.createEigenAgentCallDigestHash(
             targetToken, // CCIP-BnM token
             0 ether,
             data,
-            _nonce,
+            execNonce,
             block.chainid,
-            expiry
+            EXPIRY
         );
 
         bytes memory signature;
@@ -437,23 +383,22 @@ contract CCIP_EigenAgentTests is Test {
     function createEigenAgentDepositSignature(
         uint256 signerKey,
         uint256 amount,
-        uint256 nonce,
-        uint256 expiry
+        uint256 _nonce
     ) public view returns (bytes memory, bytes32, bytes memory) {
 
         bytes memory data = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
             address(strategy),
-            address(token),
+            address(tokenL1),
             amount
         );
 
-        bytes32 digestHash = signatureUtils.createEigenAgentCallDigestHash(
+        bytes32 digestHash = clientSigners.createEigenAgentCallDigestHash(
             address(strategyManager),
             0 ether,
             data,
-            nonce,
+            _nonce,
             block.chainid,
-            expiry
+            EXPIRY
         );
 
         bytes memory signature;

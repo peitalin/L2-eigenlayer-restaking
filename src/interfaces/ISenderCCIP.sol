@@ -3,14 +3,14 @@ pragma solidity 0.8.22;
 
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IBaseMessengerCCIP} from "./IBaseMessengerCCIP.sol";
-import {ISenderUtils} from "./ISenderUtils.sol";
+import {ISenderHooks} from "./ISenderHooks.sol";
 
 interface ISenderCCIP is IBaseMessengerCCIP {
 
-    function mockCCIPReceive(Client.Any2EVMMessage memory any2EvmMessage) external;
+    // function mockCCIPReceive(Client.Any2EVMMessage memory any2EvmMessage) external;
 
-    function getSenderUtils() external returns (ISenderUtils);
+    function getSenderHooks() external returns (ISenderHooks);
 
-    function setSenderUtils(ISenderUtils _senderUtils) external;
+    function setSenderHooks(ISenderHooks _senderHooks) external;
 }
 

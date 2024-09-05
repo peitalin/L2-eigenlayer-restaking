@@ -1,19 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-interface IEigenAgent6551 {
+// import {IERC6551Account} from "@6551/examples/simple/ERC6551Account.sol";
+import {IERC6551Account} from "./ERC6551Account.sol";
 
-    function agentImplVersion() external returns (uint256);
+interface IEigenAgent6551 is IERC6551Account {
 
-    function getExecNonce() external view returns (uint256);
-
-    function beforeExecute(bytes calldata data) external returns (bytes4);
-
-    function afterExecute(
-        bytes calldata data,
-        bool success,
-        bytes memory result
-    ) external returns (bytes4);
+    // function execNonce() external view returns (uint256);
 
     function executeWithSignature(
         address targetContract,
@@ -22,14 +15,6 @@ interface IEigenAgent6551 {
         uint256 expiry,
         bytes memory signature
     ) external payable returns (bytes memory result);
-
-    function approveWithSignature(
-        address targetContract,
-        uint256 value,
-        bytes calldata data,
-        uint256 expiry,
-        bytes memory signature
-    ) external returns (bool);
 
     function approveByWhitelistedContract(
         address targetContract,

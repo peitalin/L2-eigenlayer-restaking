@@ -5,7 +5,7 @@ import {Script, stdJson, console} from "forge-std/Script.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
-import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
@@ -30,11 +30,11 @@ contract FileReader is Script {
         return ISenderCCIP(senderAddr);
     }
 
-    function readSenderUtils() public view returns (ISenderUtils) {
+    function readSenderHooks() public view returns (ISenderHooks) {
         string memory addrData;
         addrData = vm.readFile("script/basesepolia/bridgeContractsL2.config.json");
-        address senderUtilsAddr = stdJson.readAddress(addrData, ".contracts.senderUtils");
-        return ISenderUtils(senderUtilsAddr);
+        address senderHooksAddr = stdJson.readAddress(addrData, ".contracts.senderHooks");
+        return ISenderHooks(senderHooksAddr);
     }
 
     function readProxyAdminL2() public view returns (address) {
@@ -46,15 +46,14 @@ contract FileReader is Script {
 
     /// @dev hardcoded chainid for contracts. Update for prod
     function saveSenderBridgeContracts(
-        bool isTest,
         address senderCCIP,
-        address senderUtils,
+        address senderHooks,
         address proxyAdminL2
     ) public {
         // { "inputs": <inputs_data>}
         /////////////////////////////////////////////////
         vm.serializeAddress("contracts" , "senderCCIP", senderCCIP);
-        vm.serializeAddress("contracts" , "senderUtils", senderUtils);
+        vm.serializeAddress("contracts" , "senderHooks", senderHooks);
         string memory inputs_data = vm.serializeAddress("contracts" , "proxyAdminL2", proxyAdminL2);
 
         /////////////////////////////////////////////////
@@ -74,17 +73,10 @@ contract FileReader is Script {
         // chains[17000] = "holesky";
         // chains[84532] = "basesepolia";
         // chains[11155111] = "ethsepolia";
-        if (isTest) {
-            string memory finalOutputPath2 = string(abi.encodePacked(
-                "script/localhost/bridgeContractsL2.config.json"
-            ));
-            vm.writeJson(finalJson2, finalOutputPath2);
-        } else {
-            string memory finalOutputPath2 = string(abi.encodePacked(
-                "script/basesepolia/bridgeContractsL2.config.json"
-            ));
-            vm.writeJson(finalJson2, finalOutputPath2);
-        }
+        string memory finalOutputPath2 = string(abi.encodePacked(
+            "script/basesepolia/bridgeContractsL2.config.json"
+        ));
+        vm.writeJson(finalJson2, finalOutputPath2);
     }
 
     /////////////////////////////////////////////////
@@ -128,7 +120,6 @@ contract FileReader is Script {
     }
 
     function saveReceiverBridgeContracts(
-        bool isTest,
         address receiverCCIP,
         address restakingConnector,
         address agentFactory,
@@ -136,6 +127,14 @@ contract FileReader is Script {
         address eigenAgentOwner721,
         address proxyAdminL1
     ) public {
+
+        require(receiverCCIP != address(0), "receiverCCIP cannot be null");
+        require(restakingConnector != address(0), "restakingConnector cannot be null");
+        require(agentFactory != address(0), "agentFactory cannot be null");
+        require(registry6551 != address(0), "registry6551 cannot be null");
+        require(eigenAgentOwner721 != address(0), "eigenAgentOwner721 cannot be null");
+        require(proxyAdminL1 != address(0), "proxyAdminL1 cannot be null");
+
         // { "inputs": <inputs_data>}
         /////////////////////////////////////////////////
         vm.serializeAddress("contracts" , "receiverCCIP", receiverCCIP);
@@ -162,17 +161,10 @@ contract FileReader is Script {
         // chains[17000] = "holesky";
         // chains[84532] = "basesepolia";
         // chains[11155111] = "ethsepolia";
-        if (isTest) {
-            string memory finalOutputPath1 = string(abi.encodePacked(
-                "script/localhost/bridgeContractsL1.config.json"
-            ));
-            vm.writeJson(finalJson1, finalOutputPath1);
-        } else {
-            string memory finalOutputPath1 = string(abi.encodePacked(
-                "script/ethsepolia/bridgeContractsL1.config.json"
-            ));
-            vm.writeJson(finalJson1, finalOutputPath1);
-        }
+        string memory finalOutputPath1 = string(abi.encodePacked(
+            "script/ethsepolia/bridgeContractsL1.config.json"
+        ));
+        vm.writeJson(finalJson1, finalOutputPath1);
     }
 
     /////////////////////////////////////////////////
@@ -188,8 +180,13 @@ contract FileReader is Script {
         IStrategy[] memory _strategies,
         uint256[] memory _shares,
         bytes32 _withdrawalRoot,
+        bytes32 _withdrawalAgentOwnerRoot,
         string memory _filePath
     ) public {
+
+        require(_staker != address(0), "staker cannot be null");
+        require(_withdrawer != address(0), "withdrawer cannot be null");
+        require(address(_strategies[0]) != address(0), "strategies[0] cannot be null");
 
         // { "inputs": <inputs_data>}
         /////////////////////////////////////////////////
@@ -200,11 +197,11 @@ contract FileReader is Script {
         vm.serializeUint("inputs" , "startBlock", _startBlock);
         vm.serializeAddress("inputs" , "strategy", address(_strategies[0]));
         string memory inputs_data = vm.serializeUint("inputs" , "shares", _shares[0]);
-        // figure out how to serialize arrays
 
         /////////////////////////////////////////////////
         // { "outputs": <outputs_data>}
         /////////////////////////////////////////////////
+        vm.serializeBytes32("outputs", "withdrawalAgentOwnerRoot", _withdrawalAgentOwnerRoot);
         string memory outputs_data = vm.serializeBytes32("outputs", "withdrawalRoot", _withdrawalRoot);
 
         /////////////////////////////////////////////////
@@ -269,9 +266,10 @@ contract FileReader is Script {
         address _withdrawer = stdJson.readAddress(withdrawalData, ".inputs.withdrawer");
         address _delegatedTo = stdJson.readAddress(withdrawalData, ".inputs.delegatedTo");
         ///// NOTE: Wrong withdrawalRoot because the written startBlock is wrong
-        ///// (written when bridging is initiated), instead of written after bridging is complete
+        ///// (written when bridging is initiated), not during queueWithdrawal tx in L1
         uint32 _startBlock = uint32(stdJson.readUint(withdrawalData, ".inputs.startBlock"));
         // bytes32 _withdrawalRoot = stdJson.readBytes32(withdrawalData, ".outputs.withdrawalRoot");
+        // bytes32 _withdrawalAgentOwnerRoot = stdJson.readBytes32(withdrawalData, ".outputs.withdrawalAgentOwnerRoot");
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         uint256[] memory sharesToWithdraw = new uint256[](1);

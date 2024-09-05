@@ -6,7 +6,7 @@ import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISi
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 /// Note: Workaround for libraries not playing well with multi-fork environments + scripting in foundry
@@ -34,7 +34,7 @@ contract ClientEncoders {
     ) public pure returns (bytes memory) {
 
         bytes memory message_bytes = abi.encodeWithSelector(
-            // bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
+            // cast sig "queueWithdrawals((address[],uint256[],address)[])" == 0x0dd8dd02
             IDelegationManager.queueWithdrawals.selector,
             queuedWithdrawalParams
         );
@@ -76,7 +76,6 @@ contract ClientEncoders {
 
         bytes memory message_bytes = abi.encodeWithSelector(
             // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
-            // bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)")),
             IDelegationManager.completeQueuedWithdrawal.selector,
             withdrawal,
             tokensToWithdraw,
@@ -87,20 +86,30 @@ contract ClientEncoders {
         return message_bytes;
     }
 
+    function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
+        public
+        pure
+        returns (bytes32) {
+        return keccak256(abi.encode(withdrawal));
+    }
+
+    function calculateWithdrawalAgentOwnerRoot(bytes32 withdrawalRoot, address agentOwner)
+        public
+        pure
+        returns (bytes32) {
+        return keccak256(abi.encode(withdrawalRoot, agentOwner));
+    }
+
     function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalRoot,
-        address agentOwner
+        bytes32 withdrawalAgentOwnerRoot
     ) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
-            // bytes4(keccak256("handleTransferToAgentOwner(bytes32,address,bytes32)")),
-            ISenderUtils.handleTransferToAgentOwner.selector,
-            withdrawalRoot,
-            agentOwner,
-            calculateAgentOwnerRoot(withdrawalRoot, agentOwner)
+            // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
+            ISenderHooks.handleTransferToAgentOwner.selector,
+            withdrawalAgentOwnerRoot
         );
         return message_bytes;
     }
-
 
     function encodeDelegateTo(
         address operator,
@@ -189,11 +198,8 @@ contract ClientEncoders {
         return message_bytes;
     }
 
-    function calculateAgentOwnerRoot(
-        bytes32 withdrawalRoot,
-        address agentOwner
-    ) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked(withdrawalRoot, agentOwner));
+    function hashAgentOwnerRoot(bytes32 withdrawalRoot, address agentOwner) public pure returns (bytes32) {
+        return keccak256(abi.encode(withdrawalRoot, agentOwner));
     }
 }
 

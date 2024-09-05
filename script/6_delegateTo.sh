@@ -11,4 +11,10 @@ forge script script/6_delegateTo.s.sol:DelegateToScript  \
 
 
 ## Example DelegateTo CCIP message:
-# https://ccip.chain.link/msg/0x09c9dd5a62626f6d6c9e3e8335809ca2ae5521528c9ed0c3069373f7f50bcc2f
+# https://ccip.chain.link/msg/0x241da6f1da5d9a8262c6767486a0134de9e12db1ac3d49e4f8e8ff364c7b6236
+
+## Undelegate Message:
+# https://ccip.chain.link/msg/0xd47a04c1d4aa55082e3471669673e07b78475fe870c555075defeecb1b6f581e
+
+## Redeposit Message:
+# https://ccip.chain.link/msg/0x3857a387fdcd0d87a1f7c48ac7cdfc26c19cf21ec2b069acf4d67d93e9d94cd7
