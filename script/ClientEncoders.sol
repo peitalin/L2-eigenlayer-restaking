@@ -6,7 +6,7 @@ import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISi
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 /// Note: Workaround for libraries not playing well with multi-fork environments + scripting in foundry
@@ -101,13 +101,12 @@ contract ClientEncoders {
     }
 
     function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalRoot,
-        address agentOwner
+        bytes32 withdrawalAgentOwnerRoot
     ) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
-            ISenderUtils.handleTransferToAgentOwner.selector,
-            calculateWithdrawalAgentOwnerRoot(withdrawalRoot, agentOwner)
+            ISenderHooks.handleTransferToAgentOwner.selector,
+            withdrawalAgentOwnerRoot
         );
         return message_bytes;
     }

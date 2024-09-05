@@ -31,6 +31,8 @@ library BaseSepolia {
 
     // Risk Management Network contract that curses / blesses
     // address constant RMN = ;
+
+    address constant EVM2EVMOnRamp = 0x6486906bB2d85A6c0cCEf2A2831C11A2059ebfea;
 }
 
 library EthSepolia {

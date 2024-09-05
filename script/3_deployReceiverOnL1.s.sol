@@ -15,7 +15,7 @@ import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {IReceiverCCIPMock, ReceiverCCIPMock} from "../test/mocks/ReceiverCCIPMock.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
-import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 

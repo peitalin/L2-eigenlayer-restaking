@@ -12,11 +12,11 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
-import {SenderUtils} from "../src/SenderUtils.sol";
+import {SenderHooks} from "../src/SenderHooks.sol";
 
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
-import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";

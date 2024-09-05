@@ -17,6 +17,7 @@ import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {ISenderCCIPMock} from "./mocks/SenderCCIPMock.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 
 import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
 import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
@@ -44,6 +45,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
 
     IReceiverCCIPMock public receiverContract;
     ISenderCCIPMock public senderContract;
+    ISenderHooks public senderHooks;
     IRestakingConnector public restakingConnector;
 
     IStrategyManager public strategyManager;
@@ -66,6 +68,14 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
     uint256 expiry;
     uint256 balanceOfReceiverBefore;
     uint256 balanceOfEigenAgent;
+
+    // SenderHooks.WithdrawalAgentOwnerRootCommitted
+    event WithdrawalAgentOwnerRootCommitted(
+        bytes32 indexed, // withdrawalAgentOwnerRoot
+        address indexed, //  withdrawer (eigenAgent)
+        uint256, // amount
+        address  // signer (agentOwner)
+    );
 
     function setUp() public {
 
@@ -123,7 +133,10 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         //// Setup L2 CCIP contracts
         /////////////////////////////////////////
         vm.selectFork(l2ForkId);
-        senderContract = deployOnL2Script.mockrun();
+        (
+            senderContract,
+            senderHooks
+        ) = deployOnL2Script.mockrun();
         vm.deal(address(senderContract), 1 ether);
 
         vm.startBroadcast(deployerKey);
@@ -315,7 +328,9 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
      *
      */
 
-    function test_CCIP_Eigenlayer_CompleteWithdrawal(uint256 amount) public {
+    function test_CCIP_Eigenlayer_CompleteWithdrawal() public {
+
+        uint256 amount = 0.003 ether;
 
         handler_DepositAndQueueWithdrawal(amount);
 
@@ -383,6 +398,17 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             );
         }
 
+        bytes32 withdrawalAgentOwnerRoot = EigenlayerMsgEncoders.calculateWithdrawalAgentOwnerRoot(
+            withdrawalRoot,
+            bob
+        );
+        vm.expectEmit(true, false, true, false);
+        emit WithdrawalAgentOwnerRootCommitted(
+            withdrawalAgentOwnerRoot,
+            address(eigenAgent), // withdrawer
+            amount,
+            bob // signer
+        );
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
@@ -391,6 +417,7 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             0, // not sending tokens, just message
             0 // use default gasLimit for this function
         );
+
         vm.stopBroadcast();
 
         /////////////////////////////////////////////////////////////////
@@ -408,14 +435,15 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
         vm.warp(block.timestamp + 120); // 120 seconds = 10 blocks (12second per block)
         vm.roll((block.timestamp + 120) / 12);
 
-        // Mock L1 bridge receiving CCIP message and calling CompleteWithdrawal on Eigenlayer
-        // topic [1] event check is false: senderContract is test deployed address
+
+        // sender contract is forked from testnet, addr will differ
         vm.expectEmit(false, true, true, false);
         emit ReceiverCCIP.BridgingWithdrawalToL2(
             address(senderContract),
-            EigenlayerMsgEncoders.calculateWithdrawalAgentOwnerRoot(withdrawalRoot, bob), // withdrawalAgentOwnerRoot
+            withdrawalAgentOwnerRoot,
             amount
         );
+        // Mock L1 bridge receiving CCIP message and calling CompleteWithdrawal on Eigenlayer
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
@@ -459,11 +487,14 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
                 sourceChainSelector: EthSepolia.ChainSelector,
-                sender: abi.encode(deployer),
+                sender: abi.encode(address(receiverContract)),
                 data: abi.encode(string(
                     EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
-                        withdrawalRoot,
-                        bob
+                        withdrawalAgentOwnerRoot
+                        // EigenlayerMsgEncoders.calculateWithdrawalAgentOwnerRoot(
+                        //     withdrawalRoot,
+                        //     bob
+                        // )
                     )
                 )), // CCIP abi.encodes a string message when sending
                 destTokenAmounts: new Client.EVMTokenAmount[](0)
@@ -481,6 +512,43 @@ contract CCIP_Eigen_CompleteWithdrawal_6551Tests is Test {
             "balanceOf(bob) on L2 should increase by amount after L2 -> L2 withdrawal"
         );
 
+        /////////////////////////////////////////////////////////////////
+        //// Test Attempts to re-use WithdrawalAgentOwnerRoots
+        /////////////////////////////////////////////////////////////////
+
+        // attempting to commit a spent withdrawalAgentOwnerRoot should fail on L2
+        vm.expectRevert("SenderHooks._commitWithdrawalAgentOwnerRootInfo: withdrawalAgentOwnerRoot already used");
+        senderContract.sendMessagePayNative(
+            EthSepolia.ChainSelector, // destination chain
+            address(receiverContract),
+            string(messageWithSignature_CW),
+            address(BaseSepolia.BridgeToken), // destination token
+            0, // not sending tokens, just message
+            0 // use default gasLimit for this function
+        );
+
+        // attempting to re-use withdrawalAgentOwnerRoot from L1 should fail
+        bytes memory messageWithdrawalReuse = EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
+            EigenlayerMsgEncoders.calculateWithdrawalAgentOwnerRoot(
+                withdrawalRoot,
+                bob
+            )
+        );
+        vm.expectRevert("SenderHooks.handleTransferToAgentOwner: withdrawalAgentOwnerRoot already used");
+        senderContract.mockCCIPReceive(
+            Client.Any2EVMMessage({
+                messageId: bytes32(uint256(9999)),
+                sourceChainSelector: EthSepolia.ChainSelector,
+                sender: abi.encode(address(receiverContract)),
+                data: abi.encode(string(
+                    messageWithdrawalReuse
+                )),
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
+            })
+        );
+
+        // withdrawalAgentOwnerRoot should be spent now
+        vm.assertEq(senderHooks.isWithdrawalAgentOwnerRootSpent(withdrawalAgentOwnerRoot), true);
 
         vm.stopBroadcast();
     }

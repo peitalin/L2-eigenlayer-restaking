@@ -5,14 +5,13 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {Adminable} from "./utils/Adminable.sol";
 
-import {ISenderUtils} from "./interfaces/ISenderUtils.sol";
-import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
+import {ISenderHooks} from "./interfaces/ISenderHooks.sol";
 import {EigenlayerMsgDecoders, TransferToAgentOwnerMsg} from "./utils/EigenlayerMsgDecoders.sol";
 import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 
 
-
-contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
+/// @title Sender Hooks: processes SenderCCIP messages and stores state
+contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
 
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
     event SendingWithdrawalToAgentOwner(address indexed, uint256 indexed, address indexed);
@@ -23,7 +22,7 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
         address  // signer (agentOwner)
     );
 
-    mapping(bytes32 => ISenderUtils.WithdrawalTransfer) public withdrawalAgentOwnerTransferCommits;
+    mapping(bytes32 => ISenderHooks.WithdrawalTransfer) public withdrawalAgentOwnerTransferCommits;
     mapping(bytes32 => bool) public withdrawalAgentOwnerRootsSpent;
     mapping(bytes4 => uint256) internal _gasLimitsForFunctionSelectors;
 
@@ -64,6 +63,12 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
         _senderCCIP = newSenderCCIP;
     }
 
+    function isWithdrawalAgentOwnerRootSpent(bytes32 withdrawalAgentOwnerRoot)
+        public view
+        returns (bool) {
+        return withdrawalAgentOwnerRootsSpent[withdrawalAgentOwnerRoot];
+    }
+
     function handleTransferToAgentOwner(bytes memory message) public returns (
         address,
         uint256,
@@ -74,16 +79,20 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
 
         bytes32 withdrawalAgentOwnerRoot = transferToAgentOwnerMsg.withdrawalAgentOwnerRoot;
 
-        // read withdrawalAgentOwnerRoot entry that signer previously committed to.
-        ISenderUtils.WithdrawalTransfer memory withdrawalTransfer =
-            withdrawalAgentOwnerTransferCommits[withdrawalAgentOwnerRoot];
-
+        require(
+            withdrawalAgentOwnerRootsSpent[withdrawalAgentOwnerRoot] == false,
+            "SenderHooks.handleTransferToAgentOwner: withdrawalAgentOwnerRoot already used"
+        );
         // mark withdrawalRoot as spent to prevent multiple withdrawals
         withdrawalAgentOwnerRootsSpent[withdrawalAgentOwnerRoot] = true;
         // delete withdrawalAgentOwnerTransferCommits[withdrawalAgentOwnerRoot];
 
+        // read withdrawalAgentOwnerRoot entry that signer previously committed to.
+        ISenderHooks.WithdrawalTransfer memory withdrawalTransfer =
+            withdrawalAgentOwnerTransferCommits[withdrawalAgentOwnerRoot];
+
         emit SendingWithdrawalToAgentOwner(
-            withdrawalTransfer.agentOwner,
+            withdrawalTransfer.agentOwner, // signer committed when first calling completeWithdrawal
             withdrawalTransfer.amount,
             withdrawalTransfer.tokenDestination
         );
@@ -104,19 +113,20 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
         // When a user sends a message to `completeQueuedWithdrawal` from L2 to L1:
         if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
             // 0x60d7faed == cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)"))
-            _commitWithdrawalRootInfo(message, tokenL2);
+            _commitWithdrawalAgentOwnerRootInfo(message, tokenL2);
         }
 
     }
 
     // Returns the same withdrawalRoot calculated in Eigenlayer
-    function _calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
-        internal
+    function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
+        public
         pure
         returns (bytes32) {
         return keccak256(abi.encode(withdrawal));
     }
 
+    // Returns the same withdrawalAgentOwnerRoot calculated in RestakingConnector
     function calculateWithdrawalAgentOwnerRoot(bytes32 withdrawalRoot, address agentOwner)
         public
         pure
@@ -124,53 +134,59 @@ contract SenderUtils is Initializable, Adminable, EigenlayerMsgDecoders {
         return keccak256(abi.encode(withdrawalRoot, agentOwner));
     }
 
-    function _commitWithdrawalRootInfo(bytes memory message, address tokenDestinationL2) internal {
+    function _commitWithdrawalAgentOwnerRootInfo(
+        bytes memory message,
+        address tokenDestinationL2
+    ) internal {
 
-            require(tokenDestinationL2 != address(0), "cannot commit tokenL2 as address(0)");
+        require(
+            tokenDestinationL2 != address(0),
+            "SenderHooks._commitWithdrawalAgentOwnerRootInfo: cannot commit tokenL2 as address(0)"
+        );
 
-            (
-                IDelegationManager.Withdrawal memory withdrawal,
-                , // tokensToWithdraw,
-                , // middlewareTimesIndex
-                bool receiveAsTokens, // receiveAsTokens
-                address signer, // signer
-                , // expiry
-                // signature
-            ) = decodeCompleteWithdrawalMsg(message);
+        (
+            IDelegationManager.Withdrawal memory withdrawal,
+            , // tokensToWithdraw,
+            , // middlewareTimesIndex
+            bool receiveAsTokens, // receiveAsTokens
+            address signer, // signer
+            , // expiry
+            // signature
+        ) = decodeCompleteWithdrawalMsg(message);
 
-            // only when withdrawing tokens back to L2, not for re-deposits from re-delegations
-            if (receiveAsTokens) {
+        // only when withdrawing tokens back to L2, not for re-deposits from re-delegations
+        if (receiveAsTokens) {
 
-                // Calculate withdrawalAgentOwnerRoot: hash(withdrawalRoot, signer)
-                // and commit to it on L2, so that when the withdrawalAgentOwnerRoot message is
-                // returned from L1 we can lookup and verify which AgentOwner to transfer funds to.
-                bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalAgentOwnerRoot(
-                    _calculateWithdrawalRoot(withdrawal),
-                    signer
-                );
-                // This prevents griefing attacks where other users put in withdrawalRoot entries
-                // with the wrong agentOwner address, preventing completeWithdrawals
+            // Calculate withdrawalAgentOwnerRoot: hash(withdrawalRoot, signer)
+            // and commit to it on L2, so that when the withdrawalAgentOwnerRoot message is
+            // returned from L1 we can lookup and verify which AgentOwner to transfer funds to.
+            bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalAgentOwnerRoot(
+                calculateWithdrawalRoot(withdrawal),
+                signer
+            );
+            // This prevents griefing attacks where other users put in withdrawalRoot entries
+            // with the wrong agentOwner address, preventing completeWithdrawals
 
-                require(
-                    withdrawalAgentOwnerRootsSpent[withdrawalAgentOwnerRoot] == false,
-                    "withdrawalAgentOwnerRoot has already been used"
-                );
+            require(
+                withdrawalAgentOwnerRootsSpent[withdrawalAgentOwnerRoot] == false,
+                "SenderHooks._commitWithdrawalAgentOwnerRootInfo: withdrawalAgentOwnerRoot already used"
+            );
 
-                // Commit to WithdrawalTransfer(withdrawer, amount, token, owner) before sending completeWithdrawal message,
-                withdrawalAgentOwnerTransferCommits[withdrawalAgentOwnerRoot] = ISenderUtils.WithdrawalTransfer({
-                    withdrawer: withdrawal.withdrawer, // eigenAgent
-                    amount: withdrawal.shares[0],
-                    tokenDestination: tokenDestinationL2,
-                    agentOwner: signer // signer is owner of EigenAgent
-                });
+            // Commit to WithdrawalTransfer(withdrawer, amount, token, owner) before sending completeWithdrawal message,
+            withdrawalAgentOwnerTransferCommits[withdrawalAgentOwnerRoot] = ISenderHooks.WithdrawalTransfer({
+                withdrawer: withdrawal.withdrawer, // eigenAgent
+                amount: withdrawal.shares[0],
+                tokenDestination: tokenDestinationL2,
+                agentOwner: signer // signer is owner of EigenAgent, used in handleTransferToAgentOwner
+            });
 
-                emit WithdrawalAgentOwnerRootCommitted(
-                    withdrawalAgentOwnerRoot,
-                    withdrawal.withdrawer,
-                    withdrawal.shares[0], // amount
-                    signer
-                );
-            }
+            emit WithdrawalAgentOwnerRootCommitted(
+                withdrawalAgentOwnerRoot,
+                withdrawal.withdrawer,
+                withdrawal.shares[0], // amount
+                signer
+            );
+        }
     }
 
     function setGasLimitsForFunctionSelectors(

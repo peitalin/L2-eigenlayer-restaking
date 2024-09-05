@@ -2,19 +2,16 @@
 pragma solidity 0.8.22;
 
 import {Script, console} from "forge-std/Script.sol";
-
-import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
-import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 
-import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 import {FileReader} from "./FileReader.sol";
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 
@@ -25,7 +22,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
     IAgentFactory public agentFactoryProxy;
     IReceiverCCIP public receiverProxy;
     ISenderCCIP public senderProxy;
-    ISenderUtils public senderUtilsProxy;
+    ISenderHooks public senderHooksProxy;
 
     uint256 public deployerKey = vm.envUint("DEPLOYER_KEY");
     address public deployer = vm.addr(deployerKey);
@@ -33,7 +30,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
     function run() public {
 
         senderProxy = readSenderContract();
-        senderUtilsProxy = readSenderUtils();
+        senderHooksProxy = readSenderHooks();
 
         (
             receiverProxy,
@@ -48,7 +45,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         ) = readEigenAgent721AndRegistry();
 
         require(address(senderProxy) != address(0), "senderProxy cannot be 0");
-        require(address(senderUtilsProxy) != address(0), "senderUtilsProxy cannot be 0");
+        require(address(senderHooksProxy) != address(0), "senderHooksProxy cannot be 0");
         require(address(receiverProxy) != address(0), "receiverProxy cannot be 0");
         require(address(restakingConnectorProxy) != address(0), "restakingConnectorProxy cannot be 0");
         require(address(agentFactoryProxy) != address(0), "agentFactory cannot be 0");
@@ -94,18 +91,18 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         functionSelectors[5] = 0xda8be864;
         // cast sig "undelegate(address)" == 0xda8be864
 
-        senderUtilsProxy.setGasLimitsForFunctionSelectors(
+        senderHooksProxy.setGasLimitsForFunctionSelectors(
             functionSelectors,
             gasLimits
         );
 
-        senderUtilsProxy.setSenderCCIP(address(senderProxy));
+        senderHooksProxy.setSenderCCIP(address(senderProxy));
 
         IERC20_CCIPBnM(tokenL2).drip(deployer);
 
         require(
-            address(senderProxy.getSenderUtils()) != address(0),
-            "senderProxy: missing senderUtils"
+            address(senderProxy.getSenderHooks()) != address(0),
+            "senderProxy: missing senderHooks"
         );
         require(
             senderProxy.allowlistedSenders(address(receiverProxy)),

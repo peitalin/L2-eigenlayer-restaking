@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, stdJson, console} from "forge-std/Script.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {Script, console} from "forge-std/Script.sol";
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
@@ -51,6 +50,14 @@ contract DelegateToScript is
     address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
+        return _run(false);
+    }
+
+    function mockrun(uint256 mockKey) public {
+        return _run(true);
+    }
+
+    function _run(bool isTest) public {
 
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
@@ -89,7 +96,7 @@ contract DelegateToScript is
         if (!delegationManager.isOperator(operator)) {
             vm.startBroadcast(deployerKey);
             {
-                topupSenderEthBalance(operator);
+                topupSenderEthBalance(operator, isTest);
             }
             vm.stopBroadcast();
 
@@ -171,7 +178,7 @@ contract DelegateToScript is
             );
         }
 
-        topupSenderEthBalance(address(senderContract));
+        topupSenderEthBalance(address(senderContract), isTest);
 
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain

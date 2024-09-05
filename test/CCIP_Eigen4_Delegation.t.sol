@@ -21,6 +21,7 @@ import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {ISenderCCIPMock} from "./mocks/SenderCCIPMock.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
@@ -43,6 +44,7 @@ contract CCIP_Eigen_DelegationTests is Test {
 
     IReceiverCCIPMock public receiverContract;
     ISenderCCIPMock public senderContract;
+    ISenderHooks public senderHooks;
     IRestakingConnector public restakingConnector;
     IAgentFactory public agentFactory;
 
@@ -97,7 +99,10 @@ contract CCIP_Eigen_DelegationTests is Test {
 
         //////////// Arb Sepolia ////////////
         vm.selectFork(l2ForkId);
-        senderContract = deployOnL2Script.mockrun();
+        (
+            senderContract,
+            senderHooks
+        ) = deployOnL2Script.mockrun();
 
 
         //////////// Eth Sepolia ////////////

@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 library FunctionSelectorDecoder {
 
-    /// @dev Decodes leading bytes4 in the string message to know how to decode the rest of the message
+    /// @dev Decodes leading bytes4 in the string message
     /// @param message is the CCIP Any2EVMMessage.data payload: an abi.encoded string
     function decodeFunctionSelector(bytes memory message) public pure returns (bytes4) {
 

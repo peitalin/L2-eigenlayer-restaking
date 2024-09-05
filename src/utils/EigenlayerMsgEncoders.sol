@@ -5,13 +5,12 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ISenderUtils} from "../interfaces/ISenderUtils.sol";
+import {ISenderHooks} from "../interfaces/ISenderHooks.sol";
 import {IRestakingConnector} from "../interfaces/IRestakingConnector.sol";
 
 
 library EigenlayerMsgEncoders {
 
-    // used by EigenAgent -> Eigenlayer
     function encodeDepositIntoStrategyMsg(
         address strategy,
         address token,
@@ -40,13 +39,6 @@ library EigenlayerMsgEncoders {
 
         return message_bytes;
     }
-
-    /*
-     *
-     *         Standard Messages
-     *
-     *
-    */
 
     function encodeCompleteWithdrawalMsg(
         IDelegationManager.Withdrawal memory withdrawal,
@@ -85,46 +77,23 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-    function calculateWithdrawalAgentOwnerRoot(
-        bytes32 withdrawalRoot,
-        address agentOwner // signer
-    ) public pure returns (bytes32) {
-        // encode signer into withdrawalAgentOwnerRoot
-        return keccak256(abi.encode(withdrawalRoot, agentOwner));
-    }
-
-    function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalRoot,
-        address signer
-    ) public pure returns (bytes memory) {
-
-        bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalAgentOwnerRoot(withdrawalRoot, signer);
-
-        bytes memory message_bytes = abi.encodeWithSelector(
-            // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
-            ISenderUtils.handleTransferToAgentOwner.selector,
-            withdrawalAgentOwnerRoot
-        );
-        return message_bytes;
-    }
-
     function encodeDelegateTo(
         address operator,
         ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
         bytes32 approverSalt
     ) public pure returns (bytes memory) {
 
-        // function delegateTo(
-        //     address operator,
-        //     SignatureWithExpiry memory approverSignatureAndExpiry,
-        //     bytes32 approverSalt
-        // )
-        // struct SignatureWithExpiry {
-        //     // the signature itself, formatted as a single bytes object
-        //     bytes signature;
-        //     // the expiration timestamp (UTC) of the signature
-        //     uint256 expiry;
-        // }
+        // Function Signature:
+        //     delegateTo(
+        //         address operator,
+        //         SignatureWithExpiry memory approverSignatureAndExpiry,
+        //         bytes32 approverSalt
+        //     )
+        // Where:
+        //     struct SignatureWithExpiry {
+        //         bytes signature;
+        //         uint256 expiry;
+        //     }
 
         // 0000000000000000000000000000000000000000000000000000000000000020
         // 0000000000000000000000000000000000000000000000000000000000000164
@@ -153,9 +122,45 @@ library EigenlayerMsgEncoders {
 
     function encodeUndelegateMsg(address staker) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
-            // cast sig "undelegate(address)"
+            // cast sig "undelegate(address)" == 0xda8be864
             IDelegationManager.undelegate.selector,
             staker
+        );
+        return message_bytes;
+    }
+
+    function encodeMintEigenAgent() public pure returns (bytes memory) {
+
+        bytes memory message_bytes = abi.encodeWithSelector(
+            // cast sig "mintEigenAgent(bytes)" == 0xcc15a557
+            IRestakingConnector.mintEigenAgent.selector
+        );
+        return message_bytes;
+    }
+
+    /*
+     *
+     *         L2 Withdrawal Transfers
+     *
+     *
+    */
+
+    function calculateWithdrawalAgentOwnerRoot(
+        bytes32 withdrawalRoot,
+        address agentOwner // signer
+    ) public pure returns (bytes32) {
+        // encode signer into withdrawalAgentOwnerRoot
+        return keccak256(abi.encode(withdrawalRoot, agentOwner));
+    }
+
+    function encodeHandleTransferToAgentOwnerMsg(
+        bytes32 withdrawalAgentOwnerRoot
+    ) public pure returns (bytes memory) {
+
+        bytes memory message_bytes = abi.encodeWithSelector(
+            // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
+            ISenderHooks.handleTransferToAgentOwner.selector,
+            withdrawalAgentOwnerRoot
         );
         return message_bytes;
     }

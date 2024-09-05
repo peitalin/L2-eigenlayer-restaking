@@ -19,7 +19,6 @@ import {FunctionSelectorDecoder} from "../src/utils/FunctionSelectorDecoder.sol"
 
 import {ClientSigners} from "../script/ClientSigners.sol";
 import {EthSepolia} from "../script/Addresses.sol";
-import {FileReader} from "../script/FileReader.sol";
 
 
 contract EigenlayerMsg_EncodingDecodingTests is Test {
@@ -113,12 +112,45 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             196
         ); // for depositIntoStrategy
 
-        require(_signer == _signer2, "decodeAgentOwnerSignature: signer incorrect");
-        require(_expiry == _expiry2, "decodeAgentOwnerSignature: expiry incorrect");
+        // compare vs original inputs
+        require(_signer == vm.addr(deployerKey), "decodeAgentOwnerSignature: signer not original address");
+        require(_expiry == expiry, "decodeAgentOwnerSignature: expiry not original expiry");
+
+        // compare decodeAgentOwner vs decodeDepositIntoStrategy
+        require(_signer == _signer2, "decodeAgentOwnerSignature: signer did not match");
+        require(_expiry == _expiry2, "decodeAgentOwnerSignature: expiry did not match");
         require(
             keccak256(_signature) == keccak256(_signature2),
             "decodeAgentOwnerSignature: signature incorrect"
         );
+    }
+
+    function test_Decode_MintEigenAgent() public view {
+
+        bytes memory messageToEigenlayer = EigenlayerMsgEncoders.encodeMintEigenAgent();
+
+        bytes memory messageWithSignature = clientSigners.signMessageForEigenAgentExecution(
+            deployerKey,
+            block.chainid,
+            address(strategy),
+            messageToEigenlayer,
+            execNonce,
+            expiry
+        );
+
+        // CCIP turns the message into string when sending
+        bytes memory messageWithSignatureCCIP = abi.encode(string(messageWithSignature));
+
+        (
+            // message signature
+            address _signer,
+            uint256 _expiry,
+            bytes memory _signature
+        ) = eigenlayerMsgDecoders.decodeMintEigenAgent(messageWithSignatureCCIP);
+
+        require(_signature.length == 65, "mintEigenAgent: invalid signature length");
+        require(_signer == staker, "mintEigenAgent: staker does not match");
+        require(expiry == _expiry, "mintEigenAgent: expiry error");
     }
 
     /*
@@ -160,13 +192,13 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             bytes memory _signature
         ) = eigenlayerMsgDecoders.decodeDepositIntoStrategyMsg(messageWithSignatureCCIP);
 
-        require(_signature.length == 65, "invalid signature length");
-        require(_signer == staker, "staker does not match");
-        require(expiry == _expiry, "expiry error: decodeDepositIntoStrategyMsg");
-
         require(address(_strategy) == address(strategy), "strategy does not match");
         require(address(token) == _token, "token error: decodeDepositIntoStrategyMsg");
         require(amount == _amount, "amount error: decodeDepositIntoStrategyMsg");
+
+        require(_signature.length == 65, "invalid signature length");
+        require(_signer == staker, "staker does not match");
+        require(expiry == _expiry, "expiry error: decodeDepositIntoStrategyMsg");
     }
 
     /*
@@ -308,6 +340,38 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         );
     }
 
+    function test_Decode_Revert_ZeroLenArray_QueueWithdrawals() public {
+
+        IDelegationManager.QueuedWithdrawalParams[] memory QWPArray =
+            new IDelegationManager.QueuedWithdrawalParams[](0);
+
+        bytes memory message_QW;
+        bytes memory messageWithSignature_QW;
+        {
+            message_QW = EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
+                QWPArray
+            );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature_QW = clientSigners.signMessageForEigenAgentExecution(
+                deployerKey,
+                block.chainid, // destination chainid where EigenAgent lives
+                address(123123), // StrategyManager to approve + deposit
+                message_QW,
+                execNonce,
+                expiry
+            );
+        }
+
+        vm.expectRevert("decodeQueueWithdrawalsMsg: arrayLength must be at least 1");
+        eigenlayerMsgDecoders.decodeQueueWithdrawalsMsg(
+            // CCIP string-encodes the message when sending
+            abi.encode(string(
+                messageWithSignature_QW
+            ))
+        );
+    }
+
     /*
      *
      *
@@ -404,8 +468,10 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         TransferToAgentOwnerMsg memory tta_msg = eigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(
             abi.encode(string(
                 EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
-                    withdrawalRoot,
-                    bob
+                    EigenlayerMsgEncoders.calculateWithdrawalAgentOwnerRoot(
+                        withdrawalRoot,
+                        bob
+                    )
                 )
             ))
         );

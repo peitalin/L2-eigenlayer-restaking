@@ -72,6 +72,12 @@ contract EigenAgent6551 is ERC6551Account, IEigenAgent6551 {
         virtual
         returns (bytes memory result)
     {
+        /// Should we revert on expiry?
+        /// CCIP may take hours to deliver messages when gas spikes.
+        /// We would need to return funds to the user on L2 this case,
+        /// as the transaction may no longer be manually executable after gas lowers later.
+        ///
+        // require(expiry >= block.timestamp, "Signature for EigenAgent execution expired");
 
         bytes32 digestHash = createEigenAgentCallDigestHash(
             targetContract,

@@ -2,7 +2,6 @@
 pragma solidity 0.8.22;
 
 import {Script, console} from "forge-std/Script.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
@@ -38,7 +37,6 @@ contract RedepositScript is
     ISenderCCIP public senderProxy;
     IRestakingConnector public restakingConnector;
     IAgentFactory public agentFactory;
-    address public senderAddr;
 
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
@@ -88,7 +86,6 @@ contract RedepositScript is
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
         senderProxy = readSenderContract();
-        senderAddr = address(senderProxy);
 
         (receiverProxy, restakingConnector) = readReceiverRestakingConnector();
         agentFactory = readAgentFactory();
@@ -177,7 +174,7 @@ contract RedepositScript is
             );
         }
 
-        topupSenderEthBalance(senderAddr);
+        topupSenderEthBalance(address(senderProxy), isTest);
 
         senderProxy.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain

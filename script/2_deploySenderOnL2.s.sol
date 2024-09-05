@@ -10,8 +10,8 @@ import {Script} from "forge-std/Script.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {ISenderCCIPMock, SenderCCIPMock} from "../test/mocks/SenderCCIPMock.sol";
-import {SenderUtils} from "../src/SenderUtils.sol";
-import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
+import {SenderHooks} from "../src/SenderHooks.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 
 
@@ -20,27 +20,36 @@ contract DeploySenderOnL2Script is Script, FileReader {
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
     address deployer = vm.addr(deployerKey);
 
-    function run() public returns (ISenderCCIP) {
+    function run() public returns (ISenderCCIP, ISenderHooks) {
         return _run(false);
     }
 
-    function mockrun() public returns (ISenderCCIPMock) {
-        return ISenderCCIPMock(address(_run(true)));
+    function mockrun() public returns (ISenderCCIPMock, ISenderHooks) {
+
+        (
+            ISenderCCIP _senderContract,
+            ISenderHooks _senderHooks
+        ) = _run(true);
+
+        return (
+            ISenderCCIPMock(address(_senderContract)),
+            _senderHooks
+        );
     }
 
-    function _run(bool isMockRun) internal returns (ISenderCCIP) {
+    function _run(bool isMockRun) internal returns (ISenderCCIP, ISenderHooks) {
 
         vm.startBroadcast(deployerKey);
 
         ProxyAdmin proxyAdmin = new ProxyAdmin();
 
         // deploy sender utils proxy
-        SenderUtils senderUtilsProxy = SenderUtils(
+        SenderHooks senderHooksProxy = SenderHooks(
             payable(address(
                 new TransparentUpgradeableProxy(
-                    address(new SenderUtils()),
+                    address(new SenderHooks()),
                     address(proxyAdmin),
-                    abi.encodeWithSelector(SenderUtils.initialize.selector)
+                    abi.encodeWithSelector(SenderHooks.initialize.selector)
                 )
             ))
         );
@@ -65,17 +74,17 @@ contract DeploySenderOnL2Script is Script, FileReader {
         // whitelist both chain to receive and send messages
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
-        senderProxy.setSenderUtils(ISenderUtils(address(senderUtilsProxy)));
+        senderProxy.setSenderHooks(ISenderHooks(address(senderHooksProxy)));
 
-        senderUtilsProxy.setSenderCCIP(address(senderProxy));
+        senderHooksProxy.setSenderCCIP(address(senderProxy));
 
         require(
-            address(senderProxy.getSenderUtils()) != address(0),
-            "senderProxy: missing senderUtils"
+            address(senderProxy.getSenderHooks()) != address(0),
+            "senderProxy: missing senderHooks"
         );
         require(
-            address(senderUtilsProxy.getSenderCCIP()) != address(0),
-            "senderUtilsProxy: missing senderCCIP"
+            address(senderHooksProxy.getSenderCCIP()) != address(0),
+            "senderHooksProxy: missing senderCCIP"
         );
         require(
             senderProxy.allowlistedSourceChains(EthSepolia.ChainSelector),
@@ -89,13 +98,16 @@ contract DeploySenderOnL2Script is Script, FileReader {
         if (!isMockRun) {
             saveSenderBridgeContracts(
                 address(senderProxy),
-                address(senderUtilsProxy),
+                address(senderHooksProxy),
                 address(proxyAdmin)
             );
         }
 
         vm.stopBroadcast();
 
-        return ISenderCCIP(address(senderProxy));
+        return (
+            ISenderCCIP(address(senderProxy)),
+            ISenderHooks(address(senderHooksProxy))
+        );
     }
 }

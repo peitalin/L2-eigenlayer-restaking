@@ -233,10 +233,13 @@ contract RestakingConnector is
             receiveAsTokens = _receiveAsTokens;
             withdrawalAmount = withdrawal.shares[0];
             withdrawalToken = address(tokensToWithdraw[0]);
+            withdrawalAgentOwnerRoot = EigenlayerMsgEncoders.calculateWithdrawalAgentOwnerRoot(
+                delegationManager.calculateWithdrawalRoot(withdrawal), // withdrawalRoot
+                signer
+            );
             // hash(withdrawalRoot, signer) to make withdrawalAgentOwnerRoot for L2 transfer
             messageForL2 = string(EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
-                delegationManager.calculateWithdrawalRoot(withdrawal), // withdrawal root
-                signer
+                withdrawalAgentOwnerRoot
             ));
 
             if (_receiveAsTokens) {

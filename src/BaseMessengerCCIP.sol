@@ -175,12 +175,12 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
     function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage) internal override virtual;
 
-
     /// @param _receiver The address of the receiver.
     /// @param _text The string data to be sent.
     /// @param _token The token to be transferred.
     /// @param _amount The amount of the token to be transferred.
     /// @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
+    /// @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
     /// @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
     function _buildCCIPMessage(
         address _receiver,
@@ -189,39 +189,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         uint256 _amount,
         address _feeTokenAddress,
         uint256 _overrideGasLimit
-    ) internal virtual returns (Client.EVM2AnyMessage memory) {
-
-        Client.EVMTokenAmount[] memory tokenAmounts;
-        if (_amount <= 0) {
-            // Must be an empty array as no tokens are transferred
-            // non-empty arrays with 0 amounts error with CannotSendZeroTokens() == 0x5cf04449
-            tokenAmounts = new Client.EVMTokenAmount[](0);
-        } else {
-            tokenAmounts = new Client.EVMTokenAmount[](1);
-            tokenAmounts[0] = Client.EVMTokenAmount({
-                token: _token,
-                amount: _amount
-            });
-        }
-
-        bytes memory message = abi.encode(_text);
-
-        uint256 gasLimit = 600_000;
-        if (_overrideGasLimit > 0) {
-            gasLimit = _overrideGasLimit;
-        }
-
-        return
-            Client.EVM2AnyMessage({
-                receiver: abi.encode(_receiver),
-                data: message,
-                tokenAmounts: tokenAmounts,
-                feeToken: _feeTokenAddress,
-                extraArgs: Client._argsToBytes(
-                    Client.EVMExtraArgsV1({ gasLimit: gasLimit })
-                )
-            });
-    }
+    ) internal virtual returns (Client.EVM2AnyMessage memory);
 
     /// @notice Fallback function to allow the contract to receive Ether.
     receive() external payable {}

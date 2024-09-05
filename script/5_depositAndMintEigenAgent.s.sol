@@ -83,7 +83,6 @@ contract DepositAndMintEigenAgentScript is
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
         senderContract = readSenderContract();
-        address senderAddr = address(senderContract);
 
         (
             receiverContract,
@@ -95,6 +94,7 @@ contract DepositAndMintEigenAgentScript is
         tokenL2 = IERC20(address(BaseSepolia.BridgeToken)); // CCIP-BnM on BaseSepolia
 
         TARGET_CONTRACT = address(strategyManager);
+
 
         //////////////////////////////////////////////////////////
         /// L1: Get Deposit Inputs
@@ -148,11 +148,10 @@ contract DepositAndMintEigenAgentScript is
         // Check L2 CCIP-BnM balances
         if (tokenL2.balanceOf(deployer) < 1 ether) {
             IERC20_CCIPBnM(address(tokenL2)).drip(deployer);
-            IERC20_CCIPBnM(address(tokenL2)).drip(senderAddr);
+            IERC20_CCIPBnM(address(tokenL2)).drip(address(senderContract));
         }
-        if (!isTest) {
-            topupSenderEthBalance(senderAddr);
-        }
+
+        topupSenderEthBalance(address(senderContract), isTest);
 
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain

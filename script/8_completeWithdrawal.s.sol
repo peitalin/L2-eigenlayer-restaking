@@ -2,7 +2,6 @@
 pragma solidity 0.8.22;
 
 import {Script, console} from "forge-std/Script.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
@@ -11,7 +10,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
-import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
@@ -37,10 +36,9 @@ contract CompleteWithdrawalScript is
 
     IReceiverCCIP public receiverProxy;
     ISenderCCIP public senderProxy;
-    ISenderUtils public senderUtilsProxy;
+    ISenderHooks public SenderHooksProxy;
     IRestakingConnector public restakingConnector;
     IAgentFactory public agentFactory;
-    address public senderAddr;
 
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
@@ -89,8 +87,7 @@ contract CompleteWithdrawalScript is
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
         senderProxy = readSenderContract();
-        senderAddr = address(senderProxy);
-        senderUtilsProxy = readSenderUtils();
+        SenderHooksProxy = readSenderHooks();
 
         (receiverProxy, restakingConnector) = readReceiverRestakingConnector();
         agentFactory = readAgentFactory();
@@ -186,7 +183,8 @@ contract CompleteWithdrawalScript is
             );
         }
 
-        topupSenderEthBalance(senderAddr);
+        topupSenderEthBalance(address(senderProxy), isTest);
+
         senderProxy.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
             address(receiverProxy),

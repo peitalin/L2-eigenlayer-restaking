@@ -16,7 +16,6 @@ import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
 import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
-import {WhitelistCCIPContractsScript} from "../script/4_whitelistCCIPContracts.s.sol";
 
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
@@ -41,7 +40,6 @@ contract QueueWithdrawalScript is
 
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
     address deployer = vm.addr(deployerKey);
-    bool isTest = block.chainid == 31337;
 
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
@@ -63,6 +61,14 @@ contract QueueWithdrawalScript is
     address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
+        return _run(false);
+    }
+
+    function mockrun() public {
+        return _run(true);
+    }
+
+    function _run(bool isTest) public {
 
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
@@ -94,7 +100,7 @@ contract QueueWithdrawalScript is
             vm.selectFork(l2ForkId);
             // mock deploy on L2 Fork
             DeploySenderOnL2Script deployOnL2Script = new DeploySenderOnL2Script();
-            senderContract = deployOnL2Script.mockrun();
+            (senderContract,) = deployOnL2Script.mockrun();
 
             // go back to ETH fork
             vm.selectFork(ethForkId);
@@ -124,7 +130,6 @@ contract QueueWithdrawalScript is
         // Parameters
         ////////////////////////////////////////////////////////////
 
-        address senderAddr = address(senderContract);
         tokenL2 = IERC20(address(BaseSepolia.BridgeToken)); // BaseSepolia contract
         TARGET_CONTRACT = address(delegationManager);
 
@@ -188,7 +193,7 @@ contract QueueWithdrawalScript is
         /////// Broadcast to L2
         /////////////////////////////////////////////////////////////////
 
-        topupSenderEthBalance(senderAddr);
+        topupSenderEthBalance(address(senderContract), isTest);
 
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain

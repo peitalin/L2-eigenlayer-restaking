@@ -22,6 +22,7 @@ import {QueueWithdrawalScript} from "../script/7_queueWithdrawal.s.sol";
 import {CompleteWithdrawalScript} from "../script/8_completeWithdrawal.s.sol";
 import {DeployVerifyScript} from "../script/x_deployVerify.s.sol";
 import {ScriptUtils} from "../script/ScriptUtils.sol";
+import {BaseSepolia} from "../script/Addresses.sol";
 
 
 contract DeployScriptsTests is Test, ScriptUtils {
@@ -79,6 +80,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
         deployerVerifyScript = new DeployVerifyScript();
 
         vm.chainId(31337); // sets isTest flag; script uses forkSelect()
+
         vm.deal(deployer, 1 ether);
     }
 
@@ -163,7 +165,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
     function test_step7_QueueWithdrawalScript() public {
         // Note II: If step8 has completed withdrawal, this test may warn it failed with:
         // "revert: withdrawalRoot has already been used"
-        queueWithdrawalScript.run();
+        queueWithdrawalScript.mockrun();
         // writes new json files: withdrawalRoots
     }
 

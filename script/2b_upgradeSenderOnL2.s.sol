@@ -6,10 +6,10 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 
 import {Script, console} from "forge-std/Script.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
-import {SenderUtils} from "../src/SenderUtils.sol";
+import {SenderHooks} from "../src/SenderHooks.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
-import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
@@ -21,15 +21,15 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
     address deployer = vm.addr(deployerKey);
 
     function run() public {
-        return _run(false);
+        return _run();
     }
 
     function mockrun() public {
         vm.createSelectFork("basesepolia");
-        return _run(true);
+        return _run();
     }
 
-    function _run(bool isTest) public {
+    function _run() public {
 
         ProxyAdmin proxyAdmin = ProxyAdmin(readProxyAdminL2());
 
@@ -39,7 +39,7 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
         ) = readReceiverRestakingConnector();
 
         ISenderCCIP senderProxy = readSenderContract();
-        ISenderUtils senderUtilsProxy = readSenderUtils();
+        ISenderHooks senderHooksProxy = readSenderHooks();
 
         /////////////////////////////
         /// Begin Broadcast
@@ -52,8 +52,8 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
         );
 
         proxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(senderUtilsProxy))),
-            address(new SenderUtils())
+            TransparentUpgradeableProxy(payable(address(senderHooksProxy))),
+            address(new SenderHooks())
         );
 
         /// whitelist destination chain
@@ -61,16 +61,16 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         senderProxy.allowlistSender(address(receiverProxy), true);
 
-        senderProxy.setSenderUtils(senderUtilsProxy);
-        senderUtilsProxy.setSenderCCIP(address(senderProxy));
+        senderProxy.setSenderHooks(senderHooksProxy);
+        senderHooksProxy.setSenderCCIP(address(senderProxy));
 
         require(
-            address(senderProxy.getSenderUtils()) != address(0),
-            "senderProxy: missing senderUtils"
+            address(senderProxy.getSenderHooks()) != address(0),
+            "senderProxy: missing senderHooks"
         );
         require(
-            address(senderUtilsProxy.getSenderCCIP()) != address(0),
-            "senderUtilsProxy: missing senderCCIP"
+            address(senderHooksProxy.getSenderCCIP()) != address(0),
+            "senderHooksProxy: missing senderCCIP"
         );
         require(
             senderProxy.allowlistedSenders(address(receiverProxy)),

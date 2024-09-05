@@ -5,7 +5,7 @@ import {Script, stdJson, console} from "forge-std/Script.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
-import {ISenderUtils} from "../src/interfaces/ISenderUtils.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
@@ -30,11 +30,11 @@ contract FileReader is Script {
         return ISenderCCIP(senderAddr);
     }
 
-    function readSenderUtils() public view returns (ISenderUtils) {
+    function readSenderHooks() public view returns (ISenderHooks) {
         string memory addrData;
         addrData = vm.readFile("script/basesepolia/bridgeContractsL2.config.json");
-        address senderUtilsAddr = stdJson.readAddress(addrData, ".contracts.senderUtils");
-        return ISenderUtils(senderUtilsAddr);
+        address senderHooksAddr = stdJson.readAddress(addrData, ".contracts.senderHooks");
+        return ISenderHooks(senderHooksAddr);
     }
 
     function readProxyAdminL2() public view returns (address) {
@@ -47,13 +47,13 @@ contract FileReader is Script {
     /// @dev hardcoded chainid for contracts. Update for prod
     function saveSenderBridgeContracts(
         address senderCCIP,
-        address senderUtils,
+        address senderHooks,
         address proxyAdminL2
     ) public {
         // { "inputs": <inputs_data>}
         /////////////////////////////////////////////////
         vm.serializeAddress("contracts" , "senderCCIP", senderCCIP);
-        vm.serializeAddress("contracts" , "senderUtils", senderUtils);
+        vm.serializeAddress("contracts" , "senderHooks", senderHooks);
         string memory inputs_data = vm.serializeAddress("contracts" , "proxyAdminL2", proxyAdminL2);
 
         /////////////////////////////////////////////////

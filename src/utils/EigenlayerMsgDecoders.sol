@@ -88,17 +88,6 @@ contract EigenlayerMsgDecoders {
             expiry,
             signature
         ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 196); // signature starts on 196
-
-        require(signature.length == 65, "decodeDepositIntoStrategyMsg: invalid signature length");
-
-        return (
-            strategy,
-            token,
-            amount,
-            signer,
-            expiry,
-            signature
-        );
     }
 
     function decodeMintEigenAgent(bytes memory message)
@@ -111,26 +100,17 @@ contract EigenlayerMsgDecoders {
     {
         // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
         // 00000000000000000000000000000000000000000000000000000000000000e5 [64] string length
-        // e7a050aa                                                         [96] function selector
+        // 0xcc15a557                                                       [96] function selector
         // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [100] signer (original staker)
         // 0000000000000000000000000000000000000000000000000000000066d063d4 [132] expiry (signature)
         // b65bb77203b002de051363fd17437187540d5c6a0cfcb75c31dfffff9108e41d [164] signature r
         // 037e6bdadf2079e5268e5ad0000699611e63c3e015027ad7f8e7b4a252bbb9bb [196] signature s
         // 1c000000000000000000000000000000000000000000000000000000         [228] signature v
-
         (
             signer,
             expiry,
             signature
-        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 100); // signature starts on 196
-
-        require(signature.length == 65, "decodeDepositIntoStrategyMsg: invalid signature length");
-
-        return (
-            signer,
-            expiry,
-            signature
-        );
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 100); // signature starts on 100
     }
 
     /*
@@ -214,23 +194,22 @@ contract EigenlayerMsgDecoders {
     {
         /// @dev: expect to use this in a for-loop with i iteration variable
 
-        //////////////////////////////////////////////////
-        //// Deserializing messages: offsets for assembly
-        //////////////////////////////////////////////////
+        //////////////////////////////////////////////
+        // Message offsets
+        //////////////////////////////////////////////
         //
-        // functionSelector signature:
-        // bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
-        //
+        // Function Selector signature:
+        //     bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
         // Params:
-        // queuedWithdrawal = IDelegationManager.QueuedWithdrawalParams({
-        //     strategies: strategiesToWithdraw,
-        //     shares: sharesToWithdraw,
-        //     withdrawer: withdrawer
-        // });
+        //     IDelegationManager.QueuedWithdrawalParams({
+        //         strategies: strategiesToWithdraw,
+        //         shares: sharesToWithdraw,
+        //         withdrawer: withdrawer
+        //     });
 
-        ////////////////////////////////////////////////////////////////////////
-        //// An example with 2 elements in QueuedWithdrawalParams[]
-        ////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////
+        // Example with 2 elements in QueuedWithdrawalParams[]
+        //////////////////////////////////////////////////////
         // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
         // 0000000000000000000000000000000000000000000000000000000000000244 [64] string length
         // 0dd8dd02                                                         [96] function selector
@@ -262,7 +241,6 @@ contract EigenlayerMsgDecoders {
         // Every extra element in the QueueWithdrawalParams[] array adds
         // 1x struct offset (1 line) and (7 lines), so shift everything down by:
         uint256 offset = (arrayLength - 1) + (7 * i);
-
         // So when reading the ith element, increase offset by 7 * i:
         //      1 element:  offset = (1 - 1) + (7 * 0) = 0
         //      2 elements: offset = (2 - 1) + (7 * 1) = 8
@@ -322,35 +300,22 @@ contract EigenlayerMsgDecoders {
             bytes memory signature
         )
     {
-        // Note: assumes we are withdrawing 1 token, tokensToWithdraw.length == 1
-        withdrawal = _decodeCompleteWithdrawalMsgPart1(message);
-
-        (
-            tokensToWithdraw,
-            middlewareTimesIndex,
-            receiveAsTokens,
-            signer,
-            expiry,
-            signature
-        ) = _decodeCompleteWithdrawalMsgPart2(message);
-
-        return (
-            withdrawal,
-            tokensToWithdraw,
-            middlewareTimesIndex,
-            receiveAsTokens,
-            signer,
-            expiry,
-            signature
-        );
-    }
-
-    function _decodeCompleteWithdrawalMsgPart1(bytes memory message)
-        internal pure
-        returns (IDelegationManager.Withdrawal memory)
-    {
-        /// @note decodes the first half of the CompleteWithdrawalMsg as we run into
-        /// a "stack to deep" error with more than 16 variables in the function.
+        //////////////////////////////////////////////
+        // Message offsets
+        //////////////////////////////////////////////
+        //
+        // Function Selector signature:
+        //     bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
+        // Params:
+        //     struct Withdrawal {
+        //         address staker;
+        //         address delegatedTo;
+        //         address withdrawer;
+        //         uint256 nonce;
+        //         uint32 startBlock;
+        //         IStrategy[] strategies;
+        //         uint256[] shares;
+        //     }
 
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
         // 00000000000000000000000000000000000000000000000000000000000002a5 [64]
@@ -372,36 +337,40 @@ contract EigenlayerMsgDecoders {
         // 000000000000000000000000000000000000000000000000002f40478f834000 [548] shares[0] value
         // 0000000000000000000000000000000000000000000000000000000000000001 [580] tokens[] length
         // 000000000000000000000000fd57b4ddbf88a4e07ff4e34c487b99af2fe82a05 [612] tokens[0] value
-        // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [644] signer (orignal staker, EigenAgent owner)
+        // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [644] signer (original staker, EigenAgent owner)
         // 0000000000000000000000000000000000000000000000000000000066d06d10 [676] expiry
         // 7248f3afe32860eb361e7e4f5d43d67fe7a93961c22f23d3121bbd5c23a18f7d [708] signature r
         // 7dc2083830eb5273eff83f1741080f1530162a10eafcdb848c05dcf146a9ab1f [740] signature s
         // 1b000000000000000000000000000000000000000000000000000000         [772] signature v
 
-        // struct Withdrawal {
-        //     address staker;
-        //     address delegatedTo;
-        //     address withdrawer;
-        //     uint256 nonce;
-        //     uint32 startBlock;
-        //     IStrategy[] strategies;
-        //     uint256[] shares;
-        // }
+        // Note: assumes we are withdrawing 1 token, tokensToWithdraw.length == 1
+        withdrawal = _decodeCompleteWithdrawalMsgPart1(message);
 
-        // bytes32 _str_offset;
-        // bytes32 _str_length;
-        // bytes4 functionSelector;
-        // uint256 withdrawalStructOffset;
-        // uint256 tokensArrayOffset;
-        // uint256 middlewareTimesIndex;
-        // bool receiveAsTokens;
+        (
+            tokensToWithdraw,
+            middlewareTimesIndex,
+            receiveAsTokens
+        ) = _decodeCompleteWithdrawalMsgPart2(message);
+
+        (
+            signer,
+            expiry,
+            signature
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 644); // signature (signer) starts at 644
+    }
+
+    function _decodeCompleteWithdrawalMsgPart1(bytes memory message)
+        internal pure
+        returns (IDelegationManager.Withdrawal memory)
+    {
+        /// @note decodes the first half of the CompleteWithdrawalMsg as we run into
+        /// a "stack too deep" error with more than 16 variables in the function.
 
         address staker;
         address delegatedTo;
         address withdrawer;
         uint256 nonce;
         uint32 startBlock;
-
         // uint256 strategies_offset;
         // uint256 shares_offset;
         uint256 strategies_length;
@@ -419,13 +388,11 @@ contract EigenlayerMsgDecoders {
             // tokensArrayOffset := mload(add(message, 132))
             // middlewareTimesIndex := mload(add(message, 164))
             // receiveAsTokens := mload(add(message, 196))
-
             staker := mload(add(message, 228))
             delegatedTo := mload(add(message, 260))
             withdrawer := mload(add(message, 292))
             nonce := mload(add(message, 324))
             startBlock := mload(add(message, 356))
-
             // strategies_offset := mload(add(message, 388))
             // shares_offset := mload(add(message, 420))
             strategies_length := mload(add(message, 452))
@@ -460,40 +427,11 @@ contract EigenlayerMsgDecoders {
         returns (
             IERC20[] memory tokensToWithdraw,
             uint256 middlewareTimesIndex,
-            bool receiveAsTokens,
-            address signer,
-            uint256 expiry,
-            bytes memory signature
+            bool receiveAsTokens
         )
     {
         /// @note decodes the second half of the CompleteWithdrawalMsg to avoid
         /// a "stack to deep" error with too many variables in the function.
-
-        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
-        // 00000000000000000000000000000000000000000000000000000000000002a5 [64]
-        // 60d7faed                                                         [96]
-        // 0000000000000000000000000000000000000000000000000000000000000080 [100] withdrawal struct offset (129 bytes = 4 lines)
-        // 00000000000000000000000000000000000000000000000000000000000001e0 [132] tokens array offset (480 bytes = 15 lines)
-        // 0000000000000000000000000000000000000000000000000000000000000000 [164] middlewareTimesIndex (static var)
-        // 0000000000000000000000000000000000000000000000000000000000000001 [196] receiveAsTokens (static var)
-        // 000000000000000000000000b6b60fb7c880824a3a98d3ddc783662afb1f34cb [228] struct_field_1: staker
-        // 0000000000000000000000000000000000000000000000000000000000000000 [260] struct_field_2: delegatedTo
-        // 000000000000000000000000b6b60fb7c880824a3a98d3ddc783662afb1f34cb [292] struct_field_3: withdrawer
-        // 0000000000000000000000000000000000000000000000000000000000000000 [324] struct_field_4: nonce
-        // 000000000000000000000000000000000000000000000000000000000064844f [356] struct_field_5: startBlock
-        // 00000000000000000000000000000000000000000000000000000000000000e0 [388] struct_field_6: strategies[] offset (224 bytes = 7 lines)
-        // 0000000000000000000000000000000000000000000000000000000000000120 [420] struct_field_7: shares[] offset (9 lines)
-        // 0000000000000000000000000000000000000000000000000000000000000001 [452] strategies[] length
-        // 000000000000000000000000e642c43b2a7d4510233a30f7695f437878bfee09 [484] strategies[0] value
-        // 0000000000000000000000000000000000000000000000000000000000000001 [516] shares[] length
-        // 000000000000000000000000000000000000000000000000002f40478f834000 [548] shares[0] value
-        // 0000000000000000000000000000000000000000000000000000000000000001 [580] tokens[] length
-        // 000000000000000000000000fd57b4ddbf88a4e07ff4e34c487b99af2fe82a05 [612] tokens[0] value
-        // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [644] signer (original staker, EigenAgent owner)
-        // 0000000000000000000000000000000000000000000000000000000066d06d10 [676] expiry
-        // 7248f3afe32860eb361e7e4f5d43d67fe7a93961c22f23d3121bbd5c23a18f7d [708] signature r
-        // 7dc2083830eb5273eff83f1741080f1530162a10eafcdb848c05dcf146a9ab1f [740] signature s
-        // 1b000000000000000000000000000000000000000000000000000000         [772] signature v
 
         uint256 tokensArrayLength;
         address tokensToWithdraw0;
@@ -521,22 +459,13 @@ contract EigenlayerMsgDecoders {
             tokensToWithdraw0 := mload(add(message, 612))
         }
 
-        (
-            signer,
-            expiry,
-            signature
-        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 644); // signature (signer) starts at 644
-
         tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = IERC20(tokensToWithdraw0);
 
         return (
             tokensToWithdraw,
             middlewareTimesIndex,
-            receiveAsTokens,
-            signer,
-            expiry,
-            signature
+            receiveAsTokens
         );
     }
 
@@ -640,8 +569,6 @@ library DelegationDecoders {
             signatureEigenAgent
         ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 388); // user signature starts on 388
 
-        require(signatureEigenAgent.length == 65, "decodeDelegateToMsg: invalid signature length");
-
         return (
             // original message for Eigenlayer
             operator,
@@ -673,7 +600,6 @@ library DelegationDecoders {
         // b20a886dfc3208a956b14419e367c1127258b8079559b101a7d6ced1271d464f [196] eigenAgent sig r
         // 271a38b87fd2cd30f183d542483cc71269711bdc9044b24baf2b7aa189a3d1e0 [228] eigenAgent sig s
         // 1c000000000000000000000000000000000000000000000000000000         [260] eigenAgent sig v
-
 
         bytes4 functionSelector;
 

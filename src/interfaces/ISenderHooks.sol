@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
-interface ISenderUtils {
+interface ISenderHooks {
 
     struct WithdrawalTransfer {
         address withdrawer;
@@ -15,6 +15,8 @@ interface ISenderUtils {
     function getSenderCCIP() external view returns (address);
 
     function setSenderCCIP(address newSenderCCIP) external;
+
+    function isWithdrawalAgentOwnerRootSpent(bytes32 withdrawalAgentOwnerRoot) external returns (bool);
 
     function handleTransferToAgentOwner(bytes memory message)
         external
@@ -28,17 +30,15 @@ interface ISenderUtils {
 
     function withdrawalTransferCommittments()
         external
-        returns (ISenderUtils.WithdrawalTransfer memory);
+        returns (ISenderHooks.WithdrawalTransfer memory);
 
-    function calculateWithdrawalAgentOwnerRoot(IDelegationManager.Withdrawal memory withdrawal)
+    function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
         external pure
         returns (bytes32);
 
-    function setFunctionSelectorName(bytes4 functionSelector, string memory _name) external;
-
-    function getFunctionSelectorName(bytes4 functionSelector)
-        external
-        returns (string memory);
+    function calculateWithdrawalAgentOwnerRoot(bytes32 withdrawalRoot, address agentOwner)
+        external pure
+        returns (bytes32);
 
     function setGasLimitsForFunctionSelectors(
         bytes4[] memory functionSelectors,

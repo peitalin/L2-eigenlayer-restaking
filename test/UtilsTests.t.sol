@@ -92,14 +92,14 @@ contract UtilsTests is Test, ScriptUtils {
 
         // no gas error
         vm.expectRevert("Failed to send Ether");
-        sutils.topupSenderEthBalance(bob);
+        sutils.topupSenderEthBalance(bob, false);
 
-        topupSenderEthBalance(bob);
-        require(bob.balance == sutils.amountToTopup(), "failed to topupSenderEthBalance");
+        topupSenderEthBalance(bob, true);
+        require(bob.balance == 1 ether, "failed to topupSenderEthBalance");
 
         // expect balance to stay the same as 0.05 > 0.02 ether
-        sutils.topupSenderEthBalance(bob);
-        require(bob.balance == sutils.amountToTopup(), "failed to topupSenderEthBalance");
+        sutils.topupSenderEthBalance(bob, true);
+        require(bob.balance == 1 ether, "oversent ETH in topupSenderEthBalance");
     }
 
 }

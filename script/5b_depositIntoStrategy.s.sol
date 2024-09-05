@@ -60,7 +60,7 @@ contract DepositIntoStrategyScript is
     }
 
     function mockrun() public {
-        return _run(false);
+        return _run(true);
     }
 
     function _run(bool isTest) public {
@@ -81,7 +81,6 @@ contract DepositIntoStrategyScript is
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
         senderContract = readSenderContract();
-        address senderAddr = address(senderContract);
 
         (
             receiverContract,
@@ -147,11 +146,12 @@ contract DepositIntoStrategyScript is
             );
         }
 
-        topupSenderEthBalance(senderAddr);
         // Check L2 CCIP-BnM balances
         if (tokenL2.balanceOf(deployer) < 1 ether) {
             IERC20_CCIPBnM(address(tokenL2)).drip(deployer);
         }
+
+        topupSenderEthBalance(address(senderContract), isTest);
 
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
