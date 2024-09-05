@@ -142,12 +142,12 @@ Once the L1 -> L2 bridge completes, we can see the original `0.00333` tokens tra
     - [x] `completeQueuedWithdrawals` via EigenAgent
         - [x] Transfer withdrawn tokens from L1 back to L2
         - [x] Make `mapping(bytes32 withdrawalRoot => Withdrawal)` and `withdrawalRootsSpent` mappings on the L2 SenderCCIP bridge, so that when the `withdrawalRoot` is messaged back from L1 we can look up the original staker on L2 to transfer to without needing another signature.
-    - [ ] `delegateTo`
-    - [ ] `undelegate` (this also withdraws the staker and has the same constraints as queueWithdrawals). There is no way to directly re-delegate to another operator, a staker must undelegate + withdraw, wait 7 days, then restake and re-delegate to a new operator.
+    - [x] `delegateTo`
+    - [x] `undelegate` (this also withdraws the staker and has the same constraints as queueWithdrawals). There is no way to directly re-delegate to another operator, a staker must undelegate + withdraw, wait 7 days, then restake and re-delegate to a new operator.
 
 - Gas optimization
-    - [ ] Estimate gas limit for each of the previous operations
-    - [ ] Reduce gas costs associated with 6551 accounts creation + delegate calls
+    - [x] Estimate gas limit for each of the previous operations
+    - [x] Reduce gas costs associated with 6551 accounts creation + delegate calls
     - [ ] CCIP offers manual execution in case of gas failures, need to look into this in case users get stuck transactions.
 
 - [ ] Have Chainlink setups a Mock MAGIC "lane" for their CCIP bridge:
