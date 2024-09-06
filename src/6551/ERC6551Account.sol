@@ -20,6 +20,8 @@ interface IERC6551Account {
         external
         view
         returns (bytes4 magicValue);
+
+    function supportsInterface(bytes4 interfaceId) external view returns (bool);
 }
 
 interface IERC6551Executable {
@@ -84,7 +86,11 @@ contract ERC6551Account is IERC165, IERC1271, IERC6551Account, IERC6551Executabl
         return bytes4(0);
     }
 
-    function supportsInterface(bytes4 interfaceId) public view virtual returns (bool) {
+    function supportsInterface(bytes4 interfaceId)
+        public view virtual
+        override(IERC165, IERC6551Account)
+        returns (bool)
+    {
         return interfaceId == type(IERC165).interfaceId
             || interfaceId == type(IERC6551Account).interfaceId
             || interfaceId == type(IERC6551Executable).interfaceId;

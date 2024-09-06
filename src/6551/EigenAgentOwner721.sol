@@ -58,6 +58,10 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
         return _mint(user);
     }
 
+    function mintOnlyOwner(address user) public onlyOwner returns (uint256) {
+        return _mint(user);
+    }
+
     function _mint(address user) internal returns (uint256) {
         uint256 tokenId = _tokenIdCounter;
         _safeMint(user, tokenId);
@@ -66,7 +70,7 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
         return tokenId;
     }
 
-    /// @dev callback to update EigenAgentOwner721 NFT ow
+    /// @dev callback to update EigenAgentOwner721 NFT owner
     function _afterTokenTransfer(
         address from,
         address to,

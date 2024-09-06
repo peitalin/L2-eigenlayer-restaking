@@ -28,6 +28,14 @@ contract DeployEigenlayerContractsTests is Test {
         vm.chainId(31337); // isTest
     }
 
+    /*
+     *
+     *
+     *             Tests
+     *
+     *
+     */
+
     function test_DeployEigenlayerContractsScript() public {
 
         (

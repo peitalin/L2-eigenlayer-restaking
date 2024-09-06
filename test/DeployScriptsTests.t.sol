@@ -83,6 +83,14 @@ contract DeployScriptsTests is Test, ScriptUtils {
         vm.deal(deployer, 1 ether);
     }
 
+    /*
+     *
+     *
+     *             Tests
+     *
+     *
+     */
+
     function test_step2_DeploySenderOnL2Script() public {
         deploySenderOnL2Script.mockrun();
     }

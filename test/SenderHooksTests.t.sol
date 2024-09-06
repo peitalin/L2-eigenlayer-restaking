@@ -22,6 +22,8 @@ contract SenderHooksTests is BaseTestEnvironment {
     uint256 execNonce = 0;
     uint256 withdrawalNonce = 0;
 
+    error AddressZero(string msg);
+
     function setUp() public {
         setUpLocalEnvironment();
     }
@@ -33,6 +35,21 @@ contract SenderHooksTests is BaseTestEnvironment {
      *
      *
      */
+
+    function test_SetAndGet_SenderCCIP() public {
+
+        vm.expectRevert("Ownable: caller is not the owner");
+        senderHooks.setSenderCCIP(address(senderContract));
+
+        vm.expectRevert(abi.encodeWithSelector(AddressZero.selector, "SenderCCIP cannot be address(0)"));
+        vm.prank(deployer);
+        senderHooks.setSenderCCIP(address(0));
+
+        vm.prank(deployer);
+        senderHooks.setSenderCCIP(address(senderContract));
+
+        vm.assertEq(senderHooks.getSenderCCIP(), address(senderContract));
+    }
 
     function test_SetAndGet_GasLimits_SenderHooks() public {
 

@@ -38,6 +38,14 @@ contract UtilsTests is Test, ScriptUtils {
         vm.stopBroadcast();
     }
 
+    /*
+     *
+     *
+     *             Tests
+     *
+     *
+     */
+
     function test_FileReaderFunctions() public {
         fileReaderTest.readAgentFactory();
         fileReaderTest.readEigenAgent721AndRegistry();

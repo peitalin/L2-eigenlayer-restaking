@@ -99,7 +99,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
         });
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0x0),
-            sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
+            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
             sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
             destTokenAmounts: destTokenAmounts, // Tokens and their amounts in their destination chain representation.
             data: abi.encode(string(
@@ -170,7 +170,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
             receiverContract.mockCCIPReceive(
                 Client.Any2EVMMessage({
                     messageId: bytes32(uint256(9999)),
-                    sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
+                    sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
                     sender: abi.encode(address(deployer)), // bytes: abi.decode(sender) if coming from an EVM chain.
                     destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging coins, just sending msg
                     data: abi.encode(string(
@@ -271,14 +271,14 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
 
         bytes32 withdrawalTransferRoot = calculateWithdrawalTransferRoot(
             withdrawalRoot,
-            amount,
+            withdrawal.shares[0],
             bob
         );
         vm.expectEmit(true, false, true, false);
         emit WithdrawalTransferRootCommitted(
             withdrawalTransferRoot,
-            address(eigenAgent), // withdrawer
-            amount,
+            withdrawal.withdrawer, // withdrawer
+            withdrawal.shares[0],
             bob // signer
         );
         senderContract.sendMessagePayNative(

@@ -12,7 +12,7 @@ import {IEigenAgent6551} from "./IEigenAgent6551.sol";
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
 
 
-contract EigenAgent6551 is ERC6551Account, IEigenAgent6551 {
+contract EigenAgent6551 is ERC6551Account {
 
     // uint256 public execNonce;
 
@@ -43,7 +43,7 @@ contract EigenAgent6551 is ERC6551Account, IEigenAgent6551 {
     function isValidSignature(
         bytes32 digestHash,
         bytes memory signature
-    ) public view virtual override(ERC6551Account, IEigenAgent6551) returns (bytes4) {
+    ) public view virtual override(ERC6551Account) returns (bytes4) {
         bool isValid = ECDSA.recover(digestHash, signature) == owner(); // owner of the NFT
         if (isValid) {
             return IERC1271.isValidSignature.selector;

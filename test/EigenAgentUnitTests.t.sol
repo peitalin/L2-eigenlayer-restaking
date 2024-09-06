@@ -34,6 +34,14 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
     }
 
+    /*
+     *
+     *
+     *             Tests
+     *
+     *
+     */
+
     function test_EigenAgent_ExecTypehash() public {
         vm.assertEq(
             keccak256("ExecuteWithSignature(address target,uint256 value,bytes data,uint256 execNonce,uint256 chainId,uint256 expiry)"),

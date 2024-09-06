@@ -25,4 +25,6 @@ interface IEigenAgentOwner721 is IAdminable, IERC721 {
 
     function mint(address user) external returns (uint256);
 
+    function mintOnlyOwner(address user) external returns (uint256);
+
 }

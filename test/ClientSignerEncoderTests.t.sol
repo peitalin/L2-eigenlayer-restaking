@@ -69,7 +69,9 @@ contract ClientSignerEncoderTests is BaseTestEnvironment {
 
     /*
      *
-     *            Functions
+     *
+     *             Tests
+     *
      *
      */
 

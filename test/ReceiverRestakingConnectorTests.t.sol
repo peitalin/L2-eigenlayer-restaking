@@ -169,7 +169,7 @@ contract ReceiverRestakingConnectorTests is BaseTestEnvironment {
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
-                sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
+                sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
                 sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
                 data: abi.encode(string(
                     mintEigenAgentMessageBob
@@ -189,7 +189,7 @@ contract ReceiverRestakingConnectorTests is BaseTestEnvironment {
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
-                sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
+                sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
                 sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
                 data: abi.encode(string(
                     mintEigenAgentMessageAlice

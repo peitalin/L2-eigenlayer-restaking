@@ -22,6 +22,8 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         address  // signer (agentOwner)
     );
 
+    error AddressZero(string msg);
+
     mapping(bytes32 => ISenderHooks.WithdrawalTransfer) public withdrawalTransferCommitments;
     mapping(bytes32 => bool) public withdrawalTransferRootsSpent;
     mapping(bytes4 => uint256) internal _gasLimitsForFunctionSelectors;
@@ -60,6 +62,9 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
     }
 
     function setSenderCCIP(address newSenderCCIP) public onlyOwner {
+        if (newSenderCCIP == address(0))
+            revert AddressZero("SenderCCIP cannot be address(0)");
+
         _senderCCIP = newSenderCCIP;
     }
 

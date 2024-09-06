@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Test, console} from "forge-std/Test.sol";
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
@@ -84,7 +83,7 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
         });
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0x0),
-            sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
+            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
             sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
             destTokenAmounts: destTokenAmounts, // Tokens and their amounts in their destination chain representation.
             data: abi.encode(string(
@@ -145,7 +144,7 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
 
         Client.Any2EVMMessage memory any2EvmMessageQueueWithdrawal = Client.Any2EVMMessage({
             messageId: bytes32(uint256(9999)),
-            sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
+            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
             sender: abi.encode(address(deployer)), // bytes: abi.decode(sender) if coming from an EVM chain.
             destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging coins, just sending msg
             data: abi.encode(string(

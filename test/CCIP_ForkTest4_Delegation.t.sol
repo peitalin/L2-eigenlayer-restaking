@@ -122,6 +122,13 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         vm.stopBroadcast();
     }
 
+    /*
+     *
+     *
+     *             Functions
+     *
+     *
+     */
 
     function createDelegateMessage(uint256 _operatorKey, uint256 _execNonce)
         public view
@@ -171,6 +178,13 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         return messageWithSignature_DT;
     }
 
+    /*
+     *
+     *
+     *             Tests
+     *
+     *
+     */
 
     function test_Eigenlayer_DelegateTo() public {
 

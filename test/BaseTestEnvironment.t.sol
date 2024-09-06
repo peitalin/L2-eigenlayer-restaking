@@ -44,6 +44,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
     IDelegationManager public delegationManager;
     IStrategy public strategy;
     IERC20 public tokenL1;
+    IERC20 public tokenL2;
 
     IAgentFactory public agentFactory;
     EigenAgentOwner721 public eigenAgentOwnerNft;
@@ -81,6 +82,9 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
 
         // setup L2 forked environment
         _setupL2ForkedEnvironment();
+
+        // whitelist CCIP contracts on L1 and L2
+        _whitelistContracts();
     }
 
     function _setupL1ForkedEnvironment() private {
@@ -110,17 +114,6 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         ) = deployReceiverOnL1Script.mockrun();
 
         vm.deal(address(receiverContract), 1 ether);
-
-        vm.startBroadcast(deployerKey);
-        {
-            //// allowlist deployer and mint initial balances
-            receiverContract.allowlistSender(deployer, true);
-            restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
-
-            IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
-            IERC20_CCIPBnM(address(tokenL1)).drip(bob);
-        }
-        vm.stopBroadcast();
     }
 
     function _setupL2ForkedEnvironment() private {
@@ -138,13 +131,45 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
 
         vm.deal(address(senderContract), 1 ether);
 
+        tokenL2 = IERC20(BaseSepolia.BridgeToken);
+    }
+
+    function _whitelistContracts() private {
+
+        /////////////////////////////////////////
+        //// Whitelist L1 CCIP contracts
+        /////////////////////////////////////////
+        vm.selectFork(ethForkId);
+        vm.startBroadcast(deployerKey);
+        {
+            // allowlist receiverContract chains and senders
+            receiverContract.allowlistSourceChain(BaseSepolia.ChainSelector, true);
+            receiverContract.allowlistDestinationChain(EthSepolia.ChainSelector, true);
+
+            receiverContract.allowlistSender(deployer, true);
+            receiverContract.allowlistSender(address(senderContract), true);
+            // set eigenlayer contracts
+            restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
+
+            IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
+            IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
+        }
+        vm.stopBroadcast();
+
+        /////////////////////////////////////////
+        //// Whitelist L2 CCIP contracts
+        /////////////////////////////////////////
+        vm.selectFork(l2ForkId);
         vm.startBroadcast(deployerKey);
         {
             // allow L2 sender contract to receive tokens back from L1
             senderContract.allowlistSourceChain(EthSepolia.ChainSelector, true);
+            senderContract.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
+
             senderContract.allowlistSender(address(receiverContract), true);
             senderContract.allowlistSender(deployer, true);
-            // fund L2 sender with CCIP-BnM tokens
+
+            IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(senderContract));
             IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(senderContract));
         }
         vm.stopBroadcast();
@@ -194,8 +219,13 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
 
         vm.startBroadcast(deployerKey);
         {
-            //// allowlist deployer and mint initial balances
+            // allowlist receiverContract chains and senders
+            receiverContract.allowlistSourceChain(BaseSepolia.ChainSelector, true);
+            receiverContract.allowlistDestinationChain(EthSepolia.ChainSelector, true);
+
             receiverContract.allowlistSender(deployer, true);
+            receiverContract.allowlistSender(address(senderContract), true);
+            // set eigenlayer contracts
             restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
 
             IERC20Minter(address(tokenL1)).mint(address(receiverContract), 1 ether);
@@ -217,6 +247,8 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         {
             // allow L2 sender contract to receive tokens back from L1
             senderContract.allowlistSourceChain(EthSepolia.ChainSelector, true);
+            senderContract.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
+
             senderContract.allowlistSender(address(receiverContract), true);
             senderContract.allowlistSender(deployer, true);
         }
