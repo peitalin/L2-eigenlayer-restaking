@@ -22,7 +22,6 @@ import {QueueWithdrawalScript} from "../script/7_queueWithdrawal.s.sol";
 import {CompleteWithdrawalScript} from "../script/8_completeWithdrawal.s.sol";
 import {DeployVerifyScript} from "../script/x_deployVerify.s.sol";
 import {ScriptUtils} from "../script/ScriptUtils.sol";
-import {BaseSepolia} from "../script/Addresses.sol";
 
 
 contract DeployScriptsTests is Test, ScriptUtils {

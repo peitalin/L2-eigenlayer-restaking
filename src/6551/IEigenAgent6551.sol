@@ -8,6 +8,15 @@ interface IEigenAgent6551 is IERC6551Account {
 
     // function execNonce() external view returns (uint256);
 
+    function EIGEN_AGENT_EXEC_TYPEHASH() external returns (bytes32);
+
+    function DOMAIN_TYPEHASH() external returns (bytes32);
+
+    function isValidSignature(
+        bytes32 digestHash,
+        bytes memory signature
+    ) external view returns (bytes4);
+
     function executeWithSignature(
         address targetContract,
         uint256 value,

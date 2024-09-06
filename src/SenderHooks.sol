@@ -115,7 +115,6 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             // 0x60d7faed == cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)"))
             _commitWithdrawalAgentOwnerRootInfo(message, tokenL2);
         }
-
     }
 
     // Returns the same withdrawalRoot calculated in Eigenlayer

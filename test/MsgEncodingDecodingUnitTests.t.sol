@@ -2,36 +2,27 @@
 pragma solidity 0.8.22;
 
 import {Test, console} from "forge-std/Test.sol";
+import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {TransferToAgentOwnerMsg} from "../src/utils/EigenlayerMsgDecoders.sol";
-import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {
     EigenlayerMsgDecoders,
     DelegationDecoders,
-    AgentOwnerSignature
+    AgentOwnerSignature,
+    TransferToAgentOwnerMsg
 } from "../src/utils/EigenlayerMsgDecoders.sol";
+import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {FunctionSelectorDecoder} from "../src/utils/FunctionSelectorDecoder.sol";
-
-import {ClientSigners} from "../script/ClientSigners.sol";
 import {EthSepolia} from "../script/Addresses.sol";
 
 
-contract EigenlayerMsg_EncodingDecodingTests is Test {
+contract EigenlayerMsg_EncodingDecodingTests is BaseTestEnvironment {
 
-    ClientSigners public clientSigners;
     EigenlayerMsgDecoders public eigenlayerMsgDecoders;
-
-    IStrategy public strategy;
-    IDelegationManager public delegationManager;
-    IERC20 public token;
-
-    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
-    address deployer = vm.addr(deployerKey);
 
     uint256 amount;
     address staker;
@@ -40,13 +31,10 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
     function setUp() public {
 
-        clientSigners = new ClientSigners();
+        setUpLocalEnvironment();
+
         eigenlayerMsgDecoders = new EigenlayerMsgDecoders();
 
-        // just for deserializing, not calling these contracts
-        strategy = IStrategy(0xBd4bcb3AD20E9d85D5152aE68F45f40aF8952159);
-        delegationManager = IDelegationManager(0xebbC61ccacf45396Ff4B447f353CeA404993DE98);
-        token = IERC20(0x3Eef6ec7a9679e60CC57D9688E9eC0e6624D687A);
         amount = 0.0077 ether;
         staker = deployer;
         expiry = 86421;
@@ -63,7 +51,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             bytes4(keccak256("depositIntoStrategyWithSignature(address,address,uint256,address,uint256,bytes)")),
             expiry,
             address(strategy),
-            address(token),
+            address(tokenL1),
             amount,
             staker,
             hex"3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d51c"
@@ -74,13 +62,13 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
     function test_Decode_AgentOwnerSignature() public view {
 
-        bytes memory messageToEigenlayer = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
+        bytes memory messageToEigenlayer = encodeDepositIntoStrategyMsg(
             address(strategy),
-            address(token),
+            address(tokenL1),
             amount
         );
 
-        bytes memory messageWithSignature = clientSigners.signMessageForEigenAgentExecution(
+        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             deployerKey,
             block.chainid,
             address(strategy),
@@ -127,9 +115,10 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
     function test_Decode_MintEigenAgent() public view {
 
+        // use EigenlayerMsgEncoders for coverage.
         bytes memory messageToEigenlayer = EigenlayerMsgEncoders.encodeMintEigenAgent();
 
-        bytes memory messageWithSignature = clientSigners.signMessageForEigenAgentExecution(
+        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             deployerKey,
             block.chainid,
             address(strategy),
@@ -163,13 +152,13 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
     function test_Decode_DepositIntoStrategy6551Msg() public view {
 
-        bytes memory messageToEigenlayer = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
+        bytes memory messageToEigenlayer = encodeDepositIntoStrategyMsg(
             address(strategy),
-            address(token),
+            address(tokenL1),
             amount
         );
 
-        bytes memory messageWithSignature = clientSigners.signMessageForEigenAgentExecution(
+        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             deployerKey,
             block.chainid,
             address(strategy),
@@ -193,7 +182,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         ) = eigenlayerMsgDecoders.decodeDepositIntoStrategyMsg(messageWithSignatureCCIP);
 
         require(address(_strategy) == address(strategy), "strategy does not match");
-        require(address(token) == _token, "token error: decodeDepositIntoStrategyMsg");
+        require(address(tokenL1) == _token, "token error: decodeDepositIntoStrategyMsg");
         require(amount == _amount, "amount error: decodeDepositIntoStrategyMsg");
 
         require(_signature.length == 65, "invalid signature length");
@@ -259,12 +248,12 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         bytes memory message_QW;
         bytes memory messageWithSignature_QW;
         {
-            message_QW = EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
+            message_QW = encodeQueueWithdrawalsMsg(
                 QWPArray
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_QW = clientSigners.signMessageForEigenAgentExecution(
+            messageWithSignature_QW = signMessageForEigenAgentExecution(
                 deployerKey,
                 block.chainid, // destination chainid where EigenAgent lives
                 address(123123), // StrategyManager to approve + deposit
@@ -348,12 +337,12 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         bytes memory message_QW;
         bytes memory messageWithSignature_QW;
         {
-            message_QW = EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
+            message_QW = encodeQueueWithdrawalsMsg(
                 QWPArray
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_QW = clientSigners.signMessageForEigenAgentExecution(
+            messageWithSignature_QW = signMessageForEigenAgentExecution(
                 deployerKey,
                 block.chainid, // destination chainid where EigenAgent lives
                 address(123123), // StrategyManager to approve + deposit
@@ -399,14 +388,14 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         });
 
         IERC20[] memory tokensToWithdraw = new IERC20[](1);
-        tokensToWithdraw[0] = token;
+        tokensToWithdraw[0] = tokenL1;
         uint256 middlewareTimesIndex = 0; // not used, used when slashing is enabled;
         bool receiveAsTokens = true;
 
         bytes memory message_CW;
         bytes memory messageWithSignature_CW;
         {
-            message_CW = EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+            message_CW = encodeCompleteWithdrawalMsg(
                 withdrawal,
                 tokensToWithdraw,
                 middlewareTimesIndex,
@@ -414,7 +403,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_CW = clientSigners.signMessageForEigenAgentExecution(
+            messageWithSignature_CW = signMessageForEigenAgentExecution(
                 deployerKey,
                 block.chainid, // destination chainid where EigenAgent lives
                 address(123123), // StrategyManager to approve + deposit
@@ -467,8 +456,8 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
 
         TransferToAgentOwnerMsg memory tta_msg = eigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(
             abi.encode(string(
-                EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
-                    EigenlayerMsgEncoders.calculateWithdrawalAgentOwnerRoot(
+                encodeHandleTransferToAgentOwnerMsg(
+                    calculateWithdrawalAgentOwnerRoot(
                         withdrawalRoot,
                         bob
                     )
@@ -498,7 +487,7 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
         {
 
-            bytes32 digestHash1 = clientSigners.calculateDelegationApprovalDigestHash(
+            bytes32 digestHash1 = calculateDelegationApprovalDigestHash(
                 eigenAgent,
                 operator,
                 operator,
@@ -524,14 +513,14 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         bytes memory message_DT;
         bytes memory messageWithSignature_DT;
         {
-            message_DT = EigenlayerMsgEncoders.encodeDelegateTo(
+            message_DT = encodeDelegateTo(
                 operator,
                 approverSignatureAndExpiry,
                 approverSalt
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_DT = clientSigners.signMessageForEigenAgentExecution(
+            messageWithSignature_DT = signMessageForEigenAgentExecution(
                 deployerKey,
                 block.chainid, // destination chainid where EigenAgent lives
                 address(123123), // StrategyManager to approve + deposit
@@ -576,12 +565,12 @@ contract EigenlayerMsg_EncodingDecodingTests is Test {
         bytes memory message_UD;
         bytes memory messageWithSignature_UD;
         {
-            message_UD = EigenlayerMsgEncoders.encodeUndelegateMsg(
+            message_UD = encodeUndelegateMsg(
                 staker1
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_UD = clientSigners.signMessageForEigenAgentExecution(
+            messageWithSignature_UD = signMessageForEigenAgentExecution(
                 deployerKey,
                 block.chainid, // destination chainid where EigenAgent lives
                 address(123123), // StrategyManager to approve + deposit

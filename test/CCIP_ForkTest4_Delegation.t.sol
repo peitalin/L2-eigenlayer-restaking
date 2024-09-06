@@ -2,81 +2,35 @@
 pragma solidity 0.8.22;
 
 import {Test, console} from "forge-std/Test.sol";
+import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
-
-import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
-import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
-import {IPauserRegistry} from "eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
-
-import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
-import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
-import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
-import {IReceiverCCIPMock} from "./mocks/ReceiverCCIPMock.sol";
-import {RestakingConnector} from "../src/RestakingConnector.sol";
-import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
-import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
-import {ISenderCCIPMock} from "./mocks/SenderCCIPMock.sol";
-import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
-import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
-import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
-
-import {DeployMockEigenlayerContractsScript} from "../script/1_deployMockEigenlayerContracts.s.sol";
-import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
-import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
-
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
-import {ClientSigners} from "../script/ClientSigners.sol";
-import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
+
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 
-contract CCIP_Eigen_DelegationTests is Test {
-
-    DeployReceiverOnL1Script public deployReceiverOnL1Script;
-    DeploySenderOnL2Script public deployOnL2Script;
-    DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-    ClientSigners public clientSigners;
-
-    IReceiverCCIPMock public receiverContract;
-    ISenderCCIPMock public senderContract;
-    ISenderHooks public senderHooks;
-    IRestakingConnector public restakingConnector;
-    IAgentFactory public agentFactory;
-
-    IStrategyManager public strategyManager;
-    IPauserRegistry public _pauserRegistry;
-    IRewardsCoordinator public _rewardsCoordinator;
-    IDelegationManager public delegationManager;
-    IStrategy public strategy;
-    IERC20 public tokenL1;
-
-    uint256 deployerKey;
-    address deployer;
-    IEigenAgent6551 eigenAgent;
+contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
 
     uint256 operatorKey;
     address operator;
+
     uint256 operator2Key;
     address operator2;
 
     uint256 amount = 0.0091 ether;
-    uint256 l2ForkId;
-    uint256 ethForkId;
 
     function setUp() public {
 
-        deployReceiverOnL1Script = new DeployReceiverOnL1Script();
-        deployOnL2Script = new DeploySenderOnL2Script();
-        deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-        clientSigners = new ClientSigners();
+        setUpForkedEnvironment();
 
-		deployerKey = vm.envUint("DEPLOYER_KEY");
-        deployer = vm.addr(deployerKey);
+        /////////////////////////////////////
+        //// Register Operators
+        /////////////////////////////////////
+        vm.selectFork(ethForkId);
 
         operatorKey = uint256(88888);
         operator = vm.addr(operatorKey);
@@ -84,105 +38,36 @@ contract CCIP_Eigen_DelegationTests is Test {
         operator2Key = uint256(99999);
         operator2 = vm.addr(operator2Key);
 
-        l2ForkId = vm.createFork("basesepolia");        // 0
-        ethForkId = vm.createSelectFork("ethsepolia"); // 1
-
-        (
-            strategy,
-            strategyManager,
-            , //IStrategyFactory
-            _pauserRegistry,
-            delegationManager,
-            _rewardsCoordinator,
-            tokenL1
-        ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
-
-        //////////// Arb Sepolia ////////////
-        vm.selectFork(l2ForkId);
-        (
-            senderContract,
-            senderHooks
-        ) = deployOnL2Script.mockrun();
-
-
-        //////////// Eth Sepolia ////////////
-        vm.selectFork(ethForkId);
-        (
-            receiverContract,
-            restakingConnector,
-            agentFactory
-        ) = deployReceiverOnL1Script.mockrun();
-
-
-        //////////// Arb Sepolia ////////////
-        vm.selectFork(l2ForkId);
-        vm.startBroadcast(deployerKey);
-        // allow L2 sender contract to receive tokens back from L1
-        senderContract.allowlistSourceChain(EthSepolia.ChainSelector, true);
-        senderContract.allowlistSender(address(receiverContract), true);
-        senderContract.allowlistSender(deployer, true);
-        // fund L2 sender with gas and CCIP-BnM tokens
-        vm.deal(address(senderContract), 1 ether); // fund for gas
-        if (block.chainid == BaseSepolia.ChainId) {
-            // drip() using CCIP's BnM faucet if forking from Arb Sepolia
-            IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(senderContract));
-        } else {
-            // mint() if we deployed our own Mock ERC20
-            IERC20Minter(BaseSepolia.BridgeToken).mint(address(senderContract), 1 ether);
-        }
-        vm.stopBroadcast();
-
-
-        //////////// Eth Sepolia ////////////
-        vm.selectFork(ethForkId);
-
-        vm.startBroadcast(deployerKey);
-        receiverContract.allowlistSender(deployer, true);
-        restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
-
-        // fund L1 receiver with gas and CCIP-BnM tokens
-        vm.deal(address(receiverContract), 1 ether); // fund for gas
-        if (block.chainid == EthSepolia.ChainId) {
-            // drip() using CCIP's BnM faucet if forking from Eth Sepolia
-            IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
-        } else {
-            // mint() if we deployed our own Mock ERC20
-            IERC20Minter(address(tokenL1)).mint(address(receiverContract), 1 ether);
-        }
-
-        vm.stopBroadcast();
-
-        /////////////////////////////////////
-        //// Register Operators
-        /////////////////////////////////////
-
         /// Operator 1
         vm.startBroadcast(operatorKey);
-        IDelegationManager.OperatorDetails memory registeringOperatorDetails =
-            IDelegationManager.OperatorDetails({
-                __deprecated_earningsReceiver: vm.addr(0xb0b),
-                delegationApprover: operator,
-                stakerOptOutWindowBlocks: 4
-            });
+        {
+            IDelegationManager.OperatorDetails memory registeringOperatorDetails =
+                IDelegationManager.OperatorDetails({
+                    __deprecated_earningsReceiver: vm.addr(0xb0b),
+                    delegationApprover: operator,
+                    stakerOptOutWindowBlocks: 4
+                });
 
-        delegationManager.registerAsOperator(registeringOperatorDetails, "operator 1 metadata");
+            delegationManager.registerAsOperator(registeringOperatorDetails, "operator 1 metadata");
 
-        require(delegationManager.isOperator(operator), "operator not set");
-
+            require(delegationManager.isOperator(operator), "operator not set");
+        }
         vm.stopBroadcast();
 
         /// Operator 2
         vm.startBroadcast(operator2Key);
-        IDelegationManager.OperatorDetails memory registeringOperatorDetails2 =
-            IDelegationManager.OperatorDetails({
-                __deprecated_earningsReceiver: vm.addr(0xb0b),
-                delegationApprover: operator2,
-                stakerOptOutWindowBlocks: 4
-            });
+        {
+            IDelegationManager.OperatorDetails memory registeringOperatorDetails2 =
+                IDelegationManager.OperatorDetails({
+                    __deprecated_earningsReceiver: vm.addr(0xb0b),
+                    delegationApprover: operator2,
+                    stakerOptOutWindowBlocks: 4
+                });
 
-        delegationManager.registerAsOperator(registeringOperatorDetails2, "operator 2 metadata");
+            delegationManager.registerAsOperator(registeringOperatorDetails2, "operator 2 metadata");
 
-        require(delegationManager.isOperator(operator2), "operator2 not set");
+            require(delegationManager.isOperator(operator2), "operator2 not set");
+        }
         vm.stopBroadcast();
 
         /////////////////////////////////////
@@ -197,14 +82,14 @@ contract CCIP_Eigen_DelegationTests is Test {
         bytes memory depositMessage;
         bytes memory messageWithSignature_D;
         {
-            depositMessage = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
+            depositMessage = encodeDepositIntoStrategyMsg(
                 address(strategy),
                 address(tokenL1),
                 amount
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_D = clientSigners.signMessageForEigenAgentExecution(
+            messageWithSignature_D = signMessageForEigenAgentExecution(
                 deployerKey,
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager),
@@ -248,7 +133,7 @@ contract CCIP_Eigen_DelegationTests is Test {
         address _operator = vm.addr(_operatorKey);
         {
             uint256 sig1_expiry = block.timestamp + 1 hours;
-            bytes32 digestHash1 = clientSigners.calculateDelegationApprovalDigestHash(
+            bytes32 digestHash1 = calculateDelegationApprovalDigestHash(
                 address(eigenAgent), // staker == msg.sender == eigenAgent from Eigenlayer's perspective
                 _operator, // operator
                 _operator, // _delegationApprover,
@@ -268,13 +153,13 @@ contract CCIP_Eigen_DelegationTests is Test {
         {
             uint256 expiry2 = block.timestamp + 1 hours;
 
-            bytes memory delegateToMessage = EigenlayerMsgEncoders.encodeDelegateTo(
+            bytes memory delegateToMessage = encodeDelegateTo(
                 _operator,
                 approverSignatureAndExpiry,
                 approverSalt
             );
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_DT = clientSigners.signMessageForEigenAgentExecution(
+            messageWithSignature_DT = signMessageForEigenAgentExecution(
                 deployerKey,
                 block.chainid, // destination chainid where EigenAgent lives
                 address(delegationManager), // DelegationManager.delegateTo()
@@ -364,12 +249,12 @@ contract CCIP_Eigen_DelegationTests is Test {
         bytes memory messageWithSignature_UD;
         {
             uint256 expiry = block.timestamp + 1 hours;
-            bytes memory message_UD = EigenlayerMsgEncoders.encodeUndelegateMsg(
+            bytes memory message_UD = encodeUndelegateMsg(
                 address(eigenAgent)
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_UD = clientSigners.signMessageForEigenAgentExecution(
+            messageWithSignature_UD = signMessageForEigenAgentExecution(
                 deployerKey,
                 block.chainid, // destination chainid where EigenAgent lives
                 address(delegationManager), // DelegationManager
@@ -463,7 +348,7 @@ contract CCIP_Eigen_DelegationTests is Test {
             bool receiveAsTokens = false;
             // receiveAsTokens == false to redeposit as shares back into Eigenlayer
             // if receiveAsTokens == true, tokens are withdrawn back to EigenAgent
-            completeWithdrawalMessage = EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+            completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
                 withdrawal,
                 tokensToWithdraw,
                 0, //middlewareTimesIndex,
@@ -471,7 +356,7 @@ contract CCIP_Eigen_DelegationTests is Test {
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_CW = clientSigners.signMessageForEigenAgentExecution(
+            messageWithSignature_CW = signMessageForEigenAgentExecution(
                 deployerKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
@@ -549,12 +434,12 @@ contract CCIP_Eigen_DelegationTests is Test {
         bytes memory messageWithSignature_UD;
         {
             uint256 expiry = block.timestamp + 1 hours;
-            bytes memory message_UD = EigenlayerMsgEncoders.encodeUndelegateMsg(
+            bytes memory message_UD = encodeUndelegateMsg(
                 address(eigenAgent)
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_UD = clientSigners.signMessageForEigenAgentExecution(
+            messageWithSignature_UD = signMessageForEigenAgentExecution(
                 deployerKey,
                 block.chainid, // destination chainid where EigenAgent lives
                 address(delegationManager), // DelegationManager
@@ -625,7 +510,7 @@ contract CCIP_Eigen_DelegationTests is Test {
             bool receiveAsTokens = false;
             // receiveAsTokens == false to redeposit as shares back into Eigenlayer
             // if receiveAsTokens == true, tokens are withdrawn back to EigenAgent
-            completeWithdrawalMessage = EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
+            completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
                 withdrawal,
                 tokensToWithdraw,
                 0, //middlewareTimesIndex,
@@ -633,7 +518,7 @@ contract CCIP_Eigen_DelegationTests is Test {
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_CW = clientSigners.signMessageForEigenAgentExecution(
+            messageWithSignature_CW = signMessageForEigenAgentExecution(
                 deployerKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),

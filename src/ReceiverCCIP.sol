@@ -20,7 +20,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     IRestakingConnector public restakingConnector;
     address public senderContractL2;
 
-    error InvalidContractAddress(string msg);
+    error AddressZero(string msg);
 
     event BridgingWithdrawalToL2(
         address indexed senderContractL2,
@@ -42,10 +42,10 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     ) initializer public {
 
         if (address(_restakingConnector) == address(0))
-            revert InvalidContractAddress("restakingConnector cannot be address(0)");
+            revert AddressZero("RestakingConnector cannot be address(0)");
 
         if (address(_senderContractL2) == address(0))
-            revert InvalidContractAddress("SenderCCIP cannot be address(0)");
+            revert AddressZero("SenderCCIP cannot be address(0)");
 
         restakingConnector = _restakingConnector;
         senderContractL2 = address(_senderContractL2);
@@ -58,6 +58,9 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     }
 
     function setSenderContractL2Addr(address _senderContractL2) public onlyOwner {
+        if (address(_senderContractL2) == address(0))
+            revert AddressZero("SenderContract on L2 cannot be address(0)");
+
         senderContractL2 = _senderContractL2;
     }
 
@@ -66,7 +69,9 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     }
 
     function setRestakingConnector(IRestakingConnector _restakingConnector) public onlyOwner {
-        require(address(restakingConnector) != address(0), "cannot set address(0)");
+        if (address(_restakingConnector) == address(0))
+            revert AddressZero("RestakingConnector cannot be address(0)");
+
         restakingConnector = _restakingConnector;
     }
 

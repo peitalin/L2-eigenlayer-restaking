@@ -1,13 +1,13 @@
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 
 /// Note: Workaround for libraries not playing well with multi-fork environments + scripting in foundry
 /// This contract is a copy of EigenlayerMsgEncoders.sol
@@ -147,48 +147,6 @@ contract ClientEncoders {
         return message_bytes;
     }
 
-    function encodeDelegateToBySignature(
-        address staker,
-        address operator,
-        ISignatureUtils.SignatureWithExpiry memory stakerSignatureAndExpiry,
-        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
-        bytes32 approverSalt
-    ) public pure returns (bytes memory) {
-
-        // function delegateToBySignature(
-        //     address staker,
-        //     address operator,
-        //     SignatureWithExpiry memory stakerSignatureAndExpiry,
-        //     SignatureWithExpiry memory approverSignatureAndExpiry,
-        //     bytes32 approverSalt
-        // )
-
-        // 0000000000000000000000000000000000000000000000000000000000000020
-        // 0000000000000000000000000000000000000000000000000000000000000164
-        // 0xeea9064b                                                       [96] function selector
-        // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d412eb
-        // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d41333
-        // 00000000000000000000000000000000000000000000000000000000000000a0
-        // 0000000000000000000000000000000000000000000000000000000000000100
-        // 0000000000000000000000000000000000000000000000000000000000004444
-        // 0000000000000000000000000000000000000000000000000000000000000040
-        // 0000000000000000000000000000000000000000000000000000000000000000
-        // 0000000000000000000000000000000000000000000000000000000000000000
-        // 0000000000000000000000000000000000000000000000000000000000000040
-        // 0000000000000000000000000000000000000000000000000000000000000001
-        // 0000000000000000000000000000000000000000000000000000000000000000
-
-        bytes memory message_bytes = abi.encodeWithSelector(
-            IDelegationManager.delegateToBySignature.selector,
-            staker,
-            operator,
-            stakerSignatureAndExpiry,
-            approverSignatureAndExpiry,
-            approverSalt
-        );
-        return message_bytes;
-    }
-
     function encodeUndelegateMsg(address staker) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
             // bytes4(keccak256("undelegate(address)")),
@@ -198,8 +156,13 @@ contract ClientEncoders {
         return message_bytes;
     }
 
-    function hashAgentOwnerRoot(bytes32 withdrawalRoot, address agentOwner) public pure returns (bytes32) {
-        return keccak256(abi.encode(withdrawalRoot, agentOwner));
+    function encodeMintEigenAgent() public pure returns (bytes memory) {
+
+        bytes memory message_bytes = abi.encodeWithSelector(
+            // cast sig "mintEigenAgent(bytes)" == 0xcc15a557
+            IRestakingConnector.mintEigenAgent.selector
+        );
+        return message_bytes;
     }
 }
 

@@ -257,14 +257,14 @@ contract RestakingConnector is
                 );
             }
         }
-
-        return (
-            receiveAsTokens,
-            withdrawalAmount,
-            address(withdrawalToken),
-            messageForL2,
-            withdrawalAgentOwnerRoot
-        );
+        //// Function definition defines return variables. This line is not hit in coverage
+        // return (
+        //     receiveAsTokens,
+        //     withdrawalAmount,
+        //     withdrawalToken,
+        //     messageForL2,
+        //     withdrawalAgentOwnerRoot
+        // );
     }
 
     function delegateToWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
