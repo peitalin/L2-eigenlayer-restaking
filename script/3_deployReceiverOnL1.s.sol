@@ -9,7 +9,6 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {EmptyContract} from "eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";

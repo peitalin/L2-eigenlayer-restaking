@@ -45,7 +45,7 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
     }
 
     function setAgentFactory(IAgentFactory _agentFactory) public onlyAdminOrOwner {
-        require(address(_agentFactory) != address(0), "cannot set address(0)");
+        require(address(_agentFactory) != address(0), "AgentFactory cannot be address(0)");
         agentFactory = _agentFactory;
     }
 
@@ -55,10 +55,6 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
     }
 
     function mint(address user) public onlyAgentFactory returns (uint256) {
-        return _mint(user);
-    }
-
-    function mintOnlyOwner(address user) public onlyOwner returns (uint256) {
         return _mint(user);
     }
 

@@ -4,7 +4,6 @@ pragma solidity 0.8.22;
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 
 interface IERC6551Account {
     receive() external payable;
@@ -34,10 +33,11 @@ interface IERC6551Executable {
 // This is a copy of ERC6551Account.sol in reference 6551 repository:
 // import {ERC6551Account} from "@6551/examples/simple/ERC6551Account.sol"
 //
-// The only differences are:
+// The differences are:
 // (1) renaming `state` variable to `execNonce` for creating executeWithSignature digests, and
 // (2) add `virtual` to the execute() function to make it overridable
-contract ERC6551Account is IERC165, IERC1271, IERC6551Account, IERC6551Executable {
+// (3) isValidSignature has no implementation, to be overidden in EigenAgent6551.sol
+abstract contract ERC6551Account is IERC165, IERC1271, IERC6551Account, IERC6551Executable {
     uint256 public execNonce;
 
     receive() external payable {}
@@ -71,20 +71,11 @@ contract ERC6551Account is IERC165, IERC1271, IERC6551Account, IERC6551Executabl
         return bytes4(0);
     }
 
-    function isValidSignature(bytes32 hash, bytes memory signature)
-        external
+    function isValidSignature(bytes32 digestHash, bytes memory signature)
+        public
         view
         virtual
-        returns (bytes4 magicValue)
-    {
-        bool isValid = SignatureChecker.isValidSignatureNow(owner(), hash, signature);
-
-        if (isValid) {
-            return IERC1271.isValidSignature.selector;
-        }
-
-        return bytes4(0);
-    }
+        returns (bytes4 magicValue);
 
     function supportsInterface(bytes4 interfaceId)
         public view virtual

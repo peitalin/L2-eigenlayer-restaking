@@ -22,7 +22,7 @@ import {ClientSigners} from "../script/ClientSigners.sol";
 import {ClientEncoders} from "../script/ClientEncoders.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
-import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
+import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
@@ -47,7 +47,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
     IERC20 public tokenL2;
 
     IAgentFactory public agentFactory;
-    EigenAgentOwner721 public eigenAgentOwnerNft;
+    IEigenAgentOwner721 public eigenAgentOwner721;
     IEigenAgent6551 public eigenAgent;
 
     uint256 public deployerKey;
@@ -112,6 +112,8 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             restakingConnector,
             agentFactory
         ) = deployReceiverOnL1Script.mockrun();
+
+        eigenAgentOwner721 = agentFactory.eigenAgentOwner721();
 
         vm.deal(address(receiverContract), 1 ether);
     }
@@ -214,6 +216,8 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             restakingConnector,
             agentFactory
         ) = deployReceiverOnL1Script.mockrun();
+
+        eigenAgentOwner721 = agentFactory.eigenAgentOwner721();
 
         vm.deal(address(receiverContract), 1 ether);
 

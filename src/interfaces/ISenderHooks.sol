@@ -33,7 +33,6 @@ interface ISenderHooks {
     function calculateWithdrawalTransferRoot(
         bytes32 withdrawalRoot,
         uint256 amount,
-        address tokenL2,
         address agentOwner
     ) external pure returns (bytes32);
 

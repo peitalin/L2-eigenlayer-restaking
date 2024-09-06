@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Test, console} from "forge-std/Test.sol";
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -14,10 +13,19 @@ import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
+import {MockMultisigSigner} from "./mocks/MockMultisigSigner.sol";
 
+import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {IERC6551Executable} from "@6551/interfaces/IERC6551Executable.sol";
+import {IERC6551Account} from "../src/6551/ERC6551Account.sol";
 
 
 contract EigenAgentUnitTests is BaseTestEnvironment {
+
+    error CallerNotWhitelisted();
+    error SignatureNotFromNftOwner();
+    error AlreadySigned();
 
     uint256 expiry;
     uint256 amount;
@@ -53,6 +61,13 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         vm.assertEq(
             delegationManager.DOMAIN_TYPEHASH(),
             eigenAgent.DOMAIN_TYPEHASH()
+        );
+    }
+
+    function test_GetAgentOwner() public view {
+        vm.assertEq(
+            address(deployer),
+            address(eigenAgent.getAgentOwner())
         );
     }
 
@@ -119,6 +134,220 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         vm.stopBroadcast();
     }
 
+    function test_EigenAgent_RevertOnInvalidSignature() public {
+
+        uint256 execNonce0 = eigenAgent.execNonce();
+        // alice signs
+        (
+            bytes memory data1,
+            bytes32 digestHash1,
+            bytes memory signature1
+        ) = createEigenAgentDepositSignature(
+            aliceKey,
+            amount,
+            execNonce0
+        );
+
+        vm.assertEq(
+            eigenAgent.isValidSignature(digestHash1, signature1),
+            bytes4(0) // returns bytes4(0) when signature verification fails
+        );
+
+        // alice attempts to execute using deployer's EigenAgent
+        vm.expectRevert(abi.encodeWithSelector(SignatureNotFromNftOwner.selector));
+        eigenAgent.executeWithSignature(
+            address(strategyManager), // strategyManager
+            0,
+            data1, // encodeDepositIntoStrategyMsg
+            expiry,
+            signature1
+        );
+    }
+
+    function test_EigenAgent_Multisig_Execute() public {
+
+        vm.startBroadcast(deployer);
+        MockMultisigSigner multisig = new MockMultisigSigner();
+
+        multisig.addAdmin(bob);
+        multisig.addAdmin(alice);
+
+        IEigenAgent6551 eigenAgent2 = agentFactory.spawnEigenAgentOnlyOwner(address(payable(multisig)));
+        vm.stopBroadcast();
+
+        vm.assertEq(eigenAgent2.getAgentOwner(), address(multisig));
+
+        uint256 aliceBalanceBefore = alice.balance;
+
+        vm.deal(address(eigenAgent2), 1 ether);
+        vm.deal(address(multisig), 1 ether);
+
+        //////////////////////////////////
+        // eigenagent can execute as NFT owner() == multisig
+        vm.prank(address(multisig));
+        IERC6551Executable(address(eigenAgent2)).execute(
+            payable(alice),
+            0.5 ether,
+            "",
+            0
+        );
+
+        vm.assertEq(address(eigenAgent2).balance, 0.5 ether);
+        vm.assertEq(alice.balance, aliceBalanceBefore + 0.5 ether);
+        vm.assertEq(eigenAgent2.execNonce(), 1);
+    }
+
+    function test_EigenAgent_Multisig_Execute_EIP1271Signatures() public {
+
+        vm.startBroadcast(deployer);
+        MockMultisigSigner multisig = new MockMultisigSigner();
+
+        multisig.addAdmin(bob);
+        multisig.addAdmin(alice);
+
+        IEigenAgent6551 eigenAgent2 = agentFactory.spawnEigenAgentOnlyOwner(address(payable(multisig)));
+        vm.stopBroadcast();
+
+        vm.assertEq(eigenAgent2.getAgentOwner(), address(multisig));
+
+        uint256 aliceBalanceBefore = alice.balance;
+
+        vm.deal(address(eigenAgent2), 1 ether);
+        vm.deal(address(multisig), 1 ether);
+
+        //////////////////////////////////
+        uint256 execNonce = 0;
+        address targetContract = address(agentFactory);
+
+        bytes memory spawnMessage = abi.encodeWithSignature("spawnEigenAgentOnlyOwner(address)", alice);
+
+        bytes32 digestHash = createEigenAgentCallDigestHash(
+            targetContract,
+            0 ether, // not sending ether
+            spawnMessage,
+            execNonce,
+            block.chainid, // destination chainid where EigenAgent lives, usually ETH
+            expiry
+        );
+
+        bytes memory messageWithSignatureBob;
+        bytes memory sigBob;
+        {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(bobKey, digestHash);
+            sigBob = abi.encodePacked(r, s, v);
+            address signer = vm.addr(bobKey);
+
+            messageWithSignatureBob = abi.encodePacked(
+                spawnMessage,
+                bytes32(abi.encode(signer)), // pad signer to 32byte word
+                expiry,
+                sigBob
+            );
+        }
+
+        bytes memory messageWithSignatureAlice;
+        bytes memory sigAlice;
+        {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(aliceKey, digestHash);
+            sigAlice = abi.encodePacked(r, s, v);
+            address signer = vm.addr(aliceKey);
+
+            messageWithSignatureAlice = abi.encodePacked(
+                spawnMessage,
+                bytes32(abi.encode(signer)), // pad signer to 32byte word
+                expiry,
+                sigAlice
+            );
+        }
+
+        // 1st admin signs
+        multisig.signHash(digestHash, sigAlice);
+        // isValidSignature fails, as only 1 admin signed (out of 2)
+        vm.assertNotEq(
+            multisig.isValidSignature(digestHash, sigAlice),
+            IERC1271.isValidSignature.selector
+        );
+
+        // 1st admin tries to double sign and fails
+        vm.expectRevert(abi.encodeWithSelector(AlreadySigned.selector));
+        multisig.signHash(digestHash, sigAlice);
+
+        // trying to execute call without having 2 signers on the multsig fails
+        vm.prank(address(multisig));
+        vm.expectRevert(abi.encodeWithSelector(SignatureNotFromNftOwner.selector));
+        eigenAgent2.executeWithSignature(
+            targetContract,
+            0 ether,
+            spawnMessage,
+            expiry,
+            sigAlice
+        );
+
+        // 2nd admin signs
+        multisig.signHash(digestHash, sigBob);
+        // Now this digestHash is valid
+        vm.assertEq(
+            multisig.isValidSignature(digestHash, sigAlice),
+            IERC1271.isValidSignature.selector
+        );
+
+        // add eigenAgent2 as AgentFactory admin for permissions to spawn EigenAgent
+        vm.prank(deployer);
+        agentFactory.addAdmin(address(eigenAgent2));
+
+        // dispatch message from multisig, using any of the admin signatures
+        vm.prank(address(multisig));
+        eigenAgent2.executeWithSignature(
+            targetContract,
+            0 ether,
+            spawnMessage,
+            expiry,
+            sigBob
+            // sigAlice
+        );
+        // using any signature from any Admin suffices
+
+        require(
+            agentFactory.getEigenAgentOwnerTokenId(alice) > 1,
+            "minted for Alice via multisig (owner of EigenAgent)"
+        );
+    }
+
+    function test_EigenAgent_ApproveByWhitelistedContract() public {
+
+        address someSpenderContract = address(agentFactory);
+
+        vm.expectRevert(abi.encodeWithSelector(CallerNotWhitelisted.selector));
+        eigenAgent.approveByWhitelistedContract(
+            someSpenderContract,
+            address(tokenL1),
+            amount
+        );
+
+        vm.prank(bob);
+        vm.expectRevert("Not admin or owner");
+        eigenAgentOwner721.addToWhitelistedCallers(bob);
+
+        vm.startBroadcast(deployer);
+        {
+            eigenAgentOwner721.addToWhitelistedCallers(deployer);
+
+            eigenAgent.approveByWhitelistedContract(
+                someSpenderContract,
+                address(tokenL1),
+                amount
+            );
+            eigenAgentOwner721.removeFromWhitelistedCallers(deployer);
+            vm.expectRevert(abi.encodeWithSelector(CallerNotWhitelisted.selector));
+            eigenAgent.approveByWhitelistedContract(
+                someSpenderContract,
+                address(tokenL1),
+                amount
+            );
+        }
+        vm.stopBroadcast();
+    }
+
 
     function test_EigenAgent_DepositTransferThenWithdraw() public {
 
@@ -168,7 +397,6 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         uint256 execNonce1 = eigenAgent.execNonce();
         {
             vm.startBroadcast(address(receiverContract));
-
             (
                 bytes memory data1,
                 bytes32 digestHash1,
@@ -197,15 +425,15 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
             vm.startBroadcast(bob);
 
             uint256 transferredTokenId = agentFactory.getEigenAgentOwnerTokenId(bob);
-            IEigenAgentOwner721 eigenAgentOwnerNft = agentFactory.eigenAgentOwner721();
-            eigenAgentOwnerNft.approve(alice, transferredTokenId);
+            IEigenAgentOwner721 eigenAgentOwner721 = agentFactory.eigenAgentOwner721();
+            eigenAgentOwner721.approve(alice, transferredTokenId);
 
             vm.expectEmit(true, true, true, true);
             emit IAgentFactory.EigenAgentOwnerUpdated(bob, alice, transferredTokenId);
-            eigenAgentOwnerNft.safeTransferFrom(bob, alice, transferredTokenId);
+            eigenAgentOwner721.safeTransferFrom(bob, alice, transferredTokenId);
 
             require(
-                eigenAgentOwnerNft.ownerOf(transferredTokenId) == alice,
+                eigenAgentOwner721.ownerOf(transferredTokenId) == alice,
                 "alice should be owner of the token"
             );
             vm.stopBroadcast();
@@ -357,6 +585,50 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         }
 
         return (data, digestHash, signature);
+    }
+
+    function test_EigenAgent_ValidSigners() public {
+
+        // bob is not valid signer
+        vm.assertTrue(
+            eigenAgent.isValidSigner(bob, "") != IERC6551Account.isValidSigner.selector
+        );
+        // deployer is the owner of the eigenAgent, valid signer
+        vm.assertEq(
+            eigenAgent.isValidSigner(deployer, ""),
+            IERC6551Account.isValidSigner.selector
+        );
+
+        vm.deal(address(eigenAgent), 1 ether);
+
+        uint256 aliceBalanceBefore = alice.balance;
+
+        vm.prank(deployer);
+        IERC6551Executable(address(eigenAgent)).execute(
+            payable(alice),
+            0.5 ether,
+            "",
+            0
+        );
+
+        vm.assertEq(address(eigenAgent).balance, 0.5 ether);
+        vm.assertEq(alice.balance, aliceBalanceBefore + 0.5 ether);
+        vm.assertEq(eigenAgent.execNonce(), 1);
+    }
+
+    function test_EigenAgent_SupportsInterface() public view {
+
+        IERC6551Account accountInstance = IERC6551Account(payable(eigenAgent));
+
+        accountInstance.supportsInterface(
+            type(IERC165).interfaceId
+        );
+        accountInstance.supportsInterface(
+            type(IERC6551Account).interfaceId
+        );
+        accountInstance.supportsInterface(
+            type(IERC6551Executable).interfaceId
+        );
     }
 
 }

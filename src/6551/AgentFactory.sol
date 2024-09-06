@@ -80,7 +80,7 @@ contract AgentFactory is Initializable, Adminable {
 
     function setEigenAgentOwner721(IEigenAgentOwner721 newEigenAgentOwner721) public onlyAdminOrOwner {
         if (address(newEigenAgentOwner721) == address(0))
-            revert AddressZero("AgentFactory.setEigenAgent721: cannot be address(0)");
+            revert AddressZero("AgentFactory.setEigenAgentOwner721: cannot be address(0)");
         eigenAgentOwner721 = newEigenAgentOwner721;
     }
 
@@ -108,7 +108,8 @@ contract AgentFactory is Initializable, Adminable {
     }
 
     function spawnEigenAgentOnlyOwner(address staker)
-        external onlyAdminOrOwner
+        external
+        onlyAdminOrOwner
         returns (IEigenAgent6551)
     {
         return _spawnEigenAgent6551(staker);

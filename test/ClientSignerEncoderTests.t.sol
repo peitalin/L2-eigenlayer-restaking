@@ -347,7 +347,7 @@ contract ClientSignerEncoderTests is BaseTestEnvironment {
         );
     }
 
-    function test_ClientEncoder_calculateWithdrawalTransferRoot() public view {
+    function test_ClientEncoder_calculateWithdrawalTransferRoot() public {
 
         IDelegationManager.Withdrawal memory withdrawal = makeMockWithdrawal();
         bytes32 withdrawalRoot = clientEncodersTest.calculateWithdrawalRoot(withdrawal);
@@ -355,6 +355,23 @@ contract ClientSignerEncoderTests is BaseTestEnvironment {
         vm.assertEq(
             keccak256(abi.encode(
                 clientEncodersTest.calculateWithdrawalTransferRoot(withdrawalRoot, amount, deployer)
+            )),
+            keccak256(abi.encode(
+                EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(withdrawalRoot, amount, deployer)
+            ))
+        );
+    }
+
+    function test_SenderHooks_calculateWithdrawalTransferRoot() public {
+
+        IDelegationManager.Withdrawal memory withdrawal = makeMockWithdrawal();
+        bytes32 withdrawalRoot = clientEncodersTest.calculateWithdrawalRoot(withdrawal);
+
+        vm.selectFork(l2ForkId);
+
+        vm.assertEq(
+            keccak256(abi.encode(
+                senderHooks.calculateWithdrawalTransferRoot(withdrawalRoot, amount, deployer)
             )),
             keccak256(abi.encode(
                 EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(withdrawalRoot, amount, deployer)

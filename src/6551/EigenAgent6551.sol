@@ -2,14 +2,11 @@
 pragma solidity 0.8.22;
 
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-// Either use reference implementation or copy of it:
-// import {ERC6551Account} from "@6551/examples/simple/ERC6551Account.sol";
 import {ERC6551Account} from "./ERC6551Account.sol";
-import {IEigenAgent6551} from "./IEigenAgent6551.sol";
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
+import {SignatureCheckerV5} from "../utils/SignatureCheckerV5.sol";
 
 
 contract EigenAgent6551 is ERC6551Account {
@@ -43,13 +40,13 @@ contract EigenAgent6551 is ERC6551Account {
     function isValidSignature(
         bytes32 digestHash,
         bytes memory signature
-    ) public view virtual override(ERC6551Account) returns (bytes4) {
-        bool isValid = ECDSA.recover(digestHash, signature) == owner(); // owner of the NFT
-        if (isValid) {
+    ) public view virtual override returns (bytes4) {
+        address signer = owner();
+        if (SignatureCheckerV5.isValidSignatureNow(signer, digestHash, signature)) {
             return IERC1271.isValidSignature.selector;
+        } else {
+            return bytes4(0);
         }
-
-        return bytes4(0);
     }
 
     function approveByWhitelistedContract(
@@ -141,3 +138,4 @@ contract EigenAgent6551 is ERC6551Account {
         return keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes("EigenLayer")), chainid, contractAddr));
     }
 }
+
