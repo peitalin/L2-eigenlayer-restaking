@@ -148,15 +148,9 @@ contract RestakingConnector is
     }
 
     function mintEigenAgent(bytes memory message) public onlyReceiverCCIP {
-        // Mint a EigenAgent manually
-        (
-            // message signature
-            address signer,
-            uint256 expiry,
-            bytes memory signature
-        ) = decodeMintEigenAgent(message);
-
-        agentFactory.tryGetEigenAgentOrSpawn(signer);
+        // Mint a EigenAgent manually, no signature required.
+        address recipient = decodeMintEigenAgent(message);
+        agentFactory.tryGetEigenAgentOrSpawn(recipient);
     }
 
     function queueWithdrawalsWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
@@ -165,7 +159,7 @@ contract RestakingConnector is
             // original message
             IDelegationManager.QueuedWithdrawalParams[] memory QWPArray,
             // message signature
-            address signer,
+            , // address signer,
             uint256 expiry,
             bytes memory signature
         ) = decodeQueueWithdrawalsMsg(messageWithSignature);
@@ -178,7 +172,7 @@ contract RestakingConnector is
 
         _withdrawalBlock[withdrawer][withdrawalNonce] = block.number;
 
-        bytes memory result = eigenAgent.executeWithSignature(
+        eigenAgent.executeWithSignature(
             address(delegationManager),
             0 ether,
             EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(QWPArray),
@@ -194,7 +188,7 @@ contract RestakingConnector is
             uint256 withdrawalAmount,
             address withdrawalToken,
             string memory messageForL2,
-            bytes32 withdrawalAgentOwnerRoot
+            bytes32 withdrawalTransferRoot
         )
     {
         // scope to reduce variable count
@@ -233,13 +227,14 @@ contract RestakingConnector is
             receiveAsTokens = _receiveAsTokens;
             withdrawalAmount = withdrawal.shares[0];
             withdrawalToken = address(tokensToWithdraw[0]);
-            withdrawalAgentOwnerRoot = EigenlayerMsgEncoders.calculateWithdrawalAgentOwnerRoot(
+            withdrawalTransferRoot = EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(
                 delegationManager.calculateWithdrawalRoot(withdrawal), // withdrawalRoot
+                withdrawalAmount,
                 signer
             );
-            // hash(withdrawalRoot, signer) to make withdrawalAgentOwnerRoot for L2 transfer
+            // hash(withdrawalRoot, signer) to make withdrawalTransferRoot for L2 transfer
             messageForL2 = string(EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
-                withdrawalAgentOwnerRoot
+                withdrawalTransferRoot
             ));
 
             if (_receiveAsTokens) {
@@ -257,13 +252,13 @@ contract RestakingConnector is
                 );
             }
         }
-        //// Function definition defines return variables. This line is not hit in coverage
+        //// Function defines named return variables. This line is not hit in coverage
         // return (
         //     receiveAsTokens,
         //     withdrawalAmount,
         //     withdrawalToken,
         //     messageForL2,
-        //     withdrawalAgentOwnerRoot
+        //     withdrawalTransferRoot
         // );
     }
 
@@ -299,7 +294,7 @@ contract RestakingConnector is
             // original message
             address eigenAgentAddr, // staker in Eigenlayer delegating
             // message signature
-            address signer,
+            , // address signer,
             uint256 expiry,
             bytes memory signature
         ) = DelegationDecoders.decodeUndelegateMsg(messageWithSignature);

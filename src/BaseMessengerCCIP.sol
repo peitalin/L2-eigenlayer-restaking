@@ -203,7 +203,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         if (!sent) revert FailedToWithdrawEth(msg.sender, _beneficiary, amount);
     }
 
-    /// @param _beneficiary he address to which the tokens will be sent.
+    /// @param _beneficiary address to which the tokens will be sent.
     /// @param _token contract address of the ERC20 token to be withdrawn.
     function withdrawToken(
         address _beneficiary,

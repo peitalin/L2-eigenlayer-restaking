@@ -6,9 +6,7 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 interface ISenderHooks {
 
     struct WithdrawalTransfer {
-        address withdrawer;
         uint256 amount;
-        address tokenDestination;
         address agentOwner;
     }
 
@@ -16,19 +14,15 @@ interface ISenderHooks {
 
     function setSenderCCIP(address newSenderCCIP) external;
 
-    function isWithdrawalAgentOwnerRootSpent(bytes32 withdrawalAgentOwnerRoot) external returns (bool);
+    function isWithdrawalTransferRootSpent(bytes32 withdrawalTransferRoot) external returns (bool);
 
     function handleTransferToAgentOwner(bytes memory message)
         external
-        returns (
-            address agentOwner,
-            uint256 amount,
-            address tokenL2Address
-        );
+        returns (address agentOwner, uint256 amount);
 
     function beforeSendCCIPMessage(bytes memory message, address tokenL2) external;
 
-    function withdrawalTransferCommittments()
+    function getWithdrawalTransferCommitment(bytes32 withdrawalTransferRoot)
         external
         returns (ISenderHooks.WithdrawalTransfer memory);
 
@@ -36,9 +30,12 @@ interface ISenderHooks {
         external pure
         returns (bytes32);
 
-    function calculateWithdrawalAgentOwnerRoot(bytes32 withdrawalRoot, address agentOwner)
-        external pure
-        returns (bytes32);
+    function calculateWithdrawalTransferRoot(
+        bytes32 withdrawalRoot,
+        uint256 amount,
+        address tokenL2,
+        address agentOwner
+    ) external pure returns (bytes32);
 
     function setGasLimitsForFunctionSelectors(
         bytes4[] memory functionSelectors,

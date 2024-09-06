@@ -76,14 +76,13 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             (
                 address agentOwner,
-                uint256 amount,
-                address tokenL2Address
+                uint256 amount
             ) = senderHooks.handleTransferToAgentOwner(message);
 
             // agentOwner is the signer, first committed when sending completeWithdrawal
-            // message and generating the withdrawalAgentOwnerRoot.
+            // message and generating the withdrawalTransferRoot.
             // completeWithdrawal only succeeds for the rightful signer/owner of the EigenAgent
-            IERC20(tokenL2Address).transfer(agentOwner, amount);
+            IERC20(any2EvmMessage.destTokenAmounts[0].token).transfer(agentOwner, amount);
 
             textMsg = "Completed withdrawal and sent tokens to EigenAgent owner";
 

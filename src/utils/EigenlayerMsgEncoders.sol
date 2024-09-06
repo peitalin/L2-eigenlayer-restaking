@@ -129,11 +129,12 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-    function encodeMintEigenAgent() public pure returns (bytes memory) {
+    function encodeMintEigenAgent(address recipient) public pure returns (bytes memory) {
 
         bytes memory message_bytes = abi.encodeWithSelector(
             // cast sig "mintEigenAgent(bytes)" == 0xcc15a557
-            IRestakingConnector.mintEigenAgent.selector
+            IRestakingConnector.mintEigenAgent.selector,
+            recipient
         );
         return message_bytes;
     }
@@ -145,22 +146,23 @@ library EigenlayerMsgEncoders {
      *
     */
 
-    function calculateWithdrawalAgentOwnerRoot(
+    function calculateWithdrawalTransferRoot(
         bytes32 withdrawalRoot,
+        uint256 amount,
         address agentOwner // signer
     ) public pure returns (bytes32) {
-        // encode signer into withdrawalAgentOwnerRoot
-        return keccak256(abi.encode(withdrawalRoot, agentOwner));
+        // encode signer into withdrawalTransferRoot
+        return keccak256(abi.encode(withdrawalRoot, amount, agentOwner));
     }
 
     function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalAgentOwnerRoot
+        bytes32 withdrawalTransferRoot
     ) public pure returns (bytes memory) {
 
         bytes memory message_bytes = abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderHooks.handleTransferToAgentOwner.selector,
-            withdrawalAgentOwnerRoot
+            withdrawalTransferRoot
         );
         return message_bytes;
     }

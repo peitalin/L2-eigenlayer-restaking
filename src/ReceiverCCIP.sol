@@ -24,7 +24,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
     event BridgingWithdrawalToL2(
         address indexed senderContractL2,
-        bytes32 indexed withdrawalAgentOwnerRoot,
+        bytes32 indexed withdrawalTransferRoot,
         uint256 indexed withdrawalAmount
     );
 
@@ -143,7 +143,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 uint256 withdrawalAmount,
                 address withdrawalToken,
                 string memory messageForL2,
-                bytes32 withdrawalAgentOwnerRoot
+                bytes32 withdrawalTransferRoot
             ) = restakingConnector.completeWithdrawalWithEigenAgent(message);
 
             if (receiveAsTokens) {
@@ -163,7 +163,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
                 emit BridgingWithdrawalToL2(
                     senderContractL2,
-                    withdrawalAgentOwnerRoot,
+                    withdrawalTransferRoot,
                     withdrawalAmount
                 );
 

@@ -34,7 +34,7 @@ interface IRestakingConnector {
         uint256 withdrawalAmount,
         address withdrawalToken,
         string memory messageForL2, // CCIP message for transferToAgentOwner on L2
-        bytes32 withdrawalAgentOwnerRoot
+        bytes32 withdrawalTransferRoot
     );
 
     function delegateToWithEigenAgent(bytes memory message) external;

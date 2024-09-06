@@ -7,7 +7,7 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 struct TransferToAgentOwnerMsg {
-    bytes32 withdrawalAgentOwnerRoot;
+    bytes32 withdrawalTransferRoot;
 }
 
 /// @dev used to decode user signatures on all CCIP messages to EigenAgents
@@ -92,25 +92,16 @@ contract EigenlayerMsgDecoders {
 
     function decodeMintEigenAgent(bytes memory message)
         public pure
-        returns (
-            address signer,
-            uint256 expiry,
-            bytes memory signature
-        )
+        returns (address recipient)
     {
         // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
         // 00000000000000000000000000000000000000000000000000000000000000e5 [64] string length
         // 0xcc15a557                                                       [96] function selector
-        // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [100] signer (original staker)
-        // 0000000000000000000000000000000000000000000000000000000066d063d4 [132] expiry (signature)
-        // b65bb77203b002de051363fd17437187540d5c6a0cfcb75c31dfffff9108e41d [164] signature r
-        // 037e6bdadf2079e5268e5ad0000699611e63c3e015027ad7f8e7b4a252bbb9bb [196] signature s
-        // 1c000000000000000000000000000000000000000000000000000000         [228] signature v
-        (
-            signer,
-            expiry,
-            signature
-        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 100); // signature starts on 100
+        // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [100] recipient to mint to
+        // 1c000000000000000000000000000000000000000000000000000000
+        assembly {
+            recipient := mload(add(message, 100))
+        }
     }
 
     /*
@@ -189,7 +180,7 @@ contract EigenlayerMsgDecoders {
     }
 
     function _decodeSingleQueueWithdrawalMsg(bytes memory message, uint256 arrayLength, uint256 i)
-        internal pure
+        private pure
         returns (IDelegationManager.QueuedWithdrawalParams memory)
     {
         /// @dev: expect to use this in a for-loop with i iteration variable
@@ -360,7 +351,7 @@ contract EigenlayerMsgDecoders {
     }
 
     function _decodeCompleteWithdrawalMsgPart1(bytes memory message)
-        internal pure
+        private pure
         returns (IDelegationManager.Withdrawal memory)
     {
         /// @note decodes the first half of the CompleteWithdrawalMsg as we run into
@@ -423,7 +414,7 @@ contract EigenlayerMsgDecoders {
     }
 
     function _decodeCompleteWithdrawalMsgPart2(bytes memory message)
-        internal pure
+        private pure
         returns (
             IERC20[] memory tokensToWithdraw,
             uint256 middlewareTimesIndex,
@@ -482,15 +473,15 @@ contract EigenlayerMsgDecoders {
         // 00000000000000000000000000000000000000000000000000000000
 
         bytes4 functionSelector;
-        bytes32 withdrawalAgentOwnerRoot;
+        bytes32 withdrawalTransferRoot;
 
         assembly {
             functionSelector := mload(add(message, 96))
-            withdrawalAgentOwnerRoot := mload(add(message, 100))
+            withdrawalTransferRoot := mload(add(message, 100))
         }
 
         return TransferToAgentOwnerMsg({
-            withdrawalAgentOwnerRoot: withdrawalAgentOwnerRoot
+            withdrawalTransferRoot: withdrawalTransferRoot
         });
     }
 }
