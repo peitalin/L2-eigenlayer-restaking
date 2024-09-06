@@ -59,7 +59,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
     uint256 public l2ForkId;
     uint256 public ethForkId;
 
-    function setUpForkedEnvironment() public {
+    function setUpForkedEnvironment() internal {
 
 		deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
@@ -83,7 +83,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         _setupL2ForkedEnvironment();
     }
 
-    function _setupL1ForkedEnvironment() internal {
+    function _setupL1ForkedEnvironment() private {
         /////////////////////////////////////////////
         //// Setup L1 CCIP and Eigenlayer contracts
         /////////////////////////////////////////////
@@ -123,7 +123,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         vm.stopBroadcast();
     }
 
-    function _setupL2ForkedEnvironment() internal {
+    function _setupL2ForkedEnvironment() private {
         /////////////////////////////////////////
         //// Setup L2 CCIP contracts
         /////////////////////////////////////////
@@ -150,7 +150,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         vm.stopBroadcast();
     }
 
-    function setUpLocalEnvironment() public {
+    function setUpLocalEnvironment() internal {
 
 		deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);

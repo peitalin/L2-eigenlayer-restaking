@@ -68,7 +68,7 @@ contract QueueWithdrawalScript is
         return _run(true);
     }
 
-    function _run(bool isTest) public {
+    function _run(bool isTest) private {
 
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");
@@ -224,7 +224,7 @@ contract QueueWithdrawalScript is
             strategiesToWithdraw,
             sharesToWithdraw,
             bytes32(0x0), // withdrawalRoot is created later when completeWithdrawal
-            bytes32(0x0), // withdrawalAgentOwnerRoot is created later
+            bytes32(0x0), // withdrawalTransferRoot is created later
             filePath
         );
     }

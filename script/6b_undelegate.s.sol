@@ -114,7 +114,7 @@ contract UndelegateScript is
         return _run(true);
     }
 
-    function _run(bool isTest) public {
+    function _run(bool isTest) private {
 
         senderContract = readSenderContract();
         (receiverContract, restakingConnector) = readReceiverRestakingConnector();

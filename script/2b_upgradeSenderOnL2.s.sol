@@ -29,7 +29,7 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
         return _run();
     }
 
-    function _run() public {
+    function _run() private {
 
         ProxyAdmin proxyAdmin = ProxyAdmin(readProxyAdminL2());
 

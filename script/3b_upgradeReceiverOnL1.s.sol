@@ -162,7 +162,8 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
                 address(agentFactoryProxy),
                 address(registry6551),
                 address(eigenAgentOwner721Proxy),
-                address(proxyAdmin)
+                address(proxyAdmin),
+                FILEPATH_BRIDGE_CONTRACTS_L1
             );
         }
 

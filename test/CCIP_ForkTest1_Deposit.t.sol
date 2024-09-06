@@ -33,7 +33,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
      *
      */
 
-    function test_CCIP_Eigenlayer_L1_DepositIntoStrategy() public {
+    function test_ReceiverL1_MockReceive_DepositIntoStrategy() public {
 
         /////////////////////////////////////
         //// L1: Mock receiver Deposit message on L1
@@ -97,7 +97,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             )) // CCIP abi.encodes a string message when sending
         });
 
-        // send CCIP message to receiverCCIP
+        // mock receiving CCIP message from L2
         receiverContract.mockCCIPReceive(any2EvmMessage);
 
         IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(bob);
@@ -110,7 +110,67 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         );
     }
 
-    function test_TransferToAgentOwnerEmitsEvents_Receiver() public {
+
+    function test_SenderL2_SendMessagePayNative_Deposit() public {
+
+        ///////////////////////////////////////////////////
+        //// Setup Sender contracts on L2 fork
+        ///////////////////////////////////////////////////
+        vm.selectFork(l2ForkId);
+
+        uint256 execNonce = 0;
+        bytes memory messageWithSignature;
+        {
+            bytes memory depositMessage = encodeDepositIntoStrategyMsg(
+                address(strategy),
+                address(tokenL1),
+                amount
+            );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature = signMessageForEigenAgentExecution(
+                bobKey,
+                block.chainid, // destination chainid where EigenAgent lives
+                address(strategyManager), // StrategyManager to approve + deposit
+                depositMessage,
+                execNonce,
+                expiry
+            );
+        }
+
+        // messageId (topic[1]): false as we don't know messageId yet
+        vm.expectEmit(false, true, false, false);
+        emit BaseMessengerCCIP.MessageSent(
+            bytes32(0x0),
+            EthSepolia.ChainSelector, // destination chain
+            address(receiverContract),
+            "dispatched call", // default message
+            address(BaseSepolia.BridgeToken), // token to send
+            0.1 ether,
+            address(0), // native gas for fees
+            0
+        );
+        // event MessageSent(
+        //     bytes32 indexed messageId,
+        //     uint64 indexed destinationChainSelector,
+        //     address receiver,
+        //     string text,
+        //     address token,
+        //     uint256 tokenAmount,
+        //     address feeToken,
+        //     uint256 fees
+        // );
+        senderContract.sendMessagePayNative(
+            EthSepolia.ChainSelector, // destination chain
+            address(receiverContract),
+            string(messageWithSignature),
+            address(BaseSepolia.BridgeToken), // token to send
+            0.1 ether, // test sending 0.1e18 tokens
+            999_000 // use custom gasLimit for this function
+        );
+    }
+
+    function test_ReceiverL2_SenderMessagePayNative_TransferToAgentOwner() public {
 
         ///////////////////////////////////////////////////
         //// Receiver contracts on L1 fork
@@ -189,63 +249,4 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         );
     }
 
-
-    function test_SendMessagePayNative_Sender_Deposit() public {
-
-        ///////////////////////////////////////////////////
-        //// Setup Sender contracts on L2 fork
-        ///////////////////////////////////////////////////
-        vm.selectFork(l2ForkId);
-
-        uint256 execNonce = 0;
-        bytes memory messageWithSignature;
-        {
-            bytes memory depositMessage = encodeDepositIntoStrategyMsg(
-                address(strategy),
-                address(tokenL1),
-                amount
-            );
-
-            // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature = signMessageForEigenAgentExecution(
-                bobKey,
-                block.chainid, // destination chainid where EigenAgent lives
-                address(strategyManager), // StrategyManager to approve + deposit
-                depositMessage,
-                execNonce,
-                expiry
-            );
-        }
-
-        // messageId (topic[1]): false as we don't know messageId yet
-        vm.expectEmit(false, true, false, false);
-        emit BaseMessengerCCIP.MessageSent(
-            bytes32(0x0),
-            EthSepolia.ChainSelector, // destination chain
-            address(receiverContract),
-            "dispatched call", // default message
-            address(BaseSepolia.BridgeToken), // token to send
-            0.1 ether,
-            address(0), // native gas for fees
-            0
-        );
-        // event MessageSent(
-        //     bytes32 indexed messageId,
-        //     uint64 indexed destinationChainSelector,
-        //     address receiver,
-        //     string text,
-        //     address token,
-        //     uint256 tokenAmount,
-        //     address feeToken,
-        //     uint256 fees
-        // );
-        senderContract.sendMessagePayNative(
-            EthSepolia.ChainSelector, // destination chain
-            address(receiverContract),
-            string(messageWithSignature),
-            address(BaseSepolia.BridgeToken), // token to send
-            0.1 ether, // test sending 0.1e18 tokens
-            999_000 // use custom gasLimit for this function
-        );
-    }
 }

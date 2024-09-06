@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, stdJson, console} from "forge-std/Script.sol";
+import {Script, stdJson} from "forge-std/Script.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
@@ -19,27 +19,30 @@ import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 
 contract FileReader is Script {
 
+    string public FILEPATH_BRIDGE_CONTRACTS_L1 = "script/ethsepolia/bridgeContractsL1.config.json";
+    string public FILEPATH_BRIDGE_CONTRACTS_L2 = "script/basesepolia/bridgeContractsL2.config.json";
+
     /////////////////////////////////////////////////
     // L2 Contracts
     /////////////////////////////////////////////////
 
     function readSenderContract() public view returns (ISenderCCIP) {
         string memory addrData;
-        addrData = vm.readFile("script/basesepolia/bridgeContractsL2.config.json");
+        addrData = vm.readFile(FILEPATH_BRIDGE_CONTRACTS_L2);
         address senderAddr = stdJson.readAddress(addrData, ".contracts.senderCCIP");
         return ISenderCCIP(senderAddr);
     }
 
     function readSenderHooks() public view returns (ISenderHooks) {
         string memory addrData;
-        addrData = vm.readFile("script/basesepolia/bridgeContractsL2.config.json");
+        addrData = vm.readFile(FILEPATH_BRIDGE_CONTRACTS_L2);
         address senderHooksAddr = stdJson.readAddress(addrData, ".contracts.senderHooks");
         return ISenderHooks(senderHooksAddr);
     }
 
     function readProxyAdminL2() public view returns (address) {
         string memory addrData;
-        addrData = vm.readFile("script/basesepolia/bridgeContractsL2.config.json");
+        addrData = vm.readFile(FILEPATH_BRIDGE_CONTRACTS_L2);
         address proxyAdminL2Addr = stdJson.readAddress(addrData, ".contracts.proxyAdminL2");
         return proxyAdminL2Addr;
     }
@@ -48,7 +51,8 @@ contract FileReader is Script {
     function saveSenderBridgeContracts(
         address senderCCIP,
         address senderHooks,
-        address proxyAdminL2
+        address proxyAdminL2,
+        string memory filePath
     ) public {
         // { "inputs": <inputs_data>}
         /////////////////////////////////////////////////
@@ -74,7 +78,7 @@ contract FileReader is Script {
         // chains[84532] = "basesepolia";
         // chains[11155111] = "ethsepolia";
         string memory finalOutputPath2 = string(abi.encodePacked(
-            "script/basesepolia/bridgeContractsL2.config.json"
+            filePath
         ));
         vm.writeJson(finalJson2, finalOutputPath2);
     }
@@ -85,7 +89,7 @@ contract FileReader is Script {
 
     function readReceiverRestakingConnector() public view returns (IReceiverCCIP, IRestakingConnector) {
         string memory addrData;
-        addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
+        addrData = vm.readFile(FILEPATH_BRIDGE_CONTRACTS_L1);
         address receiverAddr = stdJson.readAddress(addrData, ".contracts.receiverCCIP");
         address restakingConnectorAddr = stdJson.readAddress(addrData, ".contracts.restakingConnector");
         return (
@@ -96,14 +100,14 @@ contract FileReader is Script {
 
     function readAgentFactory() public view returns (IAgentFactory) {
         string memory addrData;
-        addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
+        addrData = vm.readFile(FILEPATH_BRIDGE_CONTRACTS_L1);
         address agentFactoryAddr = stdJson.readAddress(addrData, ".contracts.agentFactory");
         return IAgentFactory(agentFactoryAddr);
     }
 
     function readEigenAgent721AndRegistry() public view returns (IEigenAgentOwner721, IERC6551Registry) {
         string memory addrData;
-        addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
+        addrData = vm.readFile(FILEPATH_BRIDGE_CONTRACTS_L1);
         address eigenAgentOwner721 = stdJson.readAddress(addrData, ".contracts.eigenAgentOwner721");
         address registry6551 = stdJson.readAddress(addrData, ".contracts.registry6551");
         return (
@@ -114,7 +118,7 @@ contract FileReader is Script {
 
     function readProxyAdminL1() public view returns (address) {
         string memory addrData;
-        addrData = vm.readFile("script/ethsepolia/bridgeContractsL1.config.json");
+        addrData = vm.readFile(FILEPATH_BRIDGE_CONTRACTS_L1);
         address proxyAdminL1Addr = stdJson.readAddress(addrData, ".contracts.proxyAdminL1");
         return proxyAdminL1Addr;
     }
@@ -125,7 +129,8 @@ contract FileReader is Script {
         address agentFactory,
         address registry6551,
         address eigenAgentOwner721,
-        address proxyAdminL1
+        address proxyAdminL1,
+        string memory filePath
     ) public {
 
         require(receiverCCIP != address(0), "receiverCCIP cannot be null");
@@ -162,7 +167,7 @@ contract FileReader is Script {
         // chains[84532] = "basesepolia";
         // chains[11155111] = "ethsepolia";
         string memory finalOutputPath1 = string(abi.encodePacked(
-            "script/ethsepolia/bridgeContractsL1.config.json"
+            filePath
         ));
         vm.writeJson(finalJson1, finalOutputPath1);
     }
@@ -180,7 +185,7 @@ contract FileReader is Script {
         IStrategy[] memory _strategies,
         uint256[] memory _shares,
         bytes32 _withdrawalRoot,
-        bytes32 _withdrawalAgentOwnerRoot,
+        bytes32 _withdrawalTransferRoot,
         string memory _filePath
     ) public {
 
@@ -201,7 +206,7 @@ contract FileReader is Script {
         /////////////////////////////////////////////////
         // { "outputs": <outputs_data>}
         /////////////////////////////////////////////////
-        vm.serializeBytes32("outputs", "withdrawalAgentOwnerRoot", _withdrawalAgentOwnerRoot);
+        vm.serializeBytes32("outputs", "withdrawalTransferRoot", _withdrawalTransferRoot);
         string memory outputs_data = vm.serializeBytes32("outputs", "withdrawalRoot", _withdrawalRoot);
 
         /////////////////////////////////////////////////
@@ -246,7 +251,6 @@ contract FileReader is Script {
         }
     }
 
-
     function readWithdrawalInfo(
         address stakerAddress,
         string memory filePath
@@ -269,7 +273,7 @@ contract FileReader is Script {
         ///// (written when bridging is initiated), not during queueWithdrawal tx in L1
         uint32 _startBlock = uint32(stdJson.readUint(withdrawalData, ".inputs.startBlock"));
         // bytes32 _withdrawalRoot = stdJson.readBytes32(withdrawalData, ".outputs.withdrawalRoot");
-        // bytes32 _withdrawalAgentOwnerRoot = stdJson.readBytes32(withdrawalData, ".outputs.withdrawalAgentOwnerRoot");
+        // bytes32 _withdrawalTransferRoot = stdJson.readBytes32(withdrawalData, ".outputs.withdrawalTransferRoot");
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         uint256[] memory sharesToWithdraw = new uint256[](1);

@@ -8,28 +8,63 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {ScriptUtils} from "../script/ScriptUtils.sol";
 import {AdminableMock} from "./mocks/AdminableMock.sol";
 import {ERC20Minter} from "../src/ERC20Minter.sol";
-
+import {FileReader} from "../script/FileReader.sol";
 
 contract UtilsTests is Test, ScriptUtils {
 
     AdminableMock public adminableMock;
     ERC20Minter public erc20Minter;
+    FileReader public fileReaderTest;
 
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
     address deployer = vm.addr(deployerKey);
     address bob = vm.addr(0xb0b);
 
     function setUp() public {
+
+        fileReaderTest = new FileReader();
+
         vm.startBroadcast(deployer);
-        adminableMock = new AdminableMock();
-        erc20Minter = ERC20Minter(address(
-            new TransparentUpgradeableProxy(
-                address(new ERC20Minter()),
-                address(new ProxyAdmin()),
-                abi.encodeWithSelector(ERC20Minter.initialize.selector, "test", "TST")
-            )
-        ));
+        {
+            adminableMock = new AdminableMock();
+            erc20Minter = ERC20Minter(address(
+                new TransparentUpgradeableProxy(
+                    address(new ERC20Minter()),
+                    address(new ProxyAdmin()),
+                    abi.encodeWithSelector(ERC20Minter.initialize.selector, "test", "TST")
+                )
+            ));
+        }
         vm.stopBroadcast();
+    }
+
+    function test_FileReaderFunctions() public {
+        fileReaderTest.readAgentFactory();
+        fileReaderTest.readEigenAgent721AndRegistry();
+        fileReaderTest.readReceiverRestakingConnector();
+        fileReaderTest.readProxyAdminL1();
+        fileReaderTest.readProxyAdminL2();
+        fileReaderTest.readSenderContract();
+        fileReaderTest.readSenderHooks();
+        fileReaderTest.readWithdrawalInfo(
+            address(0x72C14ee915790038af0764d33Bb4B1a63212fC50),
+            "script/withdrawals-queued/"
+        );
+        fileReaderTest.saveReceiverBridgeContracts(
+            vm.addr(1),
+            vm.addr(2),
+            vm.addr(3),
+            vm.addr(4),
+            vm.addr(5),
+            vm.addr(6),
+            "test/temp-files/bridgeContractsL1.config.json"
+        );
+        fileReaderTest.saveSenderBridgeContracts(
+            vm.addr(1),
+            vm.addr(2),
+            vm.addr(3),
+            "test/temp-files/bridgeContractsL2.config.json"
+        );
     }
 
     function test_ERC20Minter() public {

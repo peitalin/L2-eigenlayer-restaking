@@ -73,7 +73,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         );
     }
 
-    function _run(bool isMockRun) internal returns (IReceiverCCIP, IRestakingConnector, IAgentFactory) {
+    function _run(bool isMockRun) private returns (IReceiverCCIP, IRestakingConnector, IAgentFactory) {
 
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
@@ -225,7 +225,8 @@ contract DeployReceiverOnL1Script is Script, FileReader {
                 address(agentFactoryProxy),
                 address(registry6551),
                 address(eigenAgentOwner721),
-                address(proxyAdmin)
+                address(proxyAdmin),
+                FILEPATH_BRIDGE_CONTRACTS_L1
             );
         }
 

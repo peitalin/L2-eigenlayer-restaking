@@ -50,7 +50,6 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         require(address(restakingConnectorProxy) != address(0), "restakingConnectorProxy cannot be 0");
         require(address(agentFactoryProxy) != address(0), "agentFactory cannot be 0");
 
-        address tokenL1 = EthSepolia.BridgeToken;
         address tokenL2 = BaseSepolia.BridgeToken;
 
         uint256 l2ForkId = vm.createFork("basesepolia");

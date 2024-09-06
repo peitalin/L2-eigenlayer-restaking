@@ -127,22 +127,9 @@ contract ReceiverRestakingConnectorTests is BaseTestEnvironment {
 
     function test_OnlyReceiverCanCall_RestakingConnector() public {
 
-        bytes memory messageWithSignature_M;
-        {
-            bytes memory mintEigenAgentMessage = encodeMintEigenAgent();
+        bytes memory mintEigenAgentMessage = encodeMintEigenAgent(bob);
 
-            // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_M = signMessageForEigenAgentExecution(
-                deployerKey,
-                block.chainid, // destination chainid where EigenAgent lives
-                address(strategyManager),
-                mintEigenAgentMessage,
-                execNonce0,
-                expiry
-            );
-        }
-
-        bytes memory ccipMessage = abi.encode(string(messageWithSignature_M));
+        bytes memory ccipMessage = abi.encode(string(mintEigenAgentMessage));
 
         vm.expectRevert("not called by ReceiverCCIP");
         restakingConnector.mintEigenAgent(
@@ -177,36 +164,47 @@ contract ReceiverRestakingConnectorTests is BaseTestEnvironment {
 
     function test_MintEigenAgent() public {
 
-        bytes memory messageWithSignature_M;
-        {
-            bytes memory mintEigenAgentMessage = encodeMintEigenAgent();
+        bytes memory mintEigenAgentMessageBob = encodeMintEigenAgent(bob);
 
-            // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature_M = signMessageForEigenAgentExecution(
-                deployerKey,
-                block.chainid, // destination chainid where EigenAgent lives
-                address(strategyManager),
-                mintEigenAgentMessage,
-                execNonce0,
-                expiry
-            );
-        }
-
-        vm.prank(deployer);
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
                 sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
                 sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
                 data: abi.encode(string(
-                    messageWithSignature_M
+                    mintEigenAgentMessageBob
                 )), // CCIP abi.encodes a string message when sending
                 destTokenAmounts: new Client.EVMTokenAmount[](0)
             })
         );
 
-        IEigenAgent6551 eAgent = agentFactory.getEigenAgent(deployer);
-        require(address(eAgent) != address(0), "should have minted a new EigenAgent");
+        require(
+            address(agentFactory.getEigenAgent(bob)) != address(0),
+            "Bob should have minted a new EigenAgent"
+        );
+
+        bytes memory mintEigenAgentMessageAlice = encodeMintEigenAgent(alice);
+
+        vm.prank(bob);
+        receiverContract.mockCCIPReceive(
+            Client.Any2EVMMessage({
+                messageId: bytes32(0x0),
+                sourceChainSelector: BaseSepolia.ChainSelector, // Arb Sepolia source chain selector
+                sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
+                data: abi.encode(string(
+                    mintEigenAgentMessageAlice
+                )), // CCIP abi.encodes a string message when sending
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
+            })
+        );
+        require(
+            address(agentFactory.getEigenAgent(alice)) != address(0),
+            "Bob should have minted a new EigenAgent for Alice"
+        );
+        require(
+            address(agentFactory.getEigenAgent(deployer)) == address(0),
+            "Deployer should not have minted a new EigenAgent"
+        );
     }
 
     function test_SetAndGet_QueueWithdrawalBlock() public {

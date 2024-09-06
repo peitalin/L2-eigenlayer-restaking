@@ -11,6 +11,7 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 
@@ -22,9 +23,9 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
     uint256 balanceOfReceiverBefore;
     uint256 balanceOfEigenAgent;
 
-    // SenderHooks.WithdrawalAgentOwnerRootCommitted
-    event WithdrawalAgentOwnerRootCommitted(
-        bytes32 indexed, // withdrawalAgentOwnerRoot
+    // SenderHooks.WithdrawalTransferRootCommitted
+    event WithdrawalTransferRootCommitted(
+        bytes32 indexed, // withdrawalTransferRoot
         address indexed, //  withdrawer (eigenAgent)
         uint256, // amount
         address  // signer (agentOwner)
@@ -40,12 +41,12 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
     /*
      *
      *
-     *             Prepare Eigenlayer State for CompleteWithdrawals
+     *             Setup Eigenlayer State for CompleteWithdrawals
      *
      *
      */
 
-    function handler_DepositAndQueueWithdrawal(uint256 amount) public {
+    function setupL1State_DepositAndQueueWithdrawal(uint256 amount) public {
 
         vm.assume(amount <= 1 ether);
         vm.assume(amount > 0);
@@ -133,15 +134,14 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
 
         uint256 execNonce1 = eigenAgent.execNonce();
 
-        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
-        uint256[] memory sharesToWithdraw = new uint256[](1);
-
         bytes memory messageWithSignature_QW;
         {
-            IDelegationManager.QueuedWithdrawalParams[] memory QWPArray;
+            IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
+            uint256[] memory sharesToWithdraw = new uint256[](1);
             strategiesToWithdraw[0] = strategy;
             sharesToWithdraw[0] = amount;
 
+            IDelegationManager.QueuedWithdrawalParams[] memory QWPArray;
             QWPArray = new IDelegationManager.QueuedWithdrawalParams[](1);
             QWPArray[0] = IDelegationManager.QueuedWithdrawalParams({
                 strategies: strategiesToWithdraw,
@@ -201,54 +201,57 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
      *
      */
 
-    function test_CCIP_Eigenlayer_CompleteWithdrawal() public {
+    function test_SenderL1_ReceiverL2_CompleteWithdrawal() public {
 
         uint256 amount = 0.003 ether;
-        handler_DepositAndQueueWithdrawal(amount);
+        setupL1State_DepositAndQueueWithdrawal(amount);
 
         /////////////////////////////////////////////////////////////////
         //// [L1] Complete Queued Withdrawals
         /////////////////////////////////////////////////////////////////
         vm.selectFork(ethForkId);
 
-        uint32 startBlock = uint32(block.number);
         uint256 execNonce2 = eigenAgent.execNonce();
-        uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(bob);
+        IDelegationManager.Withdrawal memory withdrawal;
+        {
+            uint32 startBlock = uint32(block.number);
+            uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(bob);
 
-        IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
-        uint256[] memory sharesToWithdraw = new uint256[](1);
-        strategiesToWithdraw[0] = strategy;
-        sharesToWithdraw[0] = amount;
+            IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
+            uint256[] memory sharesToWithdraw = new uint256[](1);
+            strategiesToWithdraw[0] = strategy;
+            sharesToWithdraw[0] = amount;
 
-        IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
-            staker: address(eigenAgent),
-            delegatedTo: delegationManager.delegatedTo(address(eigenAgent)),
-            withdrawer: address(eigenAgent),
-            nonce: withdrawalNonce,
-            startBlock: startBlock,
-            strategies: strategiesToWithdraw,
-            shares: sharesToWithdraw
-        });
+            withdrawal = IDelegationManager.Withdrawal({
+                staker: address(eigenAgent),
+                delegatedTo: delegationManager.delegatedTo(address(eigenAgent)),
+                withdrawer: address(eigenAgent),
+                nonce: withdrawalNonce,
+                startBlock: startBlock,
+                strategies: strategiesToWithdraw,
+                shares: sharesToWithdraw
+            });
 
+        }
         bytes32 withdrawalRoot = delegationManager.calculateWithdrawalRoot(withdrawal);
         require(withdrawalRoot != 0, "withdrawal root missing, queueWithdrawal first");
-
 
         /////////////////////////////////////////////////////////////////
         //// 1. [L2] Send CompleteWithdrawals message to L2 Bridge
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
+        vm.assertEq(withdrawalRoot, senderHooks.calculateWithdrawalRoot(withdrawal));
+
         uint256 stakerBalanceOnL2Before = IERC20(BaseSepolia.BridgeToken).balanceOf(bob);
 
-        bytes memory completeWithdrawalMessage;
         bytes memory messageWithSignature_CW;
         {
             // create the completeWithdrawal message for Eigenlayer
             IERC20[] memory tokensToWithdraw = new IERC20[](1);
             tokensToWithdraw[0] = tokenL1;
 
-            completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
+            bytes memory completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
                 withdrawal,
                 tokensToWithdraw,
                 0, //middlewareTimesIndex,
@@ -266,13 +269,14 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
             );
         }
 
-        bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalAgentOwnerRoot(
+        bytes32 withdrawalTransferRoot = calculateWithdrawalTransferRoot(
             withdrawalRoot,
+            amount,
             bob
         );
         vm.expectEmit(true, false, true, false);
-        emit WithdrawalAgentOwnerRootCommitted(
-            withdrawalAgentOwnerRoot,
+        emit WithdrawalTransferRootCommitted(
+            withdrawalTransferRoot,
             address(eigenAgent), // withdrawer
             amount,
             bob // signer
@@ -304,7 +308,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
         vm.expectEmit(false, true, true, false);
         emit ReceiverCCIP.BridgingWithdrawalToL2(
             address(senderContract),
-            withdrawalAgentOwnerRoot,
+            withdrawalTransferRoot,
             amount
         );
         // Mock L1 bridge receiving CCIP message and calling CompleteWithdrawal on Eigenlayer
@@ -340,11 +344,16 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
         /////////////////////////////////////////////////////////////////
 
         /////////////////////////////////////////////////////////////////
-        //// 3. [L2] Mock receiving CompleteWithdrawals message from L1
+        //// 3. [L2] Mock receiving handleTransferToAgentOwner message from L1
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
         // Mock SenderContract on L2 receiving the tokens and TransferToAgentOwner CCIP message from L1
+        Client.EVMTokenAmount[] memory destTokenAmountsL2 = new Client.EVMTokenAmount[](1);
+        destTokenAmountsL2[0] = Client.EVMTokenAmount({
+            token: address(BaseSepolia.BridgeToken), // CCIP-BnM token address on L2
+            amount: amount
+        });
         senderContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
@@ -352,11 +361,10 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
                 sender: abi.encode(address(receiverContract)),
                 data: abi.encode(string(
                     encodeHandleTransferToAgentOwnerMsg(
-                        withdrawalAgentOwnerRoot
+                        withdrawalTransferRoot
                     )
                 )), // CCIP abi.encodes a string message when sending
-                destTokenAmounts: new Client.EVMTokenAmount[](0)
-                // Not bridging tokens, just sending message to withdraw
+                destTokenAmounts: destTokenAmountsL2
             })
         );
 
@@ -374,8 +382,8 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
         //// Test Attempts to re-use WithdrawalAgentOwnerRoots
         /////////////////////////////////////////////////////////////////
 
-        // attempting to commit a spent withdrawalAgentOwnerRoot should fail on L2
-        vm.expectRevert("SenderHooks._commitWithdrawalAgentOwnerRootInfo: withdrawalAgentOwnerRoot already used");
+        // attempting to commit a spent withdrawalTransferRoot should fail on L2
+        vm.expectRevert("SenderHooks._commitWithdrawalTransferRootInfo: withdrawalTransferRoot already used");
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
@@ -385,14 +393,15 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
             0 // use default gasLimit for this function
         );
 
-        // attempting to re-use withdrawalAgentOwnerRoot from L1 should fail
+        // attempting to re-use withdrawalTransferRoot from L1 should fail
         bytes memory messageWithdrawalReuse = encodeHandleTransferToAgentOwnerMsg(
-            calculateWithdrawalAgentOwnerRoot(
+            calculateWithdrawalTransferRoot(
                 withdrawalRoot,
+                amount,
                 bob
             )
         );
-        vm.expectRevert("SenderHooks.handleTransferToAgentOwner: withdrawalAgentOwnerRoot already used");
+        vm.expectRevert("SenderHooks.handleTransferToAgentOwner: withdrawalTransferRoot already used");
         senderContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
@@ -405,8 +414,14 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
             })
         );
 
-        // withdrawalAgentOwnerRoot should be spent now
-        vm.assertEq(senderHooks.isWithdrawalAgentOwnerRootSpent(withdrawalAgentOwnerRoot), true);
+        ISenderHooks.WithdrawalTransfer memory wt = senderHooks.getWithdrawalTransferCommitment(
+            withdrawalTransferRoot
+        );
+        vm.assertEq(wt.amount, amount);
+        vm.assertEq(wt.agentOwner, bob);
+
+        // withdrawalTransferRoot should be spent now
+        vm.assertEq(senderHooks.isWithdrawalTransferRootSpent(withdrawalTransferRoot), true);
     }
 
 }

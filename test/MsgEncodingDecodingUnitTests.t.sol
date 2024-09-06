@@ -103,6 +103,9 @@ contract EigenlayerMsg_EncodingDecodingTests is BaseTestEnvironment {
         // compare vs original inputs
         require(_signer == vm.addr(deployerKey), "decodeAgentOwnerSignature: signer not original address");
         require(_expiry == expiry, "decodeAgentOwnerSignature: expiry not original expiry");
+        require(_amount == amount, "decodeAgentOwnerSignature: amount not original amount");
+        require(_token == address(tokenL1), "decodeAgentOwnerSignature: token not original tokenL1");
+        require(_strategy == address(strategy), "decodeAgentOwnerSignature: strategy not original strategy");
 
         // compare decodeAgentOwner vs decodeDepositIntoStrategy
         require(_signer == _signer2, "decodeAgentOwnerSignature: signer did not match");
@@ -116,30 +119,13 @@ contract EigenlayerMsg_EncodingDecodingTests is BaseTestEnvironment {
     function test_Decode_MintEigenAgent() public view {
 
         // use EigenlayerMsgEncoders for coverage.
-        bytes memory messageToEigenlayer = EigenlayerMsgEncoders.encodeMintEigenAgent();
-
-        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
-            deployerKey,
-            block.chainid,
-            address(strategy),
-            messageToEigenlayer,
-            execNonce,
-            expiry
-        );
-
+        bytes memory messageToMint = EigenlayerMsgEncoders.encodeMintEigenAgent(staker);
         // CCIP turns the message into string when sending
-        bytes memory messageWithSignatureCCIP = abi.encode(string(messageWithSignature));
+        bytes memory messageCCIP = abi.encode(string(messageToMint));
 
-        (
-            // message signature
-            address _signer,
-            uint256 _expiry,
-            bytes memory _signature
-        ) = eigenlayerMsgDecoders.decodeMintEigenAgent(messageWithSignatureCCIP);
+        address recipient = eigenlayerMsgDecoders.decodeMintEigenAgent(messageCCIP);
 
-        require(_signature.length == 65, "mintEigenAgent: invalid signature length");
-        require(_signer == staker, "mintEigenAgent: staker does not match");
-        require(expiry == _expiry, "mintEigenAgent: expiry error");
+        require(recipient == staker, "mintEigenAgent: staker does not match");
     }
 
     /*
@@ -416,7 +402,7 @@ contract EigenlayerMsg_EncodingDecodingTests is BaseTestEnvironment {
         (
             IDelegationManager.Withdrawal memory _withdrawal,
             IERC20[] memory _tokensToWithdraw,
-            uint256 _middlewareTimesIndex,
+            , // uint256 _middlewareTimesIndex
             bool _receiveAsTokens,
             address _signer,
             uint256 _expiry,
@@ -452,20 +438,21 @@ contract EigenlayerMsg_EncodingDecodingTests is BaseTestEnvironment {
         bytes32 withdrawalRoot = 0x8c20d3a37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7d8ec77;
 
         address bob = vm.addr(8881);
-        bytes32 withdrawalAgentOwnerRoot = keccak256(abi.encode(withdrawalRoot, bob));
+        bytes32 withdrawalTransferRoot = keccak256(abi.encode(withdrawalRoot, amount, bob));
 
         TransferToAgentOwnerMsg memory tta_msg = eigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(
             abi.encode(string(
                 encodeHandleTransferToAgentOwnerMsg(
-                    calculateWithdrawalAgentOwnerRoot(
+                    calculateWithdrawalTransferRoot(
                         withdrawalRoot,
+                        amount,
                         bob
                     )
                 )
             ))
         );
 
-        require(tta_msg.withdrawalAgentOwnerRoot == withdrawalAgentOwnerRoot, "incorrect withdrawalAgentOwnerRoot");
+        require(tta_msg.withdrawalTransferRoot == withdrawalTransferRoot, "incorrect withdrawalTransferRoot");
     }
 
     /*
@@ -538,8 +525,8 @@ contract EigenlayerMsg_EncodingDecodingTests is BaseTestEnvironment {
             ISignatureUtils.SignatureWithExpiry memory _approverSignatureAndExpiry,
             bytes32 _approverSalt,
             address _signer,
-            uint256 _expiryEigenAgent,
-            bytes memory _signatureEigenAgent
+            , // uint256 _expiryEigenAgent
+            // bytes memory _signatureEigenAgent
         ) = DelegationDecoders.decodeDelegateToMsg(message);
 
         require(operator == _operator, "operator incorrect");
@@ -584,7 +571,7 @@ contract EigenlayerMsg_EncodingDecodingTests is BaseTestEnvironment {
             address _staker1,
             address signer,
             uint256 expiryEigenAgent,
-            bytes memory signatureEigenAgent
+            // bytes memory signatureEigenAgent
         ) = DelegationDecoders.decodeUndelegateMsg(
             abi.encode(string(
                 messageWithSignature_UD

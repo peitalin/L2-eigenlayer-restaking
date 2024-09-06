@@ -3,13 +3,11 @@ pragma solidity 0.8.22;
 
 import {Test, console} from "forge-std/Test.sol";
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
-import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
+import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
+import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
-
-import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 
 
@@ -29,32 +27,34 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
     /*
      *
      *
-     *             Tests
+     *             Setup Eigenlayer State for QueueWithdrawals
      *
      *
      */
 
-    function test_CCIP_Eigenlayer_QueueWithdrawal6551() public {
+    function setupL1State_Deposit() public {
 
-        //////////////////////////////////////////////////////
-        /// L1: ReceiverCCIP -> EigenAgent -> Eigenlayer
-        //////////////////////////////////////////////////////
+        ///////////////////////////
+        //// Setup EigenAgent
+        ///////////////////////////
         vm.selectFork(ethForkId);
-        IEigenAgent6551 eigenAgent;
-
         vm.startBroadcast(deployerKey);
-        // should revert
-        vm.expectRevert("not called by RestakingConnector");
-        eigenAgent = agentFactory.tryGetEigenAgentOrSpawn(bob);
+        {
+            // should revert
+            vm.expectRevert("not called by RestakingConnector");
+            eigenAgent = agentFactory.tryGetEigenAgentOrSpawn(bob);
 
-        // for testing purposes, spawn eigenAgent with admin
-        eigenAgent = agentFactory.getEigenAgent(bob);
-        if (address(eigenAgent) == address(0)) {
-            eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
+            // for testing purposes, spawn eigenAgent with admin
+            eigenAgent = agentFactory.getEigenAgent(bob);
+            if (address(eigenAgent) == address(0)) {
+                eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
+            }
         }
-        console.log("eigenAgent: ", address(eigenAgent));
-        console.log("bob: ", address(bob));
         vm.stopBroadcast();
+
+        ///////////////////////////
+        //// Setup Deposit
+        ///////////////////////////
 
         uint256 execNonce0 = eigenAgent.execNonce();
 
@@ -93,9 +93,22 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
         });
 
         receiverContract.mockCCIPReceive(any2EvmMessage);
+    }
+
+    /*
+     *
+     *
+     *             Tests
+     *
+     *
+     */
+
+    function test_ReceiverL1_MockReceive_QueueWithdrawal() public {
+
+        setupL1State_Deposit();
 
         /////////////////////////////////////
-        //// Mock send message to CCIP -> EigenAgent -> Eigenlayer
+        //// Mock message to L2 Receiver
         /////////////////////////////////////
 
         uint256 execNonce1 = eigenAgent.execNonce();
@@ -140,6 +153,7 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
             ))
         });
 
+        // mock message to L2 receiver -> EigenAgent -> Eigenlayer
         receiverContract.mockCCIPReceive(any2EvmMessageQueueWithdrawal);
     }
 

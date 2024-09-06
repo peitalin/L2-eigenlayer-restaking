@@ -99,7 +99,8 @@ contract DeploySenderOnL2Script is Script, FileReader {
             saveSenderBridgeContracts(
                 address(senderProxy),
                 address(senderHooksProxy),
-                address(proxyAdmin)
+                address(proxyAdmin),
+                FILEPATH_BRIDGE_CONTRACTS_L2
             );
         }
 

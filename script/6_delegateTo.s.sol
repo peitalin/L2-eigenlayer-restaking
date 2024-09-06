@@ -53,11 +53,11 @@ contract DelegateToScript is
         return _run(false);
     }
 
-    function mockrun(uint256 mockKey) public {
+    function mockrun() public {
         return _run(true);
     }
 
-    function _run(bool isTest) public {
+    function _run(bool isTest) private {
 
         uint256 l2ForkId = vm.createFork("basesepolia");
         uint256 ethForkId = vm.createSelectFork("ethsepolia");

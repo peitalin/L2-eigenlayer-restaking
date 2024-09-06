@@ -76,6 +76,12 @@ contract SenderHooksTests is BaseTestEnvironment {
         vm.stopBroadcast();
     }
 
+    function test_DisableInitializers_SenderHooks() public {
+        SenderHooks sHooks = new SenderHooks();
+        // _disableInitializers on contract implementations
+        vm.expectRevert("Initializable: contract is already initialized");
+        sHooks.initialize();
+    }
 
     function test_BeforeSend_Commits_WithdrawalAgentOwnerRoot() public {
 
@@ -86,13 +92,14 @@ contract SenderHooksTests is BaseTestEnvironment {
             bytes memory messageWithSignature_CW
         ) = mockCompleteWithdrawalMessage(bobKey);
 
-        bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalAgentOwnerRoot(
+        bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalTransferRoot(
             withdrawalRoot,
+            amount,
             bob
         );
 
         vm.expectEmit(true, true, true, false);
-        emit SenderHooks.WithdrawalAgentOwnerRootCommitted(
+        emit SenderHooks.WithdrawalTransferRootCommitted(
             withdrawalAgentOwnerRoot,
             mockEigenAgent, // withdrawer
             amount,
@@ -115,24 +122,19 @@ contract SenderHooksTests is BaseTestEnvironment {
         address alice = vm.addr(signerKey);
 
         vm.startBroadcast(alice);
+        {
+            (
+                , // bytes32 withdrawalRoot,
+                bytes memory messageWithSignature_CW
+            ) = mockCompleteWithdrawalMessage(bobKey);
 
-        (
-            bytes32 withdrawalRoot,
-            bytes memory messageWithSignature_CW
-        ) = mockCompleteWithdrawalMessage(bobKey);
-
-        bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalAgentOwnerRoot(
-            withdrawalRoot,
-            alice
-        );
-
-        // Should revert if called by anyone other than senderContract
-        vm.expectRevert("not called by SenderCCIP");
-        senderHooks.beforeSendCCIPMessage(
-            abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-            BaseSepolia.BridgeToken
-        );
-
+            // Should revert if called by anyone other than senderContract
+            vm.expectRevert("not called by SenderCCIP");
+            senderHooks.beforeSendCCIPMessage(
+                abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
+                BaseSepolia.BridgeToken
+            );
+        }
         vm.stopBroadcast();
     }
 
@@ -147,7 +149,7 @@ contract SenderHooksTests is BaseTestEnvironment {
 
         require(withdrawalRoot != bytes32(abi.encode(0)), "withdrawalRoot cannot be 0x0");
 
-        vm.expectRevert("SenderHooks._commitWithdrawalAgentOwnerRootInfo: cannot commit tokenL2 as address(0)");
+        vm.expectRevert("SenderHooks._commitWithdrawalTransferRootInfo: cannot commit tokenL2 as address(0)");
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
             address(0) // tokenL2

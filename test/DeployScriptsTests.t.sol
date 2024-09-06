@@ -108,7 +108,8 @@ contract DeployScriptsTests is Test, ScriptUtils {
     }
 
     function test_step5_DepositAndMintEigenAgentScript() public {
-        // vm.assume(_deployerKey < type(uint256).max / 2);
+        // vm.assume(mockKey < type(uint256).max / 2);
+        // vm.assume(mockKey > 1);
         // EIP-2: secp256k1 curve order / 2
         uint256 mockKey = (vm.randomUint() / 2) + 1;
         depositAndMintEigenAgentScript.mockrun(mockKey);
@@ -119,7 +120,11 @@ contract DeployScriptsTests is Test, ScriptUtils {
     }
 
     function test_step5c_MintEigenAgent() public {
-        mintEigenAgentScript.run();
+        // vm.assume(mockKey < type(uint256).max / 2);
+        // vm.assume(mockKey > 1);
+        // EIP-2: secp256k1 curve order / 2
+        uint256 mockKey = (vm.randomUint() / 2) + 1;
+        mintEigenAgentScript.mockrun(mockKey);
     }
 
     function test_step5d_CheckMintEigenAgentGasCosts() public {
@@ -127,7 +132,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
     }
 
     function test_step6_DelegateToScript() public {
-        delegateToScript.run();
+        delegateToScript.mockrun();
     }
 
     function test_step6b_UndelegateScript() public {

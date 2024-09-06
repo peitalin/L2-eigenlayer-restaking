@@ -20,21 +20,33 @@ contract MintEigenAgentScript is Script, ScriptUtils, FileReader {
     IEigenAgent6551 public eigenAgent;
 
     function run() public {
-
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        aliceKey = uint256(5555);
+        aliceKey = deployerKey;
+        alice = deployer;
+        return _run();
+    }
+
+    function mockrun(uint256 _mockKey) public {
+        deployerKey = vm.envUint("DEPLOYER_KEY");
+        deployer = vm.addr(deployerKey);
+
+        aliceKey = _mockKey;
         alice = vm.addr(aliceKey);
+        return _run();
+    }
+
+    function _run() public {
 
         agentFactory = readAgentFactory();
 
         vm.createSelectFork("ethsepolia");
         vm.startBroadcast(deployerKey);
 
-        eigenAgent = agentFactory.getEigenAgent(deployer);
+        eigenAgent = agentFactory.getEigenAgent(alice);
         if (address(eigenAgent) == address(0)) {
-            eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
+            eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(alice);
         }
         console.log("eigenAgent:", address(eigenAgent));
 

@@ -63,7 +63,7 @@ contract DepositIntoStrategyScript is
         return _run(true);
     }
 
-    function _run(bool isTest) public {
+    function _run(bool isTest) private {
 
         l2ForkId = vm.createFork("basesepolia");
         ethForkId = vm.createSelectFork("ethsepolia");

@@ -49,7 +49,6 @@ contract CompleteWithdrawalScript is
     address public deployer;
     address public staker;
     address public withdrawer;
-    uint256 public amount;
     uint256 public expiry;
     uint256 public middlewareTimesIndex; // not used yet, for slashing
     bool public receiveAsTokens;
@@ -66,7 +65,7 @@ contract CompleteWithdrawalScript is
         return _run(true);
     }
 
-    function _run(bool isTest) public {
+    function _run(bool isTest) private {
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
@@ -108,7 +107,6 @@ contract CompleteWithdrawalScript is
         }
         require(address(eigenAgent) != address(0), "user has no EigenAgent");
 
-        amount = 0 ether; // only sending a withdrawal message, not bridging tokens.
         expiry = block.timestamp + 2 hours;
         staker = address(eigenAgent); // this should be EigenAgent (as in StrategyManager)
         withdrawer = address(eigenAgent);
@@ -141,7 +139,11 @@ contract CompleteWithdrawalScript is
         // Create a withdrawalAgentOwnerRoot and commit to it on L2.
         // So that when the withdrawal returns, we can
         // verify which user (AgentOwner) to transfer withdrawals to
-        bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalAgentOwnerRoot(withdrawalRoot, deployer);
+        bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalTransferRoot(
+            withdrawalRoot,
+            withdrawal.shares[0],
+            deployer
+        );
 
         IERC20[] memory tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = withdrawal.strategies[0].underlyingToken();
@@ -190,7 +192,7 @@ contract CompleteWithdrawalScript is
             address(receiverProxy),
             string(messageWithSignature),
             address(tokenL2),
-            amount,
+            0, // only sending message, not bridging tokens
             0 // use default gasLimit for this function
         );
 
