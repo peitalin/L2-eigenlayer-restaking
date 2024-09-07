@@ -550,4 +550,6 @@ contract DeployMockEigenlayerContractsScript is Script {
         ));
         vm.writeJson(finalJson, finalOutputPath);
     }
+
+    function test_ignore() private {}
 }

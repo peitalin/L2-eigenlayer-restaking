@@ -21,17 +21,6 @@ contract MockMultisigSigner is Adminable, IERC721Receiver {
         Adminable.__Adminable_init();
     }
 
-    receive() external payable {}
-
-    function onERC721Received(
-        address operator,
-        address from,
-        uint256 tokenId,
-        bytes calldata data
-    ) external pure returns (bytes4) {
-        return IERC721Receiver.onERC721Received.selector;
-    }
-
     function signHash(
         bytes32 digestHash,
         bytes memory signature
@@ -68,4 +57,15 @@ contract MockMultisigSigner is Adminable, IERC721Receiver {
         }
         return bytes4(0);
     }
+
+    function onERC721Received(
+        address, // operator
+        address, // from
+        uint256, // tokenId
+        bytes calldata // data
+    ) external pure returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
+    }
+
+    receive() external payable {}
 }

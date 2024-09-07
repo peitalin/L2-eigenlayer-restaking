@@ -49,21 +49,4 @@ library SignatureCheckerV5 {
             result.length >= 32 &&
             abi.decode(result, (bytes32)) == bytes32(IERC1271.isValidSignature.selector));
     }
-    function tryRecover(bytes32 hash, bytes memory signature) internal pure returns (address, ECDSA.RecoverError) {
-        if (signature.length == 65) {
-            bytes32 r;
-            bytes32 s;
-            uint8 v;
-            // ecrecover takes the signature parameters, and the only way to get them
-            // currently is to use assembly.
-            assembly ("memory-safe") {
-                r := mload(add(signature, 0x20))
-                s := mload(add(signature, 0x40))
-                v := byte(0, mload(add(signature, 0x60)))
-            }
-            return ECDSA.tryRecover(hash, abi.encodePacked(r, s, v));
-        } else {
-            return (address(0), ECDSA.RecoverError.InvalidSignatureLength);
-        }
-    }
 }

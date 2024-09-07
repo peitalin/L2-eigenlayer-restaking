@@ -139,8 +139,10 @@ contract QueueWithdrawalScript is
         staker = address(eigenAgent);
         withdrawer = address(eigenAgent);
         // staker == withdrawer == msg.sender in StrategyManager, which is EigenAgent
-        require(staker == withdrawer, "require: staker == withdrawer");
-        require(address(eigenAgent) == withdrawer, "require withdrawer == EigenAgent");
+        require(
+            (staker == withdrawer) && (address(eigenAgent) == withdrawer),
+            "staker == withdrawer == eigenAgent not satisfied"
+        );
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         strategiesToWithdraw[0] = strategy;

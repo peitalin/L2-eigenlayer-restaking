@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Test, console} from "forge-std/Test.sol";
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 
@@ -347,7 +345,7 @@ contract ClientSignerEncoderTests is BaseTestEnvironment {
         );
     }
 
-    function test_ClientEncoder_calculateWithdrawalTransferRoot() public {
+    function test_ClientEncoder_calculateWithdrawalTransferRoot() public view {
 
         IDelegationManager.Withdrawal memory withdrawal = makeMockWithdrawal();
         bytes32 withdrawalRoot = clientEncodersTest.calculateWithdrawalRoot(withdrawal);

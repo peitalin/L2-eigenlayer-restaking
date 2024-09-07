@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
@@ -110,9 +110,11 @@ contract CompleteWithdrawalScript is
         expiry = block.timestamp + 2 hours;
         staker = address(eigenAgent); // this should be EigenAgent (as in StrategyManager)
         withdrawer = address(eigenAgent);
-
-        require(staker == withdrawer, "staker should be withdrawer");
-        require(address(eigenAgent) == withdrawer, "withdrawer should be EigenAgent");
+        // staker == withdrawer == msg.sender in StrategyManager, which is EigenAgent
+        require(
+            (staker == withdrawer) && (address(eigenAgent) == withdrawer),
+            "staker == withdrawer == eigenAgent not satisfied"
+        );
 
         IDelegationManager.Withdrawal memory withdrawal = readWithdrawalInfo(
             staker,

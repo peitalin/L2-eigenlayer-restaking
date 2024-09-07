@@ -71,6 +71,15 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         );
     }
 
+    function test_EigenAgent_CanOnlySpawnOneEigenAgent() public {
+        vm.startBroadcast(deployerKey);
+        agentFactory.spawnEigenAgentOnlyOwner(bob);
+
+        vm.expectRevert("staker already has an EigenAgent");
+        agentFactory.spawnEigenAgentOnlyOwner(bob);
+        vm.stopBroadcast();
+    }
+
     function test_EigenAgent_ExecuteWithSignatures() public {
 
         vm.startBroadcast(deployerKey);
@@ -182,8 +191,7 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         vm.deal(address(eigenAgent2), 1 ether);
         vm.deal(address(multisig), 1 ether);
 
-        //////////////////////////////////
-        // eigenagent can execute as NFT owner() == multisig
+        // EigenAgent can execute as NFT owner() == multisig
         vm.prank(address(multisig));
         IERC6551Executable(address(eigenAgent2)).execute(
             payable(alice),
@@ -195,9 +203,19 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         vm.assertEq(address(eigenAgent2).balance, 0.5 ether);
         vm.assertEq(alice.balance, aliceBalanceBefore + 0.5 ether);
         vm.assertEq(eigenAgent2.execNonce(), 1);
+
+        // operation must == 0 (call operations only)
+        vm.prank(address(multisig));
+        vm.expectRevert("Only call operations are supported");
+        IERC6551Executable(address(eigenAgent2)).execute(
+            payable(alice),
+            0.1 ether,
+            "",
+            1 // operation code
+        );
     }
 
-    function test_EigenAgent_Multisig_Execute_EIP1271Signatures() public {
+    function test_EigenAgent_Multisig_EIP1271Signatures_Execute() public {
 
         vm.startBroadcast(deployer);
         MockMultisigSigner multisig = new MockMultisigSigner();
@@ -209,8 +227,6 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         vm.stopBroadcast();
 
         vm.assertEq(eigenAgent2.getAgentOwner(), address(multisig));
-
-        uint256 aliceBalanceBefore = alice.balance;
 
         vm.deal(address(eigenAgent2), 1 ether);
         vm.deal(address(multisig), 1 ether);
@@ -310,6 +326,43 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         require(
             agentFactory.getEigenAgentOwnerTokenId(alice) > 1,
             "minted for Alice via multisig (owner of EigenAgent)"
+        );
+    }
+
+    function test_EigenAgent_CallingWrongFunctions_Execute() public {
+
+        // try call agentfactor with the wrong function selectors
+        vm.prank(deployer);
+        vm.expectRevert();
+        IERC6551Executable(address(eigenAgent)).execute(
+            address(agentFactory),
+            0 ether,
+            encodeMintEigenAgent(alice), // should fail as targetContract does not have this function
+            0 // operation code
+        );
+
+    }
+
+    function test_EigenAgent_CallingWrongFunctions_ExecuteWithSignature() public {
+
+        (
+            , // bytes memory data1,
+            , // bytes32 digestHash1,
+            bytes memory signature1
+        ) = createEigenAgentDepositSignature(
+            deployerKey,
+            amount,
+            0
+        );
+        // try call agentfactor with the wrong function selectors
+        vm.prank(deployer);
+        vm.expectRevert();
+        eigenAgent.executeWithSignature(
+            address(strategyManager), // strategyManager
+            0,
+            encodeMintEigenAgent(alice), // should fail as targetContract does not have this function
+            expiry,
+            signature1
         );
     }
 

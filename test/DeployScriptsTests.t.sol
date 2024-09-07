@@ -124,7 +124,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
     }
 
     function test_step5b_DepositIntoStrategyScript() public {
-        depositIntoStrategyScript.run();
+        depositIntoStrategyScript.mockrun();
     }
 
     function test_step5c_MintEigenAgent() public {
@@ -133,6 +133,8 @@ contract DeployScriptsTests is Test, ScriptUtils {
         // EIP-2: secp256k1 curve order / 2
         uint256 mockKey = (vm.randomUint() / 2) + 1;
         mintEigenAgentScript.mockrun(mockKey);
+
+        mintEigenAgentScript.run();
     }
 
     function test_step5d_CheckMintEigenAgentGasCosts() public {
@@ -178,7 +180,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
         // Note II: If step8 has completed withdrawal, this test may warn it failed with:
         // "revert: withdrawalRoot has already been used"
         queueWithdrawalScript.mockrun();
-        // writes new json files: withdrawalRoots
+        // writes new json files: withdrawalRoots, so we use mockrun()
     }
 
     function test_step8_CompleteWithdrawalScript() public {

@@ -19,4 +19,7 @@ contract ScriptUtils is Script {
             }
         }
     }
+
+    // tells forge coverage to ignore
+    function test_ignore() private {}
 }

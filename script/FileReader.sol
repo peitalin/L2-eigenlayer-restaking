@@ -293,4 +293,6 @@ contract FileReader is Script {
             })
         );
     }
+
+    function test_ignore_filereader() private {}
 }

@@ -16,4 +16,6 @@ contract DeployVerifyScript is Script {
         empty.foo();
         vm.stopBroadcast();
     }
+
+    function test_ignore() private {}
 }

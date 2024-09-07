@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import "forge-std/Vm.sol";
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
@@ -32,7 +32,6 @@ contract DepositIntoStrategyScript is
     ClientEncoders,
     ClientSigners
 {
-
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
 
     IReceiverCCIP public receiverContract;
@@ -55,6 +54,7 @@ contract DepositIntoStrategyScript is
     uint256 l2ForkId;
     uint256 ethForkId;
 
+    // This script assumes you already have an EigenAgent
     function run() public {
         return _run(false);
     }
@@ -101,11 +101,6 @@ contract DepositIntoStrategyScript is
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployerKey);
 
-        if (isTest) {
-            vm.prank(deployer);
-            eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
-        }
-
         uint256 execNonce = 0;
         /// ReceiverCCIP spawns an EigenAgent when CCIP message reaches L1
         /// if user does not already have an EigenAgent NFT on L1.  Nonce is then 0.
@@ -123,7 +118,7 @@ contract DepositIntoStrategyScript is
 
         vm.startBroadcast(deployerKey);
 
-        uint256 amount = 0.00333 ether;
+        uint256 amount = 0.00797 ether;
         uint256 expiry = block.timestamp + 3 hours;
         bytes memory depositMessage;
         bytes memory messageWithSignature;

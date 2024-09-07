@@ -131,7 +131,7 @@ contract AgentFactory is Initializable, Adminable {
     function _spawnEigenAgent6551(address staker) internal returns (IEigenAgent6551) {
         require(
             address(getEigenAgent(staker)) == address(0),
-            "staker already has an EigenAgent account"
+            "staker already has an EigenAgent"
         );
 
         bytes32 salt = bytes32(abi.encode(staker));
