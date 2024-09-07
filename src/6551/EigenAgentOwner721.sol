@@ -60,9 +60,9 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
 
     function _mint(address user) internal returns (uint256) {
         uint256 tokenId = _tokenIdCounter;
+        ++_tokenIdCounter;
         _safeMint(user, tokenId);
         _setTokenURI(tokenId, string(abi.encodePacked("eigen-agent/", Strings.toString(tokenId), ".json")));
-        ++_tokenIdCounter;
         return tokenId;
     }
 

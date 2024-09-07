@@ -2,6 +2,7 @@
 pragma solidity 0.8.22;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgent6551} from "./IEigenAgent6551.sol";
@@ -12,7 +13,7 @@ import {Adminable} from "../utils/Adminable.sol";
 
 
 
-contract AgentFactory is Initializable, Adminable {
+contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
 
     error AddressZero(string msg);
 
@@ -55,6 +56,7 @@ contract AgentFactory is Initializable, Adminable {
         eigenAgentOwner721 = _eigenAgentOwner721;
 
         __Adminable_init();
+        __ReentrancyGuard_init();
     }
 
     modifier onlyRestakingConnector() {
@@ -128,7 +130,7 @@ contract AgentFactory is Initializable, Adminable {
     }
 
     /// Mints an NFT and creates a 6551 account for it
-    function _spawnEigenAgent6551(address staker) internal returns (IEigenAgent6551) {
+    function _spawnEigenAgent6551(address staker) internal nonReentrant returns (IEigenAgent6551) {
         require(
             address(getEigenAgent(staker)) == address(0),
             "staker already has an EigenAgent"
@@ -136,7 +138,8 @@ contract AgentFactory is Initializable, Adminable {
 
         bytes32 salt = bytes32(abi.encode(staker));
         uint256 tokenId = eigenAgentOwner721.mint(staker);
-
+        // sets userToEigenAgentTokenIds[staker] = tokenId in
+        // _afterTokenTransfer() -> updateEigenAgentOwnerTokenId
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(
             erc6551Registry.createAccount(
                 address(new EigenAgent6551()),
@@ -147,7 +150,6 @@ contract AgentFactory is Initializable, Adminable {
             )
         ));
 
-        userToEigenAgentTokenIds[staker] = tokenId;
         tokenIdToEigenAgents[tokenId] = address(eigenAgent);
 
         emit AgentCreated(staker, address(eigenAgent), tokenId);
