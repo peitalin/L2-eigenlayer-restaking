@@ -118,10 +118,13 @@ contract QueueWithdrawalScript is
 
         eigenAgent = agentFactory.getEigenAgent(deployer);
         if (address(eigenAgent) == address(0)) {
-            // revert("User must have existing deposit in Eigenlayer + EigenAgent");
-            vm.prank(deployer);
-            eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
-            execNonce = 0;
+            if (isTest) {
+                vm.prank(deployer);
+                eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
+                execNonce = 0;
+            } else {
+                revert("User must have existing deposit in Eigenlayer + EigenAgent");
+            }
         } else {
             execNonce = eigenAgent.execNonce();
         }

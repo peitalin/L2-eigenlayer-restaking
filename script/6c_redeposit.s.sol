@@ -49,13 +49,13 @@ contract RedepositScript is
     address public staker;
     address public withdrawer;
     uint256 public amount;
-    uint256 public sig_expiry;
+    uint256 public sigExpiry;
     uint256 public middlewareTimesIndex; // not used yet, for slashing
     bool public receiveAsTokens;
 
-    address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
     uint256 public execNonce; // EigenAgent execution nonce
     IEigenAgent6551 public eigenAgent;
+    address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
         return _run(false);
@@ -104,109 +104,111 @@ contract RedepositScript is
             // if the user already has a EigenAgent, fetch current execution Nonce
             execNonce = eigenAgent.execNonce();
         }
-        require(address(eigenAgent) != address(0), "user has no EigenAgent");
+        require(address(eigenAgent) != address(0), "User must have an EigenAgent");
 
         amount = 0 ether; // only sending message, not bridging tokens.
-        sig_expiry = block.timestamp + 2 hours;
+        sigExpiry = block.timestamp + 2 hours;
         staker = address(eigenAgent); // this should be EigenAgent
         withdrawer = address(eigenAgent);
-
-        require(staker == withdrawer, "staker should be withdrawer");
-        require(address(eigenAgent) == withdrawer, "withdrawer should be EigenAgent");
-
-        IDelegationManager.Withdrawal memory withdrawal = readWithdrawalInfo(
-            staker,
-            "script/withdrawals-undelegated/"
-        );
-
-        // Fetch the correct withdrawal.startBlock and withdrawalRoot
-        withdrawal.startBlock = uint32(restakingConnector.getQueueWithdrawalBlock(
-            withdrawal.staker,
-            withdrawal.nonce
-        ));
-
-        bytes32 withdrawalRootCalculated = delegationManager.calculateWithdrawalRoot(withdrawal);
-
-        IERC20[] memory tokensToWithdraw = new IERC20[](1);
-        tokensToWithdraw[0] = withdrawal.strategies[0].underlyingToken();
-
-        /////////////////////////////////////////////////////////////////
-        /////// Broadcast to L2
-        /////////////////////////////////////////////////////////////////
-
-        vm.selectFork(l2ForkId);
-
-        vm.startBroadcast(deployerKey);
-
         require(
-            senderProxy.allowlistedSenders(address(receiverProxy)),
-            "senderCCIP: must allowlistSender(receiverCCIP)"
+            (staker == withdrawer) && (address(eigenAgent) == withdrawer),
+            "staker == withdrawer == eigenAgent not satisfied"
         );
 
-        middlewareTimesIndex = 0; // not used yet, for slashing
-        receiveAsTokens = false;
-        // receiveAsTokens == false to redeposit queuedWithdrawal (from undelegating)
-        // back into Eigenlayer.
-
-        require(
-            receiveAsTokens == false,
-            "receiveAsTokens must be false to re-deposit undelegated deposit back in Eigenlayer"
-        );
-
-        bytes memory completeWithdrawalMessage;
-        bytes memory messageWithSignature;
+        try this.readWithdrawalInfo(staker, "script/withdrawals-undelegated/")
+            returns (IDelegationManager.Withdrawal memory withdrawal)
         {
-            completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
-                withdrawal,
-                tokensToWithdraw,
-                middlewareTimesIndex,
-                receiveAsTokens
+
+            // Fetch the correct withdrawal.startBlock and withdrawalRoot
+            withdrawal.startBlock = uint32(restakingConnector.getQueueWithdrawalBlock(
+                withdrawal.staker,
+                withdrawal.nonce
+            ));
+
+            bytes32 withdrawalRootCalculated = delegationManager.calculateWithdrawalRoot(withdrawal);
+
+            IERC20[] memory tokensToWithdraw = new IERC20[](1);
+            tokensToWithdraw[0] = withdrawal.strategies[0].underlyingToken();
+
+            /////////////////////////////////////////////////////////////////
+            /////// Broadcast to L2
+            /////////////////////////////////////////////////////////////////
+
+            vm.selectFork(l2ForkId);
+
+            vm.startBroadcast(deployerKey);
+
+            require(
+                senderProxy.allowlistedSenders(address(receiverProxy)),
+                "senderCCIP: must allowlistSender(receiverCCIP)"
             );
 
-            // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature = signMessageForEigenAgentExecution(
-                deployerKey,
-                EthSepolia.ChainId, // destination chainid where EigenAgent lives
-                TARGET_CONTRACT,
-                completeWithdrawalMessage,
-                execNonce,
-                sig_expiry
+            middlewareTimesIndex = 0; // not used yet, for slashing
+            receiveAsTokens = false;
+            // receiveAsTokens == false to redeposit queuedWithdrawal (from undelegating)
+            // back into Eigenlayer.
+
+            require(
+                receiveAsTokens == false,
+                "receiveAsTokens must be false to re-deposit undelegated deposit back in Eigenlayer"
             );
+
+            bytes memory completeWithdrawalMessage;
+            bytes memory messageWithSignature;
+            {
+                completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
+                    withdrawal,
+                    tokensToWithdraw,
+                    middlewareTimesIndex,
+                    receiveAsTokens
+                );
+
+                // sign the message for EigenAgent to execute Eigenlayer command
+                messageWithSignature = signMessageForEigenAgentExecution(
+                    deployerKey,
+                    EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                    TARGET_CONTRACT,
+                    completeWithdrawalMessage,
+                    execNonce,
+                    sigExpiry
+                );
+            }
+
+            topupSenderEthBalance(address(senderProxy), isTest);
+
+            senderProxy.sendMessagePayNative(
+                EthSepolia.ChainSelector, // destination chain
+                address(receiverProxy),
+                string(messageWithSignature),
+                address(tokenL2),
+                amount,
+                0 // use default gasLimit for this function
+            );
+
+            vm.stopBroadcast();
+
+
+            vm.selectFork(ethForkId);
+            string memory filePath = "script/withdrawals-redeposited/";
+            if (isTest) {
+            filePath = "test/withdrawals-redeposited/";
+            }
+
+            saveWithdrawalInfo(
+                withdrawal.staker,
+                withdrawal.delegatedTo,
+                withdrawal.withdrawer,
+                withdrawal.nonce,
+                withdrawal.startBlock,
+                withdrawal.strategies,
+                withdrawal.shares,
+                withdrawalRootCalculated,
+                bytes32(0x0), // withdrawalAgenOwnerRoot not used in delegations
+                filePath
+            );
+
+        } catch {
+            revert("Withdrawals file not found");
         }
-
-        topupSenderEthBalance(address(senderProxy), isTest);
-
-        senderProxy.sendMessagePayNative(
-            EthSepolia.ChainSelector, // destination chain
-            address(receiverProxy),
-            string(messageWithSignature),
-            address(tokenL2),
-            amount,
-            0 // use default gasLimit for this function
-        );
-
-        vm.stopBroadcast();
-
-
-        vm.selectFork(ethForkId);
-        string memory filePath = "script/withdrawals-redeposited/";
-        if (isTest) {
-           filePath = "test/withdrawals-redeposited/";
-        }
-
-        saveWithdrawalInfo(
-            withdrawal.staker,
-            withdrawal.delegatedTo,
-            withdrawal.withdrawer,
-            withdrawal.nonce,
-            withdrawal.startBlock,
-            withdrawal.strategies,
-            withdrawal.shares,
-            withdrawalRootCalculated,
-            bytes32(0x0), // withdrawalAgenOwnerRoot not used in delegations
-            filePath
-        );
-
     }
-
 }

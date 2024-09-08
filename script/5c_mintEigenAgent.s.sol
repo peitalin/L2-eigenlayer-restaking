@@ -39,6 +39,8 @@ contract MintEigenAgentScript is Script, ScriptUtils, FileReader {
 
     function _run() public {
 
+        vm.createSelectFork("ethsepolia");
+
         agentFactory = readAgentFactory();
 
         vm.createSelectFork("ethsepolia");

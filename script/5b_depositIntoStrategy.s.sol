@@ -105,7 +105,7 @@ contract DepositIntoStrategyScript is
         /// ReceiverCCIP spawns an EigenAgent when CCIP message reaches L1
         /// if user does not already have an EigenAgent NFT on L1.  Nonce is then 0.
         eigenAgent = agentFactory.getEigenAgent(deployer);
-        require(address(eigenAgent) != address(0), "user must already have an eigenAgent");
+        require(address(eigenAgent) != address(0), "User must have an EigenAgent");
         // user already has a EigenAgent, fetch current execution Nonce
         execNonce = eigenAgent.execNonce();
         vm.stopBroadcast();
@@ -142,7 +142,7 @@ contract DepositIntoStrategyScript is
         }
 
         // Check L2 CCIP-BnM balances
-        if (tokenL2.balanceOf(deployer) < 1 ether) {
+        if (tokenL2.balanceOf(deployer) < 1 ether || isTest) {
             IERC20_CCIPBnM(address(tokenL2)).drip(deployer);
         }
 

@@ -106,7 +106,7 @@ contract DepositAndMintEigenAgentScript is
         eigenAgent = agentFactory.getEigenAgent(deployer);
         require(
             address(eigenAgent) == address(0),
-            "depositAndMintEigenAgent script: user already has an EigenAgent"
+            "User already has an EigenAgent"
         );
         /// agentFactory will spawn an EigenAgent after bridging automatically
         /// if user does not already have an EigenAgent NFT on L1.
@@ -123,7 +123,7 @@ contract DepositAndMintEigenAgentScript is
         vm.startBroadcast(deployerKey);
 
         uint256 amount = 0.0619 ether;
-        uint256 expiry = block.timestamp + 3 hours;
+        uint256 expiry = block.timestamp + 1 hours;
         bytes memory depositMessage;
         bytes memory messageWithSignature;
 
@@ -148,6 +148,8 @@ contract DepositAndMintEigenAgentScript is
         // Check L2 CCIP-BnM balances
         if (tokenL2.balanceOf(deployer) < 1 ether) {
             IERC20_CCIPBnM(address(tokenL2)).drip(deployer);
+        }
+        if (tokenL2.balanceOf(address(senderContract)) < 1 ether) {
             IERC20_CCIPBnM(address(tokenL2)).drip(address(senderContract));
         }
 

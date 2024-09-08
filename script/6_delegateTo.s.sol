@@ -93,11 +93,9 @@ contract DelegateToScript is
         operatorKey = vm.envUint("OPERATOR_KEY");
         operator = vm.addr(operatorKey);
 
-        if (!delegationManager.isOperator(operator)) {
+        if (!delegationManager.isOperator(operator) || isTest) {
             vm.startBroadcast(deployerKey);
-            {
-                topupSenderEthBalance(operator, isTest);
-            }
+            topupSenderEthBalance(operator, isTest);
             vm.stopBroadcast();
 
             vm.startBroadcast(operatorKey);
@@ -110,17 +108,20 @@ contract DelegateToScript is
                     });
 
                 string memory metadataURI = "some operator";
-                delegationManager.registerAsOperator(registeringOperatorDetails, metadataURI);
+                try delegationManager.registerAsOperator(registeringOperatorDetails, metadataURI) {
+                } catch Error(string memory reason) {
+                    console.log(reason); // registerAsOperator: caller is already actively delegated
+                }
             }
             vm.stopBroadcast();
         }
 
         //// Get User's EigenAgent
         IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(deployer);
-        require(address(eigenAgent) != address(0), "User has no existing EigenAgent");
+        require(address(eigenAgent) != address(0), "User must have an EigenAgent");
         require(
             strategyManager.stakerStrategyShares(address(eigenAgent), strategy) >= 0,
-            "user's eigenAgent has no deposit in Eigenlayer"
+            "EigenAgent has no deposit in Eigenlayer"
         );
 
         uint256 execNonce = eigenAgent.execNonce();
@@ -171,7 +172,7 @@ contract DelegateToScript is
             messageWithSignature_DT = signMessageForEigenAgentExecution(
                 deployerKey,
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
-                address(delegationManager), // DelegationManager.delegateTo()
+                TARGET_CONTRACT, // DelegationManager.delegateTo()
                 delegateToMessage,
                 execNonce,
                 sig_expiry

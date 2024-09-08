@@ -105,7 +105,7 @@ contract CompleteWithdrawalScript is
             // if the user already has a EigenAgent, fetch current execution Nonce
             execNonce = eigenAgent.execNonce();
         }
-        require(address(eigenAgent) != address(0), "user has no EigenAgent");
+        require(address(eigenAgent) != address(0), "User must have an EigenAgent");
 
         expiry = block.timestamp + 2 hours;
         staker = address(eigenAgent); // this should be EigenAgent (as in StrategyManager)
@@ -116,110 +116,112 @@ contract CompleteWithdrawalScript is
             "staker == withdrawer == eigenAgent not satisfied"
         );
 
-        IDelegationManager.Withdrawal memory withdrawal = readWithdrawalInfo(
-            staker,
-            "script/withdrawals-queued/"
-        );
-
-        if (isTest) {
-            // mock save a queueWithdrawalBlock
-            vm.prank(deployer);
-            restakingConnector.setQueueWithdrawalBlock(
-                withdrawal.staker,
-                withdrawal.nonce,
-                111
-            );
-        }
-
-        // Fetch the correct withdrawal.startBlock and withdrawalRoot
-        withdrawal.startBlock = uint32(restakingConnector.getQueueWithdrawalBlock(
-            withdrawal.staker,
-            withdrawal.nonce
-        ));
-
-        bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
-        // Create a withdrawalAgentOwnerRoot and commit to it on L2.
-        // So that when the withdrawal returns, we can
-        // verify which user (AgentOwner) to transfer withdrawals to
-        bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalTransferRoot(
-            withdrawalRoot,
-            withdrawal.shares[0],
-            deployer
-        );
-
-        IERC20[] memory tokensToWithdraw = new IERC20[](1);
-        tokensToWithdraw[0] = withdrawal.strategies[0].underlyingToken();
-
-        /////////////////////////////////////////////////////////////////
-        /////// Broadcast to L2
-        /////////////////////////////////////////////////////////////////
-
-        vm.selectFork(l2ForkId);
-
-        vm.startBroadcast(deployerKey);
-
-        require(
-            senderProxy.allowlistedSenders(address(receiverProxy)),
-            "senderCCIP: must allowlistSender(receiverCCIP)"
-        );
-
-        middlewareTimesIndex = 0; // not used yet, for slashing
-        receiveAsTokens = true;
-
-        bytes memory completeWithdrawalMessage;
-        bytes memory messageWithSignature;
+        try this.readWithdrawalInfo(staker, "script/withdrawals-queued/")
+            returns (IDelegationManager.Withdrawal memory withdrawal)
         {
-            completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
-                withdrawal,
-                tokensToWithdraw,
-                middlewareTimesIndex,
-                receiveAsTokens
+
+            if (isTest) {
+                // mock save a queueWithdrawalBlock
+                vm.prank(deployer);
+                restakingConnector.setQueueWithdrawalBlock(
+                    withdrawal.staker,
+                    withdrawal.nonce,
+                    111
+                );
+            }
+
+            // Fetch the correct withdrawal.startBlock and withdrawalRoot
+            withdrawal.startBlock = uint32(restakingConnector.getQueueWithdrawalBlock(
+                withdrawal.staker,
+                withdrawal.nonce
+            ));
+
+            bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
+            // Create a withdrawalAgentOwnerRoot and commit to it on L2.
+            // So that when the withdrawal returns, we can
+            // verify which user (AgentOwner) to transfer withdrawals to
+            bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalTransferRoot(
+                withdrawalRoot,
+                withdrawal.shares[0],
+                deployer
             );
 
-            // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature = signMessageForEigenAgentExecution(
-                deployerKey,
-                EthSepolia.ChainId, // destination chainid where EigenAgent lives
-                TARGET_CONTRACT,
-                completeWithdrawalMessage,
-                execNonce,
-                expiry
+            IERC20[] memory tokensToWithdraw = new IERC20[](1);
+            tokensToWithdraw[0] = withdrawal.strategies[0].underlyingToken();
+
+            /////////////////////////////////////////////////////////////////
+            /////// Broadcast to L2
+            /////////////////////////////////////////////////////////////////
+
+            vm.selectFork(l2ForkId);
+
+            vm.startBroadcast(deployerKey);
+
+            require(
+                senderProxy.allowlistedSenders(address(receiverProxy)),
+                "senderCCIP: must allowlistSender(receiverCCIP)"
             );
+
+            middlewareTimesIndex = 0; // not used yet, for slashing
+            receiveAsTokens = true;
+
+            bytes memory completeWithdrawalMessage;
+            bytes memory messageWithSignature;
+            {
+                completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
+                    withdrawal,
+                    tokensToWithdraw,
+                    middlewareTimesIndex,
+                    receiveAsTokens
+                );
+
+                // sign the message for EigenAgent to execute Eigenlayer command
+                messageWithSignature = signMessageForEigenAgentExecution(
+                    deployerKey,
+                    EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                    TARGET_CONTRACT,
+                    completeWithdrawalMessage,
+                    execNonce,
+                    expiry
+                );
+            }
+
+            topupSenderEthBalance(address(senderProxy), isTest);
+
+            senderProxy.sendMessagePayNative(
+                EthSepolia.ChainSelector, // destination chain
+                address(receiverProxy),
+                string(messageWithSignature),
+                address(tokenL2),
+                0, // only sending message, not bridging tokens
+                0 // use default gasLimit for this function
+            );
+
+            vm.stopBroadcast();
+
+
+            vm.selectFork(ethForkId);
+            string memory filePath = "script/withdrawals-completed/";
+            if (isTest) {
+            filePath = "test/withdrawals-completed/";
+            }
+
+            saveWithdrawalInfo(
+                withdrawal.staker,
+                withdrawal.delegatedTo,
+                withdrawal.withdrawer,
+                withdrawal.nonce,
+                withdrawal.startBlock,
+                withdrawal.strategies,
+                withdrawal.shares,
+                withdrawalRoot,
+                withdrawalAgentOwnerRoot,
+                filePath
+            );
+
+        } catch {
+            revert("Withdrawals file not found");
         }
-
-        topupSenderEthBalance(address(senderProxy), isTest);
-
-        senderProxy.sendMessagePayNative(
-            EthSepolia.ChainSelector, // destination chain
-            address(receiverProxy),
-            string(messageWithSignature),
-            address(tokenL2),
-            0, // only sending message, not bridging tokens
-            0 // use default gasLimit for this function
-        );
-
-        vm.stopBroadcast();
-
-
-        vm.selectFork(ethForkId);
-        string memory filePath = "script/withdrawals-completed/";
-        if (isTest) {
-           filePath = "test/withdrawals-completed/";
-        }
-
-        saveWithdrawalInfo(
-            withdrawal.staker,
-            withdrawal.delegatedTo,
-            withdrawal.withdrawer,
-            withdrawal.nonce,
-            withdrawal.startBlock,
-            withdrawal.strategies,
-            withdrawal.shares,
-            withdrawalRoot,
-            withdrawalAgentOwnerRoot,
-            filePath
-        );
-
     }
 
 }

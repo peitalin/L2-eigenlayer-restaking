@@ -29,6 +29,7 @@ contract CheckMintEigenAgentGasCostsScript is Script, ScriptUtils, FileReader {
         uint256 bobKey = uint256(8888);
         address bob = vm.addr(bobKey);
         IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
+        vm.assertNotEq(address(eigenAgent), address(0));
 
         vm.stopBroadcast();
     }

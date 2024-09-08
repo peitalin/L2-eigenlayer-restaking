@@ -128,6 +128,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
 
         agentFactoryProxy.setRestakingConnector(address(restakingConnectorProxy));
         agentFactoryProxy.set6551Registry(registry6551);
+        agentFactoryProxy.setEigenAgentOwner721(eigenAgentOwner721Proxy);
 
         require(
             address(receiverProxy.getRestakingConnector()) != address(0),
