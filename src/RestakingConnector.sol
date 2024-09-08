@@ -34,7 +34,6 @@ contract RestakingConnector is
     IAgentFactory public agentFactory;
 
     error AddressZero(string msg);
-    error NoExistingEigenAgent(string msg);
 
     event SetQueueWithdrawalBlock(address indexed, uint256 indexed, uint256 indexed);
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
@@ -114,37 +113,48 @@ contract RestakingConnector is
             bytes memory signature // signature from original_staker
         ) = decodeDepositIntoStrategyMsg(messageWithSignature);
 
-        // get original_staker's EigenAgent, or spawn one.
-        IEigenAgent6551 eigenAgent = agentFactory.tryGetEigenAgentOrSpawn(signer);
+        // Get original_staker's EigenAgent, or spawn one.
+        try agentFactory.tryGetEigenAgentOrSpawn(signer) returns (IEigenAgent6551 eigenAgent) {
 
-        bytes memory depositData = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
-            _strategy,
-            token,
-            amount
-        );
+            // Token flow: ReceiverCCIP approves RestakingConnector to move tokens to EigenAgent,
+            // then EigenAgent approves StrategyManager to move tokens into Eigenlayer
+            try eigenAgent.approveByWhitelistedContract(
+                address(strategyManager),
+                token,
+                amount
+            ) {
+                // success
+            } catch {
+                revert IRestakingConnector.EigenAgentExecutionError(signer, expiry);
+            }
 
-        // Token flow: ReceiverCCIP approves RestakingConnector to move tokens to EigenAgent,
-        // then EigenAgent approves StrategyManager to move tokens into Eigenlayer
-        eigenAgent.approveByWhitelistedContract(
-            address(strategyManager), // strategyManager
-            token,
-            amount
-        );
+            // ReceiverCCIP approves RestakingConnector just before calling this function
+            try IERC20(token).transferFrom(
+                _receiverCCIP,
+                address(eigenAgent),
+                amount
+            ) {
+                // success
+            } catch {
+                revert IRestakingConnector.EigenAgentExecutionError(signer, expiry);
+            }
 
-        // ReceiverCCIP approves RestakingConnector just before calling this function
-        IERC20(token).transferFrom(
-            _receiverCCIP,
-            address(eigenAgent),
-            amount
-        );
+            try eigenAgent.executeWithSignature(
+                address(strategyManager), // strategyManager
+                0 ether,
+                EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(_strategy, token, amount),
+                expiry,
+                signature
+            ) returns (bytes memory result) {
+                // success, do nothing.
+            } catch {
+                revert IRestakingConnector.EigenAgentExecutionError(signer, expiry);
+            }
 
-        eigenAgent.executeWithSignature(
-            address(strategyManager), // strategyManager
-            0 ether,
-            depositData, // encodeDepositIntoStrategyMsg
-            expiry,
-            signature
-        );
+        } catch {
+            revert IRestakingConnector.EigenAgentExecutionError(signer, expiry);
+        }
+
     }
 
     function mintEigenAgent(bytes memory message) public onlyReceiverCCIP {
@@ -154,28 +164,25 @@ contract RestakingConnector is
     }
 
     function queueWithdrawalsWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
-
         (
             // original message
-            IDelegationManager.QueuedWithdrawalParams[] memory QWPArray,
+            IDelegationManager.QueuedWithdrawalParams[] memory qwpArray,
             // message signature
-            , // address signer,
+            , // address signer
             uint256 expiry,
             bytes memory signature
         ) = decodeQueueWithdrawalsMsg(messageWithSignature);
 
-        address withdrawer = QWPArray[0].withdrawer;
+        address withdrawer = qwpArray[0].withdrawer;
+        uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(withdrawer);
+        _withdrawalBlock[withdrawer][withdrawalNonce] = block.number;
         /// msg.sender == withdrawer == staker (EigenAgent is all three)
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawer));
-
-        uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(withdrawer);
-
-        _withdrawalBlock[withdrawer][withdrawalNonce] = block.number;
 
         eigenAgent.executeWithSignature(
             address(delegationManager),
             0 ether,
-            EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(QWPArray),
+            EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(qwpArray),
             expiry,
             signature
         );
@@ -252,7 +259,7 @@ contract RestakingConnector is
                 );
             }
         }
-        //// Function defines named return variables. This line is not hit in coverage
+        //// Named return variables are defined in the function signature. This line is not needed.
         // return (
         //     receiveAsTokens,
         //     withdrawalAmount,
@@ -294,7 +301,7 @@ contract RestakingConnector is
             // original message
             address eigenAgentAddr, // staker in Eigenlayer delegating
             // message signature
-            , // address signer,
+            , // address signer
             uint256 expiry,
             bytes memory signature
         ) = DelegationDecoders.decodeUndelegateMsg(messageWithSignature);

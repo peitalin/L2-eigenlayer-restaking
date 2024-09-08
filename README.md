@@ -138,6 +138,7 @@ Once the L1 -> L2 bridge completes, we can see the original `0.00333` tokens tra
 - [x] Deploy CCIP-BnM ERC20 strategy vault on Eigenlayer
 - [ ] Test cross-chain messages for:
     - [x] `depositIntoStrategy` via EigenAgent
+        - [x] Catch deposit reverts, and allow manual re-execution to trigger refund after expiry.
     - [x] `queueWithdrawals` via EigenAgent
     - [x] `completeQueuedWithdrawals` via EigenAgent
         - [x] Transfer withdrawn tokens from L1 back to L2
