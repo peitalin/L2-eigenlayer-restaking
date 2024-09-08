@@ -131,6 +131,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
 
     /// Mints an NFT and creates a 6551 account for it
     function _spawnEigenAgent6551(address staker) internal nonReentrant returns (IEigenAgent6551) {
+
         require(
             address(getEigenAgent(staker)) == address(0),
             "staker already has an EigenAgent"
@@ -140,6 +141,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
         uint256 tokenId = eigenAgentOwner721.mint(staker);
         // sets userToEigenAgentTokenIds[staker] = tokenId in
         // _afterTokenTransfer() -> updateEigenAgentOwnerTokenId
+
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(
             erc6551Registry.createAccount(
                 address(new EigenAgent6551()),
