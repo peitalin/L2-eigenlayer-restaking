@@ -5,6 +5,7 @@ import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
+import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
 
 
 contract BaseMessenger_Tests is BaseTestEnvironment {
@@ -370,4 +371,144 @@ contract BaseMessenger_Tests is BaseTestEnvironment {
             800_000
         );
     }
+
+
+    function test_Sender_L2_sendMessagePayNative_Deposit() public {
+
+        ///////////////////////////////////////////////////
+        //// Setup Sender contracts on L2 fork
+        ///////////////////////////////////////////////////
+        vm.selectFork(l2ForkId);
+
+        uint256 execNonce = 0;
+        bytes memory messageWithSignature;
+        {
+            bytes memory depositMessage = encodeDepositIntoStrategyMsg(
+                address(strategy),
+                address(tokenL1),
+                amount
+            );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature = signMessageForEigenAgentExecution(
+                bobKey,
+                block.chainid, // destination chainid where EigenAgent lives
+                address(strategyManager), // StrategyManager to approve + deposit
+                depositMessage,
+                execNonce,
+                expiry
+            );
+        }
+
+        // messageId (topic[1]): false as we don't know messageId yet
+        vm.expectEmit(false, true, false, false);
+        emit BaseMessengerCCIP.MessageSent(
+            bytes32(0x0),
+            EthSepolia.ChainSelector, // destination chain
+            address(receiverContract),
+            "dispatched call", // default message
+            address(BaseSepolia.BridgeToken), // token to send
+            0.1 ether,
+            address(0), // native gas for fees
+            0
+        );
+        // event MessageSent(
+        //     bytes32 indexed messageId,
+        //     uint64 indexed destinationChainSelector,
+        //     address receiver,
+        //     string text,
+        //     address token,
+        //     uint256 tokenAmount,
+        //     address feeToken,
+        //     uint256 fees
+        // );
+        senderContract.sendMessagePayNative(
+            EthSepolia.ChainSelector, // destination chain
+            address(receiverContract),
+            string(messageWithSignature),
+            address(BaseSepolia.BridgeToken), // token to send
+            0.1 ether, // test sending 0.1e18 tokens
+            999_000 // use custom gasLimit for this function
+        );
+    }
+
+    function test_Receiver_L2_sendMessagePayNative_TransferToAgentOwner() public {
+
+        ///////////////////////////////////////////////////
+        //// Receiver contracts on L1 fork
+        ///////////////////////////////////////////////////
+        vm.selectFork(ethForkId);
+
+        bytes memory messageWithSignature;
+        {
+            uint256 execNonce = 0;
+            bytes32 mockWithdrawalAgentOwnerRoot = bytes32(abi.encode(123));
+
+            message = encodeHandleTransferToAgentOwnerMsg(
+                mockWithdrawalAgentOwnerRoot
+            );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature = signMessageForEigenAgentExecution(
+                bobKey,
+                block.chainid, // destination chainid where EigenAgent lives
+                address(strategyManager), // StrategyManager to approve + deposit
+                message,
+                execNonce,
+                expiry
+            );
+        }
+
+        // messageId (topic[1]): false as we don't know messageId yet
+        vm.expectEmit(false, true, false, false);
+        emit BaseMessengerCCIP.MessageSent(
+            bytes32(0x0),
+            BaseSepolia.ChainSelector, // destination chain
+            address(senderContract),
+            "dispatched call", // default message
+            address(EthSepolia.BridgeToken), // token to send
+            0 ether,
+            address(0), // native gas for fees
+            0
+        );
+        // event MessageSent(
+        //     bytes32 indexed messageId,
+        //     uint64 indexed destinationChainSelector,
+        //     address receiver,
+        //     string text,
+        //     address token,
+        //     uint256 tokenAmount,
+        //     address feeToken,
+        //     uint256 fees
+        // );
+        receiverContract.sendMessagePayNative(
+            BaseSepolia.ChainSelector, // destination chain
+            address(senderContract),
+            string(messageWithSignature),
+            address(EthSepolia.BridgeToken), // token to send
+            0 ether, // test sending 0 tokens
+            888_000 // use custom gasLimit for this function
+        );
+
+        vm.expectEmit(false, true, false, false);
+        emit BaseMessengerCCIP.MessageSent(
+            bytes32(0x0),
+            BaseSepolia.ChainSelector, // destination chain
+            address(senderContract),
+            "dispatched call", // default message
+            address(EthSepolia.BridgeToken), // token to send
+            1 ether,
+            address(0), // native gas for fees
+            0
+        );
+        receiverContract.sendMessagePayNative(
+            BaseSepolia.ChainSelector, // destination chain
+            address(senderContract),
+            string(messageWithSignature),
+            address(EthSepolia.BridgeToken), // token to send
+            1 ether, // test sending 1e18 tokens
+            888_000 // use custom gasLimit for this function
+        );
+    }
+
 }

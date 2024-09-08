@@ -156,4 +156,55 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
         receiverContract.mockCCIPReceive(any2EvmMessageQueueWithdrawal);
     }
 
+    function test_ReceiverL1_CatchError_NullArrayQueueWithdrawal() public {
+
+        setupL1State_Deposit();
+
+        // Catch error, but do nothing as no tokens are bridge in queueWithdrawal calls.
+
+        /////////////////////////////////////
+        //// Mock message to L2 Receiver
+        /////////////////////////////////////
+
+        uint256 execNonce1 = eigenAgent.execNonce();
+        uint256 expiryShort = block.timestamp + 60 seconds;
+        // make expiryShort to test refund on expiry feature
+
+        bytes memory messageWithSignature1;
+        {
+            // Eigenlayer reverts with zero-length arrays:
+            IDelegationManager.QueuedWithdrawalParams[] memory QWPArray;
+            QWPArray = new IDelegationManager.QueuedWithdrawalParams[](0);
+
+            // create the queueWithdrawal message for Eigenlayer
+            bytes memory withdrawalMessage = encodeQueueWithdrawalsMsg(
+                QWPArray
+            );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature1 = signMessageForEigenAgentExecution(
+                bobKey,
+                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                address(delegationManager),
+                withdrawalMessage,
+                execNonce1,
+                expiryShort
+            );
+        }
+
+        Client.Any2EVMMessage memory any2EvmMessageQueueWithdrawal = Client.Any2EVMMessage({
+            messageId: bytes32(uint256(9999)),
+            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
+            sender: abi.encode(address(deployer)), // bytes: abi.decode(sender) if coming from an EVM chain.
+            destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging coins, just sending msg
+            data: abi.encode(string(
+                messageWithSignature1
+            ))
+        });
+
+        // revert(abi.decode(customError, (string)));
+        vm.expectRevert();
+        receiverContract.mockCCIPReceive(any2EvmMessageQueueWithdrawal);
+    }
+
 }

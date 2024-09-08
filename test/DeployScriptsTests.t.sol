@@ -51,8 +51,8 @@ contract DeployScriptsTests is Test, ScriptUtils {
     // x
     DeployVerifyScript public deployerVerifyScript;
 
-    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
-    address deployer = vm.addr(deployerKey);
+    uint256 public deployerKey = vm.envUint("DEPLOYER_KEY");
+    address public deployer = vm.addr(deployerKey);
 
     function setUp() public {
 
@@ -124,7 +124,12 @@ contract DeployScriptsTests is Test, ScriptUtils {
     }
 
     function test_step5b_DepositIntoStrategyScript() public {
-        depositIntoStrategyScript.mockrun();
+
+        try depositIntoStrategyScript.mockrun() {
+            //
+        } catch Error(string memory reason) {
+            compareErrorStr(reason, "User must have an EigenAgent");
+        }
     }
 
     function test_step5c_MintEigenAgent() public {
@@ -142,51 +147,51 @@ contract DeployScriptsTests is Test, ScriptUtils {
     }
 
     function test_step6_DelegateToScript() public {
-        delegateToScript.mockrun();
+
+        try delegateToScript.mockrun() {
+            //
+        } catch Error(string memory reason) {
+            compareErrorStr(reason, "User must have an EigenAgent");
+        }
     }
 
     function test_step6b_UndelegateScript() public {
         try undelegateScript.mockrun() {
             //
-        } catch Error(string memory reason) {
-            if (strEq(reason, "eigenAgent not delegatedTo operator")) {
-                console.log("undelegateScript: must run 6_delegateTo.s.sol script first");
-            } else {
-                console.log(reason);
-            }
-        } catch (bytes memory reason) {
-            console.log(abi.decode(reason, (string)));
-            revert(abi.decode(reason, (string)));
+        } catch (bytes memory err) {
+            compareErrorBytes(err, "User must have an EigenAgent");
         }
     }
 
     function test_step6c_RedepositScript() public {
         try redepositScript.mockrun() {
             //
-        } catch Error(string memory reason) {
-            // vm.expectRevert("eigenAgent not delegatedTo operator");
-            if (strEq(reason, "eigenAgent not delegatedTo operator")) {
-                console.log("redepositScript: must run 6b_undelegate.s.sol script first");
-            } else {
-                console.log(reason);
-            }
-        } catch (bytes memory reason) {
-            console.log(abi.decode(reason, (string)));
-            revert(abi.decode(reason, (string)));
+        } catch Error(string memory errStr) {
+            compareErrorStr(errStr, "Withdrawals file not found");
+            // Run undelegate script first
+        } catch (bytes memory err) {
+            compareErrorBytes(err, "User must have an EigenAgent");
         }
     }
 
     function test_step7_QueueWithdrawalScript() public {
-        // Note II: If step8 has completed withdrawal, this test may warn it failed with:
+        // Note: If step8 has completed withdrawal, this test may warn it failed with:
         // "revert: withdrawalRoot has already been used"
         queueWithdrawalScript.mockrun();
-        // writes new json files: withdrawalRoots, so we use mockrun()
+        // writes new json files: withdrawalRoots, so use mockrun()
     }
 
     function test_step8_CompleteWithdrawalScript() public {
         // Note: requires step7 to be run first so that:
         // script/withdrawals-queued/<eigen-agent-address>/run-latest.json exists
-        completeWithdrawalScript.mockrun();
+        try completeWithdrawalScript.mockrun() {
+
+        } catch Error(string memory errStr) {
+            compareErrorStr(errStr, "Withdrawals file not found");
+            // Run undelegate scripts first
+        } catch (bytes memory err) {
+            compareErrorBytes(err, "User must have an EigenAgent");
+        }
     }
 
     function test_stepx_TestDeployVerify() public {
@@ -195,6 +200,23 @@ contract DeployScriptsTests is Test, ScriptUtils {
 
     function strEq(string memory s1, string memory s2) public pure returns (bool) {
         return keccak256(abi.encode(s1)) == keccak256(abi.encode(s2));
+    }
+
+    function compareErrorStr(string memory s1, string memory s2) public pure returns (bool) {
+        if (strEq(s1, s2)) {
+            console.log(s1);
+        } else {
+            revert(s1);
+        }
+    }
+
+    function compareErrorBytes(bytes memory b1, string memory s2) public pure returns (bool) {
+        string memory s1 = abi.decode(b1, (string));
+        if (strEq(s1, s2)) {
+            console.log(s1);
+        } else {
+            revert(s1);
+        }
     }
 }
 

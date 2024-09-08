@@ -8,20 +8,24 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 
 interface IRestakingConnector {
 
+    error EigenAgentExecutionError(address signer, uint256 expiry);
+
+    error ExecutionErrorRefundAfterExpiry(string message, uint256 expiry);
+
     function getReceiverCCIP() external view returns (address);
 
     function setReceiverCCIP(address newReceiverCCIP) external;
 
-    /*
-     *
-     *                EigenAgent -> Eigenlayer Handlers
-     *
-     *
-    */
-
     function getAgentFactory() external view returns (address);
 
     function setAgentFactory(address newAgentFactory) external;
+
+    /*
+     *
+     *           EigenAgent -> Eigenlayer Handlers
+     *
+     *
+    */
 
     function depositWithEigenAgent(bytes memory message) external;
 
@@ -33,7 +37,7 @@ interface IRestakingConnector {
         bool receiveAsTokens,
         uint256 withdrawalAmount,
         address withdrawalToken,
-        string memory messageForL2, // CCIP message for transferToAgentOwner on L2
+        string memory messageForL2, // CCIP message: transferToAgentOwner on L2
         bytes32 withdrawalTransferRoot
     );
 
@@ -43,7 +47,7 @@ interface IRestakingConnector {
 
     /*
      *
-     *                Eigenlayer Functions
+     *            Eigenlayer Functions
      *
      *
     */
@@ -66,7 +70,7 @@ interface IRestakingConnector {
 
     /*
      *
-     *              Messaging Helpers
+     *          Helpers
      *
      *
     */

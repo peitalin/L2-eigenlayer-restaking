@@ -5,7 +5,7 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 
-interface IERC6551Account {
+interface IBase6551Account {
     receive() external payable;
 
     function token()
@@ -37,8 +37,11 @@ interface IERC6551Executable {
 // (1) renaming `state` variable to `execNonce` for creating executeWithSignature digests, and
 // (2) add `virtual` to the execute() function to make it overridable
 // (3) isValidSignature has no implementation, to be overidden in EigenAgent6551.sol
-abstract contract ERC6551Account is IERC165, IERC1271, IERC6551Account, IERC6551Executable {
+abstract contract Base6551Account is IERC165, IERC1271, IBase6551Account, IERC6551Executable {
+
     uint256 public execNonce;
+
+    uint256[49] private __gap;
 
     receive() external payable {}
 
@@ -65,7 +68,7 @@ abstract contract ERC6551Account is IERC165, IERC1271, IERC6551Account, IERC6551
 
     function isValidSigner(address signer, bytes calldata) external view virtual returns (bytes4) {
         if (_isValidSigner(signer)) {
-            return IERC6551Account.isValidSigner.selector;
+            return IBase6551Account.isValidSigner.selector;
         }
 
         return bytes4(0);
@@ -79,11 +82,11 @@ abstract contract ERC6551Account is IERC165, IERC1271, IERC6551Account, IERC6551
 
     function supportsInterface(bytes4 interfaceId)
         public view virtual
-        override(IERC165, IERC6551Account)
+        override(IERC165, IBase6551Account)
         returns (bool)
     {
         return interfaceId == type(IERC165).interfaceId
-            || interfaceId == type(IERC6551Account).interfaceId
+            || interfaceId == type(IBase6551Account).interfaceId
             || interfaceId == type(IERC6551Executable).interfaceId;
     }
 

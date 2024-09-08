@@ -36,6 +36,13 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
         senderHooks = _senderHooks;
     }
 
+    /*
+     *
+     *                Receiving
+     *
+     *
+    */
+
     function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage)
         internal
         override
@@ -53,13 +60,13 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
             s_lastReceivedTokenAmount = 0;
         }
 
-        string memory text_msg = _afterCCIPReceiveMessage(any2EvmMessage);
+        string memory textMsg = _afterCCIPReceiveMessage(any2EvmMessage);
 
         emit MessageReceived(
             any2EvmMessage.messageId,
             any2EvmMessage.sourceChainSelector,
             abi.decode(any2EvmMessage.sender, (address)),
-            text_msg,
+            textMsg,
             s_lastReceivedTokenAddress,
             s_lastReceivedTokenAmount
         );
@@ -85,15 +92,20 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
             IERC20(any2EvmMessage.destTokenAmounts[0].token).transfer(agentOwner, amount);
 
             textMsg = "Completed withdrawal and sent tokens to EigenAgent owner";
-
         } else {
-
             emit MatchedReceivedFunctionSelector(functionSelector);
             textMsg = "unknown message";
         }
 
         return textMsg;
     }
+
+    /*
+     *
+     *                Sending
+     *
+     *
+    */
 
     /// @param _receiver The address of the receiver.
     /// @param _text The string data to be sent.

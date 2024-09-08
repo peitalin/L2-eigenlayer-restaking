@@ -341,4 +341,42 @@ contract ReceiverRestakingConnectorTests is BaseTestEnvironment {
         vm.stopBroadcast();
     }
 
+    function test_ReceiverL1_dispatchMessageToEigenAgent_InternalCallsOnly(address user) public {
+
+        vm.assume(user != address(receiverContract));
+
+        vm.prank(user);
+
+        vm.expectRevert("Function not called internally");
+        receiverContract.dispatchMessageToEigenAgent(
+            Client.Any2EVMMessage({
+                messageId: bytes32(0x0),
+                sourceChainSelector: BaseSepolia.ChainSelector,
+                sender: abi.encode(deployer),
+                data: abi.encode(string(
+                    encodeMintEigenAgent(deployer)
+                )),
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
+            }),
+            address(tokenL1),
+            1 ether
+        );
+    }
+
+    function test_SetandGet_AmountRefunded() public {
+
+        bytes32 messageId = bytes32(abi.encode(1,2,3));
+
+        vm.prank(bob);
+        vm.expectRevert("Ownable: caller is not the owner");
+        receiverContract.setAmountRefundedToMessageId(messageId , 1 ether);
+
+        vm.prank(deployer);
+        receiverContract.setAmountRefundedToMessageId(messageId , 1.3 ether);
+
+        vm.assertEq(
+            receiverContract.amountRefunded(messageId ),
+            1.3 ether
+        );
+    }
 }

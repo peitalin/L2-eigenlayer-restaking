@@ -16,10 +16,7 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
 
     mapping(address contracts => bool whitelisted) public whitelistedCallers;
 
-    function initialize(
-        string memory name,
-        string memory symbol
-    ) initializer public {
+    function initialize(string memory name, string memory symbol) initializer public {
 
         __ERC721_init(name, symbol);
         __ERC721URIStorage_init();
@@ -66,7 +63,7 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
         return tokenId;
     }
 
-    /// @dev callback to update EigenAgentOwner721 NFT owner
+    /// @dev callback to update EigenAgentOwner721 NFT owner.
     function _afterTokenTransfer(
         address from,
         address to,

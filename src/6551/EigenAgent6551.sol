@@ -4,14 +4,12 @@ pragma solidity 0.8.22;
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {ERC6551Account} from "./ERC6551Account.sol";
+import {Base6551Account} from "./Base6551Account.sol";
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
 import {SignatureCheckerV5} from "../utils/SignatureCheckerV5.sol";
 
 
-contract EigenAgent6551 is ERC6551Account {
-
-    // uint256 public execNonce;
+contract EigenAgent6551 is Base6551Account {
 
     /// @notice The EIP-712 typehash for the deposit struct used by the contract
     bytes32 public constant EIGEN_AGENT_EXEC_TYPEHASH = keccak256(
@@ -31,10 +29,6 @@ contract EigenAgent6551 is ERC6551Account {
             revert CallerNotWhitelisted();
         }
         _;
-    }
-
-    function getAgentOwner() public view returns (address) {
-        return owner();
     }
 
     function isValidSignature(
@@ -69,7 +63,7 @@ contract EigenAgent6551 is ERC6551Account {
         virtual
         returns (bytes memory result)
     {
-        /// Should we revert on expiry?
+        /// Do revert on expiry.
         /// CCIP may take hours to deliver messages when gas spikes.
         /// We would need to return funds to the user on L2 this case,
         /// as the transaction may no longer be manually executable after gas lowers later.
@@ -121,7 +115,7 @@ contract EigenAgent6551 is ERC6551Account {
         // calculate the digest hash
         bytes32 digestHash = keccak256(abi.encodePacked(
             "\x19\x01",
-            getDomainSeparator(target, chainid),
+            domainSeparator(target, chainid),
             structHash
         ));
 
@@ -131,7 +125,7 @@ contract EigenAgent6551 is ERC6551Account {
     /// @param contractAddr is the address of the contract being called,
     /// usually Eigenlayer StrategyManager, or DelegationManager.
     /// @param chainid is the chain Eigenlayer is deployed on
-    function getDomainSeparator(
+    function domainSeparator(
         address contractAddr, // strategyManagerAddr, or delegationManagerAddr
         uint256 chainid
     ) public pure returns (bytes32) {

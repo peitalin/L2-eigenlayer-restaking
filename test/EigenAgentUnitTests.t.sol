@@ -4,6 +4,9 @@ pragma solidity 0.8.22;
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 
@@ -15,10 +18,8 @@ import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {MockMultisigSigner} from "./mocks/MockMultisigSigner.sol";
 
-import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IERC6551Executable} from "@6551/interfaces/IERC6551Executable.sol";
-import {IERC6551Account} from "../src/6551/ERC6551Account.sol";
+import {IBase6551Account} from "../src/6551/Base6551Account.sol";
 
 
 contract EigenAgentUnitTests is BaseTestEnvironment {
@@ -59,15 +60,43 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
 
     function test_EigenAgent_DomainTypehash() public {
         vm.assertEq(
+            delegationManager.domainSeparator(),
+            eigenAgent.domainSeparator(address(delegationManager), block.chainid)
+        );
+        vm.assertEq(
             delegationManager.DOMAIN_TYPEHASH(),
             eigenAgent.DOMAIN_TYPEHASH()
         );
     }
 
-    function test_GetAgentOwner() public view {
+    function test_EigenAgent_Client_DigestHashsEqual() public {
+
+        bytes memory message1 = encodeMintEigenAgent(deployer);
+
+        bytes32 digestHashClient = createEigenAgentCallDigestHash(
+            address(delegationManager),
+            0 ether,
+            message1,
+            1,
+            block.chainid,
+            expiry
+        );
+        bytes32 digestHashEigenAgent = eigenAgent.createEigenAgentCallDigestHash(
+            address(delegationManager),
+            0 ether,
+            message1,
+            1,
+            block.chainid,
+            expiry
+        );
+
+        vm.assertEq(digestHashClient, digestHashEigenAgent);
+    }
+
+    function test_EigenAgent_GetOwner() public view {
         vm.assertEq(
             address(deployer),
-            address(eigenAgent.getAgentOwner())
+            address(eigenAgent.owner())
         );
     }
 
@@ -92,7 +121,7 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         // encode a simple getSenderContractL2Addr call
         bytes memory data = abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector);
 
-        bytes32 digestHash = createEigenAgentCallDigestHash(
+        bytes32 digestHash = eigenAgent.createEigenAgentCallDigestHash(
             address(receiverContract),
             0 ether,
             data,
@@ -184,7 +213,7 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         IEigenAgent6551 eigenAgent2 = agentFactory.spawnEigenAgentOnlyOwner(address(payable(multisig)));
         vm.stopBroadcast();
 
-        vm.assertEq(eigenAgent2.getAgentOwner(), address(multisig));
+        vm.assertEq(eigenAgent2.owner(), address(multisig));
 
         uint256 aliceBalanceBefore = alice.balance;
 
@@ -226,7 +255,7 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         IEigenAgent6551 eigenAgent2 = agentFactory.spawnEigenAgentOnlyOwner(address(payable(multisig)));
         vm.stopBroadcast();
 
-        vm.assertEq(eigenAgent2.getAgentOwner(), address(multisig));
+        vm.assertEq(eigenAgent2.owner(), address(multisig));
 
         vm.deal(address(eigenAgent2), 1 ether);
         vm.deal(address(multisig), 1 ether);
@@ -237,7 +266,7 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
 
         bytes memory spawnMessage = abi.encodeWithSignature("spawnEigenAgentOnlyOwner(address)", alice);
 
-        bytes32 digestHash = createEigenAgentCallDigestHash(
+        bytes32 digestHash = eigenAgent2.createEigenAgentCallDigestHash(
             targetContract,
             0 ether, // not sending ether
             spawnMessage,
@@ -311,17 +340,17 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         vm.prank(deployer);
         agentFactory.addAdmin(address(eigenAgent2));
 
-        // dispatch message from multisig, using any of the admin signatures
+        // send message from multisig with any signature, multisig already has 2 admin signatures
+        bytes memory anySignature = abi.encode("0x123123");
+
         vm.prank(address(multisig));
         eigenAgent2.executeWithSignature(
             targetContract,
             0 ether,
             spawnMessage,
             expiry,
-            sigBob
-            // sigAlice
+            anySignature
         );
-        // using any signature from any Admin suffices
 
         require(
             agentFactory.getEigenAgentOwnerTokenId(alice) > 1,
@@ -329,7 +358,7 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         );
     }
 
-    function test_EigenAgent_CallingWrongFunctions_Execute() public {
+    function test_RevertOnCallingWrongFunctions_Execute() public {
 
         // try call agentfactor with the wrong function selectors
         vm.prank(deployer);
@@ -343,7 +372,7 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
 
     }
 
-    function test_EigenAgent_CallingWrongFunctions_ExecuteWithSignature() public {
+    function test_RevertOnCallingWrongFunctions_ExecuteWithSignature() public {
 
         (
             , // bytes memory data1,
@@ -546,7 +575,6 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         }
     }
 
-
     function createEigenAgentQueueWithdrawalsSignature(
         uint256 signerKey,
         uint256 execNonce,
@@ -644,12 +672,12 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
 
         // bob is not valid signer
         vm.assertTrue(
-            eigenAgent.isValidSigner(bob, "") != IERC6551Account.isValidSigner.selector
+            eigenAgent.isValidSigner(bob, "") != IBase6551Account.isValidSigner.selector
         );
         // deployer is the owner of the eigenAgent, valid signer
         vm.assertEq(
             eigenAgent.isValidSigner(deployer, ""),
-            IERC6551Account.isValidSigner.selector
+            IBase6551Account.isValidSigner.selector
         );
 
         vm.deal(address(eigenAgent), 1 ether);
@@ -671,17 +699,29 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
 
     function test_EigenAgent_SupportsInterface() public view {
 
-        IERC6551Account accountInstance = IERC6551Account(payable(eigenAgent));
+        IBase6551Account accountInstance = IBase6551Account(payable(eigenAgent));
 
         accountInstance.supportsInterface(
             type(IERC165).interfaceId
         );
         accountInstance.supportsInterface(
-            type(IERC6551Account).interfaceId
+            type(IBase6551Account).interfaceId
         );
         accountInstance.supportsInterface(
             type(IERC6551Executable).interfaceId
         );
     }
 
+    function test_EigenAgent_GetAgentOwnerToken() public view {
+
+        (
+            uint256 chainId,
+            address tokenContract,
+            uint256 tokenId
+        ) = eigenAgent.token();
+
+        vm.assertEq(chainId, block.chainid);
+        vm.assertEq(tokenContract, address(eigenAgentOwner721));
+        vm.assertTrue(tokenId >= 1);
+    }
 }

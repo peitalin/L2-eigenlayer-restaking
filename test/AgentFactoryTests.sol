@@ -6,15 +6,6 @@ import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
-import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-
-import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
-
-import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
-import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
@@ -94,7 +85,7 @@ contract AgentFactoryTests is BaseTestEnvironment {
         ));
         IAgentFactory(payable(address(
             new TransparentUpgradeableProxy(
-                address(agentFactoryImpl ),
+                address(agentFactoryImpl),
                 address(pa),
                 abi.encodeWithSelector(
                     AgentFactory.initialize.selector,
@@ -142,5 +133,29 @@ contract AgentFactoryTests is BaseTestEnvironment {
         eigenAgentOwner721.mint(bob);
 
         vm.assertEq(eigenAgentOwner721.balanceOf(bob), 1);
+    }
+
+    function test_updateEigenAgentOwnerTokenId_OnlyCallable_EigenAgentOwner721() public {
+
+        uint256 tokenId = agentFactory.getEigenAgentOwnerTokenId(deployer);
+
+        vm.prank(bob);
+        vm.expectRevert("AgentFactory.updateEigenAgentOwnerTokenId: caller not EigenAgentOwner721 contract");
+        agentFactory.updateEigenAgentOwnerTokenId(deployer, bob, tokenId);
+
+        // transer to bob
+        vm.prank(address(eigenAgentOwner721));
+        agentFactory.updateEigenAgentOwnerTokenId(deployer, bob, tokenId);
+
+        uint256 tokenId2 = agentFactory.getEigenAgentOwnerTokenId(bob);
+        vm.assertEq(tokenId, tokenId2);
+
+        // transer back to deployer
+        vm.prank(address(eigenAgentOwner721));
+        agentFactory.updateEigenAgentOwnerTokenId(bob, deployer, tokenId);
+
+        uint256 tokenId3 = agentFactory.getEigenAgentOwnerTokenId(deployer);
+
+        vm.assertEq(tokenId2, tokenId3);
     }
 }
