@@ -60,7 +60,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
     }
 
     modifier onlyRestakingConnector() {
-        require(msg.sender == _restakingConnector, "not called by RestakingConnector");
+        require(msg.sender == _restakingConnector, "Caller does not match: AgentFactory._restakingConnector");
         _;
     }
 

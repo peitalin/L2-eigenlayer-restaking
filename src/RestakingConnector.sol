@@ -118,26 +118,18 @@ contract RestakingConnector is
 
             // Token flow: ReceiverCCIP approves RestakingConnector to move tokens to EigenAgent,
             // then EigenAgent approves StrategyManager to move tokens into Eigenlayer
-            try eigenAgent.approveByWhitelistedContract(
+            eigenAgent.approveByWhitelistedContract(
                 address(strategyManager),
                 token,
                 amount
-            ) {
-                // success
-            } catch {
-                revert IRestakingConnector.EigenAgentExecutionError(signer, expiry);
-            }
+            );
 
             // ReceiverCCIP approves RestakingConnector just before calling this function
-            try IERC20(token).transferFrom(
+            IERC20(token).transferFrom(
                 _receiverCCIP,
                 address(eigenAgent),
                 amount
-            ) {
-                // success
-            } catch {
-                revert IRestakingConnector.EigenAgentExecutionError(signer, expiry);
-            }
+            );
 
             try eigenAgent.executeWithSignature(
                 address(strategyManager), // strategyManager

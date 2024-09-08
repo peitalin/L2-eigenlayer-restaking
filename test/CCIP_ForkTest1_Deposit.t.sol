@@ -185,4 +185,66 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
 
         receiverContract.mockCCIPReceive(any2EvmMessage);
     }
+
+    function test_ReceiverL1_ForceAgentFactoryError_RefundAfterExpiry() public {
+
+        vm.selectFork(ethForkId);
+
+        uint256 execNonce = 0;
+        address invalidEigenlayerContract = vm.addr(4444);
+        // should revert with EigenAgentExecutionError(signer, expiry)
+        uint256 expiryShort = block.timestamp + 60 seconds;
+        // make expiryShort to test refund on expiry feature
+
+        bytes memory messageWithSignature;
+        {
+            bytes memory depositMessage = encodeDepositIntoStrategyMsg(
+                invalidEigenlayerContract,
+                address(tokenL1),
+                amount
+            );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature = signMessageForEigenAgentExecution(
+                bobKey,
+                block.chainid, // destination chainid where EigenAgent lives
+                address(strategyManager), // StrategyManager to approve + deposit
+                depositMessage,
+                execNonce,
+                expiryShort
+            );
+        }
+
+        // warp ahead past the expiryShort timestamp:
+        vm.warp(block.timestamp + 3666); // 1 hour, 1 min, 6 seconds
+        vm.roll((block.timestamp + 3666) / 12); // 305 blocks on ETH
+
+        // Introduce error: restakingConnector can no longer call agentFactory to
+        // get or spawn EigenAgents
+        vm.prank(deployer);
+        agentFactory.setRestakingConnector(vm.addr(1233));
+
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
+            amount: amount
+        });
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0x0),
+            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
+            sender: abi.encode(deployer),
+            destTokenAmounts: destTokenAmounts,
+            data: abi.encode(string(
+                messageWithSignature
+            ))
+        });
+
+        // Call will try revert because AgentFactory._restakingConnector is set to a random address:
+        // "Caller does not match: AgentFactory._restakingConnector"
+        //
+        // But as it is after expiry, we instead trigger the refund (emitting an event)
+        vm.expectEmit(true, true, true, false);
+        emit ReceiverCCIP.RefundingDeposit(bob, address(tokenL1), amount);
+        receiverContract.mockCCIPReceive(any2EvmMessage);
+    }
 }
