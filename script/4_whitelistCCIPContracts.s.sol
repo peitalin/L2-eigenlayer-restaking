@@ -28,6 +28,14 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
     address public deployer = vm.addr(deployerKey);
 
     function run() public {
+        return _run(false);
+    }
+
+    function mockrun() public {
+        return _run(true);
+    }
+
+    function _run(bool isTest) private {
 
         senderProxy = readSenderContract();
         senderHooksProxy = readSenderHooks();
@@ -97,7 +105,9 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
 
         senderHooksProxy.setSenderCCIP(address(senderProxy));
 
-        IERC20_CCIPBnM(tokenL2).drip(deployer);
+        if (isTest) {
+            IERC20_CCIPBnM(tokenL2).drip(deployer);
+        }
 
         require(
             address(senderProxy.getSenderHooks()) != address(0),

@@ -1,51 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script} from "forge-std/Script.sol";
-
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
-import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
-import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
-import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
-import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
-import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
-
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
-import {FileReader} from "./FileReader.sol";
-import {ScriptUtils} from "./ScriptUtils.sol";
-import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
-
-import {ClientSigners} from "./ClientSigners.sol";
-import {ClientEncoders} from "./ClientEncoders.sol";
+import {BaseScript} from "./BaseScript.sol";
 
 
-contract RedepositScript is
-    Script,
-    ScriptUtils,
-    FileReader,
-    ClientEncoders,
-    ClientSigners
-{
+contract RedepositScript is BaseScript {
 
-    DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
-
-    IReceiverCCIP public receiverProxy;
-    ISenderCCIP public senderProxy;
-    IRestakingConnector public restakingConnector;
-    IAgentFactory public agentFactory;
-
-    IStrategyManager public strategyManager;
-    IDelegationManager public delegationManager;
-    IStrategy public strategy;
-    IERC20 public token;
-    IERC20 public tokenL2;
-
-    uint256 public deployerKey;
-    address public deployer;
     address public staker;
     address public withdrawer;
     uint256 public amount;
@@ -67,30 +32,14 @@ contract RedepositScript is
 
     function _run(bool isTest) private {
 
+        readContractsFromDisk();
+
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        uint256 l2ForkId = vm.createFork("basesepolia");
-        uint256 ethForkId = vm.createSelectFork("ethsepolia");
+        l2ForkId = vm.createFork("basesepolia");
+        ethForkId = vm.createSelectFork("ethsepolia");
 
-        deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
-
-        (
-            strategy,
-            strategyManager,
-            , // strategyFactory
-            , // pauserRegistry
-            delegationManager,
-            , // _rewardsCoordinator
-            // token
-        ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
-
-        senderProxy = readSenderContract();
-
-        (receiverProxy, restakingConnector) = readReceiverRestakingConnector();
-        agentFactory = readAgentFactory();
-
-        tokenL2 = IERC20(address(BaseSepolia.BridgeToken)); // BaseSepolia contract
         TARGET_CONTRACT = address(delegationManager);
 
         /////////////////////////////////////////////////////////////////
@@ -139,7 +88,7 @@ contract RedepositScript is
             vm.startBroadcast(deployerKey);
 
             require(
-                senderProxy.allowlistedSenders(address(receiverProxy)),
+                senderContract.allowlistedSenders(address(receiverContract)),
                 "senderCCIP: must allowlistSender(receiverCCIP)"
             );
 
@@ -153,32 +102,38 @@ contract RedepositScript is
                 "receiveAsTokens must be false to re-deposit undelegated deposit back in Eigenlayer"
             );
 
-            bytes memory completeWithdrawalMessage;
-            bytes memory messageWithSignature;
-            {
-                completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
+            // sign the message for EigenAgent to execute Eigenlayer command
+            bytes memory messageWithSignature = signMessageForEigenAgentExecution(
+                deployerKey,
+                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                TARGET_CONTRACT,
+                encodeCompleteWithdrawalMsg(
                     withdrawal,
                     tokensToWithdraw,
                     middlewareTimesIndex,
                     receiveAsTokens
-                );
+                ),
+                execNonce,
+                sigExpiry
+            );
 
-                // sign the message for EigenAgent to execute Eigenlayer command
-                messageWithSignature = signMessageForEigenAgentExecution(
-                    deployerKey,
-                    EthSepolia.ChainId, // destination chainid where EigenAgent lives
-                    TARGET_CONTRACT,
-                    completeWithdrawalMessage,
-                    execNonce,
-                    sigExpiry
-                );
-            }
+            topupEthBalance(address(senderContract));
 
-            topupSenderEthBalance(address(senderProxy), isTest);
+            uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
+                IDelegationManager.completeQueuedWithdrawal.selector
+            );
 
-            senderProxy.sendMessagePayNative(
+            senderContract.sendMessagePayNative{
+                value: getRouterFeesL2(
+                    address(receiverContract),
+                    string(messageWithSignature),
+                    address(tokenL2),
+                    0, // not bridging, just sending message
+                    gasLimit
+                )
+            }(
                 EthSepolia.ChainSelector, // destination chain
-                address(receiverProxy),
+                address(receiverContract),
                 string(messageWithSignature),
                 address(tokenL2),
                 amount,
@@ -191,7 +146,7 @@ contract RedepositScript is
             vm.selectFork(ethForkId);
             string memory filePath = "script/withdrawals-redeposited/";
             if (isTest) {
-            filePath = "test/withdrawals-redeposited/";
+                filePath = "test/withdrawals-redeposited/";
             }
 
             saveWithdrawalInfo(
