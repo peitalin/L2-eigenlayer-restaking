@@ -122,7 +122,9 @@ contract BaseScript is
     }
 
     function topupEthBalance(address _account) public {
+
         uint256 amountToTopup = 0.20 ether;
+
         if (_account.balance < 0.05 ether) {
             (bool sent, ) = payable(address(_account)).call{value: amountToTopup}("");
             require(sent, "Failed to send Ether");

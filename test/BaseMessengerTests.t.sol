@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
+import {console} from "forge-std/Test.sol";
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
+
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
@@ -463,44 +465,39 @@ contract BaseMessenger_Tests is BaseTestEnvironment, RouterFees {
             expiry
         );
 
-        // messageId (topic[1]): false as we don't know messageId yet
-        vm.expectEmit(false, true, false, false);
-        emit BaseMessengerCCIP.MessageSent(
-            bytes32(0x0),
-            EthSepolia.ChainSelector, // destination chain
-            address(receiverContract),
-            "dispatched call", // default message
-            address(BaseSepolia.BridgeToken), // token to send
-            0.1 ether,
-            address(0), // native gas for fees
-            0
-        );
-        // event MessageSent(
-        //     bytes32 indexed messageId,
-        //     uint64 indexed destinationChainSelector,
-        //     address receiver,
-        //     string text,
-        //     address token,
-        //     uint256 tokenAmount,
-        //     address feeToken,
-        //     uint256 fees
-        // );
-        senderContract.sendMessagePayNative{
-            value: getRouterFeesL2(
+        vm.startBroadcast(deployer);
+        {
+            tokenL2.approve(address(senderContract), 0.1 ether);
+
+            // messageId (topic[1]): false as we don't know messageId yet
+            vm.expectEmit(false, true, false, false);
+            emit BaseMessengerCCIP.MessageSent(
+                bytes32(0x0), // indexed messageId
+                EthSepolia.ChainSelector, // indexed destinationChainSelector
+                address(receiverContract), // receiver
+                "dispatched call", // message (text)
+                address(tokenL2), // token
+                0.1 ether, // token amount
+                address(0), // native gas for fees
+                999_000 // fees
+            );
+            senderContract.sendMessagePayNative{
+                value: getRouterFeesL2(
+                    address(receiverContract),
+                    string(messageWithSignature),
+                    address(tokenL2),
+                    0.1 ether,
+                    999_000
+                )
+            }(
+                EthSepolia.ChainSelector, // destination chain
                 address(receiverContract),
                 string(messageWithSignature),
-                address(tokenL2),
-                0.1 ether,
-                999_000
-            )
-        }(
-            EthSepolia.ChainSelector, // destination chain
-            address(receiverContract),
-            string(messageWithSignature),
-            address(tokenL2), // token to send
-            0.1 ether, // test sending 0.1e18 tokens
-            999_000 // use custom gasLimit for this function
-        );
+                address(tokenL2), // token to send
+                0.1 ether, // test sending 0.1e18 tokens
+                999_000 // use custom gasLimit for this function
+            );
+        }
     }
 
     function test_Receiver_L2_sendMessagePayNative_TransferToAgentOwner() public {
@@ -533,25 +530,15 @@ contract BaseMessenger_Tests is BaseTestEnvironment, RouterFees {
         // messageId (topic[1]): false as we don't know messageId yet
         vm.expectEmit(false, true, false, false);
         emit BaseMessengerCCIP.MessageSent(
-            bytes32(0x0),
-            BaseSepolia.ChainSelector, // destination chain
-            address(senderContract),
-            "dispatched call", // default message
+            bytes32(0x0), // indexed messageId
+            BaseSepolia.ChainSelector, // destinationChainSelector
+            address(senderContract), // receiver
+            "dispatched call", // message
             address(tokenL1), // token to send
-            0 ether,
+            0 ether, // token amount
             address(0), // native gas for fees
-            400_000
+            400_000 // gasLimit
         );
-        // event MessageSent(
-        //     bytes32 indexed messageId,
-        //     uint64 indexed destinationChainSelector,
-        //     address receiver,
-        //     string text,
-        //     address token,
-        //     uint256 tokenAmount,
-        //     address feeToken,
-        //     uint256 fees
-        // );
         receiverContract.sendMessagePayNative{
             value: getRouterFeesL1(
                 address(senderContract),
@@ -561,41 +548,67 @@ contract BaseMessenger_Tests is BaseTestEnvironment, RouterFees {
                 400_000
             )
         }(
-            BaseSepolia.ChainSelector, // destination chain
+            BaseSepolia.ChainSelector, // _destinationChainSelector,
             address(senderContract),
             string(messageWithSignature),
             address(tokenL1), // token to send
             0 ether, // test sending 0 tokens
             400_000 // use custom gasLimit for this function
         );
+    }
 
-        vm.expectEmit(false, true, false, false);
-        emit BaseMessengerCCIP.MessageSent(
-            bytes32(0x0),
-            EthSepolia.ChainSelector, // destination chain
-            address(senderContract),
-            "dispatched call", // default message
-            address(EthSepolia.BridgeToken), // token to send
-            1 ether,
-            address(0), // native gas for fees
-            400_000
+    function test_Receiver_L2_sendMessagePayNative_OutOfGas() public {
+
+        vm.selectFork(ethForkId);
+
+        bytes memory messageWithSignature;
+        {
+            uint256 execNonce = 0;
+            bytes32 mockWithdrawalAgentOwnerRoot = bytes32(abi.encode(123));
+
+            message = encodeHandleTransferToAgentOwnerMsg(
+                mockWithdrawalAgentOwnerRoot
+            );
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature = signMessageForEigenAgentExecution(
+                bobKey,
+                block.chainid, // destination chainid where EigenAgent lives
+                address(strategyManager), // StrategyManager to approve + deposit
+                message,
+                execNonce,
+                expiry
+            );
+        }
+
+        // test out of gas error
+        uint256 hugeGasFees = 3_000_000;
+
+        vm.selectFork(ethForkId);
+        uint256 fees = getRouterFeesL1(
+            address(receiverContract),
+            string(messageWithSignature),
+            address(tokenL1),
+            0 ether,
+            hugeGasFees
         );
-        receiverContract.sendMessagePayNative{
-            value: getRouterFeesL1(
-                address(senderContract),
-                string(messageWithSignature),
-                address(tokenL1),
-                1 ether,
-                400_000
-            )
-        }(
-            EthSepolia.ChainSelector, // destination chain
+
+        // send receiverContract's ETH balance to bob, to trigger NotEnoughBalance error
+        vm.prank(address(receiverContract));
+        address(bob).call{value: address(receiverContract).balance}("");
+
+        vm.expectRevert(abi.encodeWithSelector(BaseMessengerCCIP.NotEnoughBalance.selector, 0, fees));
+        // don't send gas to receiver contract
+        vm.prank(address(receiverContract));
+        receiverContract.sendMessagePayNative(
+            BaseSepolia.ChainSelector, // _destinationChainSelector,
             address(senderContract),
             string(messageWithSignature),
             address(tokenL1), // token to send
-            1 ether, // test sending 1e18 tokens
-            400_000 // use custom gasLimit for this function
+            0 ether, // test sending 0 tokens
+            hugeGasFees // use custom gasLimit for this function
         );
-    }
 
+        require(address(receiverContract).balance == 0, "receiverCCIP should not have any ETH");
+    }
 }
