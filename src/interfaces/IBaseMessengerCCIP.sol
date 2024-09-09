@@ -22,7 +22,7 @@ interface IBaseMessengerCCIP {
         address _token,
         uint256 _amount,
         uint256 _overrideGasLimit
-    ) external returns (bytes32 messageId);
+    ) external payable returns (bytes32 messageId);
 
     function withdraw(address _beneficiary) external;
 

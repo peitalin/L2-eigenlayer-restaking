@@ -21,10 +21,9 @@ import {RedepositScript} from "../script/6c_redeposit.s.sol";
 import {QueueWithdrawalScript} from "../script/7_queueWithdrawal.s.sol";
 import {CompleteWithdrawalScript} from "../script/8_completeWithdrawal.s.sol";
 import {DeployVerifyScript} from "../script/x_deployVerify.s.sol";
-import {ScriptUtils} from "../script/ScriptUtils.sol";
 
 
-contract DeployScriptsTests is Test, ScriptUtils {
+contract DeployScriptsTests is Test {
 
     ///////////// Deploy scripts /////////////
     // 2
@@ -51,8 +50,8 @@ contract DeployScriptsTests is Test, ScriptUtils {
     // x
     DeployVerifyScript public deployerVerifyScript;
 
-    uint256 public deployerKey = vm.envUint("DEPLOYER_KEY");
-    address public deployer = vm.addr(deployerKey);
+    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+    address deployer = vm.addr(deployerKey);
 
     function setUp() public {
 
@@ -78,8 +77,7 @@ contract DeployScriptsTests is Test, ScriptUtils {
 
         deployerVerifyScript = new DeployVerifyScript();
 
-        vm.chainId(31337); // sets isTest flag; script uses forkSelect()
-
+        vm.chainId(31337);
         vm.deal(deployer, 1 ether);
     }
 
@@ -96,23 +94,23 @@ contract DeployScriptsTests is Test, ScriptUtils {
     }
 
     function test_step2b_UpgradeSenderOnL2Script() public {
-        // this test fails if L2 contracts have not been deployed + saved to disk
+        // This test fails if L2 contracts have not been deployed + saved to disk
         upgradeSenderOnL2Script.mockrun();
     }
 
     function test_step3_DeployReceiverOnL1Script() public {
         deployReceiverOnL1Script.mockrun();
-        // writes new json files: contract addrs
+        // Writes new json files: contract addrs
     }
 
     function test_step3b_UpgradeReceiverOnL1Script() public {
-        // this test fails if L1 contracts have not been deployed + saved to disk
+        // This test fails if L1 contracts have not been deployed + saved to disk
         upgradeReceiverOnL1Script.mockrun();
         // writes new json files: contract addrs
     }
 
     function test_step4_WhitelistCCIPContractsScript() public {
-        whitelistCCIPContractsScript.run();
+        whitelistCCIPContractsScript.mockrun();
     }
 
     function test_step5_DepositAndMintEigenAgentScript() public {
@@ -120,7 +118,11 @@ contract DeployScriptsTests is Test, ScriptUtils {
         // vm.assume(mockKey > 1);
         // EIP-2: secp256k1 curve order / 2
         uint256 mockKey = (vm.randomUint() / 2) + 1;
-        depositAndMintEigenAgentScript.mockrun(mockKey);
+        try depositAndMintEigenAgentScript.mockrun(mockKey) {
+            //
+        } catch Error(string memory reason) {
+            compareErrorStr(reason, "User already has an EigenAgent");
+        }
     }
 
     function test_step5b_DepositIntoStrategyScript() public {

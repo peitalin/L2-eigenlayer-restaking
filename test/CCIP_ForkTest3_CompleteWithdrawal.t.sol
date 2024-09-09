@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Test, console} from "forge-std/Test.sol";
+import {console} from "forge-std/Test.sol";
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
@@ -13,11 +13,11 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
+import {RouterFees} from "../script/RouterFees.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 
 
-
-contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
+contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFees {
 
     uint256 expiry;
     uint256 balanceOfReceiverBefore;
@@ -274,6 +274,10 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
             withdrawal.shares[0],
             bob
         );
+
+        uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
+            IDelegationManager.completeQueuedWithdrawal.selector);
+
         vm.expectEmit(true, false, true, false);
         emit WithdrawalTransferRootCommitted(
             withdrawalTransferRoot,
@@ -281,11 +285,19 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment {
             withdrawal.shares[0],
             bob // signer
         );
-        senderContract.sendMessagePayNative(
+        senderContract.sendMessagePayNative{
+            value: getRouterFeesL2(
+                address(receiverContract),
+                string(messageWithSignature_CW),
+                address(tokenL2),
+                0 ether,
+                gasLimit
+            )
+        }(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_CW),
-            address(BaseSepolia.BridgeToken), // destination token
+            address(tokenL2), // destination token
             0, // not sending tokens, just message
             0 // use default gasLimit for this function
         );

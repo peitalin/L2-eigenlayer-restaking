@@ -19,6 +19,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     error SourceChainNotAllowed(uint64 sourceChainSelector);
     error SenderNotAllowed(address sender);
     error InvalidReceiverAddress();
+    error NotEnoughEthGasFees(uint256 setGasFees, uint256 requiredGasFees);
 
     event MessageSent(
         bytes32 indexed messageId,
@@ -129,6 +130,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         uint256 _overrideGasLimit
     )
         external
+        payable
         onlyAllowlistedDestinationChain(_destinationChainSelector)
         validateReceiver(_receiver)
         returns (bytes32 messageId)
@@ -147,9 +149,21 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
         uint256 fees = router.getFee(_destinationChainSelector, evm2AnyMessage);
 
-        if (fees > address(this).balance)
-            revert NotEnoughBalance(address(this).balance, fees);
+        if (msg.sender != address(this)) {
+            // user sends ETH to the router
+            if (fees > msg.value)
+                revert NotEnoughEthGasFees(msg.value, fees);
+        } else {
+            // when contract initiates refund
+            if (fees > address(this).balance)
+                revert NotEnoughBalance(address(this).balance, fees);
+        }
 
+        // transfer tokens from user to this contract
+        if (_amount >= 0 && msg.sender != address(this)) {
+            IERC20(_token).transferFrom(msg.sender, address(this), _amount);
+        }
+        // then approve router to move tokens from this contract
         IERC20(_token).approve(address(router), _amount);
 
         messageId = router.ccipSend{value: fees}(

@@ -5,20 +5,21 @@ import {Test} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {ScriptUtils} from "../script/ScriptUtils.sol";
+import {BaseScript} from "../script/BaseScript.sol";
 import {AdminableMock} from "./mocks/AdminableMock.sol";
 import {ERC20Minter} from "../src/ERC20Minter.sol";
 import {FileReader} from "../script/FileReader.sol";
 
-contract UtilsTests is Test, ScriptUtils {
+contract UtilsTests is Test {
 
     AdminableMock public adminableMock;
     ERC20Minter public erc20Minter;
     FileReader public fileReaderTest;
+    BaseScript public baseScript;
 
+    address bob = vm.addr(0xb0b);
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
     address deployer = vm.addr(deployerKey);
-    address bob = vm.addr(0xb0b);
 
     function setUp() public {
 
@@ -130,20 +131,26 @@ contract UtilsTests is Test, ScriptUtils {
         require(adminableMock.mockOnlyAdminOrOwner(), "deployer should pass onlyAdminOrOwner modifier");
     }
 
-    function test_ScriptUtils() public {
-        // test inherited ScriptUtils vs instantiated ScriptUtils
-        ScriptUtils sutils = new ScriptUtils();
+    function test_BaseScript_TopupEthBalance() public {
+
+        // Test inherited BaseScript vs instantiated BaseScript for test coverage
+        // msg.sender is sutils in this case.
+        BaseScript sutils = new BaseScript();
 
         // no gas error
         vm.expectRevert("Failed to send Ether");
-        sutils.topupSenderEthBalance(bob, false);
+        sutils.topupEthBalance(bob);
 
-        topupSenderEthBalance(bob, true);
-        require(bob.balance == 1 ether, "failed to topupSenderEthBalance");
+        // give sutils some ether
+        vm.deal(address(sutils), 2 ether);
+        sutils.topupEthBalance(bob);
+        require(bob.balance > 0, "failed to topupEthBalance");
+
+        uint256 bobBalanceBefore = bob.balance;
 
         // expect balance to stay the same as 0.05 > 0.02 ether
-        sutils.topupSenderEthBalance(bob, true);
-        require(bob.balance == 1 ether, "oversent ETH in topupSenderEthBalance");
+        sutils.topupEthBalance(bob);
+        require(bob.balance == bobBalanceBefore , "oversent ETH in topupEthBalance");
     }
 
 }

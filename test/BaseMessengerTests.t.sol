@@ -5,10 +5,11 @@ import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
+import {RouterFees} from "../script/RouterFees.sol";
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
 
 
-contract BaseMessenger_Tests is BaseTestEnvironment {
+contract BaseMessenger_Tests is BaseTestEnvironment, RouterFees {
 
     error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees);
     error NothingToWithdraw();
@@ -200,28 +201,44 @@ contract BaseMessenger_Tests is BaseTestEnvironment {
         vm.selectFork(ethForkId);
 
         uint64 randomChainSelector = 125;
+        uint256 _amount = 0.1 ether;
+        uint256 _gasLimit = 800_000;
 
-        vm.expectRevert(abi.encodeWithSelector(
-            DestinationChainNotAllowed.selector,
-            randomChainSelector
-        ));
-        receiverContract.sendMessagePayNative(
-            randomChainSelector, // _destinationChainSelector,
-            address(receiverContract), // _receiver,
-            string(message),
-            address(tokenL1),
-            0.1 ether,
-            800_000
-        );
+        vm.startBroadcast(deployerKey);
+        {
+            uint256 fees = getRouterFeesL1(
+                address(senderContract),
+                string(message),
+                address(tokenL1),
+                _amount,
+                _gasLimit
+            );
 
-        receiverContract.sendMessagePayNative(
-            BaseSepolia.ChainSelector, // _destinationChainSelector,
-            address(receiverContract), // _receiver,
-            string(message),
-            address(tokenL1),
-            0.1 ether,
-            800_000
-        );
+            tokenL1.approve(address(receiverContract), _amount);
+
+            vm.expectRevert(abi.encodeWithSelector(
+                DestinationChainNotAllowed.selector,
+                randomChainSelector
+            ));
+            receiverContract.sendMessagePayNative{value: fees}(
+                randomChainSelector, // _destinationChainSelector,
+                address(senderContract), // _receiver,
+                string(message),
+                address(tokenL1),
+                _amount,
+                _gasLimit
+            );
+
+            receiverContract.sendMessagePayNative{value: fees}(
+                BaseSepolia.ChainSelector, // _destinationChainSelector,
+                address(senderContract), // _receiver,
+                string(message),
+                address(tokenL1),
+                _amount,
+                _gasLimit
+            );
+        }
+        vm.stopBroadcast();
     }
 
     function test_BaseMessenger_L2_onlyAllowlistedDestinationChain() public {
@@ -229,28 +246,79 @@ contract BaseMessenger_Tests is BaseTestEnvironment {
         vm.selectFork(l2ForkId);
 
         uint64 randomChainSelector = 125;
+        uint256 _amount = 0.1 ether;
+        uint256 _gasLimit = 800_000;
 
-        vm.expectRevert(abi.encodeWithSelector(
-            DestinationChainNotAllowed.selector,
-            randomChainSelector
-        ));
-        senderContract.sendMessagePayNative(
-            randomChainSelector, // _destinationChainSelector,
-            address(receiverContract), // _receiver,
-            string(message),
-            address(tokenL2),
-            0.1 ether,
-            800_000
-        );
+        vm.startBroadcast(deployerKey);
+        {
+            uint256 fees = getRouterFeesL2(
+                address(receiverContract),
+                string(message),
+                address(tokenL2),
+                _amount,
+                _gasLimit
+            );
 
-        senderContract.sendMessagePayNative(
-            EthSepolia.ChainSelector, // _destinationChainSelector,
-            address(receiverContract), // _receiver,
-            string(message),
-            address(tokenL2),
-            0.1 ether,
-            800_000
-        );
+            tokenL2.approve(address(senderContract), _amount);
+
+            vm.expectRevert(abi.encodeWithSelector(
+                DestinationChainNotAllowed.selector,
+                randomChainSelector
+            ));
+            senderContract.sendMessagePayNative{value: fees}(
+                randomChainSelector, // _destinationChainSelector,
+                address(receiverContract), // _receiver,
+                string(message),
+                address(tokenL2),
+                _amount,
+                _gasLimit
+            );
+
+            senderContract.sendMessagePayNative{value: fees}(
+                EthSepolia.ChainSelector, // _destinationChainSelector,
+                address(receiverContract), // _receiver,
+                string(message),
+                address(tokenL2),
+                _amount,
+                _gasLimit
+            );
+        }
+    }
+
+    function test_BaseMessenger_L2_NotEnoughGasFees() public {
+
+        vm.selectFork(l2ForkId);
+
+        uint256 _amount = 0.1 ether;
+        uint256 _gasLimit = 800_000;
+
+        vm.startBroadcast(deployerKey);
+        {
+            uint256 fees = 0 ether;
+            uint256 feesExpected = getRouterFeesL2(
+                address(receiverContract), // _receiver,
+                string(message),
+                address(tokenL2),
+                _amount,
+                _gasLimit
+            );
+
+            tokenL2.approve(address(senderContract), _amount);
+
+            vm.expectRevert(abi.encodeWithSelector(
+                BaseMessengerCCIP.NotEnoughEthGasFees.selector,
+                fees,
+                feesExpected
+            ));
+            senderContract.sendMessagePayNative{value: fees}(
+                EthSepolia.ChainSelector, // _destinationChainSelector,
+                address(receiverContract), // _receiver,
+                string(message),
+                address(tokenL2),
+                _amount,
+                _gasLimit
+            );
+        }
     }
 
     function test_BaseMessenger_L1_onlyAllowlistedSourceChain() public {
@@ -381,24 +449,19 @@ contract BaseMessenger_Tests is BaseTestEnvironment {
         vm.selectFork(l2ForkId);
 
         uint256 execNonce = 0;
-        bytes memory messageWithSignature;
-        {
-            bytes memory depositMessage = encodeDepositIntoStrategyMsg(
+        // sign the message for EigenAgent to execute Eigenlayer command
+        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
+            bobKey,
+            block.chainid, // destination chainid where EigenAgent lives
+            address(strategyManager), // StrategyManager to approve + deposit
+            encodeDepositIntoStrategyMsg(
                 address(strategy),
                 address(tokenL1),
                 amount
-            );
-
-            // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature = signMessageForEigenAgentExecution(
-                bobKey,
-                block.chainid, // destination chainid where EigenAgent lives
-                address(strategyManager), // StrategyManager to approve + deposit
-                depositMessage,
-                execNonce,
-                expiry
-            );
-        }
+            ),
+            execNonce,
+            expiry
+        );
 
         // messageId (topic[1]): false as we don't know messageId yet
         vm.expectEmit(false, true, false, false);
@@ -422,11 +485,19 @@ contract BaseMessenger_Tests is BaseTestEnvironment {
         //     address feeToken,
         //     uint256 fees
         // );
-        senderContract.sendMessagePayNative(
+        senderContract.sendMessagePayNative{
+            value: getRouterFeesL2(
+                address(receiverContract),
+                string(messageWithSignature),
+                address(tokenL2),
+                0.1 ether,
+                999_000
+            )
+        }(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature),
-            address(BaseSepolia.BridgeToken), // token to send
+            address(tokenL2), // token to send
             0.1 ether, // test sending 0.1e18 tokens
             999_000 // use custom gasLimit for this function
         );
@@ -466,10 +537,10 @@ contract BaseMessenger_Tests is BaseTestEnvironment {
             BaseSepolia.ChainSelector, // destination chain
             address(senderContract),
             "dispatched call", // default message
-            address(EthSepolia.BridgeToken), // token to send
+            address(tokenL1), // token to send
             0 ether,
             address(0), // native gas for fees
-            0
+            400_000
         );
         // event MessageSent(
         //     bytes32 indexed messageId,
@@ -481,33 +552,49 @@ contract BaseMessenger_Tests is BaseTestEnvironment {
         //     address feeToken,
         //     uint256 fees
         // );
-        receiverContract.sendMessagePayNative(
+        receiverContract.sendMessagePayNative{
+            value: getRouterFeesL1(
+                address(senderContract),
+                string(messageWithSignature),
+                address(tokenL1),
+                0 ether,
+                400_000
+            )
+        }(
             BaseSepolia.ChainSelector, // destination chain
             address(senderContract),
             string(messageWithSignature),
-            address(EthSepolia.BridgeToken), // token to send
+            address(tokenL1), // token to send
             0 ether, // test sending 0 tokens
-            888_000 // use custom gasLimit for this function
+            400_000 // use custom gasLimit for this function
         );
 
         vm.expectEmit(false, true, false, false);
         emit BaseMessengerCCIP.MessageSent(
             bytes32(0x0),
-            BaseSepolia.ChainSelector, // destination chain
+            EthSepolia.ChainSelector, // destination chain
             address(senderContract),
             "dispatched call", // default message
             address(EthSepolia.BridgeToken), // token to send
             1 ether,
             address(0), // native gas for fees
-            0
+            400_000
         );
-        receiverContract.sendMessagePayNative(
-            BaseSepolia.ChainSelector, // destination chain
+        receiverContract.sendMessagePayNative{
+            value: getRouterFeesL1(
+                address(senderContract),
+                string(messageWithSignature),
+                address(tokenL1),
+                1 ether,
+                400_000
+            )
+        }(
+            EthSepolia.ChainSelector, // destination chain
             address(senderContract),
             string(messageWithSignature),
-            address(EthSepolia.BridgeToken), // token to send
+            address(tokenL1), // token to send
             1 ether, // test sending 1e18 tokens
-            888_000 // use custom gasLimit for this function
+            400_000 // use custom gasLimit for this function
         );
     }
 
