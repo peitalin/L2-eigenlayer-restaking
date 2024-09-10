@@ -11,6 +11,10 @@ import {IRestakingConnector} from "../interfaces/IRestakingConnector.sol";
 
 library EigenlayerMsgEncoders {
 
+    /// @dev Encodes a depositIntoStrategy() message for Eigenlayer's StrategyManager.sol contract
+    /// @param strategy Eigenlayer strategy to deposit into
+    /// @param token token associated with strategy
+    /// @param amount deposit amount
     function encodeDepositIntoStrategyMsg(
         address strategy,
         address token,
@@ -27,6 +31,8 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
+    /// @dev Encodes a queueWithdrawals() message for Eigenlayer's DelegationManager.sol contract
+    /// @param queuedWithdrawalParams withdrawal parameters for queueWithdrawals() function call
     function encodeQueueWithdrawalsMsg(
         IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
     ) public pure returns (bytes memory) {
@@ -40,6 +46,11 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
+    /// @dev Encodes params for a completeWithdrawal() call to Eigenlayer's DelegationManager.sol
+    /// @param withdrawal withdrawal parameters for completeWithdrawals() function call
+    /// @param tokensToWithdraw tokens to withdraw.
+    /// @param middlewareTimesIndex used for slashing. Not used yet.
+    /// @param receiveAsTokens determines whether to redeposit into Eigenlayer, or withdraw as tokens
     function encodeCompleteWithdrawalMsg(
         IDelegationManager.Withdrawal memory withdrawal,
         IERC20[] memory tokensToWithdraw,
@@ -77,6 +88,10 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
+    /// @dev Encodes params for a delegateTo() call to Eigenlayer's DelegationManager.sol
+    /// @param operator entity to delegate to
+    /// @param approverSignatureAndExpiry operator approver's signature to delegate to them
+    /// @param approverSalt salt to ensure message signature is unique
     function encodeDelegateTo(
         address operator,
         ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
@@ -95,21 +110,6 @@ library EigenlayerMsgEncoders {
         //         uint256 expiry;
         //     }
 
-        // 0000000000000000000000000000000000000000000000000000000000000020
-        // 0000000000000000000000000000000000000000000000000000000000000164
-        // 0xeea9064b                                                       [96] function selector
-        // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d412eb
-        // 00000000000000000000000071c6f7ed8c2d4925d0baf16f6a85bb1736d41333
-        // 00000000000000000000000000000000000000000000000000000000000000a0
-        // 0000000000000000000000000000000000000000000000000000000000000100
-        // 0000000000000000000000000000000000000000000000000000000000004444
-        // 0000000000000000000000000000000000000000000000000000000000000040
-        // 0000000000000000000000000000000000000000000000000000000000000000
-        // 0000000000000000000000000000000000000000000000000000000000000000
-        // 0000000000000000000000000000000000000000000000000000000000000040
-        // 0000000000000000000000000000000000000000000000000000000000000001
-        // 0000000000000000000000000000000000000000000000000000000000000000
-
         bytes memory message_bytes = abi.encodeWithSelector(
             // cast sig "delegateTo(address,(bytes,uint256),bytes32)" == 0xeea9064b
             IDelegationManager.delegateTo.selector,
@@ -120,6 +120,8 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
+    /// @dev Encodes params for a undelegate() call to Eigenlayer's DelegationManager.sol
+    /// @param staker to undelegate (in this case EigenAgent). Msg.sender must be EigenAgent, Operator, or delegation approver
     function encodeUndelegateMsg(address staker) public pure returns (bytes memory) {
         bytes memory message_bytes = abi.encodeWithSelector(
             // cast sig "undelegate(address)" == 0xda8be864
@@ -129,6 +131,8 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
+    /// @dev Encodes params to mint an EigenAgent from the AgentFactory.sol contract. Can be called by anyone.
+    /// @param recipient address to mint an EigenAgent to.
     function encodeMintEigenAgent(address recipient) public pure returns (bytes memory) {
 
         bytes memory message_bytes = abi.encodeWithSelector(
@@ -146,6 +150,12 @@ library EigenlayerMsgEncoders {
      *
     */
 
+    /// @dev withdrawalTransferRoot commits to a Eigenlayer withdrawalRoot, amount and agentOwner
+    /// @dev on L2 when first sending a completeWithdrawal() message so that when the withdrawan
+    /// @dev funds return from L2 later, the bridge can lookup the user to transfer funds to.
+    /// @param withdrawalRoot is calculate by Eigenlayer during queueWithdrawals, needed to completeWithdrawal
+    /// @param amount is the amount withdrawan
+    /// @param agentOwner is the owner of the EigenAgent who deposits and withdraws from Eigenlayer
     function calculateWithdrawalTransferRoot(
         bytes32 withdrawalRoot,
         uint256 amount,
@@ -155,6 +165,8 @@ library EigenlayerMsgEncoders {
         return keccak256(abi.encode(withdrawalRoot, amount, agentOwner));
     }
 
+    /// @dev encodes a message containing the withdrawalTransferRoot when sending message from L1 to L2
+    /// @param withdrawalTransferRoot is a hash of withdrawalRoot, amount, and agentOwner.
     function encodeHandleTransferToAgentOwnerMsg(
         bytes32 withdrawalTransferRoot
     ) public pure returns (bytes memory) {

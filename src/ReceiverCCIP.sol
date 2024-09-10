@@ -88,10 +88,16 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         restakingConnector = _restakingConnector;
     }
 
+    /// @dev Gets the amount refunded to prevent triggering a refund if admin manually refunds user.
+    /// @param messageId is the CCIP messageId
+    /// @return amount refunded
     function amountRefunded(bytes32 messageId) external view returns (uint256) {
         return amountRefundedToMessageIds[messageId];
     }
 
+    /// @dev This function sets amount refunded in case owner wants to refund a user manually.
+    /// @param messageId is the CCIP messageId
+    /// @param amountAfter is the amount refunded
     function setAmountRefundedToMessageId(bytes32 messageId, uint256 amountAfter) external onlyOwner {
         uint256 amountBefore = amountRefundedToMessageIds[messageId];
         amountRefundedToMessageIds[messageId] = amountAfter;
@@ -140,17 +146,19 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
         } catch (bytes memory customError) {
             // If there were bridged tokens (e.g. DepositIntoStrategy call)...
+            // and the deposit has not been manually refunded by an admin...
             if (
                 s_lastReceivedTokenAmount > 0 &&
                 s_lastReceivedTokenAddress != address(0) &&
                 amountRefundedToMessageIds[any2EvmMessage.messageId] <= 0
             ) {
-                // ...decode and catch EigenAgentExecutionError.
+                // ...then decode and catch the EigenAgentExecutionError
                 bytes4 errorSelector = FunctionSelectorDecoder.decodeErrorSelector(customError);
 
                 if (errorSelector == IRestakingConnector.EigenAgentExecutionError.selector) {
-                    // Mark messageId as refunded
+                    // ...mark messageId as refunded
                     amountRefundedToMessageIds[any2EvmMessage.messageId] = s_lastReceivedTokenAmount;
+                    // ...then initiate a refund back to L2
                     return _refundToSignerAfterExpiry(customError);
                 }
             }
@@ -159,15 +167,22 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         }
     }
 
-    /// @dev Allows users to manually execute failed EigenAgent execution messages until expiry.
-    /// After message expiry, manual executions that result in a EigenAgentExecutionError will
-    /// trigger a refund to the original sender back on L2
+    /**
+     * @dev Allows users to manually execute EigenAgent execution messages until expiry
+     * if the message fails because of gas spikes, or other temporary issues.
+     *
+     * After message expiry, manual executions that result in a EigenAgentExecutionError will
+     * trigger a refund to the original sender back on L2. This may happen for instance if an
+     * Operator goes offline when attempting to deposit.
+     *
+     * No other Eigenlayer function call bridges tokens, this is the main UX edgecase to cover.
+     */
     function _refundToSignerAfterExpiry(bytes memory customError) private {
 
         (
             address signer,
             uint256 expiry
-        ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
+        ) = FunctionSelectorDecoder.decodeEigenAgentExecutionErrorParams(customError);
 
         if (block.timestamp > expiry) {
             // If message has expired, trigger CCIP call to bridge funds back to L2 signer
@@ -191,6 +206,12 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         }
     }
 
+    /**
+     * @dev This function is called only by this contract (marked external for try/catch feature).
+     * @notice This function matches the on function selector, then forwards CCIP messages for
+     * Eigenlayer to the RestakingConnector which will deserialize the rest of the message and
+     * forward it to the user's EigenAgent for execution.
+     */
     function dispatchMessageToEigenAgent(
         Client.Any2EVMMessage memory any2EvmMessage,
         address token,
@@ -262,7 +283,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             } else {
                 /// Otherwise if `receiveAsTokens == false`, withdrawal is redeposited in Eigenlayer
                 /// as shares, re-delegated to a new Operator as part of the `undelegate` flow.
-                /// We do not need to do anything in thise case.
+                /// We do not need to do anything in this case.
             }
         }
 

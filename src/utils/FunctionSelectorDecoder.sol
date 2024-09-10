@@ -19,23 +19,29 @@ library FunctionSelectorDecoder {
         }
     }
 
+    /// @dev decodes error selectors. Used to catch EigenAgentExecutionError to refund failed deposits on L1.
     function decodeErrorSelector(bytes memory customError)
         public
         pure
         returns (bytes4 errorSelector)
     {
+        //////////////////////// Message offsets //////////////////////////
         // [59b170e3]0000000000000000000000004ef1575822436f6fc6935aa3f025c7ea [32]
-        // bytes4 takes the leading 4 bytes of the 32 byte word (ignoring everything to the right)
+        // bytes4 takes the leading 4 bytes of the 32 byte word.
         assembly {
             errorSelector := mload(add(customError, 32))
         }
     }
 
-    function decodeEigenAgentExecutionError(bytes memory customError)
+    /// @dev decodes params associated with EigenAgentExecutionError
+    /// @return signer the original signer of the message
+    /// @return expiry signature expiry
+    function decodeEigenAgentExecutionErrorParams(bytes memory customError)
         public
         pure
         returns (address signer, uint256 expiry)
     {
+        //////////////////////// Message offsets //////////////////////////
         // 59b170e3                                                         [32]
         // 0000000000000000000000004ef1575822436f6fc6935aa3f025c7eaedce67a4 [36] signer
         // 0000000000000000000000000000000000000000000000000000000066dc8444 [68] expiry
@@ -45,9 +51,6 @@ library FunctionSelectorDecoder {
             signer := mload(add(customError, 36))
             expiry := mload(add(customError, 68))
         }
-
-        // bytes calldata _data = customError;
-        // ( signer, expiry) = abi.decode(_data[4:], (address, uint256));
     }
 }
 

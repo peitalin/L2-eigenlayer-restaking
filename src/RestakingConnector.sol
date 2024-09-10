@@ -59,8 +59,7 @@ contract RestakingConnector is
 
         agentFactory = newAgentFactory;
 
-        // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
-        // [gas: 268_420]
+        // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48 // [gas: 268_420]
         _gasLimitsForFunctionSelectors[0xd8a85b48] = 290_000;
 
         __Adminable_init();
@@ -75,6 +74,7 @@ contract RestakingConnector is
         return _receiverCCIP;
     }
 
+    /// @param newReceiverCCIP address of the ReceiverCCIP contract.
     function setReceiverCCIP(address newReceiverCCIP) public onlyOwner {
         _receiverCCIP = newReceiverCCIP;
     }
@@ -83,6 +83,7 @@ contract RestakingConnector is
         return address(agentFactory);
     }
 
+    /// @param newAgentFactory address of the AgentFactory contract.
     function setAgentFactory(address newAgentFactory) public onlyOwner {
         if (newAgentFactory == address(0))
             revert AddressZero("AgentFactory cannot be address(0)");
@@ -97,9 +98,16 @@ contract RestakingConnector is
      *
     */
 
-    // Mints an EigenAgent before depositing if a user does not already have one.
-    // If the user already has an EigenAgent this call will continue depositing
-    // It will not mint a new EigenAgent if a user already has one. Users can only own one.
+    /**
+     * @dev Mints an EigenAgent before depositing into Eigenlayer if a user
+     * does not already have one. Users can only own one EigenAgent at a time.
+     * If the user already has an EigenAgent this call will continue depositing,
+     * It will not mint a new EigenAgent if a user already has one.
+     *
+     * Errors with EigenAgentExecutionError(signer, expiry) error if there is an issue
+     * retrieving an EigenAgent, spawning an EigenAgent, or depositing into Eigenlayer,
+     * allowing the caller (ReceiverCCIP) to handle the error and refund the user if necessary.
+     */
     function depositWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
 
         (
@@ -129,7 +137,7 @@ contract RestakingConnector is
                 _receiverCCIP,
                 address(eigenAgent),
                 amount
-            );
+                );
 
             try eigenAgent.executeWithSignature(
                 address(strategyManager), // strategyManager
@@ -149,12 +157,20 @@ contract RestakingConnector is
 
     }
 
+    /**
+     * @dev Manually mints an EigenAgent. Users can only own one EigenAgent at a time.
+     * It will not mint a new EigenAgent if a user already has one.
+     */
     function mintEigenAgent(bytes memory message) public onlyReceiverCCIP {
         // Mint a EigenAgent manually, no signature required.
         address recipient = decodeMintEigenAgent(message);
         agentFactory.tryGetEigenAgentOrSpawn(recipient);
     }
 
+    /**
+     * @dev Forwards a queueWithdrawals message to Eigenlayer to
+     * the user's EigenAgent to execute on the user's behalf.
+     */
     function queueWithdrawalsWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
         (
             // original message
@@ -180,8 +196,23 @@ contract RestakingConnector is
         );
     }
 
+    /**
+     * @dev Forwards a completeWithdrawal message to Eigenlayer to the user's EigenAgent to execute.
+     * @return receiveAsTokens determines whether Eigenlayer returns tokens to the EigenAgent or
+     * re-deposits them into Eigenlayer strategy vault as part of a re-delegate and re-deposit flow.
+     * If receiveAsTokens is true, tokens are returned then the bridge will bridge the withdrawal
+     * from L2 back to L1 to the EigenAgent's owner.
+     * @param withdrawalAmount is the amount withdrawn from Eigenlayer
+     * @param withdrawalToken is the token withdrawn from Eigenlayer
+     * @param messageForL2 encodes a "transferToAgentOwner" message to L2 to transfer the withdrawn
+     * funds back to the EigenAgent's owner.
+     * @param withdrawalTransferRoot refers to the withdrawalTransferRoot commitment set in L2 contract
+     * when completeWithdrawal message was initially dispatched on L2. This ensures that the withdrawn
+     * funds to L2 will be transferred to the EigenAgent's owner and cannot be tampered with.
+     */
     function completeWithdrawalWithEigenAgent(bytes memory messageWithSignature)
-        public onlyReceiverCCIP
+        public
+        onlyReceiverCCIP
         returns (
             bool receiveAsTokens,
             uint256 withdrawalAmount,
@@ -251,7 +282,7 @@ contract RestakingConnector is
                 );
             }
         }
-        //// Named return variables are defined in the function signature. This line is not needed.
+        //// Named return variables are defined in the function signature.
         // return (
         //     receiveAsTokens,
         //     withdrawalAmount,
@@ -261,6 +292,7 @@ contract RestakingConnector is
         // );
     }
 
+    /// @dev Forwards a delegateTo message to Eigenlayer to the user's EigenAgent to execute.
     function delegateToWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
         (
             // original message
@@ -288,6 +320,7 @@ contract RestakingConnector is
         );
     }
 
+    /// @dev Forwards a undelegate message to Eigenlayer to the user's EigenAgent to execute.
     function undelegateWithEigenAgent(bytes memory messageWithSignature) public onlyReceiverCCIP {
         (
             // original message
@@ -320,15 +353,26 @@ contract RestakingConnector is
      *
     */
 
+    /**
+     * @dev Retreives the block.number where queueWithdrawal occured. Needed as the time when
+     * queueWithdrawal message is dispatched differs from the time the message executes on L1.
+     * @param staker is the EigenAgent staking into Eigenlayer
+     * @param nonce is the withdrawal nonce Eigenlayer keeps track of in DelegationManager.sol
+     */
     function getQueueWithdrawalBlock(address staker, uint256 nonce) public view returns (uint256) {
         return _withdrawalBlock[staker][nonce];
     }
 
-    /// @dev Checkpoint the actual block.number before queueWithdrawal happens
-    /// When dispatching a L2 -> L1 message to queueWithdrawal, the block.number
-    /// varies depending on how long it takes to bridge.
-    /// We need the block.number to in the following step to
-    /// create the withdrawalRoot used to completeWithdrawal.
+    /**
+     * @dev Checkpoint the actual block.number before queueWithdrawal happens
+     * When dispatching a L2 -> L1 message to queueWithdrawal, the block.number varies depending
+     * on how long it takes to bridge. We need the block.number to in the following step to
+     * create the withdrawalRoot used to completeWithdrawal.
+     * @param staker is the EigenAgent staking into Eigenlayer
+     * @param nonce is the withdrawal nonce Eigenlayer keeps track of in DelegationManager.sol
+     * accessible by calling cumulativeWithdrawalsQueued()
+     * @param blockNumber is the block.number where withdrawal is queued. Needed to completeWithdrawal
+     */
     function setQueueWithdrawalBlock(
         address staker,
         uint256 nonce,
@@ -339,7 +383,8 @@ contract RestakingConnector is
     }
 
     function getEigenlayerContracts()
-        public view
+        public
+        view
         returns (IDelegationManager, IStrategyManager, IStrategy)
     {
         return (delegationManager, strategyManager, strategy);
@@ -365,6 +410,12 @@ contract RestakingConnector is
         strategy = _strategy;
     }
 
+    /**
+     * @dev Sets gas limits for various functions. Requires an array of bytes4 function selectors and
+     * a corresponding array of gas limits.
+     * @param functionSelectors list of bytes4 function selectors
+     * @param gasLimits list of gasLimits to set the gasLimits for functions to call
+     */
     function setGasLimitsForFunctionSelectors(
         bytes4[] memory functionSelectors,
         uint256[] memory gasLimits
@@ -378,6 +429,11 @@ contract RestakingConnector is
         }
     }
 
+    /**
+     * @dev Retrieves estimated gasLimits for different L2 restaking functions, e.g:
+     * "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
+     * @param functionSelector bytes4 functionSelector to get estimated gasLimits for.
+     */
     function getGasLimitForFunctionSelector(bytes4 functionSelector) public view returns (uint256) {
         uint256 gasLimit = _gasLimitsForFunctionSelectors[functionSelector];
         if (gasLimit != 0) {

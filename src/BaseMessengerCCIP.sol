@@ -47,12 +47,18 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     string internal s_lastReceivedText;
 
     mapping(uint64 => bool) public allowlistedDestinationChains;
-
     mapping(uint64 => bool) public allowlistedSourceChains;
-
     mapping(address => bool) public allowlistedSenders;
 
     IERC20 internal s_linkToken;
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+
+    uint256[42] private __gap;
 
     constructor(
         address _router,
@@ -154,7 +160,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
             if (fees > msg.value)
                 revert NotEnoughEthGasFees(msg.value, fees);
         } else {
-            // when contract initiates refund
+            // when contract initiates refund, or transfers withdrawals back to L1
             if (fees > address(this).balance)
                 revert NotEnoughBalance(address(this).balance, fees);
         }
@@ -207,6 +213,8 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
     /// @notice Fallback function to allow the contract to receive Ether.
     receive() external payable {}
+
+    fallback() external payable {}
 
     /// @notice Allows the contract owner to withdraw the entire balance of Ether from the contract.
     /// @param _beneficiary The address to which the Ether should be sent.

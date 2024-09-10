@@ -31,6 +31,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
         return senderHooks;
     }
 
+    /// @param _senderHooks address of the SenderHooks contract.
     function setSenderHooks(ISenderHooks _senderHooks) external onlyOwner {
         require(address(_senderHooks) != address(0), "_senderHooks cannot be address(0)");
         senderHooks = _senderHooks;
@@ -43,6 +44,11 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
      *
     */
 
+    /**
+     * @dev ccipReceiver is called when a CCIP bridge contract receives a CCIP message.
+     * This contract allows us to define custom logic to handle outboound Eigenlayer messages
+     * for instance, committing a withdrawalTransferRoot on outbound completeWithdrawal messages.
+     */
     function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage)
         internal
         override
@@ -72,6 +78,12 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
         );
     }
 
+    /**
+     * @dev This function catches outbound completeWithdrawal messages to L1 Eigenlayer, and
+     * sets a withdrawalTransferRoot commitment that contains info on the agentOwner and amount.
+     * This is so when the SenderCCIP bridge receives the withdrawn funds from L1, it knows who to
+     * transfer the funds to.
+     */
     function _afterCCIPReceiveMessage(Client.Any2EVMMessage memory any2EvmMessage)
         internal
         returns (string memory textMsg)
@@ -137,12 +149,13 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
         }
 
         bytes memory message = abi.encode(_text);
+        uint256 gasLimit;
 
-        bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
-
-        uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(functionSelector);
         if (_overrideGasLimit > 0) {
             gasLimit = _overrideGasLimit;
+        } else {
+            bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
+            gasLimit = senderHooks.getGasLimitForFunctionSelector(functionSelector);
         }
 
         senderHooks.beforeSendCCIPMessage(message, _token);
