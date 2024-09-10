@@ -32,7 +32,7 @@ contract RedepositScript is BaseScript {
 
     function _run(bool isTest) private {
 
-        readContractsFromDisk();
+        readContractsFromDisk(isTest);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
@@ -116,8 +116,6 @@ contract RedepositScript is BaseScript {
                 execNonce,
                 sigExpiry
             );
-
-            topupEthBalance(address(senderContract));
 
             uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
                 IDelegationManager.completeQueuedWithdrawal.selector

@@ -13,28 +13,24 @@ contract MintEigenAgentScript is BaseScript {
     IEigenAgent6551 public eigenAgent;
 
     function run() public {
-
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
         aliceKey = deployerKey;
         alice = deployer;
-
-        return _run();
+        return _run(false);
     }
 
     function mockrun(uint256 _mockKey) public {
-
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
         aliceKey = _mockKey;
         alice = vm.addr(aliceKey);
-
-        return _run();
+        return _run(true);
     }
 
-    function _run() public {
+    function _run(bool isTest) public {
 
-        readContractsFromDisk();
+        readContractsFromDisk(isTest);
 
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployerKey);

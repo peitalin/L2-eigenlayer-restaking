@@ -121,6 +121,8 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
             address(new RestakingConnector())
         );
 
+        receiverProxy.setRestakingConnector(restakingConnectorProxy);
+
         restakingConnectorProxy.setAgentFactory(address(agentFactoryProxy));
         restakingConnectorProxy.setReceiverCCIP(address(receiverProxy));
 
@@ -151,7 +153,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
             "upgrade agentFactory: missing restakingConnector"
         );
 
-        // Update registry6551 address, all other proxies stay the same
+        // Update addresses if need be (all proxies stay the same)
         if (!isTest) {
             saveReceiverBridgeContracts(
                 address(receiverProxy),

@@ -31,7 +31,7 @@ contract CompleteWithdrawalScript is BaseScript {
 
     function _run(bool isTest) private {
 
-        readContractsFromDisk();
+        readContractsFromDisk(isTest);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
@@ -133,15 +133,26 @@ contract CompleteWithdrawalScript is BaseScript {
                 );
             }
 
-            topupEthBalance(address(senderContract));
+            uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
+                IDelegationManager.completeQueuedWithdrawal.selector
+            );
+            // gas: 415,166
 
-            senderContract.sendMessagePayNative(
+            senderContract.sendMessagePayNative{
+                value: getRouterFeesL2(
+                    address(receiverContract),
+                    string(messageWithSignature),
+                    address(tokenL2),
+                    0,
+                    gasLimit // only sending message, not bridging tokens
+                )
+            }(
                 EthSepolia.ChainSelector, // destination chain
                 address(receiverContract),
                 string(messageWithSignature),
                 address(tokenL2),
                 0, // only sending message, not bridging tokens
-                0 // use default gasLimit for this function
+                gasLimit
             );
 
             vm.stopBroadcast();

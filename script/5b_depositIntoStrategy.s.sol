@@ -8,6 +8,7 @@ import {BaseScript} from "./BaseScript.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
 
+
 contract DepositIntoStrategyScript is BaseScript {
 
     IEigenAgent6551 public eigenAgent;
@@ -24,11 +25,10 @@ contract DepositIntoStrategyScript is BaseScript {
 
     function _run(bool isTest) private {
 
-        readContractsFromDisk();
+        readContractsFromDisk(isTest);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
-
 
         TARGET_CONTRACT = address(strategyManager);
 
@@ -60,39 +60,25 @@ contract DepositIntoStrategyScript is BaseScript {
 
         uint256 amount = 0.00797 ether;
         uint256 expiry = block.timestamp + 45 minutes;
-        bytes memory depositMessage;
-        bytes memory messageWithSignature;
 
-        {
-            depositMessage = encodeDepositIntoStrategyMsg(
+        // sign the message for EigenAgent to execute Eigenlayer command
+        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
+            deployerKey,
+            EthSepolia.ChainId, // destination chainid where EigenAgent lives
+            TARGET_CONTRACT, // StrategyManager is the target
+            encodeDepositIntoStrategyMsg(
                 address(strategy),
                 address(tokenL1),
                 amount
-            );
+            ),
+            execNonce,
+            expiry
+        );
 
-            // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature = signMessageForEigenAgentExecution(
-                deployerKey,
-                EthSepolia.ChainId, // destination chainid where EigenAgent lives
-                TARGET_CONTRACT, // StrategyManager is the target
-                depositMessage,
-                execNonce,
-                expiry
-            );
-        }
-
-        // Check L2 CCIP-BnM balances
-        if (tokenL2.balanceOf(deployer) < 1 ether || isTest) {
-            IERC20_CCIPBnM(address(tokenL2)).drip(deployer);
-        }
-
-        topupEthBalance(address(senderContract));
         // token approval
         tokenL2.approve(address(senderContract), amount);
-        // get ETH fees to send
 
-        uint256 gasLimit = 800_000;
-        // set gasLimit = 0 to use default values
+        uint256 gasLimit = 600_000; // gas: 564,969
 
         senderContract.sendMessagePayNative{
             value: getRouterFeesL2(

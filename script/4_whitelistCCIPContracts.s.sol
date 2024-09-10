@@ -81,7 +81,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         gasLimits[1] = 700_000; // mintEigenAgent                    [gas: 1,500,000?]
         gasLimits[2] = 580_000; // queueWithdrawals                  [gas: 529,085]
         gasLimits[3] = 840_000; // completeWithdrawal + transferToL2 [gas: 791,717]
-        gasLimits[4] = 600_000; // delegateTo                        [gas: 550,292]
+        gasLimits[4] = 650_000; // delegateTo                        [gas: 550,292]
         gasLimits[5] = 400_000; // undelegate                        [gas: ?]
 
         bytes4[] memory functionSelectors = new bytes4[](6);

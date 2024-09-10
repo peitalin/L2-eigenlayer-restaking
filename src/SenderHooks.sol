@@ -69,10 +69,12 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         _senderCCIP = newSenderCCIP;
     }
 
-    /// @param withdrawlTransferRoot is calculated when dispatching a completeWithdrawal message.
+    /// @param withdrawalTransferRoot is calculated when dispatching a completeWithdrawal message.
     function isWithdrawalTransferRootSpent(bytes32 withdrawalTransferRoot)
-        public view
-        returns (bool) {
+        public
+        view
+        returns (bool)
+    {
         return withdrawalTransferRootsSpent[withdrawalTransferRoot];
     }
 
@@ -82,7 +84,8 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
     function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
         public
         pure
-        returns (bytes32) {
+        returns (bytes32)
+    {
         return keccak256(abi.encode(withdrawal));
     }
 
@@ -106,11 +109,10 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * It receives a withdrawalTransferRoot and matches it with the committed withdrawalTransferRoot
      * to verify which user to transfer the withdrawan funds to.
      */
-    function handleTransferToAgentOwner(bytes memory message) public returns (
-        address,
-        uint256
-    ) {
-
+    function handleTransferToAgentOwner(bytes memory message)
+        public
+        returns (address, uint256)
+    {
         TransferToAgentOwnerMsg memory transferToAgentOwnerMsg = decodeTransferToAgentOwnerMsg(message);
 
         bytes32 withdrawalTransferRoot = transferToAgentOwnerMsg.withdrawalTransferRoot;
@@ -157,10 +159,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         }
     }
 
-    function _commitWithdrawalTransferRootInfo(
-        bytes memory message,
-        address tokenL2
-    ) private {
+    function _commitWithdrawalTransferRootInfo(bytes memory message, address tokenL2) private {
 
         require(
             tokenL2 != address(0),
@@ -212,7 +211,8 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
     }
 
     function getWithdrawalTransferCommitment(bytes32 withdrawalTransferRoot)
-        external view
+        external
+        view
         returns (ISenderHooks.WithdrawalTransfer memory)
     {
         return withdrawalTransferCommitments[withdrawalTransferRoot];
@@ -244,15 +244,15 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * delegateTo(address,(bytes,uint256),bytes32) == 0xeea9064b
      * undelegate(address) == 0xda8be864
      * @param functionSelector bytes4 functionSelector to get estimated gasLimits for.
+     * @return gasLimit a default gasLimit of 400_000 functionSelector parameter finds no matches.
      */
-    function getGasLimitForFunctionSelector(bytes4 functionSelector) public view returns (uint256) {
+    function getGasLimitForFunctionSelector(bytes4 functionSelector)
+        public
+        view
+        returns (uint256)
+    {
         uint256 gasLimit = _gasLimitsForFunctionSelectors[functionSelector];
-        if (gasLimit != 0) {
-            return gasLimit;
-        } else {
-            // default gasLimit
-            return 400_000;
-        }
+        return (gasLimit > 0) ? gasLimit : 400_000;
     }
 }
 

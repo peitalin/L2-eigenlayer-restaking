@@ -35,19 +35,21 @@ contract UndelegateScript is BaseScript {
         address operator = vm.addr(operatorKey);
         address TARGET_CONTRACT = address(delegationManager);
 
-        readContractsFromDisk();
+        readContractsFromDisk(isTest);
 
         vm.selectFork(ethForkId);
 
         // Get User's EigenAgent
         IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(deployer);
+
+        require(address(eigenAgent) != address(0), "User must have an EigenAgent");
         require(
             strategyManager.stakerStrategyShares(address(eigenAgent), strategy) >= 0,
             "EigenAgent has no deposit in Eigenlayer"
         );
 
         if (!isTest) {
-            require(delegationManager.isOperator(operator), "operator must be registered");
+            require(delegationManager.isOperator(operator), "Operator must be registered");
             require(
                 delegationManager.delegatedTo(address(eigenAgent)) == address(operator),
                 "EigenAgent not delegatedTo any operators"
@@ -90,8 +92,6 @@ contract UndelegateScript is BaseScript {
             execNonce,
             sig_expiry
         );
-
-        topupEthBalance(address(senderContract));
 
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
             IDelegationManager.undelegate.selector

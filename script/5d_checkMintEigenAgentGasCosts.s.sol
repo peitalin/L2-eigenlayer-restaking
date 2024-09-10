@@ -9,8 +9,16 @@ import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 contract CheckMintEigenAgentGasCostsScript is BaseScript {
 
     function run() public {
+        return _run(false);
+    }
 
-        readContractsFromDisk();
+    function mockrun() public {
+        return _run(true);
+    }
+
+    function _run(bool isTest) private {
+
+        readContractsFromDisk(isTest);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);

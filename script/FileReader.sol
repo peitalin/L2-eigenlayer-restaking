@@ -269,8 +269,8 @@ contract FileReader is Script {
         address _strategy = stdJson.readAddress(withdrawalData, ".inputs.strategy");
         address _withdrawer = stdJson.readAddress(withdrawalData, ".inputs.withdrawer");
         address _delegatedTo = stdJson.readAddress(withdrawalData, ".inputs.delegatedTo");
-        ///// NOTE: Wrong withdrawalRoot because the written startBlock is wrong
-        ///// (written when bridging is initiated), not during queueWithdrawal tx in L1
+        ///// Note: Wrong startBlock produces wrong withdrawalRoots.
+        ///// (startBlock is during withdrawal on L1), not when first sending message on L2
         uint32 _startBlock = uint32(stdJson.readUint(withdrawalData, ".inputs.startBlock"));
         // bytes32 _withdrawalRoot = stdJson.readBytes32(withdrawalData, ".outputs.withdrawalRoot");
         // bytes32 _withdrawalTransferRoot = stdJson.readBytes32(withdrawalData, ".outputs.withdrawalTransferRoot");

@@ -31,7 +31,7 @@ contract QueueWithdrawalScript is BaseScript {
 
     function _run(bool isTest) private {
 
-        readContractsFromDisk();
+        readContractsFromDisk(isTest);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
@@ -50,16 +50,6 @@ contract QueueWithdrawalScript is BaseScript {
             // mock deploy on L2 Fork
             DeploySenderOnL2Script deployOnL2Script = new DeploySenderOnL2Script();
             (senderContract,) = deployOnL2Script.mockrun();
-
-        } else {
-            // otherwise if running the script, read the existing contracts on Sepolia
-            senderContract = readSenderContract();
-            (
-                receiverContract,
-                restakingConnector
-            ) = readReceiverRestakingConnector();
-
-            agentFactory = readAgentFactory();
         }
 
         ///////////////////////////
@@ -72,13 +62,12 @@ contract QueueWithdrawalScript is BaseScript {
             if (isTest) {
                 vm.prank(deployer);
                 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
-                execNonce = 0;
             } else {
                 revert("User must have existing deposit in Eigenlayer + EigenAgent");
             }
-        } else {
-            execNonce = eigenAgent.execNonce();
         }
+
+        execNonce = isTest ? 0 : eigenAgent.execNonce();
 
         ///////////////////////////
         // Parameters
@@ -136,18 +125,17 @@ contract QueueWithdrawalScript is BaseScript {
             expiry
         );
 
-        /////////////////////////////////////////////////////////////////
-        /////// Broadcast to L2
-        /////////////////////////////////////////////////////////////////
+        ///////////////////////////
+        // Broadcast to L2
+        ///////////////////////////
 
         vm.selectFork(l2ForkId);
         vm.startBroadcast(deployerKey);
 
-        topupEthBalance(address(senderContract));
-
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
             IDelegationManager.queueWithdrawals.selector
         );
+        // gas: 315,798
 
         senderContract.sendMessagePayNative{
             value: getRouterFeesL2(

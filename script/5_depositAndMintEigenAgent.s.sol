@@ -2,7 +2,6 @@
 pragma solidity 0.8.22;
 
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
 import {EthSepolia} from "./Addresses.sol";
@@ -29,7 +28,7 @@ contract DepositAndMintEigenAgentScript is BaseScript {
 
     function _run(bool isTest) private {
 
-        readContractsFromDisk();
+        readContractsFromDisk(isTest);
 
         TARGET_CONTRACT = address(strategyManager);
 
@@ -58,16 +57,6 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         // Make sure we are on BaseSepolia Fork
         vm.selectFork(l2ForkId);
         vm.startBroadcast(deployerKey);
-
-        // Check L2 CCIP-BnM balances
-        if (tokenL2.balanceOf(deployer) < 1 ether) {
-            IERC20_CCIPBnM(address(tokenL2)).drip(deployer);
-        }
-        if (tokenL2.balanceOf(address(senderContract)) < 1 ether) {
-            IERC20_CCIPBnM(address(tokenL2)).drip(address(senderContract));
-        }
-
-        topupEthBalance(address(senderContract));
 
         uint256 amount = 0.0619 ether;
         uint256 expiry = block.timestamp + 1 hours;

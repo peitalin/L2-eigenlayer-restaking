@@ -28,7 +28,7 @@ contract DelegateToScript is BaseScript {
 
     function _run(bool isTest) private {
 
-        readContractsFromDisk();
+        readContractsFromDisk(isTest);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
@@ -75,13 +75,12 @@ contract DelegateToScript is BaseScript {
         );
 
         uint256 execNonce = eigenAgent.execNonce();
-        uint256 sig_expiry = block.timestamp + 1 hours;
+        uint256 sigExpiry = block.timestamp + 1 hours;
 
         /////////////////////////////////////////////////////////////////
         /////// Broadcast DelegateTo message on L2
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
-
         vm.startBroadcast(deployerKey);
 
         // Operator Approver signs the delegateTo call
@@ -95,7 +94,7 @@ contract DelegateToScript is BaseScript {
                 operator, // operator
                 operator, // _delegationApprover,
                 approverSalt,
-                sig_expiry,
+                sigExpiry,
                 address(delegationManager), // delegationManagerAddr
                 EthSepolia.ChainId
             );
@@ -105,7 +104,7 @@ contract DelegateToScript is BaseScript {
 
             approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
                 signature: signature1,
-                expiry: sig_expiry
+                expiry: sigExpiry
             });
         }
 
@@ -120,14 +119,13 @@ contract DelegateToScript is BaseScript {
                 approverSalt
             ),
             execNonce,
-            sig_expiry
+            sigExpiry
         );
 
-        topupEthBalance(address(senderContract));
-
-        uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
-            IDelegationManager.delegateTo.selector
-        );
+        // uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
+        //     IDelegationManager.delegateTo.selector
+        // );
+        uint gasLimit = 750_000;
 
         senderContract.sendMessagePayNative{
             value: getRouterFeesL2(

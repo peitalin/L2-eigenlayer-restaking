@@ -433,14 +433,14 @@ contract RestakingConnector is
      * @dev Retrieves estimated gasLimits for different L2 restaking functions, e.g:
      * "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
      * @param functionSelector bytes4 functionSelector to get estimated gasLimits for.
+     * @return gasLimit a default gasLimit of 400_000 functionSelector parameter finds no matches.
      */
-    function getGasLimitForFunctionSelector(bytes4 functionSelector) public view returns (uint256) {
+    function getGasLimitForFunctionSelector(bytes4 functionSelector)
+        public
+        view
+        returns (uint256)
+    {
         uint256 gasLimit = _gasLimitsForFunctionSelectors[functionSelector];
-        if (gasLimit != 0) {
-            return gasLimit;
-        } else {
-            // default gasLimit
-            return 400_000;
-        }
+        return (gasLimit > 0) ? gasLimit : 400_000;
     }
 }
