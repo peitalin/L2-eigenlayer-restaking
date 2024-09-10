@@ -19,6 +19,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     error SourceChainNotAllowed(uint64 sourceChainSelector);
     error SenderNotAllowed(address sender);
     error InvalidReceiverAddress();
+    error NotEnoughEthGasFees(uint256 setGasFees, uint256 requiredGasFees);
 
     event MessageSent(
         bytes32 indexed messageId,
@@ -46,12 +47,18 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     string internal s_lastReceivedText;
 
     mapping(uint64 => bool) public allowlistedDestinationChains;
-
     mapping(uint64 => bool) public allowlistedSourceChains;
-
     mapping(address => bool) public allowlistedSenders;
 
     IERC20 internal s_linkToken;
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+
+    uint256[42] private __gap;
 
     constructor(
         address _router,
@@ -129,6 +136,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         uint256 _overrideGasLimit
     )
         external
+        payable
         onlyAllowlistedDestinationChain(_destinationChainSelector)
         validateReceiver(_receiver)
         returns (bytes32 messageId)
@@ -147,9 +155,21 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
         uint256 fees = router.getFee(_destinationChainSelector, evm2AnyMessage);
 
-        if (fees > address(this).balance)
-            revert NotEnoughBalance(address(this).balance, fees);
+        if (msg.sender != address(this)) {
+            // user sends ETH to the router
+            if (fees > msg.value)
+                revert NotEnoughEthGasFees(msg.value, fees);
+        } else {
+            // when contract initiates refund, or transfers withdrawals back to L1
+            if (fees > address(this).balance)
+                revert NotEnoughBalance(address(this).balance, fees);
+        }
 
+        // transfer tokens from user to this contract
+        if (_amount >= 0 && msg.sender != address(this)) {
+            IERC20(_token).transferFrom(msg.sender, address(this), _amount);
+        }
+        // then approve router to move tokens from this contract
         IERC20(_token).approve(address(router), _amount);
 
         messageId = router.ccipSend{value: fees}(
@@ -194,6 +214,8 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     /// @notice Fallback function to allow the contract to receive Ether.
     receive() external payable {}
 
+    fallback() external payable {}
+
     /// @notice Allows the contract owner to withdraw the entire balance of Ether from the contract.
     /// @param _beneficiary The address to which the Ether should be sent.
     function withdraw(address _beneficiary) public onlyOwner {
@@ -203,7 +225,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         if (!sent) revert FailedToWithdrawEth(msg.sender, _beneficiary, amount);
     }
 
-    /// @param _beneficiary he address to which the tokens will be sent.
+    /// @param _beneficiary address to which the tokens will be sent.
     /// @param _token contract address of the ERC20 token to be withdrawn.
     function withdrawToken(
         address _beneficiary,
@@ -213,5 +235,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         if (amount == 0) revert NothingToWithdraw();
         IERC20(_token).safeTransfer(_beneficiary, amount);
     }
+
+
 }
 

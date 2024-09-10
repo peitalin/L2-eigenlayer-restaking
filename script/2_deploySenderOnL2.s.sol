@@ -3,7 +3,6 @@ pragma solidity 0.8.22;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {EmptyContract} from "eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
 import {FileReader} from "./FileReader.sol";
 import {Script} from "forge-std/Script.sol";
@@ -99,7 +98,8 @@ contract DeploySenderOnL2Script is Script, FileReader {
             saveSenderBridgeContracts(
                 address(senderProxy),
                 address(senderHooksProxy),
-                address(proxyAdmin)
+                address(proxyAdmin),
+                FILEPATH_BRIDGE_CONTRACTS_L2
             );
         }
 

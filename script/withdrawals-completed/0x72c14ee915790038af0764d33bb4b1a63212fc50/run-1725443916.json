@@ -15,7 +15,7 @@
     "withdrawer": "0x72C14ee915790038af0764d33Bb4B1a63212fC50"
   },
   "outputs": {
-    "withdrawalAgentOwnerRoot": "0xa4405622fa53b0160d9710298c813d36981f81b404141a172709ed95666a2056",
+    "withdrawalTransferRoot": "0xa4405622fa53b0160d9710298c813d36981f81b404141a172709ed95666a2056",
     "withdrawalRoot": "0xb16f783f2e091433d4b576cab957f8f9a0a51f302e688270bf70f3f2952ea51c"
   }
 }

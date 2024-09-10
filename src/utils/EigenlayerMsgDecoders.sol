@@ -6,15 +6,21 @@ import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISi
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+
 struct TransferToAgentOwnerMsg {
-    bytes32 withdrawalAgentOwnerRoot;
+    bytes32 withdrawalTransferRoot;
 }
 
-/// @dev used to decode user signatures on all CCIP messages to EigenAgents
 library AgentOwnerSignature {
 
+    /**
+     * @dev Decodes user signatures on all CCIP messages to EigenAgents
+     * @param message is a CCIP message to Eigenlayer
+     * @param sigOffset is the offset where the user signature begins
+     */
     function decodeAgentOwnerSignature(bytes memory message, uint256 sigOffset)
-        public pure
+        public
+        pure
         returns (
             address signer,
             uint256 expiry,
@@ -54,8 +60,20 @@ contract EigenlayerMsgDecoders {
      *
     */
 
+    /**
+    * @param message CCIP message to Eigenlayer
+    * @return strategy Eigenlayer strategy vault user is depositing into.
+    * @return token Token address associated with the strategy.
+    * @return amount Amount user is depositing
+    * @return signer Owner of the EigenAgent
+    * @return expiry Determines when a cross chain deposit can be refunded.
+    * If a deposit is stuck in CCIP after bridging, user may manually trigger a refund after expiry.
+    * @return signature Signed by the user for their EigenAgent to excecute.
+    * The signature signs a hash of the message being sent to Eigenlayer.
+    */
     function decodeDepositIntoStrategyMsg(bytes memory message)
-        public pure
+        public
+        pure
         returns (
             address strategy,
             address token,
@@ -65,6 +83,7 @@ contract EigenlayerMsgDecoders {
             bytes memory signature
         )
     {
+        //////////////////////// Message offsets //////////////////////////
         // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
         // 00000000000000000000000000000000000000000000000000000000000000e5 [64] string length
         // e7a050aa                                                         [96] function selector
@@ -90,27 +109,21 @@ contract EigenlayerMsgDecoders {
         ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 196); // signature starts on 196
     }
 
+    /// @return recipient is the user when will be minted an EigenAgent
     function decodeMintEigenAgent(bytes memory message)
-        public pure
-        returns (
-            address signer,
-            uint256 expiry,
-            bytes memory signature
-        )
+        public
+        pure
+        returns (address recipient)
     {
+        //////////////////////// Message offsets //////////////////////////
         // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
         // 00000000000000000000000000000000000000000000000000000000000000e5 [64] string length
         // 0xcc15a557                                                       [96] function selector
-        // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [100] signer (original staker)
-        // 0000000000000000000000000000000000000000000000000000000066d063d4 [132] expiry (signature)
-        // b65bb77203b002de051363fd17437187540d5c6a0cfcb75c31dfffff9108e41d [164] signature r
-        // 037e6bdadf2079e5268e5ad0000699611e63c3e015027ad7f8e7b4a252bbb9bb [196] signature s
-        // 1c000000000000000000000000000000000000000000000000000000         [228] signature v
-        (
-            signer,
-            expiry,
-            signature
-        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 100); // signature starts on 100
+        // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [100] recipient to mint to
+        // 1c000000000000000000000000000000000000000000000000000000
+        assembly {
+            recipient := mload(add(message, 100))
+        }
     }
 
     /*
@@ -121,8 +134,16 @@ contract EigenlayerMsgDecoders {
      *
     */
 
+    /**
+     * @param message CCIP message to Eigenlayer
+     * @return arrayQueuedWithdrawalParams is the message sent to Eigenlayer when calling queueWithdrawals()
+     * @return signer Owner of the EigenAgent
+     * @return expiry Expiry of the signature (does not revert)
+     * @return signature Signed by the user for their EigenAgent to excecute.
+     */
     function decodeQueueWithdrawalsMsg(bytes memory message)
-        public pure
+        public
+        pure
         returns (
             IDelegationManager.QueuedWithdrawalParams[] memory arrayQueuedWithdrawalParams,
             address signer,
@@ -133,6 +154,7 @@ contract EigenlayerMsgDecoders {
         /// @dev note: Need to account for bytes message including arrays of QueuedWithdrawalParams
         /// We will need to check array length in SenderCCIP to determine gas as well.
 
+        //////////////////////// Message offsets //////////////////////////
         // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
         // 00000000000000000000000000000000000000000000000000000000000001a5 [64] string length
         // 0dd8dd02                                                         [96] function selector
@@ -189,14 +211,11 @@ contract EigenlayerMsgDecoders {
     }
 
     function _decodeSingleQueueWithdrawalMsg(bytes memory message, uint256 arrayLength, uint256 i)
-        internal pure
+        private
+        pure
         returns (IDelegationManager.QueuedWithdrawalParams memory)
     {
-        /// @dev: expect to use this in a for-loop with i iteration variable
-
-        //////////////////////////////////////////////
-        // Message offsets
-        //////////////////////////////////////////////
+        /// @Note: expect to use this in a for-loop with i iteration variable
         //
         // Function Selector signature:
         //     bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
@@ -207,9 +226,8 @@ contract EigenlayerMsgDecoders {
         //         withdrawer: withdrawer
         //     });
 
-        //////////////////////////////////////////////////////
         // Example with 2 elements in QueuedWithdrawalParams[]
-        //////////////////////////////////////////////////////
+        //////////////////////// Message offsets //////////////////////////
         // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
         // 0000000000000000000000000000000000000000000000000000000000000244 [64] string length
         // 0dd8dd02                                                         [96] function selector
@@ -288,8 +306,19 @@ contract EigenlayerMsgDecoders {
      *
     */
 
+    /**
+     * @param message CCIP message to Eigenlayer
+     * @return withdrawal is the message sent to Eigenlayer to call completeWithdrawal()
+     * @return tokensToWithdraw Eigenlayer parameter when calling completeWithdrawal()
+     * @return middlewareTimesIndex Eigenlayer parameter, used for slashing later.
+     * @return receiveAsTokens determines whether to redeposit into Eigenlayer or receive as tokens.
+     * @return signer Owner of the EigenAgent
+     * @return expiry Expiry of the signature (does not revert)
+     * @return signature Signed by the user for their EigenAgent to excecute.
+     */
     function decodeCompleteWithdrawalMsg(bytes memory message)
-        public pure
+        public
+        pure
         returns (
             IDelegationManager.Withdrawal memory withdrawal,
             IERC20[] memory tokensToWithdraw,
@@ -300,10 +329,6 @@ contract EigenlayerMsgDecoders {
             bytes memory signature
         )
     {
-        //////////////////////////////////////////////
-        // Message offsets
-        //////////////////////////////////////////////
-        //
         // Function Selector signature:
         //     bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
         // Params:
@@ -316,7 +341,8 @@ contract EigenlayerMsgDecoders {
         //         IStrategy[] strategies;
         //         uint256[] shares;
         //     }
-
+        //
+        //////////////////////// Message offsets //////////////////////////
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
         // 00000000000000000000000000000000000000000000000000000000000002a5 [64]
         // 60d7faed                                                         [96]
@@ -360,12 +386,12 @@ contract EigenlayerMsgDecoders {
     }
 
     function _decodeCompleteWithdrawalMsgPart1(bytes memory message)
-        internal pure
+        private
+        pure
         returns (IDelegationManager.Withdrawal memory)
     {
-        /// @note decodes the first half of the CompleteWithdrawalMsg as we run into
+        /// @Note decodes the first half of the CompleteWithdrawalMsg as we run into
         /// a "stack too deep" error with more than 16 variables in the function.
-
         address staker;
         address delegatedTo;
         address withdrawer;
@@ -423,14 +449,14 @@ contract EigenlayerMsgDecoders {
     }
 
     function _decodeCompleteWithdrawalMsgPart2(bytes memory message)
-        internal pure
+        private pure
         returns (
             IERC20[] memory tokensToWithdraw,
             uint256 middlewareTimesIndex,
             bool receiveAsTokens
         )
     {
-        /// @note decodes the second half of the CompleteWithdrawalMsg to avoid
+        /// @Note decodes the second half of the CompleteWithdrawalMsg to avoid
         /// a "stack to deep" error with too many variables in the function.
 
         uint256 tokensArrayLength;
@@ -470,27 +496,35 @@ contract EigenlayerMsgDecoders {
     }
 
 
-    /// @dev this message is dispatched from L1 -> L2 by ReceiverCCIP.sol
+    /**
+     * @dev This message is dispatched from L1 to L2 by ReceiverCCIP.sol
+     * When sending a completeWithdrawal message, we first commit to a withdrawalTransferRoot on L2
+     * so that when completeWithdrawal finishes on L1 and bridge the funds back to L2, the bridge knows
+     * who the original owner associated with that withdrawalTransferRoot is.
+     * @param message CCIP message to Eigenlayer
+     * @return transferToAgentOwnerMsg contains the withdrawalTransferRoot which is sent back to L2
+     */
     function decodeTransferToAgentOwnerMsg(bytes memory message)
         public pure
         returns (TransferToAgentOwnerMsg memory transferToAgentOwnerMsg)
     {
-        // 0000000000000000000000000000000000000000000000000000000000000020
-        // 0000000000000000000000000000000000000000000000000000000000000064
+        //////////////////////// Message offsets //////////////////////////
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
+        // 0000000000000000000000000000000000000000000000000000000000000064 [64]
         // d8a85b48                                                         [96] function selector
         // dd900ac4d233ec9d74ac5af4ce89f87c78781d8fd9ee2aad62d312bdfdf78a14 [100] withdrawal root
         // 00000000000000000000000000000000000000000000000000000000
 
         bytes4 functionSelector;
-        bytes32 withdrawalAgentOwnerRoot;
+        bytes32 withdrawalTransferRoot;
 
         assembly {
             functionSelector := mload(add(message, 96))
-            withdrawalAgentOwnerRoot := mload(add(message, 100))
+            withdrawalTransferRoot := mload(add(message, 100))
         }
 
         return TransferToAgentOwnerMsg({
-            withdrawalAgentOwnerRoot: withdrawalAgentOwnerRoot
+            withdrawalTransferRoot: withdrawalTransferRoot
         });
     }
 }
@@ -505,8 +539,16 @@ contract EigenlayerMsgDecoders {
 
 library DelegationDecoders {
 
+    /// @param message CCIP message to Eigenlayer
+    /// @return operator Eigenalyer parameter: address to delegate to.
+    /// @return approverSignatureAndExpiry Eigenlayer parameter: signature from Operator.
+    /// @return approverSalt Eigenlayer parameter: approver salt.
+    /// @return signer owner of the EigenAgent
+    /// @return expiryEigenAgent expiry of the signature (does not revert)
+    /// @return signatureEigenAgent Signed by the user for their EigenAgent to excecute.
     function decodeDelegateToMsg(bytes memory message)
-        public pure
+        public
+        pure
         returns (
             address operator,
             ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
@@ -521,7 +563,8 @@ library DelegationDecoders {
         //     SignatureWithExpiry memory approverSignatureAndExpiry,
         //     bytes32 approverSalt
         // )
-
+        //
+        //////////////////////// Message offsets //////////////////////////
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
         // 0000000000000000000000000000000000000000000000000000000000000124 [64]
         // eea9064b                                                         [96]
@@ -581,16 +624,24 @@ library DelegationDecoders {
         );
     }
 
+    /**
+     * @param message CCIP message to Eigenlayer
+     * @return staker address of the EigenAgent (the staker from Eigenlayer's perspective)
+     * @return signer Owner of the EigenAgent
+     * @return expiry Expiry of the signature
+     * @return signature Signed by the user for their EigenAgent to excecute.
+     */
     function decodeUndelegateMsg(bytes memory message)
-        public pure
+        public
+        pure
         returns (
             address staker, // eigenAgent
             address signer,
-            uint256 expiryEigenAgent,
-            bytes memory signatureEigenAgent
+            uint256 expiry,
+            bytes memory signature
         )
     {
-
+        //////////////////////// Message offsets //////////////////////////
         // 0000000000000000000000000000000000000000000000000000000000000020
         // 00000000000000000000000000000000000000000000000000000000000000a5
         // da8be864                                                         [96] function selector
@@ -610,15 +661,15 @@ library DelegationDecoders {
 
         (
             signer,
-            expiryEigenAgent,
-            signatureEigenAgent
+            expiry,
+            signature
         ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 132);
 
         return (
             staker,
             signer,
-            expiryEigenAgent,
-            signatureEigenAgent
+            expiry,
+            signature
         );
     }
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
@@ -28,6 +28,14 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
     address public deployer = vm.addr(deployerKey);
 
     function run() public {
+        return _run(false);
+    }
+
+    function mockrun() public {
+        return _run(true);
+    }
+
+    function _run(bool isTest) private {
 
         senderProxy = readSenderContract();
         senderHooksProxy = readSenderHooks();
@@ -50,7 +58,6 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         require(address(restakingConnectorProxy) != address(0), "restakingConnectorProxy cannot be 0");
         require(address(agentFactoryProxy) != address(0), "agentFactory cannot be 0");
 
-        address tokenL1 = EthSepolia.BridgeToken;
         address tokenL2 = BaseSepolia.BridgeToken;
 
         uint256 l2ForkId = vm.createFork("basesepolia");
@@ -71,10 +78,10 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         uint256[] memory gasLimits = new uint256[](6);
         gasLimits[0] = 2_100_000; // deposit + mint EigenAgent      [gas: 1,935,006] 1.4mil to mint agent, 500k for deposit
         // https://sepolia.etherscan.io/tx/0x929dc3f03eb10143d2a215cd0695348bca656ea026ed959b9cf449a0af79c2c4
-        gasLimits[1] = 700_000; // mintEigenAgent                    [gas: 1,500,000?]
+        gasLimits[1] = 1_500_000; // mintEigenAgent                    [gas: 1,500,000?]
         gasLimits[2] = 580_000; // queueWithdrawals                  [gas: 529,085]
         gasLimits[3] = 840_000; // completeWithdrawal + transferToL2 [gas: 791,717]
-        gasLimits[4] = 600_000; // delegateTo                        [gas: 550,292]
+        gasLimits[4] = 650_000; // delegateTo                        [gas: 550,292]
         gasLimits[5] = 400_000; // undelegate                        [gas: ?]
 
         bytes4[] memory functionSelectors = new bytes4[](6);
@@ -98,7 +105,9 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
 
         senderHooksProxy.setSenderCCIP(address(senderProxy));
 
-        IERC20_CCIPBnM(tokenL2).drip(deployer);
+        if (isTest) {
+            IERC20_CCIPBnM(tokenL2).drip(deployer);
+        }
 
         require(
             address(senderProxy.getSenderHooks()) != address(0),

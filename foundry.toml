@@ -6,16 +6,18 @@ ffi = true
 fs_permissions = [
   { access = "read-write", path = "./"},
 ]
+# Note: If DeployScripts tests run into OutofGas errors, could be a memory issue:
+# https://github.com/foundry-rs/foundry/issues/3971
+# memory_limit = 335544320
 
 remappings = [
   "@chainlink/local/=lib/chainlink-local/",
   "@chainlink/contracts-ccip/=lib/chainlink-local/lib/ccip/contracts/",
   "forge-std/=lib/forge-std/src/",
   "@6551/=lib/reference/src/",
-  ### NOTE: use eigenlayer's openzeppelin dependencies
+  ### Note: Use Eigenlayer's OpenZeppelin dependencies.
   "@openzeppelin/contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts",
   "@openzeppelin/contracts-upgradeable/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable/contracts"
-
 ]
 
 [rpc_endpoints]

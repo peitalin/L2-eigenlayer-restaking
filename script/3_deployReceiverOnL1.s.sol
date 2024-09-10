@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
@@ -9,13 +9,11 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {EmptyContract} from "eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
 
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {IReceiverCCIPMock, ReceiverCCIPMock} from "../test/mocks/ReceiverCCIPMock.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
-import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
@@ -73,7 +71,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         );
     }
 
-    function _run(bool isMockRun) internal returns (IReceiverCCIP, IRestakingConnector, IAgentFactory) {
+    function _run(bool isMockRun) private returns (IReceiverCCIP, IRestakingConnector, IAgentFactory) {
 
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
@@ -225,7 +223,8 @@ contract DeployReceiverOnL1Script is Script, FileReader {
                 address(agentFactoryProxy),
                 address(registry6551),
                 address(eigenAgentOwner721),
-                address(proxyAdmin)
+                address(proxyAdmin),
+                FILEPATH_BRIDGE_CONTRACTS_L1
             );
         }
 

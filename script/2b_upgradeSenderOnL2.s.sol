@@ -4,7 +4,7 @@ pragma solidity 0.8.22;
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
-import {Script, console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
@@ -29,7 +29,7 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
         return _run();
     }
 
-    function _run() public {
+    function _run() private {
 
         ProxyAdmin proxyAdmin = ProxyAdmin(readProxyAdminL2());
 

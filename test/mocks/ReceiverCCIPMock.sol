@@ -6,7 +6,14 @@ import {ReceiverCCIP} from "../../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../../src/interfaces/IReceiverCCIP.sol";
 
 interface IReceiverCCIPMock is IReceiverCCIP {
+
     function mockCCIPReceive(Client.Any2EVMMessage memory any2EvmMessage) external;
+
+    function dispatchMessageToEigenAgent(
+        Client.Any2EVMMessage memory any2EvmMessage,
+        address token,
+        uint256 amount
+    ) external returns (string memory textMsg);
 }
 
 contract ReceiverCCIPMock is ReceiverCCIP {
@@ -17,4 +24,5 @@ contract ReceiverCCIPMock is ReceiverCCIP {
         _ccipReceive(any2EvmMessage);
     }
 }
+
 

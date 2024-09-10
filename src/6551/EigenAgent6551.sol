@@ -2,19 +2,14 @@
 pragma solidity 0.8.22;
 
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-// Either use reference implementation or copy of it:
-// import {ERC6551Account} from "@6551/examples/simple/ERC6551Account.sol";
-import {ERC6551Account} from "./ERC6551Account.sol";
-import {IEigenAgent6551} from "./IEigenAgent6551.sol";
+import {Base6551Account} from "./Base6551Account.sol";
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
+import {SignatureCheckerV5} from "../utils/SignatureCheckerV5.sol";
 
 
-contract EigenAgent6551 is ERC6551Account, IEigenAgent6551 {
-
-    // uint256 public execNonce;
+contract EigenAgent6551 is Base6551Account {
 
     /// @notice The EIP-712 typehash for the deposit struct used by the contract
     bytes32 public constant EIGEN_AGENT_EXEC_TYPEHASH = keccak256(
@@ -36,22 +31,32 @@ contract EigenAgent6551 is ERC6551Account, IEigenAgent6551 {
         _;
     }
 
-    function getAgentOwner() public view returns (address) {
-        return owner();
-    }
-
+    /**
+     * @dev Checks if signature is valid according to ERC-1271. If the signer is an EOA,
+     * it validates signatures using ecrecover. If the signer is a contract, calls isValidSignature
+     * on the contract to determin if the signatuer is valid. For an example, see MockMultisigSigner.sol
+     * contract and associated tests.
+     */
     function isValidSignature(
         bytes32 digestHash,
         bytes memory signature
     ) public view virtual override returns (bytes4) {
-        bool isValid = ECDSA.recover(digestHash, signature) == owner(); // owner of the NFT
-        if (isValid) {
+        address signer = owner();
+        if (SignatureCheckerV5.isValidSignatureNow(signer, digestHash, signature)) {
             return IERC1271.isValidSignature.selector;
+        } else {
+            return bytes4(0);
         }
-
-        return bytes4(0);
     }
 
+    /**
+     * @dev This function is used by RestakingConnector.sol to approve Eigenlayer StrategyManager
+     * to transfer and EigenAgent's tokens into Eigenlayer strategy vaults. This avoids needing
+     * to extra transfers and signed messages to complete L2 restaking deposits.
+     * @param targetContract to approve transfer for, expected to be the Eigenlayer StrategyManager contract
+     * @param token the token used in the Eigenlayer Strategy vault.
+     * @param amount of tokens user is depositing into the strategy vault.
+     */
     function approveByWhitelistedContract(
         address targetContract,
         address token,
@@ -60,6 +65,19 @@ contract EigenAgent6551 is ERC6551Account, IEigenAgent6551 {
         return IERC20(token).approve(targetContract, amount);
     }
 
+    /**
+     * @dev EigenAgent receives CCIP messages and executes Eigenlayer commands on behalf of it's owner
+     * on L2. The EigenAgent will only execute if provided a valid signature from the owner of the
+     * EigenAgentOwner721 NFT associated with the ERC-6551 EigenAgent account.
+     * @param targetContract is the contract to call
+     * @param value amount of ETH to send with the call
+     * @param data the data to send to targetContract (e.g. depositIntoStrategy calldata)
+     * @param expiry expiry of the signature, currently only used to give users an option to withdraw
+     * bridged funds (for a deposit) if the call reverts after a period of a time (e.g in case an
+     * Operator deactivates in the time it takes to bridge from L2 to L1 and deposit).
+     * @param signature is the owner of the EigenAgent's signature, signed over the hash of the
+     * data that the EigenAgent calls the targetContract with.
+     */
     function executeWithSignature(
         address targetContract,
         uint256 value,
@@ -72,11 +90,13 @@ contract EigenAgent6551 is ERC6551Account, IEigenAgent6551 {
         virtual
         returns (bytes memory result)
     {
-        /// Should we revert on expiry?
-        /// CCIP may take hours to deliver messages when gas spikes.
-        /// We would need to return funds to the user on L2 this case,
-        /// as the transaction may no longer be manually executable after gas lowers later.
+        /// Expiry: does not revert on expiry: CCIP may take hours to deliver messages when gas spikes.
+        /// We would need to return funds to the user on L2 this case, as the transaction may
+        /// no longer be manually executable after gas lowers later.
         ///
+        /// Instead, we use expiry for specific purposes, such as allowing users to trigger
+        /// a refund if their deposit fails on L1 manually (e.g. Operator goes offline while bridging).
+
         // require(expiry >= block.timestamp, "Signature for EigenAgent execution expired");
 
         bytes32 digestHash = createEigenAgentCallDigestHash(
@@ -103,6 +123,15 @@ contract EigenAgent6551 is ERC6551Account, IEigenAgent6551 {
         return result;
     }
 
+    /**
+     * @dev Creates a digestHash of the Eigenlayer command (e.g depositIntoStrategy) to be sent through CCIP.
+     * @param target contract for the EigenAgent to call
+     * @param value amount of Eth to send with the call
+     * @param data to send (e.g. encoded queueWithdrawal parameters) to target contract (DelegationManager)
+     * @param nonce execution nonce used in EigenAgent execution signatures
+     * @param chainid is the chain EigenAgent and Eigenlayer is deployed on.
+     * @param expiry expiry parameter for signature (currently does not revert if expired)
+     */
     function createEigenAgentCallDigestHash(
         address target,
         uint256 value,
@@ -111,7 +140,7 @@ contract EigenAgent6551 is ERC6551Account, IEigenAgent6551 {
         uint256 chainid,
         uint256 expiry
     ) public pure returns (bytes32) {
-
+        // EIP-712 struct hash
         bytes32 structHash = keccak256(abi.encode(
             EIGEN_AGENT_EXEC_TYPEHASH,
             target,
@@ -124,20 +153,23 @@ contract EigenAgent6551 is ERC6551Account, IEigenAgent6551 {
         // calculate the digest hash
         bytes32 digestHash = keccak256(abi.encodePacked(
             "\x19\x01",
-            getDomainSeparator(target, chainid),
+            domainSeparator(target, chainid),
             structHash
         ));
 
         return digestHash;
     }
 
-    /// @param contractAddr is the address of the contract being called,
-    /// usually Eigenlayer StrategyManager, or DelegationManager.
-    /// @param chainid is the chain Eigenlayer is deployed on
-    function getDomainSeparator(
+    /**
+     * @param contractAddr is the address of the contract where the signature will be verified,
+     * either EigenAgent, Eigenlayer StrategyManager, or DelegationManager.
+     * @param chainid is the chain Eigenlayer and EigenAgent are deployed on.
+     */
+    function domainSeparator(
         address contractAddr, // strategyManagerAddr, or delegationManagerAddr
         uint256 chainid
     ) public pure returns (bytes32) {
         return keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes("EigenLayer")), chainid, contractAddr));
     }
 }
+

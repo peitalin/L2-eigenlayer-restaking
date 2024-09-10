@@ -27,7 +27,7 @@ import {StrategyBase} from  "eigenlayer-contracts/src/contracts/strategies/Strat
 import {StrategyFactory} from "eigenlayer-contracts/src/contracts/strategies/StrategyFactory.sol";
 import {StrategyBaseTVLLimits} from "eigenlayer-contracts/src/contracts/strategies/StrategyBaseTVLLimits.sol";
 
-import {ERC20Minter} from "../src/ERC20Minter.sol";
+import {ERC20Minter} from "../test/mocks/ERC20Minter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {EthSepolia} from "./Addresses.sol";
@@ -550,4 +550,6 @@ contract DeployMockEigenlayerContractsScript is Script {
         ));
         vm.writeJson(finalJson, finalOutputPath);
     }
+
+    function test_ignore() private {}
 }

@@ -7,8 +7,6 @@ import {ISenderHooks} from "./ISenderHooks.sol";
 
 interface ISenderCCIP is IBaseMessengerCCIP {
 
-    // function mockCCIPReceive(Client.Any2EVMMessage memory any2EvmMessage) external;
-
     function getSenderHooks() external returns (ISenderHooks);
 
     function setSenderHooks(ISenderHooks _senderHooks) external;

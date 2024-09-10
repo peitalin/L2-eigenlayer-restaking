@@ -16,10 +16,7 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
 
     mapping(address contracts => bool whitelisted) public whitelistedCallers;
 
-    function initialize(
-        string memory name,
-        string memory symbol
-    ) initializer public {
+    function initialize(string memory name, string memory symbol) initializer public {
 
         __ERC721_init(name, symbol);
         __ERC721URIStorage_init();
@@ -28,10 +25,18 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
         _tokenIdCounter = 1;
     }
 
+    /**
+     * @dev Whitelists the RestakingConnector contract to allow it to approve token spends
+     * for EigenAgents. Specifically, RestakingConnector approves Eigenlayer StrategyManager to
+     * transferFrom tokens into Eigenlayer Strategy vaults.
+     * This whitelist is only used in the function EigenAgent6551.approveByWhitelistedContract().
+     * @param caller is the contract to whitelist (RestakingConnector)
+     */
     function addToWhitelistedCallers(address caller) external onlyAdminOrOwner {
         whitelistedCallers[caller] = true;
     }
 
+    /// @param caller is the contract to remove from whitelist.
     function removeFromWhitelistedCallers(address caller) external onlyAdminOrOwner {
         whitelistedCallers[caller] = false;
     }
@@ -44,8 +49,9 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
         return address(agentFactory);
     }
 
+    /// @param _agentFactory is the AgentFactory contract that creates EigenAgents
     function setAgentFactory(IAgentFactory _agentFactory) public onlyAdminOrOwner {
-        require(address(_agentFactory) != address(0), "cannot set address(0)");
+        require(address(_agentFactory) != address(0), "AgentFactory cannot be address(0)");
         agentFactory = _agentFactory;
     }
 
@@ -60,13 +66,16 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
 
     function _mint(address user) internal returns (uint256) {
         uint256 tokenId = _tokenIdCounter;
+        ++_tokenIdCounter;
         _safeMint(user, tokenId);
         _setTokenURI(tokenId, string(abi.encodePacked("eigen-agent/", Strings.toString(tokenId), ".json")));
-        ++_tokenIdCounter;
         return tokenId;
     }
 
-    /// @dev callback to update EigenAgentOwner721 NFT ow
+    /**
+     * @dev Hook to update EigenAgentOwner721 NFT owner whenever a NFT transfer occurs.
+     * This  updates AgentFactory and keeps users matched with tokenIds (and associated ERC-6551 EigenAgents).
+     */
     function _afterTokenTransfer(
         address from,
         address to,

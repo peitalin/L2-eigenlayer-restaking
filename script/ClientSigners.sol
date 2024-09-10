@@ -5,7 +5,6 @@ import {Script} from "forge-std/Script.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP1271SignatureUtils} from "eigenlayer-contracts/src/contracts/libraries/EIP1271SignatureUtils.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 
 /// @dev Retrieve these struct hashes by calling Eigenlayer contracts, or storing the hash.
@@ -73,63 +72,6 @@ contract ClientSigners is Script {
         // address(this) is the StrategyManager, not this contract (SignatureUtils)
         // chainid is the chain Eigenlayer is deployed on (it can fork!), not the chain you are calling this function
         // So chainid should be destination chainid in the context of L2 -> L1 restaking calls
-    }
-
-    function calculateQueueWithdrawalDigestHash(
-        address staker,
-        IStrategy[] memory strategies,
-        uint256[] memory shares,
-        uint256 withdrawalNonce,
-        uint256 expiry,
-        address delegationManagerAddr,
-        uint256 destinationChainid
-    ) public pure returns (bytes32) {
-
-        /// @notice The EIP-712 typehash for the deposit struct used by the contract
-        bytes32 QUEUE_WITHDRAWAL_TYPEHASH =
-            keccak256("QueueWithdrawal(address staker,address[] strategies,uint256[] shares,uint256 nonce,uint256 expiry)");
-
-        // calculate the struct hash
-        bytes32 structHash = keccak256(abi.encode(
-            QUEUE_WITHDRAWAL_TYPEHASH,
-            staker,
-            strategies,
-            shares,
-            withdrawalNonce,
-            expiry
-        ));
-        // calculate the digest hash
-        bytes32 digestHash = keccak256(abi.encodePacked(
-            "\x19\x01",
-            getDomainSeparator(delegationManagerAddr, destinationChainid),
-            structHash
-        ));
-        return digestHash;
-    }
-
-    function calculateStakerDelegationDigestHash(
-        address staker,
-        uint256 _stakerNonce,
-        address operator,
-        uint256 expiry,
-        address delegationManagerAddr,
-        uint256 destinationChainid
-    ) public pure returns (bytes32) {
-
-        /// @notice The EIP-712 typehash for the `StakerDelegation` struct used by the contract
-        bytes32 STAKER_DELEGATION_TYPEHASH =
-            keccak256("StakerDelegation(address staker,address operator,uint256 nonce,uint256 expiry)");
-
-        // calculate the struct hash
-        bytes32 stakerStructHash =
-            keccak256(abi.encode(STAKER_DELEGATION_TYPEHASH, staker, operator, _stakerNonce, expiry));
-        // calculate the digest hash
-        bytes32 stakerDigestHash = keccak256(abi.encodePacked(
-            "\x19\x01",
-            getDomainSeparator(delegationManagerAddr, destinationChainid),
-            stakerStructHash
-        ));
-        return stakerDigestHash;
     }
 
     function calculateDelegationApprovalDigestHash(

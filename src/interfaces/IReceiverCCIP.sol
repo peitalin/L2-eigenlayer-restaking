@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {ISenderHooks} from "./ISenderHooks.sol";
 import {IRestakingConnector} from "./IRestakingConnector.sol";
 import {IBaseMessengerCCIP} from "./IBaseMessengerCCIP.sol";
 
 
 interface IReceiverCCIP is IBaseMessengerCCIP {
-
-    // function mockCCIPReceive(Client.Any2EVMMessage memory any2EvmMessage) external;
 
     function setSenderHooks(ISenderHooks _senderHooks) external;
 
@@ -21,5 +18,8 @@ interface IReceiverCCIP is IBaseMessengerCCIP {
 
     function setRestakingConnector(IRestakingConnector _restakingConnector) external;
 
+    function amountRefunded(bytes32 messageId) external view returns (uint256);
+
+    function setAmountRefundedToMessageId(bytes32 messageId, uint256 amountAfter) external;
 }
 

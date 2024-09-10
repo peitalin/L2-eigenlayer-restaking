@@ -1,12 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-// import {IERC6551Account} from "@6551/examples/simple/ERC6551Account.sol";
-import {IERC6551Account} from "./ERC6551Account.sol";
+import {IBase6551Account} from "./Base6551Account.sol";
 
-interface IEigenAgent6551 is IERC6551Account {
 
-    // function execNonce() external view returns (uint256);
+interface IEigenAgent6551 is IBase6551Account {
+
+    function EIGEN_AGENT_EXEC_TYPEHASH() external returns (bytes32);
+
+    function DOMAIN_TYPEHASH() external returns (bytes32);
+
+    function isValidSignature(
+        bytes32 digestHash,
+        bytes memory signature
+    ) external view returns (bytes4);
 
     function executeWithSignature(
         address targetContract,
@@ -22,6 +29,21 @@ interface IEigenAgent6551 is IERC6551Account {
         uint256 amount
     ) external returns (bool);
 
-    function getAgentOwner() external view returns (address);
+    function execNonce() external view returns (uint256);
 
+    function owner() external view returns (address) ;
+
+    function createEigenAgentCallDigestHash(
+        address target,
+        uint256 value,
+        bytes calldata data,
+        uint256 nonce,
+        uint256 chainid,
+        uint256 expiry
+    ) external pure returns (bytes32);
+
+    function domainSeparator(
+        address contractAddr,
+        uint256 chainid
+    ) external pure returns (bytes32);
 }

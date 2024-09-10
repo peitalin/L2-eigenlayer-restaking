@@ -2,6 +2,7 @@
 pragma solidity 0.8.22;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgent6551} from "./IEigenAgent6551.sol";
@@ -12,7 +13,7 @@ import {Adminable} from "../utils/Adminable.sol";
 
 
 
-contract AgentFactory is Initializable, Adminable {
+contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
 
     error AddressZero(string msg);
 
@@ -55,10 +56,11 @@ contract AgentFactory is Initializable, Adminable {
         eigenAgentOwner721 = _eigenAgentOwner721;
 
         __Adminable_init();
+        __ReentrancyGuard_init();
     }
 
     modifier onlyRestakingConnector() {
-        require(msg.sender == _restakingConnector, "not called by RestakingConnector");
+        require(msg.sender == _restakingConnector, "Caller does not match: AgentFactory._restakingConnector");
         _;
     }
 
@@ -66,25 +68,34 @@ contract AgentFactory is Initializable, Adminable {
         return _restakingConnector;
     }
 
+    /// @param newRestakingConnector address of the RestakingConnector contract.
     function setRestakingConnector(address newRestakingConnector) public onlyAdminOrOwner {
         if (address(newRestakingConnector) == address(0))
             revert AddressZero("AgentFactory.setRestakingConnector: cannot be address(0)");
+
         _restakingConnector = newRestakingConnector;
     }
 
+    /// @param new6551Registry address of the 6551Registry contract.
     function set6551Registry(IERC6551Registry new6551Registry) public onlyAdminOrOwner {
         if (address(new6551Registry) == address(0))
             revert AddressZero("AgentFactory.set6551Registry: cannot be address(0)");
+
         erc6551Registry = new6551Registry;
     }
 
+    /// @param newEigenAgentOwner721 address of the eigenAgentOwner712 NFT contract.
     function setEigenAgentOwner721(IEigenAgentOwner721 newEigenAgentOwner721) public onlyAdminOrOwner {
         if (address(newEigenAgentOwner721) == address(0))
-            revert AddressZero("AgentFactory.setEigenAgent721: cannot be address(0)");
+            revert AddressZero("AgentFactory.setEigenAgentOwner721: cannot be address(0)");
+
         eigenAgentOwner721 = newEigenAgentOwner721;
     }
 
     /// @dev this callback is triggered every time a EigenAgentOwner721 NFT is transferred
+    /// @param from the account where NFT is being transferred from
+    /// @param to the account where NFT is being transferred to
+    /// @param tokenId NFT tokenId is being transferred
     function updateEigenAgentOwnerTokenId(
         address from,
         address to,
@@ -99,42 +110,66 @@ contract AgentFactory is Initializable, Adminable {
         emit IAgentFactory.EigenAgentOwnerUpdated(from, to, tokenId);
     }
 
-    function getEigenAgentOwnerTokenId(address staker) public view returns (uint256) {
-        return userToEigenAgentTokenIds[staker];
+    /**
+     * @dev Gets the tokenId of the EigenAgentOwner NFT owned by the user.
+     * Owner of the NFT controls the associated 6551v EigenAgent account.
+     * @param user owner of the EigenAgentOwner NFT
+     */
+    function getEigenAgentOwnerTokenId(address user) public view returns (uint256) {
+        return userToEigenAgentTokenIds[user];
     }
 
-    function getEigenAgent(address staker) public view returns (IEigenAgent6551) {
-        return IEigenAgent6551(payable(tokenIdToEigenAgents[userToEigenAgentTokenIds[staker]]));
+    /**
+     * @dev Gets the ERC-6551 EigenAgent account of the user.
+     * @param user owner of the EigenAgentOwner NFT that controls the ERC-6551 EigenAgent account.
+     */
+    function getEigenAgent(address user) public view returns (IEigenAgent6551) {
+        return IEigenAgent6551(payable(tokenIdToEigenAgents[userToEigenAgentTokenIds[user]]));
     }
 
-    function spawnEigenAgentOnlyOwner(address staker)
-        external onlyAdminOrOwner
+    /**
+     * @dev Spawns a ERC-6551 EigenAgent for a user.
+     * @param user address to mint a EigenAgentOwner721 NFT and create a ERC-6551 EigenAgent account for.
+     */
+    function spawnEigenAgentOnlyOwner(address user)
+        external
+        onlyAdminOrOwner
         returns (IEigenAgent6551)
     {
-        return _spawnEigenAgent6551(staker);
+        return _spawnEigenAgent6551(user);
     }
 
-    function tryGetEigenAgentOrSpawn(address staker)
+    /**
+     * @dev Tries to get a user's 6551 EigenAgent account if they have one, or spawns a new EigenAgent
+     * for the user if they do not already have one. Mind the gas costs is higher if they need to mint.
+     * @param user address to retrive (or spawn) their ERC-6551 EigenAgent account.
+     */
+    function tryGetEigenAgentOrSpawn(address user)
         external
         onlyRestakingConnector
         returns (IEigenAgent6551)
     {
-        IEigenAgent6551 eigenAgent = getEigenAgent(staker);
+        IEigenAgent6551 eigenAgent = getEigenAgent(user);
         if (address(eigenAgent) != address(0)) {
             return eigenAgent;
         }
-        return _spawnEigenAgent6551(staker);
+        return _spawnEigenAgent6551(user);
     }
 
-    /// Mints an NFT and creates a 6551 account for it
-    function _spawnEigenAgent6551(address staker) internal returns (IEigenAgent6551) {
-        require(
-            address(getEigenAgent(staker)) == address(0),
-            "staker already has an EigenAgent account"
-        );
+    /**
+     * @dev Mints a EigenAgentOnwer721 NFT and creates a ERC-6551 EigenAgent account for it.
+     * The resulting ERC-6551 EigenAgent account address is deterministic and depends on
+     * (1) the user's address, (2) chainId, (3) Eigenagent6551 implementation contract,
+     * (4) contract address of EigenAgentOwner721 NFT, and (5) tokenId of the EigenAgentOwner NFT.
+     */
+    function _spawnEigenAgent6551(address user) internal nonReentrant returns (IEigenAgent6551) {
 
-        bytes32 salt = bytes32(abi.encode(staker));
-        uint256 tokenId = eigenAgentOwner721.mint(staker);
+        require(address(getEigenAgent(user)) == address(0), "User already has an EigenAgent");
+
+        bytes32 salt = bytes32(abi.encode(user));
+        uint256 tokenId = eigenAgentOwner721.mint(user);
+        // sets userToEigenAgentTokenIds[user] = tokenId in
+        // _afterTokenTransfer() -> updateEigenAgentOwnerTokenId
 
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(
             erc6551Registry.createAccount(
@@ -146,10 +181,9 @@ contract AgentFactory is Initializable, Adminable {
             )
         ));
 
-        userToEigenAgentTokenIds[staker] = tokenId;
         tokenIdToEigenAgents[tokenId] = address(eigenAgent);
 
-        emit AgentCreated(staker, address(eigenAgent), tokenId);
+        emit AgentCreated(user, address(eigenAgent), tokenId);
 
         return eigenAgent;
     }

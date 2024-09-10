@@ -14,16 +14,18 @@ import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
 
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
-    event SendingWithdrawalToAgentOwner(address indexed, uint256 indexed, address indexed);
-    event WithdrawalAgentOwnerRootCommitted(
-        bytes32 indexed, // withdrawalAgentOwnerRoot
+    event SendingWithdrawalToAgentOwner(address indexed, uint256 indexed);
+    event WithdrawalTransferRootCommitted(
+        bytes32 indexed, // withdrawalTransferRoot
         address indexed, //  withdrawer (eigenAgent)
         uint256, // amount
         address  // signer (agentOwner)
     );
 
-    mapping(bytes32 => ISenderHooks.WithdrawalTransfer) public withdrawalAgentOwnerTransferCommits;
-    mapping(bytes32 => bool) public withdrawalAgentOwnerRootsSpent;
+    error AddressZero(string msg);
+
+    mapping(bytes32 => ISenderHooks.WithdrawalTransfer) public withdrawalTransferCommitments;
+    mapping(bytes32 => bool) public withdrawalTransferRootsSpent;
     mapping(bytes4 => uint256) internal _gasLimitsForFunctionSelectors;
 
     address internal _senderCCIP;
@@ -59,89 +61,109 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         return _senderCCIP;
     }
 
+    /// @param newSenderCCIP address of the SenderCCIP contract.
     function setSenderCCIP(address newSenderCCIP) public onlyOwner {
+        if (newSenderCCIP == address(0))
+            revert AddressZero("SenderCCIP cannot be address(0)");
+
         _senderCCIP = newSenderCCIP;
     }
 
-    function isWithdrawalAgentOwnerRootSpent(bytes32 withdrawalAgentOwnerRoot)
-        public view
-        returns (bool) {
-        return withdrawalAgentOwnerRootsSpent[withdrawalAgentOwnerRoot];
+    /// @param withdrawalTransferRoot is calculated when dispatching a completeWithdrawal message.
+    function isWithdrawalTransferRootSpent(bytes32 withdrawalTransferRoot)
+        public
+        view
+        returns (bool)
+    {
+        return withdrawalTransferRootsSpent[withdrawalTransferRoot];
     }
 
-    function handleTransferToAgentOwner(bytes memory message) public returns (
-        address,
-        uint256,
-        address
-    ) {
+    /**
+     * @dev Returns the same withdrawalRoot calculated in Eigenlayer's DelegationManager during withdrawal
+     */
+    function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
+        public
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(withdrawal));
+    }
 
+    /**
+     * @dev Returns the same withdrawalTransferRoot calculated in RestakingConnector.
+     * @param withdrawalRoot withdrawalRoot calculated by Eigenlayer to verify withdrawals.
+     * @param amount amount in the withdrawal
+     * @param agentOwner owner of the EigenAgent executing completeWithdrawals
+     */
+    function calculateWithdrawalTransferRoot(
+        bytes32 withdrawalRoot,
+        uint256 amount,
+        address agentOwner
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encode(withdrawalRoot, amount, agentOwner));
+    }
+
+    /**
+     * @dev This function handles inbound L1 -> L2 completeWithdrawal messages after Eigenlayer has
+     * withdrawn funds, and the L1 bridge has bridged them back to L2.
+     * It receives a withdrawalTransferRoot and matches it with the committed withdrawalTransferRoot
+     * to verify which user to transfer the withdrawan funds to.
+     */
+    function handleTransferToAgentOwner(bytes memory message)
+        public
+        returns (address, uint256)
+    {
         TransferToAgentOwnerMsg memory transferToAgentOwnerMsg = decodeTransferToAgentOwnerMsg(message);
 
-        bytes32 withdrawalAgentOwnerRoot = transferToAgentOwnerMsg.withdrawalAgentOwnerRoot;
+        bytes32 withdrawalTransferRoot = transferToAgentOwnerMsg.withdrawalTransferRoot;
 
         require(
-            withdrawalAgentOwnerRootsSpent[withdrawalAgentOwnerRoot] == false,
-            "SenderHooks.handleTransferToAgentOwner: withdrawalAgentOwnerRoot already used"
+            withdrawalTransferRootsSpent[withdrawalTransferRoot] == false,
+            "SenderHooks.handleTransferToAgentOwner: withdrawalTransferRoot already used"
         );
-        // mark withdrawalRoot as spent to prevent multiple withdrawals
-        withdrawalAgentOwnerRootsSpent[withdrawalAgentOwnerRoot] = true;
-        // delete withdrawalAgentOwnerTransferCommits[withdrawalAgentOwnerRoot];
+        // Mark withdrawalTransferRoot as spent to prevent multiple withdrawals
+        withdrawalTransferRootsSpent[withdrawalTransferRoot] = true;
+        // Note: keep withdrawalTransferCommitments as a record, no need to delete.
+        // delete withdrawalTransferCommitments[withdrawalTransferRoot];
 
-        // read withdrawalAgentOwnerRoot entry that signer previously committed to.
+        // read withdrawalTransferRoot entry that signer previously committed to.
         ISenderHooks.WithdrawalTransfer memory withdrawalTransfer =
-            withdrawalAgentOwnerTransferCommits[withdrawalAgentOwnerRoot];
+            withdrawalTransferCommitments[withdrawalTransferRoot];
 
         emit SendingWithdrawalToAgentOwner(
             withdrawalTransfer.agentOwner, // signer committed when first calling completeWithdrawal
-            withdrawalTransfer.amount,
-            withdrawalTransfer.tokenDestination
+            withdrawalTransfer.amount
         );
 
         return (
             withdrawalTransfer.agentOwner,
-            withdrawalTransfer.amount,
-            withdrawalTransfer.tokenDestination
+            withdrawalTransfer.amount
         );
     }
 
-    /// Hook that executes during _buildCCIPMessage (sendMessagePayNative) call
-    /// @param message is the outbound message passed to CCIP's _buildCCIPMessage function
-    /// @param tokenL2 token on L2 for TransferToAgentOwner callback
+    /**
+     * @dev Hook that executes in outbound sendMessagePayNative calls.
+     * if the outbound message is completeQueueWithdrawal, it will calculate a withdrawalTransferRoot
+     * and store information about the amount and owner of the EigenAgent doing the withdrawal to
+     * transfer withdrawals to later.
+     * @param message is the outbound message passed to CCIP's _buildCCIPMessage function
+     * @param tokenL2 token on L2 for TransferToAgentOwner callback
+     */
     function beforeSendCCIPMessage(bytes memory message, address tokenL2) external onlySenderCCIP {
 
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
         // When a user sends a message to `completeQueuedWithdrawal` from L2 to L1:
         if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
-            // 0x60d7faed == cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)"))
-            _commitWithdrawalAgentOwnerRootInfo(message, tokenL2);
+            // 0x60d7faed
+            _commitWithdrawalTransferRootInfo(message, tokenL2);
         }
-
     }
 
-    // Returns the same withdrawalRoot calculated in Eigenlayer
-    function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
-        public
-        pure
-        returns (bytes32) {
-        return keccak256(abi.encode(withdrawal));
-    }
-
-    // Returns the same withdrawalAgentOwnerRoot calculated in RestakingConnector
-    function calculateWithdrawalAgentOwnerRoot(bytes32 withdrawalRoot, address agentOwner)
-        public
-        pure
-        returns (bytes32) {
-        return keccak256(abi.encode(withdrawalRoot, agentOwner));
-    }
-
-    function _commitWithdrawalAgentOwnerRootInfo(
-        bytes memory message,
-        address tokenDestinationL2
-    ) internal {
+    function _commitWithdrawalTransferRootInfo(bytes memory message, address tokenL2) private {
 
         require(
-            tokenDestinationL2 != address(0),
-            "SenderHooks._commitWithdrawalAgentOwnerRootInfo: cannot commit tokenL2 as address(0)"
+            tokenL2 != address(0),
+            "SenderHooks._commitWithdrawalTransferRootInfo: cannot commit tokenL2 as address(0)"
         );
 
         (
@@ -157,38 +179,51 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         // only when withdrawing tokens back to L2, not for re-deposits from re-delegations
         if (receiveAsTokens) {
 
-            // Calculate withdrawalAgentOwnerRoot: hash(withdrawalRoot, signer)
-            // and commit to it on L2, so that when the withdrawalAgentOwnerRoot message is
+            // Calculate withdrawalTransferRoot: hash(withdrawalRoot, signer)
+            // and commit to it on L2, so that when the withdrawalTransferRoot message is
             // returned from L1 we can lookup and verify which AgentOwner to transfer funds to.
-            bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalAgentOwnerRoot(
+            bytes32 withdrawalTransferRoot = calculateWithdrawalTransferRoot(
                 calculateWithdrawalRoot(withdrawal),
-                signer
+                withdrawal.shares[0], // amount
+                signer // agentOwner
             );
             // This prevents griefing attacks where other users put in withdrawalRoot entries
             // with the wrong agentOwner address, preventing completeWithdrawals
 
             require(
-                withdrawalAgentOwnerRootsSpent[withdrawalAgentOwnerRoot] == false,
-                "SenderHooks._commitWithdrawalAgentOwnerRootInfo: withdrawalAgentOwnerRoot already used"
+                withdrawalTransferRootsSpent[withdrawalTransferRoot] == false,
+                "SenderHooks._commitWithdrawalTransferRootInfo: withdrawalTransferRoot already used"
             );
 
             // Commit to WithdrawalTransfer(withdrawer, amount, token, owner) before sending completeWithdrawal message,
-            withdrawalAgentOwnerTransferCommits[withdrawalAgentOwnerRoot] = ISenderHooks.WithdrawalTransfer({
-                withdrawer: withdrawal.withdrawer, // eigenAgent
+            withdrawalTransferCommitments[withdrawalTransferRoot] = ISenderHooks.WithdrawalTransfer({
                 amount: withdrawal.shares[0],
-                tokenDestination: tokenDestinationL2,
                 agentOwner: signer // signer is owner of EigenAgent, used in handleTransferToAgentOwner
             });
 
-            emit WithdrawalAgentOwnerRootCommitted(
-                withdrawalAgentOwnerRoot,
-                withdrawal.withdrawer,
+            emit WithdrawalTransferRootCommitted(
+                withdrawalTransferRoot,
+                withdrawal.withdrawer, // eigenAgent
                 withdrawal.shares[0], // amount
-                signer
+                signer // agentOwner
             );
         }
     }
 
+    function getWithdrawalTransferCommitment(bytes32 withdrawalTransferRoot)
+        external
+        view
+        returns (ISenderHooks.WithdrawalTransfer memory)
+    {
+        return withdrawalTransferCommitments[withdrawalTransferRoot];
+    }
+
+    /**
+     * @dev Sets gas limits for various functions. Requires an array of bytes4 function selectors and
+     * a corresponding array of gas limits.
+     * @param functionSelectors list of bytes4 function selectors
+     * @param gasLimits list of gasLimits to set the gasLimits for functions to call
+     */
     function setGasLimitsForFunctionSelectors(
         bytes4[] memory functionSelectors,
         uint256[] memory gasLimits
@@ -200,14 +235,24 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         }
     }
 
-    function getGasLimitForFunctionSelector(bytes4 functionSelector) public view returns (uint256) {
+    /**
+     * @dev Retrieves estimated gasLimits for different L2 restaking functions, e.g:
+     * - depositIntoStrategy(address,address,uint256) == 0xe7a050aa
+     * - mintEigenAgent(bytes) == 0xcc15a557
+     * - queueWithdrawals((address[],uint256[],address)[]) == 0x0dd8dd02
+     * - completeQueuedWithdrawal(withdrawal,address[],uint256,bool) == 0x60d7faed
+     * - delegateTo(address,(bytes,uint256),bytes32) == 0xeea9064b
+     * - undelegate(address) == 0xda8be864
+     * @param functionSelector bytes4 functionSelector to get estimated gasLimits for.
+     * @return gasLimit a default gasLimit of 400_000 functionSelector parameter finds no matches.
+     */
+    function getGasLimitForFunctionSelector(bytes4 functionSelector)
+        public
+        view
+        returns (uint256)
+    {
         uint256 gasLimit = _gasLimitsForFunctionSelectors[functionSelector];
-        if (gasLimit != 0) {
-            return gasLimit;
-        } else {
-            // default gasLimit
-            return 400_000;
-        }
+        return (gasLimit > 0) ? gasLimit : 400_000;
     }
 }
 

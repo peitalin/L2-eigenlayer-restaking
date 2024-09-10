@@ -31,11 +31,24 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
         return senderHooks;
     }
 
+    /// @param _senderHooks address of the SenderHooks contract.
     function setSenderHooks(ISenderHooks _senderHooks) external onlyOwner {
         require(address(_senderHooks) != address(0), "_senderHooks cannot be address(0)");
         senderHooks = _senderHooks;
     }
 
+    /*
+     *
+     *                Receiving
+     *
+     *
+    */
+
+    /**
+     * @dev _ccipReceiver is called when a CCIP bridge contract receives a CCIP message.
+     * This contract allows us to define custom logic to handle outboound Eigenlayer messages
+     * for instance, committing a withdrawalTransferRoot on outbound completeWithdrawal messages.
+     */
     function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage)
         internal
         override
@@ -53,18 +66,24 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
             s_lastReceivedTokenAmount = 0;
         }
 
-        string memory text_msg = _afterCCIPReceiveMessage(any2EvmMessage);
+        string memory textMsg = _afterCCIPReceiveMessage(any2EvmMessage);
 
         emit MessageReceived(
             any2EvmMessage.messageId,
             any2EvmMessage.sourceChainSelector,
             abi.decode(any2EvmMessage.sender, (address)),
-            text_msg,
+            textMsg,
             s_lastReceivedTokenAddress,
             s_lastReceivedTokenAmount
         );
     }
 
+    /**
+     * @dev This function catches outbound completeWithdrawal messages to L1 Eigenlayer, and
+     * sets a withdrawalTransferRoot commitment that contains info on the agentOwner and amount.
+     * This is so when the SenderCCIP bridge receives the withdrawn funds from L1, it knows who to
+     * transfer the funds to.
+     */
     function _afterCCIPReceiveMessage(Client.Any2EVMMessage memory any2EvmMessage)
         internal
         returns (string memory textMsg)
@@ -76,19 +95,16 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             (
                 address agentOwner,
-                uint256 amount,
-                address tokenL2Address
+                uint256 amount
             ) = senderHooks.handleTransferToAgentOwner(message);
 
             // agentOwner is the signer, first committed when sending completeWithdrawal
-            // message and generating the withdrawalAgentOwnerRoot.
+            // message and generating the withdrawalTransferRoot.
             // completeWithdrawal only succeeds for the rightful signer/owner of the EigenAgent
-            IERC20(tokenL2Address).transfer(agentOwner, amount);
+            IERC20(any2EvmMessage.destTokenAmounts[0].token).transfer(agentOwner, amount);
 
             textMsg = "Completed withdrawal and sent tokens to EigenAgent owner";
-
         } else {
-
             emit MatchedReceivedFunctionSelector(functionSelector);
             textMsg = "unknown message";
         }
@@ -96,13 +112,22 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
         return textMsg;
     }
 
-    /// @param _receiver The address of the receiver.
-    /// @param _text The string data to be sent.
-    /// @param _token The token to be transferred.
-    /// @param _amount The amount of the token to be transferred.
-    /// @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
-    /// @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
-    /// @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
+    /*
+     *
+     *                Sending
+     *
+     *
+    */
+
+    /**
+     * @param _receiver The address of the receiver.
+     * @param _text The string data to be sent.
+     * @param _token The token to be transferred.
+     * @param _amount The amount of the token to be transferred.
+     * @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
+     * @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
+     * @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
+     */
     function _buildCCIPMessage(
         address _receiver,
         string calldata _text,
@@ -126,12 +151,13 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
         }
 
         bytes memory message = abi.encode(_text);
+        uint256 gasLimit;
 
-        bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
-
-        uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(functionSelector);
         if (_overrideGasLimit > 0) {
             gasLimit = _overrideGasLimit;
+        } else {
+            bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
+            gasLimit = senderHooks.getGasLimitForFunctionSelector(functionSelector);
         }
 
         senderHooks.beforeSendCCIPMessage(message, _token);

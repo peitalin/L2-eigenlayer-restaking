@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script, console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
@@ -11,19 +11,15 @@ import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy
 
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
-import {SenderCCIP} from "../src/SenderCCIP.sol";
-import {SenderHooks} from "../src/SenderHooks.sol";
 
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
-import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
-import {BaseSepolia, EthSepolia} from "./Addresses.sol";
+import {EthSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
 
-import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
@@ -125,6 +121,8 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
             address(new RestakingConnector())
         );
 
+        receiverProxy.setRestakingConnector(restakingConnectorProxy);
+
         restakingConnectorProxy.setAgentFactory(address(agentFactoryProxy));
         restakingConnectorProxy.setReceiverCCIP(address(receiverProxy));
 
@@ -132,6 +130,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
 
         agentFactoryProxy.setRestakingConnector(address(restakingConnectorProxy));
         agentFactoryProxy.set6551Registry(registry6551);
+        agentFactoryProxy.setEigenAgentOwner721(eigenAgentOwner721Proxy);
 
         require(
             address(receiverProxy.getRestakingConnector()) != address(0),
@@ -154,7 +153,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
             "upgrade agentFactory: missing restakingConnector"
         );
 
-        // Update registry6551 address, all other proxies stay the same
+        // Update addresses if need be (all proxies stay the same)
         if (!isTest) {
             saveReceiverBridgeContracts(
                 address(receiverProxy),
@@ -162,7 +161,8 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
                 address(agentFactoryProxy),
                 address(registry6551),
                 address(eigenAgentOwner721Proxy),
-                address(proxyAdmin)
+                address(proxyAdmin),
+                FILEPATH_BRIDGE_CONTRACTS_L1
             );
         }
 

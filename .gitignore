@@ -18,3 +18,4 @@ docs/
 /test/withdrawals-queued/*
 /test/withdrawals-redeposited/*
 /test/withdrawals-undelegated/*
+/test/temp-files/*
