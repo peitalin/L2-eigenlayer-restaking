@@ -5,11 +5,12 @@ import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
-import {BaseSepolia} from "../script/Addresses.sol";
+import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 import {EigenlayerMsgDecoders} from "../src/utils/EigenlayerMsgDecoders.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
+import {RouterFees} from "../script/RouterFees.sol";
 
 
 
@@ -116,10 +117,10 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         vm.selectFork(ethForkId);
 
         uint256 execNonce = 0;
-        address invalidEigenlayerContract = vm.addr(4444);
         // should revert with EigenAgentExecutionError(signer, expiry)
-        uint256 expiryShort = block.timestamp + 60 seconds;
+        address invalidEigenlayerContract = vm.addr(4444);
         // make expiryShort to test refund on expiry feature
+        uint256 expiryShort = block.timestamp + 60 seconds;
 
         bytes memory messageWithSignature;
         {
@@ -239,12 +240,42 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             ))
         });
 
-        // Call will try revert because AgentFactory._restakingConnector is set to a random address:
+        // Call will revert because AgentFactory._restakingConnector is set to a random address:
         // "Caller does not match: AgentFactory._restakingConnector"
         //
         // But as it is after expiry, we instead trigger the refund (emitting an event)
         vm.expectEmit(true, true, true, false);
         emit ReceiverCCIP.RefundingDeposit(bob, address(tokenL1), amount);
         receiverContract.mockCCIPReceive(any2EvmMessage);
+    }
+
+
+    function test_RouterFees_OnL1AndL2() public {
+
+        vm.selectFork(ethForkId);
+        RouterFees routerFeesL1 = new RouterFees();
+
+        uint256 fees1 = routerFeesL1.getRouterFeesL1(
+            address(receiverContract), // receiver
+            string("some random message"), // message
+            address(EthSepolia.BridgeToken), // tokenL1
+            0.1 ether, // amount
+            0 // gasLimit
+        );
+
+        require(fees1 > 0, "RouterFees on L1 did not esimate bridging fees");
+
+        vm.selectFork(l2ForkId);
+        RouterFees routerFeesL2 = new RouterFees();
+
+        uint256 fees2 = routerFeesL2.getRouterFeesL2(
+            address(senderContract), // receiver
+            string("some random message"), // message
+            address(BaseSepolia.BridgeToken), // tokenL1
+            0.1 ether, // amount
+            0 // gasLimit
+        );
+
+        require(fees2 > 0, "RouterFees on L2 did not esimate bridging fees");
     }
 }

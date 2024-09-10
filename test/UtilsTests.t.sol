@@ -7,8 +7,9 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transpa
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {BaseScript} from "../script/BaseScript.sol";
 import {AdminableMock} from "./mocks/AdminableMock.sol";
-import {ERC20Minter} from "../src/ERC20Minter.sol";
+import {ERC20Minter} from "./mocks/ERC20Minter.sol";
 import {FileReader} from "../script/FileReader.sol";
+
 
 contract UtilsTests is Test {
 

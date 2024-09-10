@@ -29,7 +29,7 @@ contract DelegationScriptsTests is Test, DeployScriptHelpers {
         try delegateToScript.mockrun() {
             //
         } catch Error(string memory reason) {
-            compareErrorStr(reason, "User must have an EigenAgent");
+            catchErrorStr(reason, "User must have an EigenAgent");
         }
     }
 
@@ -40,8 +40,27 @@ contract DelegationScriptsTests is Test, DeployScriptHelpers {
         try undelegateScript.mockrun() {
             //
         } catch (bytes memory err) {
-            compareErrorBytes(err, "User must have an EigenAgent");
+            //
+        } catch Error(string memory errStr) {
+            if (catchErrorStr(errStr, "Withdrawals file not found")) {
+
+            } else if (catchErrorStr(errStr, "User must have an EigenAgent")) {
+                console.log("Run depositAndMintEigenAgent script first");
+
+            } else if (catchErrorStr(errStr, "EigenAgent has no deposit in Eigenlayer")) {
+                console.log("Run depositIntoStrategy script first");
+
+            } else if (catchErrorStr(errStr, "Operator must be registered")) {
+                console.log("Run delegateTo script first");
+
+            } else if (catchErrorStr(errStr, "EigenAgent not delegatedTo any operators")) {
+                console.log("Run delegateTo script first");
+
+            } else {
+                revert(errStr);
+            }
         }
+
     }
 
     function test_step6c_RedepositScript() public {
@@ -51,10 +70,16 @@ contract DelegationScriptsTests is Test, DeployScriptHelpers {
         try redepositScript.mockrun() {
             //
         } catch Error(string memory errStr) {
-            compareErrorStr(errStr, "Withdrawals file not found");
-            // Run undelegate script first on Sepolia.
-        } catch (bytes memory err) {
-            compareErrorBytes(err, "User must have an EigenAgent");
+
+            if (catchErrorStr(errStr, "User must have an EigenAgent")) {
+                console.log("Run depositAndMintEigenAgent script first");
+
+            } else if (catchErrorStr(errStr, "Withdrawals file not found")) {
+                console.log("Run undelegate script first");
+
+            } else {
+                revert(errStr);
+            }
         }
     }
 

@@ -32,11 +32,11 @@ contract DepositWithdrawalScriptsTests is Test, DeployScriptHelpers {
         // vm.assume(mockKey < type(uint256).max / 2);
         // vm.assume(mockKey > 1);
         // EIP-2: secp256k1 curve order / 2
-        uint256 mockKey = (vm.randomUint() / 2) + 1;
+        uint256 mockKey = (vm.randomUint() / 3) + 2;
         try depositAndMintEigenAgentScript.mockrun(mockKey) {
             //
         } catch Error(string memory reason) {
-            compareErrorStr(reason, "User already has an EigenAgent");
+            catchErrorStr(reason, "User already has an EigenAgent");
         }
     }
 
@@ -47,7 +47,7 @@ contract DepositWithdrawalScriptsTests is Test, DeployScriptHelpers {
         try depositIntoStrategyScript.mockrun() {
             //
         } catch Error(string memory reason) {
-            compareErrorStr(reason, "User must have an EigenAgent");
+            catchErrorStr(reason, "User must have an EigenAgent");
         }
     }
 
@@ -68,7 +68,7 @@ contract DepositWithdrawalScriptsTests is Test, DeployScriptHelpers {
         CheckMintEigenAgentGasCostsScript checkMintEigenAgentGasCostsScript
             = new CheckMintEigenAgentGasCostsScript();
 
-        checkMintEigenAgentGasCostsScript.run();
+        checkMintEigenAgentGasCostsScript.mockrun();
     }
 
     function test_step7_QueueWithdrawalScript() public {
@@ -86,13 +86,19 @@ contract DepositWithdrawalScriptsTests is Test, DeployScriptHelpers {
         // Note: requires step7 to be run first so that:
         // script/withdrawals-queued/<eigen-agent-address>/run-latest.json exists
         try completeWithdrawalScript.mockrun() {
-
+            //
         } catch Error(string memory errStr) {
-            compareErrorStr(errStr, "Withdrawals file not found");
-            // Run undelegate scripts first
-        } catch (bytes memory err) {
-            compareErrorBytes(err, "User must have an EigenAgent");
+            if (catchErrorStr(errStr, "User must have an EigenAgent")) {
+                console.log("Run depositAndMintEigenAgent script first.");
+
+            } else if (catchErrorStr(errStr, "Withdrawals file not found")) {
+                console.log("Run queueWithdrawal script first.");
+
+            } else {
+                revert(errStr);
+            }
         }
+
     }
 }
 

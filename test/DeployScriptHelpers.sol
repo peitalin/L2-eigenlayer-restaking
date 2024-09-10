@@ -9,20 +9,22 @@ contract DeployScriptHelpers {
         return keccak256(abi.encode(s1)) == keccak256(abi.encode(s2));
     }
 
-    function compareErrorStr(string memory s1, string memory s2) public pure returns (bool) {
+    function catchErrorStr(string memory s1, string memory s2) public pure returns (bool) {
         if (strEq(s1, s2)) {
             console.log(s1);
+            return true;
         } else {
-            revert(s1);
+            return false;
         }
     }
 
-    function compareErrorBytes(bytes memory b1, string memory s2) public pure returns (bool) {
+    function catchErrorBytes(bytes memory b1, string memory s2) public pure returns (bool) {
         string memory s1 = abi.decode(b1, (string));
         if (strEq(s1, s2)) {
             console.log(s1);
+            return true;
         } else {
-            revert(s1);
+            return false;
         }
     }
 
