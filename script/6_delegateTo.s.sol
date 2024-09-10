@@ -122,10 +122,9 @@ contract DelegateToScript is BaseScript {
             sigExpiry
         );
 
-        // uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
-        //     IDelegationManager.delegateTo.selector
-        // );
-        uint gasLimit = 750_000;
+        uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
+            IDelegationManager.delegateTo.selector
+        );
 
         senderContract.sendMessagePayNative{
             value: getRouterFeesL2(

@@ -104,7 +104,7 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
         vm.startBroadcast(deployerKey);
         agentFactory.spawnEigenAgentOnlyOwner(bob);
 
-        vm.expectRevert("staker already has an EigenAgent");
+        vm.expectRevert("User already has an EigenAgent");
         agentFactory.spawnEigenAgentOnlyOwner(bob);
         vm.stopBroadcast();
     }

@@ -90,6 +90,7 @@ abstract contract Base6551Account is IERC165, IERC1271, IBase6551Account, IERC65
             || interfaceId == type(IERC6551Executable).interfaceId;
     }
 
+    /// @notice Gets the NFT collection associated with ERC-6551 accounts
     function token() public view virtual returns (uint256, address, uint256) {
         bytes memory footer = new bytes(0x60);
 
@@ -100,6 +101,7 @@ abstract contract Base6551Account is IERC165, IERC1271, IBase6551Account, IERC65
         return abi.decode(footer, (uint256, address, uint256));
     }
 
+    /// @notice Gets the owner of the ERC-6551 account
     function owner() public view virtual returns (address) {
         (uint256 chainId, address tokenContract, uint256 tokenId) = token();
         if (chainId != block.chainid) return address(0);

@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import {IBase6551Account} from "./Base6551Account.sol";
 
+
 interface IEigenAgent6551 is IBase6551Account {
 
     function EIGEN_AGENT_EXEC_TYPEHASH() external returns (bytes32);

@@ -268,27 +268,6 @@ contract EigenlayerMsg_EncodingDecodingTests is BaseTestEnvironment {
             ))
         );
 
-        // console.log("[0].strategies[0]");
-        // console.log(address(decodedQW[0].strategies[0]));
-        // console.log("[0].shares[0]");
-        // console.log(decodedQW[0].shares[0]);
-        // console.log("[0].withdrawer");
-        // console.log(decodedQW[0].withdrawer);
-
-        // console.log("[1].strategies[0]");
-        // console.log(address(decodedQW[1].strategies[0]));
-        // console.log("[1].shares[0]");
-        // console.log(decodedQW[1].shares[0]);
-        // console.log("[1].withdrawer");
-        // console.log(decodedQW[1].withdrawer);
-
-        // console.log("[2].strategies[0]");
-        // console.log(address(decodedQW[2].strategies[0]));
-        // console.log("[2].shares[0]");
-        // console.log(decodedQW[2].shares[0]);
-        // console.log("[2].withdrawer");
-        // console.log(decodedQW[2].withdrawer);
-
         // signature
         require(_signature.length == 65, "signature bad length: decodeQueueWithdrawalsMsg");
         require(signer == deployer, "incorrect signer: decodeQueueWithdrawalsMsg");

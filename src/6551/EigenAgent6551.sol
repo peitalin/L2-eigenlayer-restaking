@@ -31,6 +31,12 @@ contract EigenAgent6551 is Base6551Account {
         _;
     }
 
+    /**
+     * @dev Checks if signature is valid according to ERC-1271. If the signer is an EOA,
+     * it validates signatures using ecrecover. If the signer is a contract, calls isValidSignature
+     * on the contract to determin if the signatuer is valid. For an example, see MockMultisigSigner.sol
+     * contract and associated tests.
+     */
     function isValidSignature(
         bytes32 digestHash,
         bytes memory signature
@@ -43,6 +49,14 @@ contract EigenAgent6551 is Base6551Account {
         }
     }
 
+    /**
+     * @dev This function is used by RestakingConnector.sol to approve Eigenlayer StrategyManager
+     * to transfer and EigenAgent's tokens into Eigenlayer strategy vaults. This avoids needing
+     * to extra transfers and signed messages to complete L2 restaking deposits.
+     * @param targetContract to approve transfer for, expected to be the Eigenlayer StrategyManager contract
+     * @param token the token used in the Eigenlayer Strategy vault.
+     * @param amount of tokens user is depositing into the strategy vault.
+     */
     function approveByWhitelistedContract(
         address targetContract,
         address token,
@@ -51,6 +65,19 @@ contract EigenAgent6551 is Base6551Account {
         return IERC20(token).approve(targetContract, amount);
     }
 
+    /**
+     * @dev EigenAgent receives CCIP messages and executes Eigenlayer commands on behalf of it's owner
+     * on L2. The EigenAgent will only execute if provided a valid signature from the owner of the
+     * EigenAgentOwner721 NFT associated with the ERC-6551 EigenAgent account.
+     * @param targetContract is the contract to call
+     * @param value amount of ETH to send with the call
+     * @param data the data to send to targetContract (e.g. depositIntoStrategy calldata)
+     * @param expiry expiry of the signature, currently only used to give users an option to withdraw
+     * bridged funds (for a deposit) if the call reverts after a period of a time (e.g in case an
+     * Operator deactivates in the time it takes to bridge from L2 to L1 and deposit).
+     * @param signature is the owner of the EigenAgent's signature, signed over the hash of the
+     * data that the EigenAgent calls the targetContract with.
+     */
     function executeWithSignature(
         address targetContract,
         uint256 value,
@@ -63,9 +90,9 @@ contract EigenAgent6551 is Base6551Account {
         virtual
         returns (bytes memory result)
     {
-        /// Does not revert on expiry: CCIP may take hours to deliver messages when gas spikes.
-        /// We would need to return funds to the user on L2 this case,
-        /// as the transaction may no longer be manually executable after gas lowers later.
+        /// Expiry: does not revert on expiry: CCIP may take hours to deliver messages when gas spikes.
+        /// We would need to return funds to the user on L2 this case, as the transaction may
+        /// no longer be manually executable after gas lowers later.
         ///
         /// Instead, we use expiry for specific purposes, such as allowing users to trigger
         /// a refund if their deposit fails on L1 manually (e.g. Operator goes offline while bridging).
@@ -96,6 +123,15 @@ contract EigenAgent6551 is Base6551Account {
         return result;
     }
 
+    /**
+     * @dev Creates a digestHash of the Eigenlayer command (e.g depositIntoStrategy) to be sent through CCIP.
+     * @param target contract for the EigenAgent to call
+     * @param value amount of Eth to send with the call
+     * @param data to send (e.g. encoded queueWithdrawal parameters) to target contract (DelegationManager)
+     * @param nonce execution nonce used in EigenAgent execution signatures
+     * @param chainid is the chain EigenAgent and Eigenlayer is deployed on.
+     * @param expiry expiry parameter for signature (currently does not revert if expired)
+     */
     function createEigenAgentCallDigestHash(
         address target,
         uint256 value,
@@ -104,7 +140,7 @@ contract EigenAgent6551 is Base6551Account {
         uint256 chainid,
         uint256 expiry
     ) public pure returns (bytes32) {
-
+        // EIP-712 struct hash
         bytes32 structHash = keccak256(abi.encode(
             EIGEN_AGENT_EXEC_TYPEHASH,
             target,
@@ -124,9 +160,11 @@ contract EigenAgent6551 is Base6551Account {
         return digestHash;
     }
 
-    /// @param contractAddr is the address of the contract being called,
-    /// usually Eigenlayer StrategyManager, or DelegationManager.
-    /// @param chainid is the chain Eigenlayer is deployed on
+    /**
+     * @param contractAddr is the address of the contract where the signature will be verified,
+     * either EigenAgent, Eigenlayer StrategyManager, or DelegationManager.
+     * @param chainid is the chain Eigenlayer and EigenAgent are deployed on.
+     */
     function domainSeparator(
         address contractAddr, // strategyManagerAddr, or delegationManagerAddr
         uint256 chainid

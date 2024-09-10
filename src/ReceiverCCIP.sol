@@ -307,13 +307,15 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
      *
     */
 
-    /// @param _receiver The address of the receiver.
-    /// @param _text The string data to be sent.
-    /// @param _token The token to be transferred.
-    /// @param _amount The amount of the token to be transferred.
-    /// @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
-    /// @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
-    /// @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
+    /**
+     * @param _receiver The address of the receiver.
+     * @param _text The string data to be sent.
+     * @param _token The token to be transferred.
+     * @param _amount The amount of the token to be transferred.
+     * @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
+     * @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
+     * @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
+     */
     function _buildCCIPMessage(
         address _receiver,
         string calldata _text,

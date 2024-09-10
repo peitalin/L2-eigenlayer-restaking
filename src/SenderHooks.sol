@@ -237,12 +237,12 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
 
     /**
      * @dev Retrieves estimated gasLimits for different L2 restaking functions, e.g:
-     * depositIntoStrategy(address,address,uint256) == 0xe7a050aa
-     * mintEigenAgent(bytes) == 0xcc15a557
-     * queueWithdrawals((address[],uint256[],address)[]) == 0x0dd8dd02
-     * completeQueuedWithdrawal(withdrawal,address[],uint256,bool) == 0x60d7faed
-     * delegateTo(address,(bytes,uint256),bytes32) == 0xeea9064b
-     * undelegate(address) == 0xda8be864
+     * - depositIntoStrategy(address,address,uint256) == 0xe7a050aa
+     * - mintEigenAgent(bytes) == 0xcc15a557
+     * - queueWithdrawals((address[],uint256[],address)[]) == 0x0dd8dd02
+     * - completeQueuedWithdrawal(withdrawal,address[],uint256,bool) == 0x60d7faed
+     * - delegateTo(address,(bytes,uint256),bytes32) == 0xeea9064b
+     * - undelegate(address) == 0xda8be864
      * @param functionSelector bytes4 functionSelector to get estimated gasLimits for.
      * @return gasLimit a default gasLimit of 400_000 functionSelector parameter finds no matches.
      */

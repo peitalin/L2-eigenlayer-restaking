@@ -33,9 +33,11 @@ library FunctionSelectorDecoder {
         }
     }
 
-    /// @dev decodes params associated with EigenAgentExecutionError
-    /// @return signer the original signer of the message
-    /// @return expiry signature expiry
+    /**
+     * @dev decodes params associated with EigenAgentExecutionError
+     * @return signer the original signer of the message
+     * @return expiry signature expiry
+     */
     function decodeEigenAgentExecutionErrorParams(bytes memory customError)
         public
         pure

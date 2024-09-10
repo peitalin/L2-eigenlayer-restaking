@@ -354,7 +354,7 @@ contract RestakingConnector is
     */
 
     /**
-     * @dev Retreives the block.number where queueWithdrawal occured. Needed as the time when
+     * @dev Retrieves the block.number where queueWithdrawal occured. Needed as the time when
      * queueWithdrawal message is dispatched differs from the time the message executes on L1.
      * @param staker is the EigenAgent staking into Eigenlayer
      * @param nonce is the withdrawal nonce Eigenlayer keeps track of in DelegationManager.sol

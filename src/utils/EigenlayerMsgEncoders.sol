@@ -11,10 +11,12 @@ import {IRestakingConnector} from "../interfaces/IRestakingConnector.sol";
 
 library EigenlayerMsgEncoders {
 
-    /// @dev Encodes a depositIntoStrategy() message for Eigenlayer's StrategyManager.sol contract
-    /// @param strategy Eigenlayer strategy to deposit into
-    /// @param token token associated with strategy
-    /// @param amount deposit amount
+    /**
+     * @dev Encodes a depositIntoStrategy() message for Eigenlayer's StrategyManager.sol contract
+     * @param strategy Eigenlayer strategy to deposit into
+     * @param token token associated with strategy
+     * @param amount deposit amount
+    */
     function encodeDepositIntoStrategyMsg(
         address strategy,
         address token,
@@ -46,11 +48,13 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-    /// @dev Encodes params for a completeWithdrawal() call to Eigenlayer's DelegationManager.sol
-    /// @param withdrawal withdrawal parameters for completeWithdrawals() function call
-    /// @param tokensToWithdraw tokens to withdraw.
-    /// @param middlewareTimesIndex used for slashing. Not used yet.
-    /// @param receiveAsTokens determines whether to redeposit into Eigenlayer, or withdraw as tokens
+    /**
+     * @dev Encodes params for a completeWithdrawal() call to Eigenlayer's DelegationManager.sol
+     * @param withdrawal withdrawal parameters for completeWithdrawals() function call
+     * @param tokensToWithdraw tokens to withdraw.
+     * @param middlewareTimesIndex used for slashing. Not used yet.
+     * @param receiveAsTokens determines whether to redeposit into Eigenlayer, or withdraw as tokens
+     */
     function encodeCompleteWithdrawalMsg(
         IDelegationManager.Withdrawal memory withdrawal,
         IERC20[] memory tokensToWithdraw,
@@ -88,10 +92,12 @@ library EigenlayerMsgEncoders {
         return message_bytes;
     }
 
-    /// @dev Encodes params for a delegateTo() call to Eigenlayer's DelegationManager.sol
-    /// @param operator entity to delegate to
-    /// @param approverSignatureAndExpiry operator approver's signature to delegate to them
-    /// @param approverSalt salt to ensure message signature is unique
+    /**
+     * @dev Encodes params for a delegateTo() call to Eigenlayer's DelegationManager.sol
+     * @param operator entity to delegate to
+     * @param approverSignatureAndExpiry operator approver's signature to delegate to them
+     * @param approverSalt salt to ensure message signature is unique
+     */
     function encodeDelegateTo(
         address operator,
         ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
@@ -150,12 +156,14 @@ library EigenlayerMsgEncoders {
      *
     */
 
-    /// @dev withdrawalTransferRoot commits to a Eigenlayer withdrawalRoot, amount and agentOwner
-    /// @dev on L2 when first sending a completeWithdrawal() message so that when the withdrawan
-    /// @dev funds return from L2 later, the bridge can lookup the user to transfer funds to.
-    /// @param withdrawalRoot is calculate by Eigenlayer during queueWithdrawals, needed to completeWithdrawal
-    /// @param amount is the amount withdrawan
-    /// @param agentOwner is the owner of the EigenAgent who deposits and withdraws from Eigenlayer
+    /**
+     * @dev withdrawalTransferRoot commits to a Eigenlayer withdrawalRoot, amount and agentOwner
+     * on L2 when first sending a completeWithdrawal() message so that when the withdrawan
+     * funds return from L2 later, the bridge can lookup the user to transfer funds to.
+     * @param withdrawalRoot is calculate by Eigenlayer during queueWithdrawals, needed to completeWithdrawal
+     * @param amount is the amount withdrawan
+     * @param agentOwner is the owner of the EigenAgent who deposits and withdraws from Eigenlayer
+     */
     function calculateWithdrawalTransferRoot(
         bytes32 withdrawalRoot,
         uint256 amount,

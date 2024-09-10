@@ -5,13 +5,15 @@ pragma solidity 0.8.22;
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-/// Notice: Copy v5 OpenZeppelin implementation, as Eigenlayer depends on OpenZeppelin v4.
-/// OpenZeppelin v4 SignatureChecker does not check if signer is EOA or Contract properly.
-/// So we copy the v5 SignatureChecker here (adapted to use ECDSA from v4):
-/// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/SignatureChecker.sol
-///
-/// If we do not need to deploy Mock Eigenlayer contracts (e.g. on Holesky and mainnet), then we can use
-/// OepnZeppelin v5 and delete this file.
+/**
+ * Notice: Copy v5 OpenZeppelin implementation, as Eigenlayer depends on OpenZeppelin v4.
+ * OpenZeppelin v4 SignatureChecker does not check if signer is EOA or Contract properly.
+ * So we copy the v5 SignatureChecker here (adapted to use ECDSA from v4):
+ * https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/SignatureChecker.sol
+
+ * If we do not need to deploy Mock Eigenlayer contracts (e.g. on Holesky and mainnet), then we can use
+ * OpenZeppelin v5 and delete this file.
+*/
 library SignatureCheckerV5 {
     /**
      * @dev Checks if a signature is valid for a given signer and data hash. If the signer is a smart contract, the

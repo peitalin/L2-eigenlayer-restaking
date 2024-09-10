@@ -13,9 +13,11 @@ struct TransferToAgentOwnerMsg {
 
 library AgentOwnerSignature {
 
-    /// @dev Decodes user signatures on all CCIP messages to EigenAgents
-    /// @param message is a CCIP message to Eigenlayer
-    /// @param sigOffset is the offset where the user signature begins
+    /**
+     * @dev Decodes user signatures on all CCIP messages to EigenAgents
+     * @param message is a CCIP message to Eigenlayer
+     * @param sigOffset is the offset where the user signature begins
+     */
     function decodeAgentOwnerSignature(bytes memory message, uint256 sigOffset)
         public
         pure
@@ -58,13 +60,17 @@ contract EigenlayerMsgDecoders {
      *
     */
 
-    /// @param message CCIP message to Eigenlayer
-    /// @return strategy Eigenlayer strategy vault user is depositing into.
-    /// @return token Token address associated with the strategy.
-    /// @return amount Amount user is depositing
-    /// @return signer Owner of the EigenAgent
-    /// @return expiry Determines when a cross chain deposit can be refunded. If a deposit is stuck in CCIP after bridging, user may manually trigger a refund after expiry.
-    /// @return signature Signed by the user for their EigenAgent to excecute. The signature signs a hash of the message being sent to Eigenlayer.
+    /**
+    * @param message CCIP message to Eigenlayer
+    * @return strategy Eigenlayer strategy vault user is depositing into.
+    * @return token Token address associated with the strategy.
+    * @return amount Amount user is depositing
+    * @return signer Owner of the EigenAgent
+    * @return expiry Determines when a cross chain deposit can be refunded.
+    * If a deposit is stuck in CCIP after bridging, user may manually trigger a refund after expiry.
+    * @return signature Signed by the user for their EigenAgent to excecute.
+    * The signature signs a hash of the message being sent to Eigenlayer.
+    */
     function decodeDepositIntoStrategyMsg(bytes memory message)
         public
         pure
@@ -128,11 +134,13 @@ contract EigenlayerMsgDecoders {
      *
     */
 
-    /// @param message CCIP message to Eigenlayer
-    /// @return arrayQueuedWithdrawalParams is the message sent to Eigenlayer when calling queueWithdrawals()
-    /// @return signer Owner of the EigenAgent
-    /// @return expiry Expiry of the signature (does not revert)
-    /// @return signature Signed by the user for their EigenAgent to excecute.
+    /**
+     * @param message CCIP message to Eigenlayer
+     * @return arrayQueuedWithdrawalParams is the message sent to Eigenlayer when calling queueWithdrawals()
+     * @return signer Owner of the EigenAgent
+     * @return expiry Expiry of the signature (does not revert)
+     * @return signature Signed by the user for their EigenAgent to excecute.
+     */
     function decodeQueueWithdrawalsMsg(bytes memory message)
         public
         pure
@@ -298,14 +306,16 @@ contract EigenlayerMsgDecoders {
      *
     */
 
-    /// @param message CCIP message to Eigenlayer
-    /// @return withdrawal is the message sent to Eigenlayer to call completeWithdrawal()
-    /// @return tokensToWithdraw Eigenlayer parameter when calling completeWithdrawal()
-    /// @return middlewareTimesIndex Eigenlayer parameter, used for slashing later.
-    /// @return receiveAsTokens determines whether to redeposit into Eigenlayer or receive as tokens.
-    /// @return signer Owner of the EigenAgent
-    /// @return expiry Expiry of the signature (does not revert)
-    /// @return signature Signed by the user for their EigenAgent to excecute.
+    /**
+     * @param message CCIP message to Eigenlayer
+     * @return withdrawal is the message sent to Eigenlayer to call completeWithdrawal()
+     * @return tokensToWithdraw Eigenlayer parameter when calling completeWithdrawal()
+     * @return middlewareTimesIndex Eigenlayer parameter, used for slashing later.
+     * @return receiveAsTokens determines whether to redeposit into Eigenlayer or receive as tokens.
+     * @return signer Owner of the EigenAgent
+     * @return expiry Expiry of the signature (does not revert)
+     * @return signature Signed by the user for their EigenAgent to excecute.
+     */
     function decodeCompleteWithdrawalMsg(bytes memory message)
         public
         pure
@@ -486,12 +496,14 @@ contract EigenlayerMsgDecoders {
     }
 
 
-    /// @dev This message is dispatched from L1 to L2 by ReceiverCCIP.sol
-    /// @dev When sending a completeWithdrawal message, we first commit to a withdrawalTransferRoot on L2
-    /// @dev so that when completeWithdrawal finishes on L1 and bridge the funds back to L2, the bridge knows
-    /// @dev who the original owner associated with that withdrawalTransferRoot is.
-    /// @param message CCIP message to Eigenlayer
-    /// @return transferToAgentOwnerMsg contains the withdrawalTransferRoot which is sent back to L2
+    /**
+     * @dev This message is dispatched from L1 to L2 by ReceiverCCIP.sol
+     * When sending a completeWithdrawal message, we first commit to a withdrawalTransferRoot on L2
+     * so that when completeWithdrawal finishes on L1 and bridge the funds back to L2, the bridge knows
+     * who the original owner associated with that withdrawalTransferRoot is.
+     * @param message CCIP message to Eigenlayer
+     * @return transferToAgentOwnerMsg contains the withdrawalTransferRoot which is sent back to L2
+     */
     function decodeTransferToAgentOwnerMsg(bytes memory message)
         public pure
         returns (TransferToAgentOwnerMsg memory transferToAgentOwnerMsg)
@@ -612,11 +624,13 @@ library DelegationDecoders {
         );
     }
 
-    /// @param message CCIP message to Eigenlayer
-    /// @return staker address of the EigenAgent (the staker from Eigenlayer's perspective)
-    /// @return signer Owner of the EigenAgent
-    /// @return expiry Expiry of the signature
-    /// @return signature Signed by the user for their EigenAgent to excecute.
+    /**
+     * @param message CCIP message to Eigenlayer
+     * @return staker address of the EigenAgent (the staker from Eigenlayer's perspective)
+     * @return signer Owner of the EigenAgent
+     * @return expiry Expiry of the signature
+     * @return signature Signed by the user for their EigenAgent to excecute.
+     */
     function decodeUndelegateMsg(bytes memory message)
         public
         pure
