@@ -7,7 +7,6 @@ import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {EthSepolia} from "./Addresses.sol";
 import {BaseScript} from "./BaseScript.sol";
 
-import {console} from "forge-std/Test.sol";
 
 contract DepositAndMintEigenAgentScript is BaseScript {
 
@@ -42,8 +41,6 @@ contract DepositAndMintEigenAgentScript is BaseScript {
 
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployerKey);
-
-        console.log("deployer:", deployer);
 
         (
             eigenAgent,

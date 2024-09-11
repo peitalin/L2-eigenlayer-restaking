@@ -97,10 +97,7 @@ contract CompleteWithdrawalScript is BaseScript {
             /////////////////////////////////////////////////////////////////
             /////// Broadcast to L2
             /////////////////////////////////////////////////////////////////
-
             vm.selectFork(l2ForkId);
-
-            vm.startBroadcast(deployerKey);
 
             require(
                 senderContract.allowlistedSenders(address(receiverContract)),
@@ -134,7 +131,8 @@ contract CompleteWithdrawalScript is BaseScript {
             uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
                 IDelegationManager.completeQueuedWithdrawal.selector
             );
-            // gas: 415,166
+
+            vm.startBroadcast(deployerKey);
 
             senderContract.sendMessagePayNative{
                 value: getRouterFeesL2(

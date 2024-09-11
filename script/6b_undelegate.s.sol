@@ -51,7 +51,6 @@ contract UndelegateScript is BaseScript {
         );
 
         if (!isTest) {
-            require(delegationManager.isOperator(operator), "Operator must be registered");
             require(
                 delegationManager.delegatedTo(address(eigenAgent)) == address(operator),
                 "EigenAgent not delegatedTo any operators"

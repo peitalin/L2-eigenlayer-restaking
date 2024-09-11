@@ -88,10 +88,21 @@ contract ScriptsTests_Deposits_Withdrawals is Test, TestErrorHandlers {
     function test_step7_QueueWithdrawalScript() public {
 
         QueueWithdrawalScript queueWithdrawalScript = new QueueWithdrawalScript();
-        // Note: If step8 has completed withdrawal, this test may warn it failed with:
-        // "revert: withdrawalRoot has already been used"
-        queueWithdrawalScript.mockrun();
-        // writes new json files: withdrawalRoots, so use mockrun()
+        // Writes new json files: withdrawalRoots, so use mockrun()
+        try queueWithdrawalScript.mockrun() {
+        //
+        } catch Error(string memory errStr) {
+            if (catchErrorStr(errStr, "User must have an EigenAgent")) {
+                console.log("Run depositAndMintEigenAgent script first.");
+
+            } else if (catchErrorStr(errStr, "SenderHooks._commitWithdrawalTransferRootInfo: withdrawalTransferRoot already used")) {
+                // Note: If step8 has completed withdrawal, this test may warn it failed with:
+                // "SenderHooks._commitWithdrawalTransferRootInfo: withdrawalTransferRoot already used"
+                console.log("Make another deposit first, run depositAndMintEigenAgent script.");
+            } else {
+                revert(errStr);
+            }
+        }
     }
 
     function test_step8_CompleteWithdrawalScript() public {
@@ -112,7 +123,6 @@ contract ScriptsTests_Deposits_Withdrawals is Test, TestErrorHandlers {
                 revert(errStr);
             }
         }
-
     }
 }
 

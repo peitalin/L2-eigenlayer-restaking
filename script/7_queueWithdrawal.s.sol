@@ -60,13 +60,11 @@ contract QueueWithdrawalScript is BaseScript {
         vm.selectFork(ethForkId);
 
         eigenAgent = agentFactory.getEigenAgent(deployer);
-        if (address(eigenAgent) == address(0)) {
-            if (isTest) {
-                vm.prank(deployer);
-                eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
-            } else {
-                revert("User must have existing deposit in Eigenlayer + EigenAgent");
-            }
+        if (!isTest) {
+            require(address(eigenAgent) != address(0), "User must have an EigenAgent");
+        } else {
+            vm.prank(deployer);
+            eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
         }
 
         execNonce = isTest ? 0 : eigenAgent.execNonce();

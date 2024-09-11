@@ -25,7 +25,7 @@ contract ScriptsTests_ReadEigenlayerContracts is Test {
 
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
-        vm.chainId(31337); // isTest
+        vm.chainId(31337);
     }
 
     /*
