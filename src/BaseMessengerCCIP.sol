@@ -12,14 +12,24 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     using SafeERC20 for IERC20;
 
-    error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees);
-    error NothingToWithdraw();
-    error FailedToWithdrawEth(address owner, address target, uint256 value);
-    error DestinationChainNotAllowed(uint64 destinationChainSelector);
-    error SourceChainNotAllowed(uint64 sourceChainSelector);
-    error SenderNotAllowed(address sender);
-    error InvalidReceiverAddress();
-    error NotEnoughEthGasFees(uint256 setGasFees, uint256 requiredGasFees);
+    bytes32 internal s_lastReceivedMessageId;
+    address internal s_lastReceivedTokenAddress;
+    uint256 internal s_lastReceivedTokenAmount;
+    string internal s_lastReceivedText;
+
+    mapping(uint64 => bool) public allowlistedDestinationChains;
+    mapping(uint64 => bool) public allowlistedSourceChains;
+    mapping(address => bool) public allowlistedSenders;
+
+    IERC20 internal s_linkToken;
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+
+    uint256[42] private __gap;
 
     event MessageSent(
         bytes32 indexed messageId,
@@ -41,24 +51,14 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         uint256 tokenAmount
     );
 
-    bytes32 internal s_lastReceivedMessageId;
-    address internal s_lastReceivedTokenAddress;
-    uint256 internal s_lastReceivedTokenAmount;
-    string internal s_lastReceivedText;
-
-    mapping(uint64 => bool) public allowlistedDestinationChains;
-    mapping(uint64 => bool) public allowlistedSourceChains;
-    mapping(address => bool) public allowlistedSenders;
-
-    IERC20 internal s_linkToken;
-
-    /**
-     * @dev This empty reserved space is put in place to allow future versions to add new
-     * variables without shifting down storage in the inheritance chain.
-     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
-     */
-
-    uint256[42] private __gap;
+    error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees);
+    error NothingToWithdraw();
+    error FailedToWithdrawEth(address owner, address target, uint256 value);
+    error DestinationChainNotAllowed(uint64 destinationChainSelector);
+    error SourceChainNotAllowed(uint64 sourceChainSelector);
+    error SenderNotAllowed(address sender);
+    error InvalidReceiverAddress();
+    error NotEnoughEthGasFees(uint256 setGasFees, uint256 requiredGasFees);
 
     constructor(
         address _router,
@@ -166,7 +166,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         }
 
         // transfer tokens from user to this contract
-        if (_amount >= 0 && msg.sender != address(this)) {
+        if (_amount > 0 && msg.sender != address(this)) {
             IERC20(_token).transferFrom(msg.sender, address(this), _amount);
         }
         // then approve router to move tokens from this contract
@@ -218,7 +218,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
     /// @notice Allows the contract owner to withdraw the entire balance of Ether from the contract.
     /// @param _beneficiary The address to which the Ether should be sent.
-    function withdraw(address _beneficiary) public onlyOwner {
+    function withdraw(address _beneficiary) external onlyOwner {
         uint256 amount = address(this).balance;
         if (amount == 0) revert NothingToWithdraw();
         (bool sent, ) = _beneficiary.call{value: amount}("");
@@ -230,7 +230,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     function withdrawToken(
         address _beneficiary,
         address _token
-    ) public onlyOwner {
+    ) external onlyOwner {
         uint256 amount = IERC20(_token).balanceOf(address(this));
         if (amount == 0) revert NothingToWithdraw();
         IERC20(_token).safeTransfer(_beneficiary, amount);

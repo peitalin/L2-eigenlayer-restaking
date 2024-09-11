@@ -32,24 +32,6 @@ contract EigenAgent6551 is Base6551Account {
     }
 
     /**
-     * @dev Checks if signature is valid according to ERC-1271. If the signer is an EOA,
-     * it validates signatures using ecrecover. If the signer is a contract, calls isValidSignature
-     * on the contract to determin if the signatuer is valid. For an example, see MockMultisigSigner.sol
-     * contract and associated tests.
-     */
-    function isValidSignature(
-        bytes32 digestHash,
-        bytes memory signature
-    ) public view virtual override returns (bytes4) {
-        address signer = owner();
-        if (SignatureCheckerV5.isValidSignatureNow(signer, digestHash, signature)) {
-            return IERC1271.isValidSignature.selector;
-        } else {
-            return bytes4(0);
-        }
-    }
-
-    /**
      * @dev This function is used by RestakingConnector.sol to approve Eigenlayer StrategyManager
      * to transfer and EigenAgent's tokens into Eigenlayer strategy vaults. This avoids needing
      * to extra transfers and signed messages to complete L2 restaking deposits.
@@ -90,12 +72,12 @@ contract EigenAgent6551 is Base6551Account {
         virtual
         returns (bytes memory result)
     {
-        /// Expiry: does not revert on expiry: CCIP may take hours to deliver messages when gas spikes.
+        /// Expiry: does not revert on expiry. CCIP may take hours to deliver messages if gas spikes.
         /// We would need to return funds to the user on L2 this case, as the transaction may
-        /// no longer be manually executable after gas lowers later.
+        /// no longer be manually executable after gas lowers later (e.g. Operator goes offline).
         ///
         /// Instead, we use expiry for specific purposes, such as allowing users to trigger
-        /// a refund if their deposit fails on L1 manually (e.g. Operator goes offline while bridging).
+        /// a refund if their deposit fails on L1 manually after expiry.
 
         // require(expiry >= block.timestamp, "Signature for EigenAgent execution expired");
 
@@ -121,6 +103,24 @@ contract EigenAgent6551 is Base6551Account {
 
         require(success, string(result));
         return result;
+    }
+
+    /**
+     * @dev Checks if signature is valid according to ERC-1271. If the signer is an EOA,
+     * it validates signatures using ecrecover. If the signer is a contract, calls isValidSignature
+     * on the contract to determin if the signatuer is valid. For an example, see MockMultisigSigner.sol
+     * contract and associated tests.
+     */
+    function isValidSignature(
+        bytes32 digestHash,
+        bytes memory signature
+    ) public view virtual override returns (bytes4) {
+        address signer = owner();
+        if (SignatureCheckerV5.isValidSignatureNow(signer, digestHash, signature)) {
+            return IERC1271.isValidSignature.selector;
+        } else {
+            return bytes4(0);
+        }
     }
 
     /**

@@ -26,9 +26,9 @@ interface IAgentFactory is IAdminable {
 
     function getEigenAgentOwnerTokenId(address staker) external view returns (uint256);
 
-    function getEigenAgent(address staker) external view returns (IEigenAgent6551);
-
     function tryGetEigenAgentOrSpawn(address staker) external returns (IEigenAgent6551);
+
+    function spawnEigenAgentOnlyOwner(address staker) external returns (IEigenAgent6551);
 
     function updateEigenAgentOwnerTokenId(
         address from,
@@ -36,6 +36,6 @@ interface IAgentFactory is IAdminable {
         uint256 tokenId
     ) external;
 
-    function spawnEigenAgentOnlyOwner(address staker) external returns (IEigenAgent6551);
+    function getEigenAgent(address staker) external view returns (IEigenAgent6551);
 
 }

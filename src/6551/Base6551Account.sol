@@ -5,13 +5,9 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 
+
 interface IBase6551Account {
     receive() external payable;
-
-    function token()
-        external
-        view
-        returns (uint256 chainId, address tokenContract, uint256 tokenId);
 
     function execNonce() external view returns (uint256);
 
@@ -21,7 +17,16 @@ interface IBase6551Account {
         returns (bytes4 magicValue);
 
     function supportsInterface(bytes4 interfaceId) external view returns (bool);
+
+    function owner() external view returns (address);
+
+    function token() external view returns (
+        uint256 chainId,
+        address tokenContract,
+        uint256 tokenId
+    );
 }
+
 
 interface IERC6551Executable {
     function execute(address to, uint256 value, bytes calldata data, uint8 operation)
@@ -30,18 +35,20 @@ interface IERC6551Executable {
         returns (bytes memory);
 }
 
-// This is a copy of ERC6551Account.sol in reference 6551 repository:
-// import {ERC6551Account} from "@6551/examples/simple/ERC6551Account.sol"
-//
-// The differences are:
-// (1) renaming `state` variable to `execNonce` for creating executeWithSignature digests, and
-// (2) add `virtual` to the execute() function to make it overridable
-// (3) isValidSignature has no implementation, to be overidden in EigenAgent6551.sol
+
+/*
+ * This is a copy of ERC6551Account.sol in reference 6551 repository:
+ * import {ERC6551Account} from "@6551/examples/simple/ERC6551Account.sol"
+ *
+ * The differences are:
+ * (1) renaming `state` variable to `execNonce` for creating executeWithSignature digests, and
+ * (2) add `virtual` to the execute() function to make it overridable
+ * (3) isValidSignature has no implementation, to be overidden in EigenAgent6551.sol
+*/
 abstract contract Base6551Account is IERC165, IERC1271, IBase6551Account, IERC6551Executable {
 
+    /// @notice Nonce for signing executeWithSignature calls
     uint256 public execNonce;
-
-    uint256[49] private __gap;
 
     receive() external payable {}
 
@@ -81,7 +88,9 @@ abstract contract Base6551Account is IERC165, IERC1271, IBase6551Account, IERC65
         returns (bytes4 magicValue);
 
     function supportsInterface(bytes4 interfaceId)
-        public view virtual
+        public
+        view
+        virtual
         override(IERC165, IBase6551Account)
         returns (bool)
     {

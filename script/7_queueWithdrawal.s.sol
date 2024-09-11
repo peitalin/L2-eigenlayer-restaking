@@ -12,14 +12,17 @@ import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
 contract QueueWithdrawalScript is BaseScript {
 
-    address public staker;
-    address public withdrawer;
-    uint256 public amount;
-    uint256 public expiry;
-    uint256 public execNonce; // EigenAgent execution nonce
-    uint256 public withdrawalNonce; // Eigenlayer withdrawal nonce
-    IEigenAgent6551 public eigenAgent;
-    address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
+    uint256 deployerKey;
+    address deployer;
+
+    address staker;
+    address withdrawer;
+    uint256 amount;
+    uint256 expiry;
+    uint256 execNonce; // EigenAgent execution nonce
+    uint256 withdrawalNonce; // Eigenlayer withdrawal nonce
+    IEigenAgent6551 eigenAgent;
+    address TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
         return _run(false);
@@ -31,10 +34,9 @@ contract QueueWithdrawalScript is BaseScript {
 
     function _run(bool isTest) private {
 
-        readContractsFromDisk(isTest);
-
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
+        readContractsAndSetupEnvironment(isTest, deployer);
 
         if (isTest) {
             // if isTest, deploy SenderCCIP and ReceiverCCIP again
@@ -58,13 +60,11 @@ contract QueueWithdrawalScript is BaseScript {
         vm.selectFork(ethForkId);
 
         eigenAgent = agentFactory.getEigenAgent(deployer);
-        if (address(eigenAgent) == address(0)) {
-            if (isTest) {
-                vm.prank(deployer);
-                eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
-            } else {
-                revert("User must have existing deposit in Eigenlayer + EigenAgent");
-            }
+        if (!isTest) {
+            require(address(eigenAgent) != address(0), "User must have an EigenAgent");
+        } else {
+            vm.prank(deployer);
+            eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
         }
 
         execNonce = isTest ? 0 : eigenAgent.execNonce();

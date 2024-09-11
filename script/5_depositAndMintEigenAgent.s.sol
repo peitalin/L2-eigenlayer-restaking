@@ -10,25 +10,28 @@ import {BaseScript} from "./BaseScript.sol";
 
 contract DepositAndMintEigenAgentScript is BaseScript {
 
-    address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
-    uint256 public execNonce = 0;
-    IEigenAgent6551 public eigenAgent;
+    uint256 deployerKey;
+    address deployer;
+
+    address TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
+    uint256 execNonce = 0;
+    IEigenAgent6551 eigenAgent;
 
     function run() public {
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
-        return _run(false);
+        readContractsAndSetupEnvironment(false, deployer);
+        return _run();
     }
 
     function mockrun(uint256 mockKey) public {
         deployerKey = mockKey;
-        deployer = vm.addr(deployerKey);
-        return _run(true);
+        deployer = vm.addr(mockKey);
+        readContractsAndSetupEnvironment(true, deployer);
+        return _run();
     }
 
-    function _run(bool isTest) private {
-
-        readContractsFromDisk(isTest);
+    function _run() private {
 
         TARGET_CONTRACT = address(strategyManager);
 

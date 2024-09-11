@@ -14,20 +14,22 @@ interface ISenderHooks {
 
     function setSenderCCIP(address newSenderCCIP) external;
 
-    function isWithdrawalTransferRootSpent(bytes32 withdrawalTransferRoot) external returns (bool);
+    function getGasLimitForFunctionSelector(bytes4 functionSelector) external returns (uint256);
 
-    function handleTransferToAgentOwner(bytes memory message)
-        external
-        returns (address agentOwner, uint256 amount);
-
-    function beforeSendCCIPMessage(bytes memory message, address tokenL2) external;
+    function setGasLimitsForFunctionSelectors(
+        bytes4[] memory functionSelectors,
+        uint256[] memory gasLimits
+    ) external;
 
     function getWithdrawalTransferCommitment(bytes32 withdrawalTransferRoot)
         external
         returns (ISenderHooks.WithdrawalTransfer memory);
 
+    function isWithdrawalTransferRootSpent(bytes32 withdrawalTransferRoot) external returns (bool);
+
     function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
-        external pure
+        external
+        pure
         returns (bytes32);
 
     function calculateWithdrawalTransferRoot(
@@ -36,14 +38,12 @@ interface ISenderHooks {
         address agentOwner
     ) external pure returns (bytes32);
 
-    function setGasLimitsForFunctionSelectors(
-        bytes4[] memory functionSelectors,
-        uint256[] memory gasLimits
-    ) external;
+    function beforeSendCCIPMessage(bytes memory message, address tokenL2) external;
 
-    function getGasLimitForFunctionSelector(bytes4 functionSelector)
+    function handleTransferToAgentOwner(bytes memory message)
         external
-        returns (uint256);
+        returns (address agentOwner, uint256 amount);
+
 }
 
 

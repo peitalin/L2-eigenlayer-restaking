@@ -16,13 +16,32 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
 
     mapping(address contracts => bool whitelisted) public whitelistedCallers;
 
-    function initialize(string memory name, string memory symbol) initializer public {
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(string memory name, string memory symbol) external initializer {
 
         __ERC721_init(name, symbol);
         __ERC721URIStorage_init();
         __Adminable_init();
 
         _tokenIdCounter = 1;
+    }
+
+    modifier onlyAgentFactory() {
+        require(msg.sender == address(agentFactory), "Caller not AgentFactory");
+        _;
+    }
+
+    function getAgentFactory() external view returns (address) {
+        return address(agentFactory);
+    }
+
+    /// @param _agentFactory is the AgentFactory contract that creates EigenAgents
+    function setAgentFactory(IAgentFactory _agentFactory) external onlyAdminOrOwner {
+        require(address(_agentFactory) != address(0), "AgentFactory cannot be address(0)");
+        agentFactory = _agentFactory;
     }
 
     /**
@@ -41,26 +60,11 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
         whitelistedCallers[caller] = false;
     }
 
-    function isWhitelistedCaller(address caller) public view returns (bool) {
+    function isWhitelistedCaller(address caller) external view returns (bool) {
         return whitelistedCallers[caller];
     }
 
-    function getAgentFactory() public view returns (address) {
-        return address(agentFactory);
-    }
-
-    /// @param _agentFactory is the AgentFactory contract that creates EigenAgents
-    function setAgentFactory(IAgentFactory _agentFactory) public onlyAdminOrOwner {
-        require(address(_agentFactory) != address(0), "AgentFactory cannot be address(0)");
-        agentFactory = _agentFactory;
-    }
-
-    modifier onlyAgentFactory() {
-        require(msg.sender == address(agentFactory), "Caller not AgentFactory");
-        _;
-    }
-
-    function mint(address user) public onlyAgentFactory returns (uint256) {
+    function mint(address user) external onlyAgentFactory returns (uint256) {
         return _mint(user);
     }
 

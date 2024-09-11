@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
-
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {BaseScript} from "./BaseScript.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
 
-
 contract DepositIntoStrategyScript is BaseScript {
 
-    IEigenAgent6551 public eigenAgent;
-    address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
+    uint256 deployerKey;
+    address deployer;
+
+    IEigenAgent6551 eigenAgent;
+    address TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     // This script assumes you already have an EigenAgent
     function run() public {
@@ -25,10 +25,9 @@ contract DepositIntoStrategyScript is BaseScript {
 
     function _run(bool isTest) private {
 
-        readContractsFromDisk(isTest);
-
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
+        readContractsAndSetupEnvironment(isTest, deployer);
 
         TARGET_CONTRACT = address(strategyManager);
 

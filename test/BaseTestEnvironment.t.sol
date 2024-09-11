@@ -154,7 +154,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
 
             IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
-            IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
+            IERC20_CCIPBnM(address(tokenL1)).drip(address(deployer));
         }
         vm.stopBroadcast();
 
@@ -172,7 +172,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             senderContract.allowlistSender(deployer, true);
 
             IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(senderContract));
-            IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(senderContract));
+            IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(deployer));
         }
         vm.stopBroadcast();
     }
@@ -233,7 +233,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
 
             IERC20Minter(address(tokenL1)).mint(address(receiverContract), 1 ether);
-            IERC20Minter(address(tokenL1)).mint(bob, 1 ether);
+            IERC20Minter(address(tokenL1)).mint(deployer, 1 ether);
         }
         vm.stopBroadcast();
 

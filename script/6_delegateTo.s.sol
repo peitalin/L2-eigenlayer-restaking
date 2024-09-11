@@ -13,10 +13,13 @@ import {EthSepolia} from "./Addresses.sol";
 
 contract DelegateToScript is BaseScript {
 
-    uint256 public operatorKey;
-    address public operator;
-    address public staker;
-    address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
+    uint256 deployerKey;
+    address deployer;
+
+    uint256 operatorKey;
+    address operator;
+    address staker;
+    address TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
     function run() public {
         return _run(false);
@@ -28,10 +31,9 @@ contract DelegateToScript is BaseScript {
 
     function _run(bool isTest) private {
 
-        readContractsFromDisk(isTest);
-
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
+        readContractsAndSetupEnvironment(isTest, deployer);
 
         TARGET_CONTRACT = address(delegationManager);
 
@@ -59,6 +61,7 @@ contract DelegateToScript is BaseScript {
 
                 string memory metadataURI = "some operator";
                 try delegationManager.registerAsOperator(registeringOperatorDetails, metadataURI) {
+
                 } catch Error(string memory reason) {
                     console.log(reason); // registerAsOperator: caller is already actively delegated
                 }
