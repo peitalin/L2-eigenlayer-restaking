@@ -27,6 +27,7 @@ contract UndelegateScript is BaseScript {
     }
 
     function _run(bool isTest) private {
+        readContractsAndSetupEnvironment(isTest);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
@@ -35,11 +36,9 @@ contract UndelegateScript is BaseScript {
         address operator = vm.addr(operatorKey);
         address TARGET_CONTRACT = address(delegationManager);
 
-        readContractsFromDisk(isTest);
-
         vm.selectFork(ethForkId);
 
-        // Get User's EigenAgent
+        // Get EigenAgent
         IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(deployer);
 
         require(address(eigenAgent) != address(0), "User must have an EigenAgent");
@@ -65,8 +64,9 @@ contract UndelegateScript is BaseScript {
         //     withdrawer
         ///////////////////////////////////////
 
+        vm.startBroadcast(deployerKey);
         uint256 execNonce = eigenAgent.execNonce();
-        uint256 sig_expiry = block.timestamp + 2 hours;
+        uint256 sigExpiry = block.timestamp + 2 hours;
         uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(address(eigenAgent));
         address withdrawer = address(eigenAgent);
 
@@ -76,6 +76,7 @@ contract UndelegateScript is BaseScript {
         sharesToWithdraw[0] = strategyManager.stakerStrategyShares(withdrawer, strategy);
 
         address delegatedTo = delegationManager.delegatedTo(address(eigenAgent));
+        vm.stopBroadcast();
 
         /////////////////////////////////////////////////////////////////
         /////// Broadcast Undelegate message on L2
@@ -84,13 +85,13 @@ contract UndelegateScript is BaseScript {
         vm.startBroadcast(deployerKey);
 
         // Encode undelegate message, and append user signature for EigenAgent execution
-        bytes memory messageWithSignature_DT = signMessageForEigenAgentExecution(
+        bytes memory messageWithSignature_UD = signMessageForEigenAgentExecution(
             deployerKey,
             EthSepolia.ChainId, // destination chainid where EigenAgent lives
             TARGET_CONTRACT, // DelegationManager.delegateTo()
             encodeUndelegateMsg(address(eigenAgent)),
             execNonce,
-            sig_expiry
+            sigExpiry
         );
 
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
@@ -100,7 +101,7 @@ contract UndelegateScript is BaseScript {
         senderContract.sendMessagePayNative{
             value: getRouterFeesL2(
                 address(receiverContract),
-                string(messageWithSignature_DT),
+                string(messageWithSignature_UD),
                 address(tokenL2),
                 0, // not bridging, just sending message
                 gasLimit
@@ -108,7 +109,7 @@ contract UndelegateScript is BaseScript {
         }(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
-            string(messageWithSignature_DT),
+            string(messageWithSignature_UD),
             address(tokenL2),
             0, // not bridging, just sending message
             gasLimit

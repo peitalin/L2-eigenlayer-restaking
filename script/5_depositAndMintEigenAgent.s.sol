@@ -28,7 +28,7 @@ contract DepositAndMintEigenAgentScript is BaseScript {
 
     function _run(bool isTest) private {
 
-        readContractsFromDisk(isTest);
+        readContractsAndSetupEnvironment(isTest);
 
         TARGET_CONTRACT = address(strategyManager);
 

@@ -62,7 +62,11 @@ contract BaseScript is
     uint256 public l2ForkId;
     uint256 public ethForkId;
 
-    function readContractsFromDisk(bool isTest) public {
+    /**
+     * @dev Reads saved contracts from disk and sets up fork environments for L1 and L2.
+     * Run this command first in scripts or you may have 0x0 addresses and variables
+     */
+    function readContractsAndSetupEnvironment(bool isTest) public {
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);

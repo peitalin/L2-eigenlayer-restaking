@@ -30,8 +30,7 @@ contract QueueWithdrawalScript is BaseScript {
     }
 
     function _run(bool isTest) private {
-
-        readContractsFromDisk(isTest);
+        readContractsAndSetupEnvironment(isTest);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);

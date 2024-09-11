@@ -30,7 +30,7 @@ contract MintEigenAgentScript is BaseScript {
 
     function _run(bool isTest) public {
 
-        readContractsFromDisk(isTest);
+        readContractsAndSetupEnvironment(isTest);
 
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployerKey);

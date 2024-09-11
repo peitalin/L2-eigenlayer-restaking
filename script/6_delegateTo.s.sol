@@ -28,7 +28,7 @@ contract DelegateToScript is BaseScript {
 
     function _run(bool isTest) private {
 
-        readContractsFromDisk(isTest);
+        readContractsAndSetupEnvironment(isTest);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
@@ -59,6 +59,7 @@ contract DelegateToScript is BaseScript {
 
                 string memory metadataURI = "some operator";
                 try delegationManager.registerAsOperator(registeringOperatorDetails, metadataURI) {
+
                 } catch Error(string memory reason) {
                     console.log(reason); // registerAsOperator: caller is already actively delegated
                 }

@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP1271SignatureUtils} from "eigenlayer-contracts/src/contracts/libraries/EIP1271SignatureUtils.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
@@ -47,7 +47,7 @@ contract ClientSigners is Script {
         address staker,
         uint256 nonce,
         uint256 expiry,
-        bytes32 domainSeparator
+        bytes32 _domainSeparator
     ) public pure returns (bytes32) {
 
         /// @notice The EIP-712 typehash for the deposit struct used by the contract
@@ -55,12 +55,12 @@ contract ClientSigners is Script {
 
         bytes32 structHash = keccak256(abi.encode(DEPOSIT_TYPEHASH, staker, strategy, token, amount, nonce, expiry));
         // calculate the digest hash
-        bytes32 digestHash = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+        bytes32 digestHash = keccak256(abi.encodePacked("\x19\x01", _domainSeparator, structHash));
 
         return digestHash;
     }
 
-    function getDomainSeparator(
+    function domainSeparator(
         address contractAddr, // strategyManagerAddr, or delegationManagerAddr
         uint256 destinationChainid
     ) public pure returns (bytes32) {
@@ -96,7 +96,7 @@ contract ClientSigners is Script {
         // calculate the digest hash
         bytes32 approverDigestHash = keccak256(abi.encodePacked(
             "\x19\x01",
-            getDomainSeparator(delegationManagerAddr, destinationChainid),
+            domainSeparator(delegationManagerAddr, destinationChainid),
             approverStructHash
         ));
         return approverDigestHash;
@@ -123,7 +123,7 @@ contract ClientSigners is Script {
         // calculate the digest hash
         bytes32 digestHash = keccak256(abi.encodePacked(
             "\x19\x01",
-            getDomainSeparator(_target, _chainid),
+            domainSeparator(_target, _chainid),
             structHash
         ));
 
@@ -147,7 +147,7 @@ contract ClientSigners is Script {
                 0 ether, // not sending ether
                 messageToEigenlayer,
                 execNonceEigenAgent,
-                chainid, // destination chainid where EigenAgent lives, usually ETH
+                chainid, // destination chainid where EigenAgent lives: L1 Ethereum
                 expiry
             );
 
