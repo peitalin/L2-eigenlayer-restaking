@@ -12,7 +12,6 @@ import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IS
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
-
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
@@ -21,7 +20,7 @@ import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 
 
-contract ReceiverRestakingConnectorTests is BaseTestEnvironment {
+contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
     error AddressZero(string msg);
 

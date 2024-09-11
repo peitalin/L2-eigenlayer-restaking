@@ -24,9 +24,6 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
     ISenderCCIP public senderProxy;
     ISenderHooks public senderHooksProxy;
 
-    uint256 public deployerKey = vm.envUint("DEPLOYER_KEY");
-    address public deployer = vm.addr(deployerKey);
-
     function run() public {
         return _run(false);
     }
@@ -36,6 +33,9 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
     }
 
     function _run(bool isTest) private {
+
+        uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+        address deployer = vm.addr(deployerKey);
 
         senderProxy = readSenderContract();
         senderHooksProxy = readSenderHooks();

@@ -56,9 +56,6 @@ contract BaseScript is
     IERC20 public tokenL1;
     IERC20 public tokenL2;
 
-    uint256 public deployerKey;
-    address public deployer;
-
     uint256 public l2ForkId;
     uint256 public ethForkId;
 
@@ -66,10 +63,7 @@ contract BaseScript is
      * @dev Reads saved contracts from disk and sets up fork environments for L1 and L2.
      * Run this command first in scripts or you may have 0x0 addresses and variables
      */
-    function readContractsAndSetupEnvironment(bool isTest) public {
-
-        deployerKey = vm.envUint("DEPLOYER_KEY");
-        deployer = vm.addr(deployerKey);
+    function readContractsAndSetupEnvironment(bool isTest, address deployer) public {
 
         ethForkId = vm.createFork("ethsepolia");
         l2ForkId = vm.createFork("basesepolia");

@@ -5,7 +5,6 @@ import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
@@ -23,7 +22,7 @@ import {EthSepolia} from "../script/Addresses.sol";
 
 
 
-contract ClientSignerEncoderTests is BaseTestEnvironment {
+contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
     EigenlayerMsgDecoders public eigenlayerMsgDecoders;
     ClientSigners public clientSignersTest;
@@ -42,7 +41,7 @@ contract ClientSignerEncoderTests is BaseTestEnvironment {
 
     function setUp() public {
 
-        setUpForkedEnvironment();
+        setUpLocalEnvironment();
 
         amount = 0.0077 ether;
         staker = deployer;
@@ -55,7 +54,6 @@ contract ClientSignerEncoderTests is BaseTestEnvironment {
         operator2Key = uint256(99999);
         operator2 = vm.addr(operator2Key);
 
-        vm.selectFork(ethForkId);
         vm.prank(deployer);
         eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
 
@@ -364,8 +362,6 @@ contract ClientSignerEncoderTests is BaseTestEnvironment {
 
         IDelegationManager.Withdrawal memory withdrawal = makeMockWithdrawal();
         bytes32 withdrawalRoot = clientEncodersTest.calculateWithdrawalRoot(withdrawal);
-
-        vm.selectFork(l2ForkId);
 
         vm.assertEq(
             keccak256(abi.encode(

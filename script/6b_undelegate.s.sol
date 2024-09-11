@@ -18,6 +18,9 @@ import {BaseScript} from "./BaseScript.sol";
 
 contract UndelegateScript is BaseScript {
 
+    uint256 deployerKey;
+    address deployer;
+
     function run() public {
         return _run(false);
     }
@@ -27,10 +30,10 @@ contract UndelegateScript is BaseScript {
     }
 
     function _run(bool isTest) private {
-        readContractsAndSetupEnvironment(isTest);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
+        readContractsAndSetupEnvironment(isTest, deployer);
 
         uint256 operatorKey = vm.envUint("OPERATOR_KEY");
         address operator = vm.addr(operatorKey);

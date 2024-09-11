@@ -11,7 +11,7 @@ import {UpgradeReceiverOnL1Script} from "../script/3b_upgradeReceiverOnL1.s.sol"
 import {WhitelistCCIPContractsScript} from "../script/4_whitelistCCIPContracts.s.sol";
 
 
-contract DeployCCIPScriptsTests is Test, TestErrorHandlers {
+contract ScriptsTests_Deploy_CCIP_6551_Contracts is Test, TestErrorHandlers {
 
     function setUp() public {}
 

@@ -140,7 +140,7 @@ contract ClientSigners is Script {
     ) public view returns (bytes memory) {
 
         require(chainid != 0, "ClientSigner: chainid cannot be 0");
-        require(targetContractAddr != address(0x0), "ClientSigner: targetContractAddr cannot be 0x0");
+        require(targetContractAddr != address(0x0), "ClientSigner: targetContract cannot be 0x0");
 
         bytes32 digestHash;
         bytes memory messageWithSignature;

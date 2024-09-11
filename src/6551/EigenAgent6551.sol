@@ -72,12 +72,12 @@ contract EigenAgent6551 is Base6551Account {
         virtual
         returns (bytes memory result)
     {
-        /// Expiry: does not revert on expiry: CCIP may take hours to deliver messages when gas spikes.
+        /// Expiry: does not revert on expiry. CCIP may take hours to deliver messages if gas spikes.
         /// We would need to return funds to the user on L2 this case, as the transaction may
-        /// no longer be manually executable after gas lowers later.
+        /// no longer be manually executable after gas lowers later (e.g. Operator goes offline).
         ///
         /// Instead, we use expiry for specific purposes, such as allowing users to trigger
-        /// a refund if their deposit fails on L1 manually (e.g. Operator goes offline while bridging).
+        /// a refund if their deposit fails on L1 manually after expiry.
 
         // require(expiry >= block.timestamp, "Signature for EigenAgent execution expired");
 

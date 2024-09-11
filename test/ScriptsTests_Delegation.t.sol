@@ -10,7 +10,7 @@ import {RedepositScript} from "../script/6c_redeposit.s.sol";
 
 
 
-contract DelegationScriptsTests is Test, TestErrorHandlers {
+contract ScriptsTests_Delegation is Test, TestErrorHandlers {
 
     function setUp() public {}
 

@@ -12,7 +12,7 @@ import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 
 
 
-contract SenderCCIPTests is BaseTestEnvironment {
+contract UnitTests_SenderCCIP is BaseTestEnvironment {
 
     uint256 amount = 0.003 ether;
     bytes4 randomFunctionSelector;

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Test, console} from "forge-std/Test.sol";
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -9,16 +8,14 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
-
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
-
 import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 
 
 
-contract AgentFactoryTests is BaseTestEnvironment {
+contract UnitTests_AgentFactory is BaseTestEnvironment {
 
     error CallerNotWhitelisted();
     error SignatureNotFromNftOwner();
@@ -29,12 +26,11 @@ contract AgentFactoryTests is BaseTestEnvironment {
 
     function setUp() public {
 
-        setUpForkedEnvironment();
+        setUpLocalEnvironment();
 
         expiry = block.timestamp + 1 hours;
         amount = 0.0013 ether;
 
-        vm.selectFork(ethForkId);
         vm.prank(deployer);
         eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
     }

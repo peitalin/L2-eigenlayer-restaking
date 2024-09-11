@@ -5,11 +5,14 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
-import {BaseSepolia, EthSepolia} from "./Addresses.sol";
+import {EthSepolia} from "./Addresses.sol";
 import {BaseScript} from "./BaseScript.sol";
 
 
 contract RedepositScript is BaseScript {
+
+    uint256 deployerKey;
+    address deployer;
 
     address public staker;
     address public withdrawer;
@@ -31,10 +34,10 @@ contract RedepositScript is BaseScript {
     }
 
     function _run(bool isTest) private {
-        readContractsAndSetupEnvironment(isTest);
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
+        readContractsAndSetupEnvironment(isTest, deployer);
 
         TARGET_CONTRACT = address(delegationManager);
 

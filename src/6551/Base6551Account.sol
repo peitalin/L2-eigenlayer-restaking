@@ -35,15 +35,19 @@ interface IERC6551Executable {
         returns (bytes memory);
 }
 
-// This is a copy of ERC6551Account.sol in reference 6551 repository:
-// import {ERC6551Account} from "@6551/examples/simple/ERC6551Account.sol"
-//
-// The differences are:
-// (1) renaming `state` variable to `execNonce` for creating executeWithSignature digests, and
-// (2) add `virtual` to the execute() function to make it overridable
-// (3) isValidSignature has no implementation, to be overidden in EigenAgent6551.sol
+
+/*
+ * This is a copy of ERC6551Account.sol in reference 6551 repository:
+ * import {ERC6551Account} from "@6551/examples/simple/ERC6551Account.sol"
+ *
+ * The differences are:
+ * (1) renaming `state` variable to `execNonce` for creating executeWithSignature digests, and
+ * (2) add `virtual` to the execute() function to make it overridable
+ * (3) isValidSignature has no implementation, to be overidden in EigenAgent6551.sol
+*/
 abstract contract Base6551Account is IERC165, IERC1271, IBase6551Account, IERC6551Executable {
 
+    /// @notice Nonce for signing executeWithSignature calls
     uint256 public execNonce;
 
     receive() external payable {}

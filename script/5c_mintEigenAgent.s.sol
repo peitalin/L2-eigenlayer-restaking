@@ -7,30 +7,37 @@ import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
 contract MintEigenAgentScript is BaseScript {
 
-    uint256 public aliceKey;
-    address public alice;
+    uint256 deployerKey;
+    address deployer;
+    uint256 aliceKey;
+    address alice;
 
     IEigenAgent6551 public eigenAgent;
 
     function run() public {
+
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
         aliceKey = deployerKey;
         alice = deployer;
-        return _run(false);
+        readContractsAndSetupEnvironment(false, deployer);
+
+        return _run();
     }
 
     function mockrun(uint256 _mockKey) public {
+
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
         aliceKey = _mockKey;
         alice = vm.addr(aliceKey);
-        return _run(true);
+        readContractsAndSetupEnvironment(true, deployer);
+
+        return _run();
     }
 
-    function _run(bool isTest) public {
+    function _run() public {
 
-        readContractsAndSetupEnvironment(isTest);
 
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployerKey);

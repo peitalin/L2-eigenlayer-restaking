@@ -11,15 +11,18 @@ import {BaseScript} from "./BaseScript.sol";
 
 contract CompleteWithdrawalScript is BaseScript {
 
-    address public staker;
-    address public withdrawer;
-    uint256 public expiry;
-    uint256 public middlewareTimesIndex; // not used yet, for slashing
-    bool public receiveAsTokens;
+    uint256 deployerKey;
+    address deployer;
 
-    address public TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
-    uint256 public execNonce; // EigenAgent execution nonce
-    IEigenAgent6551 public eigenAgent;
+    address staker;
+    address withdrawer;
+    uint256 expiry;
+    uint256 middlewareTimesIndex; // not used yet, for slashing
+    bool receiveAsTokens;
+
+    address TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
+    uint256 execNonce; // EigenAgent execution nonce
+    IEigenAgent6551 eigenAgent;
 
     function run() public {
         return _run(false);
@@ -31,10 +34,9 @@ contract CompleteWithdrawalScript is BaseScript {
 
     function _run(bool isTest) private {
 
-        readContractsAndSetupEnvironment(isTest);
-
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
+        readContractsAndSetupEnvironment(isTest, deployer);
 
         TARGET_CONTRACT = address(delegationManager);
 

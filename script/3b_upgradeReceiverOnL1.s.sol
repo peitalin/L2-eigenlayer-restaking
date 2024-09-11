@@ -32,9 +32,6 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
 
-    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
-    address deployer = vm.addr(deployerKey);
-
     IAgentFactory public agentFactoryProxy;
     ISenderCCIP public senderProxy;
     RestakingConnector public restakingConnectorImpl;
@@ -57,6 +54,9 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
     }
 
     function _run(bool isTest) internal {
+
+        uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+        address deployer = vm.addr(deployerKey);
 
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 

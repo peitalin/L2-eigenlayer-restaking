@@ -15,7 +15,7 @@ import {ERC20Minter} from "./mocks/ERC20Minter.sol";
 import {FileReader} from "../script/FileReader.sol";
 
 
-contract UtilsTests is Test, TestErrorHandlers {
+contract UnitTests_Utils is Test, TestErrorHandlers {
 
     AdminableMock public adminableMock;
     ERC20Minter public erc20Minter;

@@ -12,7 +12,7 @@ import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 
 
 
-contract SenderHooksTests is BaseTestEnvironment {
+contract UnitTests_SenderHooks is BaseTestEnvironment {
 
     uint256 amount = 0.003 ether;
     address mockEigenAgent = vm.addr(3333);

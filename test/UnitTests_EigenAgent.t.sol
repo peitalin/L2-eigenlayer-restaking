@@ -22,7 +22,7 @@ import {IERC6551Executable} from "@6551/interfaces/IERC6551Executable.sol";
 import {IBase6551Account} from "../src/6551/Base6551Account.sol";
 
 
-contract EigenAgentUnitTests is BaseTestEnvironment {
+contract UnitTests_EigenAgent is BaseTestEnvironment {
 
     error CallerNotWhitelisted();
     error SignatureNotFromNftOwner();
@@ -33,12 +33,11 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
 
     function setUp() public {
 
-        setUpForkedEnvironment();
+        setUpLocalEnvironment();
 
         expiry = block.timestamp + 1 hours;
         amount = 0.0013 ether;
 
-        vm.selectFork(ethForkId);
         vm.prank(deployer);
         eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
     }
@@ -360,7 +359,7 @@ contract EigenAgentUnitTests is BaseTestEnvironment {
 
     function test_RevertOnCallingWrongFunctions_Execute() public {
 
-        // try call agentfactor with the wrong function selectors
+        // try call agentFactory with the wrong function selectors
         vm.prank(deployer);
         vm.expectRevert();
         IERC6551Executable(address(eigenAgent)).execute(

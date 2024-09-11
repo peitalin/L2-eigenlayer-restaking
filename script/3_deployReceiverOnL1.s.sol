@@ -47,8 +47,8 @@ contract DeployReceiverOnL1Script is Script, FileReader {
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
 
-    uint256 public deployerKey = vm.envUint("DEPLOYER_KEY");
-    address public deployer = vm.addr(deployerKey);
+    uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
+    address deployer = vm.addr(deployerKey);
 
     function run() public returns (IReceiverCCIP, IRestakingConnector, IAgentFactory) {
         return _run(false);

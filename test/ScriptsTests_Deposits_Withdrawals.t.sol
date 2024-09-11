@@ -12,7 +12,7 @@ import {QueueWithdrawalScript} from "../script/7_queueWithdrawal.s.sol";
 import {CompleteWithdrawalScript} from "../script/8_completeWithdrawal.s.sol";
 
 
-contract DepositWithdrawalScriptsTests is Test, TestErrorHandlers {
+contract ScriptsTests_Deposits_Withdrawals is Test, TestErrorHandlers {
 
     function setUp() public {}
 

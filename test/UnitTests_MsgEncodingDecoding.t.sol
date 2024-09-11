@@ -19,7 +19,7 @@ import {FunctionSelectorDecoder} from "../src/utils/FunctionSelectorDecoder.sol"
 import {EthSepolia} from "../script/Addresses.sol";
 
 
-contract EigenlayerMsg_EncodingDecodingTests is BaseTestEnvironment {
+contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
     EigenlayerMsgDecoders public eigenlayerMsgDecoders;
 
@@ -410,7 +410,6 @@ contract EigenlayerMsg_EncodingDecodingTests is BaseTestEnvironment {
         require(address(_tokensToWithdraw[0]) == address(tokensToWithdraw[0]), "decodeCompleteWithdrawalMsg tokensToWithdraw error");
         require(_receiveAsTokens == receiveAsTokens, "decodeCompleteWithdrawalMsg error");
     }
-
 
     function test_FunctionSelectors_CompleteQueueWithdrawal() public pure {
         bytes4 fselector1 = IDelegationManager.completeQueuedWithdrawal.selector;
