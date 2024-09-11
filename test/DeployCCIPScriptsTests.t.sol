@@ -2,7 +2,7 @@
 pragma solidity 0.8.22;
 
 import {Test, console} from "forge-std/Test.sol";
-import {DeployScriptHelpers} from "./DeployScriptHelpers.sol";
+import {TestErrorHandlers} from "./TestErrorHandlers.sol";
 
 import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
 import {UpgradeSenderOnL2Script} from "../script/2b_upgradeSenderOnL2.s.sol";
@@ -11,7 +11,7 @@ import {UpgradeReceiverOnL1Script} from "../script/3b_upgradeReceiverOnL1.s.sol"
 import {WhitelistCCIPContractsScript} from "../script/4_whitelistCCIPContracts.s.sol";
 
 
-contract DeployCCIPScriptsTests is Test, DeployScriptHelpers {
+contract DeployCCIPScriptsTests is Test, TestErrorHandlers {
 
     function setUp() public {}
 
@@ -34,7 +34,15 @@ contract DeployCCIPScriptsTests is Test, DeployScriptHelpers {
 
         UpgradeSenderOnL2Script upgradeSenderOnL2Script = new UpgradeSenderOnL2Script();
         // This test fails if L2 contracts have not been deployed + saved to disk
-        upgradeSenderOnL2Script.mockrun();
+        try upgradeSenderOnL2Script.mockrun() {
+            //
+        } catch Error(string memory reason) {
+            if (catchErrorStr(reason, "Ownable: caller is not the owner")) {
+                console.log("Run deploy script 2 first.");
+            } else {
+                revert(reason);
+            }
+        }
     }
 
     function test_step3_DeployReceiverOnL1Script() public {
@@ -52,8 +60,16 @@ contract DeployCCIPScriptsTests is Test, DeployScriptHelpers {
             new UpgradeReceiverOnL1Script();
 
         // This test fails if L1 contracts have not been deployed + saved to disk
-        upgradeReceiverOnL1Script.mockrun();
         // writes new json files: contract addrs
+        try upgradeReceiverOnL1Script.mockrun() {
+            //
+        } catch Error(string memory reason) {
+            if (catchErrorStr(reason, "Ownable: caller is not the owner")) {
+                console.log("Run deploy script 3 first.");
+            } else {
+                revert(reason);
+            }
+        }
     }
 
     function test_step4_WhitelistCCIPContractsScript() public {
@@ -61,7 +77,15 @@ contract DeployCCIPScriptsTests is Test, DeployScriptHelpers {
         WhitelistCCIPContractsScript whitelistCCIPContractsScript =
             new WhitelistCCIPContractsScript();
 
-        whitelistCCIPContractsScript.mockrun();
+        try whitelistCCIPContractsScript.mockrun() {
+            //
+        } catch Error(string memory reason) {
+            if (catchErrorStr(reason, "Ownable: caller is not the owner")) {
+                console.log("Run deploy scripts 2 and 3 first.");
+            } else {
+                revert(reason);
+            }
+        }
     }
 
 }

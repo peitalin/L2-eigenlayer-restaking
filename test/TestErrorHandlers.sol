@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import {console} from "forge-std/Test.sol";
 
-contract DeployScriptHelpers {
+contract TestErrorHandlers {
 
     function strEq(string memory s1, string memory s2) public pure returns (bool) {
         return keccak256(abi.encode(s1)) == keccak256(abi.encode(s2));

@@ -91,7 +91,7 @@ contract ClientSignerEncoderTests is BaseTestEnvironment {
 
     function test_ClientSigner_createEigenlayerDepositDigest() public view {
 
-        bytes32 domainSeparator = clientSignersTest.getDomainSeparator(address(strategyManager), EthSepolia.ChainId);
+        bytes32 domainSeparator = clientSignersTest.domainSeparator(address(strategyManager), EthSepolia.ChainId);
 
         bytes32 digest1 = clientSignersTest.createEigenlayerDepositDigest(
             strategy,
@@ -131,7 +131,7 @@ contract ClientSignerEncoderTests is BaseTestEnvironment {
             contractAddr
         ));
 
-        bytes32 domainSeparator2 = clientSignersTest.getDomainSeparator(contractAddr, chainid);
+        bytes32 domainSeparator2 = clientSignersTest.domainSeparator(contractAddr, chainid);
 
         vm.assertEq(domainSeparator1, domainSeparator2);
     }
@@ -160,7 +160,7 @@ contract ClientSignerEncoderTests is BaseTestEnvironment {
         // calculate the digest hash
         bytes32 approverDigestHash = keccak256(abi.encodePacked(
             "\x19\x01",
-            getDomainSeparator(delegationManagerAddr, destinationChainid),
+            domainSeparator(delegationManagerAddr, destinationChainid),
             approverStructHash
         ));
 
@@ -198,7 +198,7 @@ contract ClientSignerEncoderTests is BaseTestEnvironment {
         // calculate the digest hash
         bytes32 digestHash = keccak256(abi.encodePacked(
             "\x19\x01",
-            getDomainSeparator(_target, _chainid),
+            domainSeparator(_target, _chainid),
             structHash
         ));
 

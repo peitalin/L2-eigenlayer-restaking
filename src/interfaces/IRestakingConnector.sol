@@ -20,6 +20,29 @@ interface IRestakingConnector {
 
     function setAgentFactory(address newAgentFactory) external;
 
+    function getEigenlayerContracts() external returns (
+        IDelegationManager,
+        IStrategyManager,
+        IStrategy
+    );
+
+    function setEigenlayerContracts(
+        IDelegationManager _delegationManager,
+        IStrategyManager _strategyManager,
+        IStrategy _strategy
+    ) external;
+
+    function getGasLimitForFunctionSelector(bytes4 functionSelector) external returns (uint256);
+
+    function setGasLimitsForFunctionSelectors(
+        bytes4[] memory functionSelectors,
+        uint256[] memory gasLimits
+    ) external;
+
+    function getQueueWithdrawalBlock(address staker, uint256 nonce) external returns (uint256);
+
+    function setQueueWithdrawalBlock(address staker, uint256 nonce, uint256 blockNumber) external;
+
     /*
      *
      *           EigenAgent -> Eigenlayer Handlers
@@ -44,44 +67,5 @@ interface IRestakingConnector {
     function delegateToWithEigenAgent(bytes memory message) external;
 
     function undelegateWithEigenAgent(bytes memory message) external;
-
-    /*
-     *
-     *            Eigenlayer Functions
-     *
-     *
-    */
-
-    function getEigenlayerContracts() external returns (
-        IDelegationManager,
-        IStrategyManager,
-        IStrategy
-    );
-
-    function setEigenlayerContracts(
-        IDelegationManager _delegationManager,
-        IStrategyManager _strategyManager,
-        IStrategy _strategy
-    ) external;
-
-    function getQueueWithdrawalBlock(address staker, uint256 nonce) external returns (uint256);
-
-    function setQueueWithdrawalBlock(address staker, uint256 nonce, uint256 blockNumber) external;
-
-    /*
-     *
-     *          Helpers
-     *
-     *
-    */
-
-    function setGasLimitsForFunctionSelectors(
-        bytes4[] memory functionSelectors,
-        uint256[] memory gasLimits
-    ) external;
-
-    function getGasLimitForFunctionSelector(
-        bytes4 functionSelector
-    ) external returns (uint256);
 
 }

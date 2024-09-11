@@ -139,10 +139,14 @@ contract ClientSigners is Script {
         uint256 expiry
     ) public view returns (bytes memory) {
 
+        require(chainid != 0, "ClientSigner: chainid cannot be 0");
+        require(targetContractAddr != address(0x0), "ClientSigner: targetContractAddr cannot be 0x0");
+
+        bytes32 digestHash;
         bytes memory messageWithSignature;
         bytes memory signatureEigenAgent;
         {
-            bytes32 digestHash = createEigenAgentCallDigestHash(
+            digestHash = createEigenAgentCallDigestHash(
                 targetContractAddr,
                 0 ether, // not sending ether
                 messageToEigenlayer,
@@ -170,8 +174,31 @@ contract ClientSigners is Script {
 
             checkSignature_EIP1271(signer, digestHash, signatureEigenAgent);
         }
-
+        // _logClientEigenAgentExecutionMessage(chainid, targetContractAddr, messageToEigenlayer, execNonceEigenAgent, expiry);
+        // _logClientSignature(signer, digestHash, signatureEigenAgent);
         return messageWithSignature;
     }
 
+    // function _logClientEigenAgentExecutionMessage(
+    //     uint256 chainid,
+    //     address targetContractAddr,
+    //     bytes memory messageToEigenlayer,
+    //     uint256 execNonce,
+    //     uint256 expiry
+    // ) private pure {
+    //     console.log("chainid:", chainid);
+    //     console.log("targetContractAddr:", targetContractAddr);
+    //     console.log("messageToEigenlayer:");
+    //     console.logBytes(messageToEigenlayer);
+    //     console.log("execNonce:", execNonce);
+    //     console.log("expiry:", expiry);
+    // }
+
+    // function _logClientSignature(address signer, bytes32 digestHash, bytes memory signatureEigenAgent) private pure {
+    //     console.log("signer:", signer);
+    //     console.log("digestHash:");
+    //     console.logBytes32(digestHash);
+    //     console.log("signature:");
+    //     console.logBytes(signatureEigenAgent);
+    // }
 }

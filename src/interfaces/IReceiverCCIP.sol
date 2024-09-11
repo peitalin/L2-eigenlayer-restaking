@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {ISenderHooks} from "./ISenderHooks.sol";
 import {IRestakingConnector} from "./IRestakingConnector.sol";
 import {IBaseMessengerCCIP} from "./IBaseMessengerCCIP.sol";
 
 
 interface IReceiverCCIP is IBaseMessengerCCIP {
-
-    function setSenderHooks(ISenderHooks _senderHooks) external;
 
     function getSenderContractL2Addr() external view returns (address);
 

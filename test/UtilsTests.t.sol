@@ -2,16 +2,20 @@
 pragma solidity 0.8.22;
 
 import {Test} from "forge-std/Test.sol";
+import {TestErrorHandlers} from "./TestErrorHandlers.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
+
 import {BaseScript} from "../script/BaseScript.sol";
 import {AdminableMock} from "./mocks/AdminableMock.sol";
 import {ERC20Minter} from "./mocks/ERC20Minter.sol";
 import {FileReader} from "../script/FileReader.sol";
 
 
-contract UtilsTests is Test {
+contract UtilsTests is Test, TestErrorHandlers {
 
     AdminableMock public adminableMock;
     ERC20Minter public erc20Minter;
@@ -48,7 +52,7 @@ contract UtilsTests is Test {
      *
      */
 
-    function test_FileReaderFunctions() public {
+    function test_FileReader_ReadContracts() public {
         fileReaderTest.readAgentFactory();
         fileReaderTest.readEigenAgent721AndRegistry();
         fileReaderTest.readReceiverRestakingConnector();
@@ -56,10 +60,6 @@ contract UtilsTests is Test {
         fileReaderTest.readProxyAdminL2();
         fileReaderTest.readSenderContract();
         fileReaderTest.readSenderHooks();
-        fileReaderTest.readWithdrawalInfo(
-            address(0x72C14ee915790038af0764d33Bb4B1a63212fC50),
-            "script/withdrawals-queued/"
-        );
         fileReaderTest.saveReceiverBridgeContracts(
             vm.addr(1),
             vm.addr(2),
@@ -75,6 +75,40 @@ contract UtilsTests is Test {
             vm.addr(3),
             "test/temp-files/bridgeContractsL2.config.json"
         );
+    }
+
+    function test_FileReader_ReadAndWriteWithdrawals() public {
+
+        uint256[] memory shares = new uint256[](1);
+        IStrategy[] memory strategies = new IStrategy[](1);
+        shares[0] = 200;
+        strategies[0] = IStrategy(address(123123));
+
+        fileReaderTest.saveWithdrawalInfo(
+            0x0000000000000000000000000000000000000001, // _staker
+            0x0000000000000000000000000000000000000002, // _delegatedTo
+            0x0000000000000000000000000000000000000003, // , _withdrawer
+            5, // _nonce
+            100, // _startBlock
+            strategies, // _strategies
+            shares, // _shares
+            bytes32(0x0), // _withdrawalRoot
+            bytes32(0x0), // _withdrawalTransferRoot
+            "test/withdrawals-queued/" // _filePath
+        );
+
+        IDelegationManager.Withdrawal memory wt = fileReaderTest.readWithdrawalInfo(
+            address(0x0000000000000000000000000000000000000001),
+            "test/withdrawals-queued/"
+        );
+
+        vm.assertEq(wt.staker, 0x0000000000000000000000000000000000000001);
+        vm.assertEq(wt.delegatedTo, 0x0000000000000000000000000000000000000002);
+        vm.assertEq(wt.withdrawer, 0x0000000000000000000000000000000000000003);
+        vm.assertEq(wt.nonce, 5);
+        vm.assertEq(wt.startBlock, 100);
+        vm.assertEq(address(wt.strategies[0]), address(strategies[0]));
+        vm.assertEq(wt.shares[0], shares[0]);
     }
 
     function test_ERC20Minter() public {

@@ -6,14 +6,25 @@ import {IBase6551Account} from "./Base6551Account.sol";
 
 interface IEigenAgent6551 is IBase6551Account {
 
+    function execNonce() external view returns (uint256);
+
     function EIGEN_AGENT_EXEC_TYPEHASH() external returns (bytes32);
 
     function DOMAIN_TYPEHASH() external returns (bytes32);
 
-    function isValidSignature(
-        bytes32 digestHash,
-        bytes memory signature
-    ) external view returns (bytes4);
+    function owner() external view returns (address);
+
+    function token() external view returns (
+        uint256 chainId,
+        address tokenContract,
+        uint256 tokenId
+    );
+
+    function approveByWhitelistedContract(
+        address targetContract,
+        address token,
+        uint256 amount
+    ) external returns (bool);
 
     function executeWithSignature(
         address targetContract,
@@ -23,15 +34,10 @@ interface IEigenAgent6551 is IBase6551Account {
         bytes memory signature
     ) external payable returns (bytes memory result);
 
-    function approveByWhitelistedContract(
-        address targetContract,
-        address token,
-        uint256 amount
-    ) external returns (bool);
-
-    function execNonce() external view returns (uint256);
-
-    function owner() external view returns (address) ;
+    function isValidSignature(
+        bytes32 digestHash,
+        bytes memory signature
+    ) external view returns (bytes4);
 
     function createEigenAgentCallDigestHash(
         address target,

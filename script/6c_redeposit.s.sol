@@ -36,9 +36,6 @@ contract RedepositScript is BaseScript {
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        l2ForkId = vm.createFork("basesepolia");
-        ethForkId = vm.createSelectFork("ethsepolia");
-
         TARGET_CONTRACT = address(delegationManager);
 
         /////////////////////////////////////////////////////////////////
@@ -48,14 +45,11 @@ contract RedepositScript is BaseScript {
 
         // Get EigenAgent
         eigenAgent = agentFactory.getEigenAgent(deployer);
-        if (address(eigenAgent) != address(0)) {
-            // if the user already has a EigenAgent, fetch current execution Nonce
-            execNonce = eigenAgent.execNonce();
-        }
         require(address(eigenAgent) != address(0), "User must have an EigenAgent");
 
         amount = 0 ether; // only sending message, not bridging tokens.
         sigExpiry = block.timestamp + 2 hours;
+        execNonce = eigenAgent.execNonce();
         staker = address(eigenAgent); // this should be EigenAgent
         withdrawer = address(eigenAgent);
         require(
@@ -81,10 +75,7 @@ contract RedepositScript is BaseScript {
             /////////////////////////////////////////////////////////////////
             /////// Broadcast to L2
             /////////////////////////////////////////////////////////////////
-
             vm.selectFork(l2ForkId);
-
-            vm.startBroadcast(deployerKey);
 
             require(
                 senderContract.allowlistedSenders(address(receiverContract)),
@@ -119,6 +110,8 @@ contract RedepositScript is BaseScript {
             uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
                 IDelegationManager.completeQueuedWithdrawal.selector
             );
+
+            vm.startBroadcast(deployerKey);
 
             senderContract.sendMessagePayNative{
                 value: getRouterFeesL2(

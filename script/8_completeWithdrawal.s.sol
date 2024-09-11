@@ -36,9 +36,6 @@ contract CompleteWithdrawalScript is BaseScript {
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
 
-        l2ForkId = vm.createFork("basesepolia");
-        ethForkId = vm.createSelectFork("ethsepolia");
-
         TARGET_CONTRACT = address(delegationManager);
 
         /////////////////////////////////////////////////////////////////

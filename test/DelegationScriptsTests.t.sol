@@ -2,7 +2,7 @@
 pragma solidity 0.8.22;
 
 import {Test, console} from "forge-std/Test.sol";
-import {DeployScriptHelpers} from "./DeployScriptHelpers.sol";
+import {TestErrorHandlers} from "./TestErrorHandlers.sol";
 
 import {DelegateToScript} from "../script/6_delegateTo.s.sol";
 import {UndelegateScript} from "../script/6b_undelegate.s.sol";
@@ -10,7 +10,7 @@ import {RedepositScript} from "../script/6c_redeposit.s.sol";
 
 
 
-contract DelegationScriptsTests is Test, DeployScriptHelpers {
+contract DelegationScriptsTests is Test, TestErrorHandlers {
 
     function setUp() public {}
 

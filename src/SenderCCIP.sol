@@ -13,21 +13,23 @@ import {ISenderHooks} from "./interfaces/ISenderHooks.sol";
 /// @title L2 Messenger Contract: sends Eigenlayer messages to CCIP Router
 contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
-    event MatchedReceivedFunctionSelector(bytes4 indexed);
-
     ISenderHooks public senderHooks;
 
-    /// @param _router address of the router contract.
-    /// @param _link address of the link contract.
+    event MatchedReceivedFunctionSelector(bytes4 indexed);
+
+    /**
+     * @param _router address of the router contract.
+     * @param _link address of the link contract.
+     */
     constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {
         _disableInitializers();
     }
 
-    function initialize() initializer public {
+    function initialize() external initializer {
         BaseMessengerCCIP.__BaseMessengerCCIP_init();
     }
 
-    function getSenderHooks() public view returns (ISenderHooks) {
+    function getSenderHooks() external view returns (ISenderHooks) {
         return senderHooks;
     }
 
@@ -39,7 +41,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
     /*
      *
-     *                Receiving
+     *                Receiving Messages
      *
      *
     */
@@ -114,7 +116,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
     /*
      *
-     *                Sending
+     *                Sending Messages
      *
      *
     */

@@ -21,8 +21,6 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     address public senderContractL2;
     mapping(bytes32 messageId => uint256) public amountRefundedToMessageIds;
 
-    error AddressZero(string msg);
-
     event BridgingWithdrawalToL2(
         address indexed senderContractL2,
         bytes32 indexed withdrawalTransferRoot,
@@ -41,6 +39,8 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         uint256 indexed afterAmount
     );
 
+    error AddressZero(string msg);
+
     /// @param _router address of the router contract.
     /// @param _link address of the link contract.
     constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {
@@ -52,7 +52,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     function initialize(
         IRestakingConnector _restakingConnector,
         ISenderCCIP _senderContractL2
-    ) initializer public {
+    ) external initializer {
 
         if (address(_restakingConnector) == address(0))
             revert AddressZero("RestakingConnector cannot be address(0)");
@@ -66,22 +66,22 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         BaseMessengerCCIP.__BaseMessengerCCIP_init();
     }
 
-    function getSenderContractL2Addr() public view returns (address) {
+    function getSenderContractL2Addr() external view returns (address) {
         return senderContractL2;
     }
 
-    function setSenderContractL2Addr(address _senderContractL2) public onlyOwner {
+    function setSenderContractL2Addr(address _senderContractL2) external onlyOwner {
         if (address(_senderContractL2) == address(0))
             revert AddressZero("SenderContract on L2 cannot be address(0)");
 
         senderContractL2 = _senderContractL2;
     }
 
-    function getRestakingConnector() public view returns (IRestakingConnector) {
+    function getRestakingConnector() external view returns (IRestakingConnector) {
         return restakingConnector;
     }
 
-    function setRestakingConnector(IRestakingConnector _restakingConnector) public onlyOwner {
+    function setRestakingConnector(IRestakingConnector _restakingConnector) external onlyOwner {
         if (address(_restakingConnector) == address(0))
             revert AddressZero("RestakingConnector cannot be address(0)");
 
@@ -164,45 +164,6 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             }
             // Otherwise revert, and continue allowing manual re-execution tries.
             revert(abi.decode(customError, (string)));
-        }
-    }
-
-    /**
-     * @dev Allows users to manually execute EigenAgent execution messages until expiry
-     * if the message fails because of gas spikes, or other temporary issues.
-     *
-     * After message expiry, manual executions that result in a EigenAgentExecutionError will
-     * trigger a refund to the original sender back on L2. This may happen for instance if an
-     * Operator goes offline when attempting to deposit.
-     *
-     * No other Eigenlayer function call bridges tokens, this is the main UX edgecase to cover.
-     */
-    function _refundToSignerAfterExpiry(bytes memory customError) private {
-
-        (
-            address signer,
-            uint256 expiry
-        ) = FunctionSelectorDecoder.decodeEigenAgentExecutionErrorParams(customError);
-
-        if (block.timestamp > expiry) {
-            // If message has expired, trigger CCIP call to bridge funds back to L2 signer
-            this.sendMessagePayNative(
-                BaseSepolia.ChainSelector, // destination chain
-                signer, // receiver on L2
-                string("EigenAgentExecutionError: refunding deposit to L2 signer"),
-                s_lastReceivedTokenAddress, // L1 token to burn/lock
-                s_lastReceivedTokenAmount,
-                0 // use default gasLimit for this call
-            );
-
-            emit RefundingDeposit(signer, s_lastReceivedTokenAddress, s_lastReceivedTokenAmount);
-
-        } else {
-            // otherwise if message hasn't expired, allow manual execution retries
-            revert IRestakingConnector.ExecutionErrorRefundAfterExpiry(
-                "Deposit failed: manually execute after expiry for a refund.",
-                expiry
-            );
         }
     }
 
@@ -297,6 +258,45 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         if (functionSelector == IDelegationManager.undelegate.selector) {
             restakingConnector.undelegateWithEigenAgent(message);
             textMsg = "Undelegated by EigenAgent";
+        }
+    }
+
+    /**
+     * @dev Allows users to manually execute EigenAgent execution messages until expiry
+     * if the message fails because of gas spikes, or other temporary issues.
+     *
+     * After message expiry, manual executions that result in a EigenAgentExecutionError will
+     * trigger a refund to the original sender back on L2. This may happen for instance if an
+     * Operator goes offline when attempting to deposit.
+     *
+     * No other Eigenlayer function call bridges tokens, this is the main UX edgecase to cover.
+     */
+    function _refundToSignerAfterExpiry(bytes memory customError) private {
+
+        (
+            address signer,
+            uint256 expiry
+        ) = FunctionSelectorDecoder.decodeEigenAgentExecutionErrorParams(customError);
+
+        if (block.timestamp > expiry) {
+            // If message has expired, trigger CCIP call to bridge funds back to L2 signer
+            this.sendMessagePayNative(
+                BaseSepolia.ChainSelector, // destination chain
+                signer, // receiver on L2
+                string("EigenAgentExecutionError: refunding deposit to L2 signer"),
+                s_lastReceivedTokenAddress, // L1 token to burn/lock
+                s_lastReceivedTokenAmount,
+                0 // use default gasLimit for this call
+            );
+
+            emit RefundingDeposit(signer, s_lastReceivedTokenAddress, s_lastReceivedTokenAmount);
+
+        } else {
+            // otherwise if message hasn't expired, allow manual execution retries
+            revert IRestakingConnector.ExecutionErrorRefundAfterExpiry(
+                "Deposit failed: manually execute after expiry for a refund.",
+                expiry
+            );
         }
     }
 
