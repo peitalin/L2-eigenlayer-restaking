@@ -8,6 +8,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
@@ -43,6 +44,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
     IStrategy public strategy;
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
+    IRewardsCoordinator public rewardsCoordinator;
 
     function run() public {
         return _run(false);

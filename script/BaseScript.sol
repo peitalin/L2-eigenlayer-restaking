@@ -10,6 +10,7 @@ import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 // interfaces
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
@@ -52,6 +53,7 @@ contract BaseScript is
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
     IStrategy public strategy;
+    IRewardsCoordinator public rewardsCoordinator;
 
     IERC20 public tokenL1;
     IERC20 public tokenL2;
@@ -82,7 +84,7 @@ contract BaseScript is
             , // strategyFactory
             , // pauserRegistry
             delegationManager,
-            , // _rewardsCoordinator
+            rewardsCoordinator,
             // tokenL1
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
