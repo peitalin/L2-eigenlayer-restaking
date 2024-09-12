@@ -446,10 +446,10 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         );
     }
 
-    function test_ClientEncoder_encodeMintEigenAgent() public view {
+    function test_ClientEncoder_encodeMintEigenAgentMsg() public view {
         vm.assertEq(
-            keccak256(clientEncodersTest.encodeMintEigenAgent(bob)),
-            keccak256(EigenlayerMsgEncoders.encodeMintEigenAgent(bob))
+            keccak256(clientEncodersTest.encodeMintEigenAgentMsg(bob)),
+            keccak256(EigenlayerMsgEncoders.encodeMintEigenAgentMsg(bob))
         );
     }
 }

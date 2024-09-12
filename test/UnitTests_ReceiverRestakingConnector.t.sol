@@ -124,7 +124,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
     function test_OnlyReceiverCanCall_RestakingConnector() public {
 
-        bytes memory mintEigenAgentMessage = encodeMintEigenAgent(bob);
+        bytes memory mintEigenAgentMessage = encodeMintEigenAgentMsg(bob);
 
         bytes memory ccipMessage = abi.encode(string(mintEigenAgentMessage));
 
@@ -161,7 +161,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
     function test_MintEigenAgent() public {
 
-        bytes memory mintEigenAgentMessageBob = encodeMintEigenAgent(bob);
+        bytes memory mintEigenAgentMessageBob = encodeMintEigenAgentMsg(bob);
 
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
@@ -180,7 +180,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             "Bob should have minted a new EigenAgent"
         );
 
-        bytes memory mintEigenAgentMessageAlice = encodeMintEigenAgent(alice);
+        bytes memory mintEigenAgentMessageAlice = encodeMintEigenAgentMsg(alice);
 
         vm.prank(bob);
         receiverContract.mockCCIPReceive(
@@ -353,7 +353,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
                 sourceChainSelector: BaseSepolia.ChainSelector,
                 sender: abi.encode(deployer),
                 data: abi.encode(string(
-                    encodeMintEigenAgent(deployer)
+                    encodeMintEigenAgentMsg(deployer)
                 )),
                 destTokenAmounts: new Client.EVMTokenAmount[](0)
             }),

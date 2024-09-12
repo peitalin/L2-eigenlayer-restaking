@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 
@@ -19,27 +20,24 @@ contract ClientEncoders {
         uint256 amount
     ) public pure returns (bytes memory) {
 
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
             IStrategyManager.depositIntoStrategy.selector,
             strategy,
             token,
             amount
         );
-        return message_bytes;
     }
 
     function encodeQueueWithdrawalsMsg(
         IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
     ) public pure returns (bytes memory) {
 
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "queueWithdrawals((address[],uint256[],address)[])" == 0x0dd8dd02
             IDelegationManager.queueWithdrawals.selector,
             queuedWithdrawalParams
         );
-
-        return message_bytes;
     }
 
     /*
@@ -74,7 +72,7 @@ contract ClientEncoders {
         //         uint256[] shares;
         //     }
 
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
             IDelegationManager.completeQueuedWithdrawal.selector,
             withdrawal,
@@ -82,8 +80,6 @@ contract ClientEncoders {
             middlewareTimesIndex,
             receiveAsTokens
         );
-
-        return message_bytes;
     }
 
     function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
@@ -104,12 +100,11 @@ contract ClientEncoders {
     function encodeHandleTransferToAgentOwnerMsg(
         bytes32 withdrawalTransferRoot
     ) public pure returns (bytes memory) {
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderHooks.handleTransferToAgentOwner.selector,
             withdrawalTransferRoot
         );
-        return message_bytes;
     }
 
     function encodeDelegateTo(
@@ -139,32 +134,51 @@ contract ClientEncoders {
         // 0000000000000000000000000000000000000000000000000000000000000001
         // 0000000000000000000000000000000000000000000000000000000000000000
 
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             IDelegationManager.delegateTo.selector,
             operator,
             approverSignatureAndExpiry,
             approverSalt
         );
-        return message_bytes;
     }
 
     function encodeUndelegateMsg(address staker) public pure returns (bytes memory) {
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // bytes4(keccak256("undelegate(address)")),
             IDelegationManager.undelegate.selector,
             staker
         );
-        return message_bytes;
     }
 
-    function encodeMintEigenAgent(address recipient) public pure returns (bytes memory) {
+    function encodeMintEigenAgentMsg(address recipient) public pure returns (bytes memory) {
 
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "mintEigenAgent(bytes)" == 0xcc15a557
             IRestakingConnector.mintEigenAgent.selector,
             recipient
         );
-        return message_bytes;
     }
+
+    function encodeProcessClaimMsg(
+        IRewardsCoordinator.RewardsMerkleClaim memory claim,
+        address recipient
+    ) public pure returns (bytes memory) {
+
+        return abi.encodeWithSelector(
+            // cast sig "processClaim((uint32,uint32,bytes,(address,bytes32),uint32[],bytes[],(address,uint256)[]), address)" == 0x3ccc861d
+            IRewardsCoordinator.processClaim.selector,
+            claim,
+            recipient
+        );
+    }
+
+    function encodeSetClaimerForMsg(address claimer) public pure returns (bytes memory) {
+
+        return abi.encodeWithSelector(
+            IRewardsCoordinator.setClaimerFor.selector,
+            claimer
+        );
+    }
+
 }
 

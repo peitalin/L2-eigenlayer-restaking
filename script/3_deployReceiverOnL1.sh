@@ -17,7 +17,7 @@ forge script script/3_deployReceiverOnL1.s.sol:DeployReceiverOnL1Script \
 #     --rpc-url ethsepolia \
 #     --etherscan-api-key $ETHERSCAN_API_KEY \
 #     --compiler-version v0.8.22 \
-#     0x946BBcD4E3E0fF85FC297bBBB8a5daA6a99BE73F \
+#     0xD23dACdC965b67D18DaD34D01a27EDAeb5Da44eb \
 #     src/6551/EigenAgent6551.sol:EigenAgent6551
 
 # forge verify-contract \

@@ -70,7 +70,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
     function test_EigenAgent_Client_DigestHashsEqual() public {
 
-        bytes memory message1 = encodeMintEigenAgent(deployer);
+        bytes memory message1 = encodeMintEigenAgentMsg(deployer);
 
         bytes32 digestHashClient = createEigenAgentCallDigestHash(
             address(delegationManager),
@@ -365,7 +365,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         IERC6551Executable(address(eigenAgent)).execute(
             address(agentFactory),
             0 ether,
-            encodeMintEigenAgent(alice), // should fail as targetContract does not have this function
+            encodeMintEigenAgentMsg(alice), // should fail as targetContract does not have this function
             0 // operation code
         );
 
@@ -388,7 +388,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         eigenAgent.executeWithSignature(
             address(strategyManager), // strategyManager
             0,
-            encodeMintEigenAgent(alice), // should fail as targetContract does not have this function
+            encodeMintEigenAgentMsg(alice), // should fail as targetContract does not have this function
             expiry,
             signature1
         );

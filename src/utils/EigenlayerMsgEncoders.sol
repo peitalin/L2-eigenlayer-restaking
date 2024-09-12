@@ -4,6 +4,8 @@ pragma solidity 0.8.22;
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ISenderHooks} from "../interfaces/ISenderHooks.sol";
 import {IRestakingConnector} from "../interfaces/IRestakingConnector.sol";
@@ -23,14 +25,13 @@ library EigenlayerMsgEncoders {
         uint256 amount
     ) public pure returns (bytes memory) {
 
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
             IStrategyManager.depositIntoStrategy.selector,
             strategy,
             token,
             amount
         );
-        return message_bytes;
     }
 
     /// @dev Encodes a queueWithdrawals() message for Eigenlayer's DelegationManager.sol contract
@@ -39,13 +40,11 @@ library EigenlayerMsgEncoders {
         IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
     ) public pure returns (bytes memory) {
 
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "queueWithdrawals((address[],uint256[],address)[])"
             IDelegationManager.queueWithdrawals.selector,
             queuedWithdrawalParams
         );
-
-        return message_bytes;
     }
 
     /**
@@ -80,7 +79,7 @@ library EigenlayerMsgEncoders {
         //         uint256[] shares;
         //     }
 
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
             IDelegationManager.completeQueuedWithdrawal.selector,
             withdrawal,
@@ -88,8 +87,6 @@ library EigenlayerMsgEncoders {
             middlewareTimesIndex,
             receiveAsTokens
         );
-
-        return message_bytes;
     }
 
     /**
@@ -116,14 +113,13 @@ library EigenlayerMsgEncoders {
         //         uint256 expiry;
         //     }
 
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "delegateTo(address,(bytes,uint256),bytes32)" == 0xeea9064b
             IDelegationManager.delegateTo.selector,
             operator,
             approverSignatureAndExpiry,
             approverSalt
         );
-        return message_bytes;
     }
 
     /// @dev Encodes params for a undelegate() call to Eigenlayer's DelegationManager.sol
@@ -139,14 +135,13 @@ library EigenlayerMsgEncoders {
 
     /// @dev Encodes params to mint an EigenAgent from the AgentFactory.sol contract. Can be called by anyone.
     /// @param recipient address to mint an EigenAgent to.
-    function encodeMintEigenAgent(address recipient) public pure returns (bytes memory) {
+    function encodeMintEigenAgentMsg(address recipient) public pure returns (bytes memory) {
 
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "mintEigenAgent(bytes)" == 0xcc15a557
             IRestakingConnector.mintEigenAgent.selector,
             recipient
         );
-        return message_bytes;
     }
 
     /*
@@ -179,11 +174,118 @@ library EigenlayerMsgEncoders {
         bytes32 withdrawalTransferRoot
     ) public pure returns (bytes memory) {
 
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderHooks.handleTransferToAgentOwner.selector,
             withdrawalTransferRoot
         );
-        return message_bytes;
     }
+
+    /*
+     *
+     *         Rewards Claims
+     *
+     *
+    */
+
+    /**
+     * @notice Claim rewards against a given root (read from _distributionRoots[claim.rootIndex]).
+     * Earnings are cumulative so earners don't have to claim against all distribution roots they have earnings for,
+     * they can simply claim against the latest root and the contract will calculate the difference between
+     * their cumulativeEarnings and cumulativeClaimed. This difference is then transferred to recipient address.
+     * @param claim The RewardsMerkleClaim to be processed.
+     * Contains the root index, earner, token leaves, and required proofs
+     * @param recipient The address recipient that receives the ERC20 rewards
+     * @dev only callable by the valid claimer, that is
+     * if claimerFor[claim.earner] is address(0) then only the earner can claim, otherwise only
+     * claimerFor[claim.earner] can claim the rewards.
+     */
+    function encodeProcessClaimMsg(
+        IRewardsCoordinator.RewardsMerkleClaim memory claim,
+        address recipient
+    ) public pure returns (bytes memory) {
+
+        // struct RewardsMerkleClaim {
+        //     uint32 rootIndex;
+        //     uint32 earnerIndex;
+        //     bytes earnerTreeProof;
+        //     EarnerTreeMerkleLeaf earnerLeaf;
+        //     uint32[] tokenIndices;
+        //     bytes[] tokenTreeProofs;
+        //     TokenTreeMerkleLeaf[] tokenLeaves;
+        // }
+        // struct EarnerTreeMerkleLeaf {
+        //     address earner;
+        //     bytes32 earnerTokenRoot;
+        // }
+        // struct TokenTreeMerkleLeaf {
+        //     IERC20 token;
+        //     uint256 cumulativeEarnings;
+        // }
+
+        return abi.encodeWithSelector(
+            // cast sig "processClaim((uint32,uint32,bytes,(address,bytes32),uint32[],bytes[],(address,uint256)[]), address)" == 0x3ccc861d
+            IRewardsCoordinator.processClaim.selector,
+            claim,
+            recipient
+        );
+    }
+
+    /**
+     * @notice Sets the address of the entity that can call `processClaim` on behalf of the earner (msg.sender)
+     * @param claimer The address of the entity that can claim rewards on behalf of the earner
+     * @dev Only callable by the `earner`
+     */
+    function encodeSetClaimerForMsg(address claimer) public pure returns (bytes memory) {
+
+        return abi.encodeWithSelector(
+            IRewardsCoordinator.setClaimerFor.selector,
+            claimer
+        );
+    }
+
 }
+
+    // /**
+    //  * @notice Claim rewards against a given root (read from _distributionRoots[claim.rootIndex]).
+    //  * Earnings are cumulative so earners don't have to claim against all distribution roots they have earnings for,
+    //  * they can simply claim against the latest root and the contract will calculate the difference between
+    //  * their cumulativeEarnings and cumulativeClaimed. This difference is then transferred to recipient address.
+    //  * @param claim The RewardsMerkleClaim to be processed.
+    //  * Contains the root index, earner, token leaves, and required proofs
+    //  * @param recipient The address recipient that receives the ERC20 rewards
+    //  * @dev only callable by the valid claimer, that is
+    //  * if claimerFor[claim.earner] is address(0) then only the earner can claim, otherwise only
+    //  * claimerFor[claim.earner] can claim the rewards.
+    //  */
+    // function processClaim(RewardsMerkleClaim calldata claim, address recipient) external;
+
+
+    // /**
+    //  * @notice A claim against a distribution root called by an
+    //  * earners claimer (could be the earner themselves). Each token claim will claim the difference
+    //  * between the cumulativeEarnings of the earner and the cumulativeClaimed of the claimer.
+    //  * Each claim can specify which of the earner's earned tokens they want to claim.
+    //  * See `processClaim()` for more details.
+    //  * @param rootIndex The index of the root in the list of DistributionRoots
+    //  * @param earnerIndex The index of the earner's account root in the merkle tree
+    //  * @param earnerTreeProof The proof of the earner's EarnerTreeMerkleLeaf against the merkle root
+    //  * @param earnerLeaf The earner's EarnerTreeMerkleLeaf struct, providing the earner address and earnerTokenRoot
+    //  * @param tokenIndices The indices of the token leaves in the earner's subtree
+    //  * @param tokenTreeProofs The proofs of the token leaves against the earner's earnerTokenRoot
+    //  * @param tokenLeaves The token leaves to be claimed
+    //  * @dev The merkle tree is structured with the merkle root at the top and EarnerTreeMerkleLeaf as internal leaves
+    //  * in the tree. Each earner leaf has its own subtree with TokenTreeMerkleLeaf as leaves in the subtree.
+    //  * To prove a claim against a specified rootIndex(which specifies the distributionRoot being used),
+    //  * the claim will first verify inclusion of the earner leaf in the tree against _distributionRoots[rootIndex].root.
+    //  * Then for each token, it will verify inclusion of the token leaf in the earner's subtree against the earner's earnerTokenRoot.
+    //  */
+    // struct RewardsMerkleClaim {
+    //     uint32 rootIndex;
+    //     uint32 earnerIndex;
+    //     bytes earnerTreeProof;
+    //     EarnerTreeMerkleLeaf earnerLeaf;
+    //     uint32[] tokenIndices;
+    //     bytes[] tokenTreeProofs;
+    //     TokenTreeMerkleLeaf[] tokenLeaves;
+    // }
