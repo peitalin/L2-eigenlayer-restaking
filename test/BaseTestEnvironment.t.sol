@@ -9,6 +9,7 @@ import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 
 import {IReceiverCCIPMock} from "./mocks/ReceiverCCIPMock.sol";
 import {ISenderCCIPMock} from "./mocks/SenderCCIPMock.sol";
@@ -43,6 +44,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
     IStrategy public strategy;
+    IRewardsCoordinator public rewardsCoordinator;
     IERC20 public tokenL1;
     IERC20 public tokenL2;
 
@@ -102,7 +104,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             , // IStrategyFactory
             , // pauserRegistry
             delegationManager,
-            , // rewardsCoordinator
+            rewardsCoordinator,
             tokenL1
         ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
@@ -151,7 +153,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             receiverContract.allowlistSender(deployer, true);
             receiverContract.allowlistSender(address(senderContract), true);
             // set eigenlayer contracts
-            restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
+            restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy, rewardsCoordinator);
 
             IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
             IERC20_CCIPBnM(address(tokenL1)).drip(address(deployer));
@@ -208,7 +210,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             , // IStrategyFactory
             , // pauserRegistry
             delegationManager,
-            , // rewardsCoordinator
+            rewardsCoordinator,
             tokenL1
         ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
@@ -232,7 +234,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             receiverContract.allowlistSender(deployer, true);
             receiverContract.allowlistSender(address(senderContract), true);
             // set eigenlayer contracts
-            restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
+            restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy, rewardsCoordinator);
 
             IERC20Minter(address(tokenL1)).mint(address(receiverContract), 1 ether);
             IERC20Minter(address(tokenL1)).mint(deployer, 1 ether);

@@ -577,7 +577,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
      *
     */
 
-    function test_Decode_RewardsCoordinator_ProcessClaim() public {
+    function test_Decode_RewardsCoordinator_ProcessClaim() public view {
 
         // struct RewardsMerkleClaim {
         //     uint32 rootIndex;

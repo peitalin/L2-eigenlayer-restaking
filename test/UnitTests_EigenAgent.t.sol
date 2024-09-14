@@ -68,7 +68,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         );
     }
 
-    function test_EigenAgent_Client_DigestHashsEqual() public {
+    function test_EigenAgent_Client_DigestHashsEqual() public view {
 
         bytes memory message1 = encodeMintEigenAgentMsg(deployer);
 

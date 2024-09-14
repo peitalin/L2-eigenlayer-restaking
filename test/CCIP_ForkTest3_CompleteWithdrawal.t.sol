@@ -319,8 +319,8 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         // sender contract is forked from testnet, addr will differ
         vm.expectEmit(false, true, true, false);
         emit ReceiverCCIP.BridgingWithdrawalToL2(
-            address(senderContract),
             withdrawalTransferRoot,
+            address(tokenL1),
             amount
         );
         // Mock L1 bridge receiving CCIP message and calling CompleteWithdrawal on Eigenlayer

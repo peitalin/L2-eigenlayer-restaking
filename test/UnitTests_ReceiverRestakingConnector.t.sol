@@ -10,6 +10,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
@@ -247,7 +248,8 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         restakingConnector.setEigenlayerContracts(
             delegationManager,
             strategyManager,
-            strategy
+            strategy,
+            rewardsCoordinator
         );
 
         vm.startBroadcast(deployer);
@@ -258,7 +260,8 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             restakingConnector.setEigenlayerContracts(
                 IDelegationManager(address(0)),
                 strategyManager,
-                strategy
+                strategy,
+                rewardsCoordinator
             );
 
             vm.expectRevert(
@@ -267,7 +270,8 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             restakingConnector.setEigenlayerContracts(
                 delegationManager,
                 IStrategyManager(address(0)),
-                strategy
+                strategy,
+                rewardsCoordinator
             );
 
             vm.expectRevert(
@@ -276,24 +280,39 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             restakingConnector.setEigenlayerContracts(
                 delegationManager,
                 strategyManager,
-                IStrategy(address(0))
+                IStrategy(address(0)),
+                rewardsCoordinator
             );
+
+            vm.expectRevert(
+                abi.encodeWithSelector(AddressZero.selector, "_rewardsCoordinator cannot be address(0)")
+            );
+            restakingConnector.setEigenlayerContracts(
+                delegationManager,
+                strategyManager,
+                strategy,
+                IRewardsCoordinator(address(0))
+            );
+
 
             restakingConnector.setEigenlayerContracts(
                 delegationManager,
                 strategyManager,
-                strategy
+                strategy,
+                rewardsCoordinator
             );
 
             (
                 IDelegationManager _delegationManager,
                 IStrategyManager _strategyManager,
-                IStrategy _strategy
+                IStrategy _strategy,
+                IRewardsCoordinator _rewardsCoordinator
             ) = restakingConnector.getEigenlayerContracts();
 
             vm.assertEq(address(delegationManager), address(_delegationManager));
             vm.assertEq(address(strategyManager), address(_strategyManager));
             vm.assertEq(address(strategy), address(_strategy));
+            vm.assertEq(address(rewardsCoordinator), address(_rewardsCoordinator));
         }
         vm.stopBroadcast();
     }
