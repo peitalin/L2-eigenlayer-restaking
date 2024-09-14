@@ -10,6 +10,11 @@ interface ISenderHooks {
         address agentOwner;
     }
 
+    struct RewardsTransfer {
+        uint256 amount;
+        address recipient;
+    }
+
     function getSenderCCIP() external view returns (address);
 
     function setSenderCCIP(address newSenderCCIP) external;
@@ -35,6 +40,13 @@ interface ISenderHooks {
     function calculateWithdrawalTransferRoot(
         bytes32 withdrawalRoot,
         uint256 amount,
+        address agentOwner
+    ) external pure returns (bytes32);
+
+    function calculateRewardsTransferRoot(
+        bytes32 rewardsRoot,
+        uint256 rewardAmount,
+        address rewardToken,
         address agentOwner
     ) external pure returns (bytes32);
 

@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 
 import {EigenlayerMsgDecoders, DelegationDecoders} from "./utils/EigenlayerMsgDecoders.sol";
@@ -16,6 +17,7 @@ import {Adminable} from "./utils/Adminable.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
+import {EthSepolia} from "../script/Addresses.sol";
 
 
 
@@ -29,15 +31,16 @@ contract RestakingConnector is
     IDelegationManager public delegationManager;
     IStrategyManager public strategyManager;
     IStrategy public strategy;
-
     address private _receiverCCIP;
     IAgentFactory public agentFactory;
+    IRewardsCoordinator public rewardsCoordinator;
 
     mapping(address user => mapping(uint256 nonce => uint256 withdrawalBlock)) private _withdrawalBlock;
     mapping(bytes4 => uint256) internal _gasLimitsForFunctionSelectors;
 
     event SetQueueWithdrawalBlock(address indexed, uint256 indexed, uint256 indexed);
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
+    event SendingRewardsToAgentOwnerOnL1(address indexed, address indexed, uint256 indexed);
 
     error AddressZero(string msg);
 
@@ -94,15 +97,17 @@ contract RestakingConnector is
     function getEigenlayerContracts() external view returns (
         IDelegationManager,
         IStrategyManager,
-        IStrategy
+        IStrategy,
+        IRewardsCoordinator
     ) {
-        return (delegationManager, strategyManager, strategy);
+        return (delegationManager, strategyManager, strategy, rewardsCoordinator);
     }
 
     function setEigenlayerContracts(
         IDelegationManager _delegationManager,
         IStrategyManager _strategyManager,
-        IStrategy _strategy
+        IStrategy _strategy,
+        IRewardsCoordinator _rewardsCoordinator
     ) external onlyOwner {
 
         if (address(_delegationManager) == address(0))
@@ -114,9 +119,13 @@ contract RestakingConnector is
         if (address(_strategy) == address(0))
             revert AddressZero("_strategy cannot be address(0)");
 
+        if (address(_rewardsCoordinator) == address(0))
+            revert AddressZero("_rewardsCoordinator cannot be address(0)");
+
         delegationManager = _delegationManager;
         strategyManager = _strategyManager;
         strategy = _strategy;
+        rewardsCoordinator = _rewardsCoordinator;
     }
 
     /**
@@ -383,7 +392,7 @@ contract RestakingConnector is
         // );
     }
 
-    /// @dev Forwards a delegateTo message to Eigenlayer to the user's EigenAgent to execute.
+    /// @dev Forwards a delegateTo message to Eigenlayer via the user's EigenAgent.
     function delegateToWithEigenAgent(bytes memory messageWithSignature) external onlyReceiverCCIP {
         (
             // original message
@@ -411,7 +420,7 @@ contract RestakingConnector is
         );
     }
 
-    /// @dev Forwards a undelegate message to Eigenlayer to the user's EigenAgent to execute.
+    /// @dev Forwards a undelegate message to Eigenlayer via EigenAgent to execute.
     function undelegateWithEigenAgent(bytes memory messageWithSignature) external onlyReceiverCCIP {
         (
             // original message
@@ -437,4 +446,91 @@ contract RestakingConnector is
         );
     }
 
+    /// @dev Forwards a processClaim message to claim Eigenlayer rewards via EigenAgent.
+    function processClaimWithEigenAgent(bytes memory messageWithSignature)
+        external
+        onlyReceiverCCIP
+        returns (
+            uint256 withdrawalAmount,
+            address withdrawalToken,
+            string memory messageForL2,
+            bytes32 rewardsTransferRoot
+        )
+    {
+        (
+            // original message
+            IRewardsCoordinator.RewardsMerkleClaim memory claim,
+            address recipient,
+            // message signature
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        ) = decodeProcessClaimMsg(messageWithSignature);
+
+        IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(recipient);
+
+        require(address(eigenAgent) != address(0), "User does not have an EigenAgent");
+
+        eigenAgent.executeWithSignature(
+            address(rewardsCoordinator),
+            0 ether,
+            EigenlayerMsgEncoders.encodeProcessClaimMsg(claim, recipient),
+            expiry,
+            signature
+        );
+
+        address agentOwner = eigenAgent.owner();
+        bytes32 rewardsRoot = EigenlayerMsgEncoders.calculateRewardsRoot(claim);
+        // The same rewardsRoot calculated on L2 in SenderHooks.sol
+
+        for (uint32 i = 0; i < claim.tokenLeaves.length; ++i) {
+
+            uint256 rewardAmount = claim.tokenLeaves[i].cumulativeEarnings;
+            address rewardToken = address(claim.tokenLeaves[i].token);
+
+            // (1) EigenAgent approves RestakingConnector to transfer tokens to ReceiverCCIP
+            eigenAgent.approveByWhitelistedContract(
+                address(this), // restakingConnector
+                rewardToken,
+                rewardAmount
+            );
+
+            // Only transfer BridgeTokens back to L2. Transfer remaining L1 tokens to AgentOwner.
+            if (rewardToken != EthSepolia.BridgeToken) {
+                // (2) If the token is L1-native and cannot be bridged to L2, transfer to AgentOwner on L1.
+                IERC20(rewardToken).transferFrom(
+                    address(eigenAgent),
+                    agentOwner,
+                    rewardAmount
+                );
+
+                emit SendingRewardsToAgentOwnerOnL1(
+                    rewardToken,
+                    agentOwner,
+                    rewardAmount
+                );
+
+            } else {
+                // (2) RestakingConnector transfers tokens to ReceiverCCIP, to bridge tokens to Router (bridge)
+                IERC20(rewardToken).transferFrom(
+                    address(eigenAgent),
+                    _receiverCCIP,
+                    rewardAmount
+                );
+                // return variables
+                withdrawalAmount = rewardAmount;
+                withdrawalToken = rewardToken;
+                rewardsTransferRoot = EigenlayerMsgEncoders.calculateRewardsTransferRoot(
+                    rewardsRoot,
+                    rewardAmount,
+                    rewardToken,
+                    agentOwner
+                );
+                // rewardsTransferRoot for L2 transfer
+                messageForL2 = string(EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
+                    rewardsTransferRoot
+                ));
+            }
+        }
+    }
 }

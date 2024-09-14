@@ -555,7 +555,7 @@ contract EigenlayerMsgDecoders {
         // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
         // 00000000000000000000000000000000000000000000000000000000000005a5 [64] string length
         // 3ccc861d                                                         [96] processClaim function selector
-        // 0000000000000000000000000000000000000000000000000000000000000040 [100] [OFFSET_1] RewardsMerkleClaim struct offset (100 + 64 = 164)
+        // 0000000000000000000000000000000000000000000000000000000000000040 [100] [OFFSET_1] RewardsMerkleClaim offset (100+64 = 164)
         // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] recipient
         // 0000000000000000000000000000000000000000000000000000000000000054 [164] rootIndex
         // 0000000000000000000000000000000000000000000000000000000000010252 [196] earnerIndex
@@ -670,7 +670,7 @@ contract EigenlayerMsgDecoders {
         uint32 tokenIndicesOffset,
         uint32 tokenTreeProofsOffset,
         uint32 tokenLeavesOffset
-    ) private view returns (
+    ) private pure returns (
         uint32[] memory tokenIndices,
         bytes[] memory tokenTreeProofs,
         IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves
@@ -693,7 +693,7 @@ contract EigenlayerMsgDecoders {
         {
             for (uint32 i = 0; i < tokenIndicesLength; ++i) {
                 uint32 _tokenIndex;
-                // add +1 line to skip array lenght, then i*32 for each following element
+                // add +1 line to skip array length, then i*32 for each following element
                 uint32 _offset_elem = tokenIndicesOffset + 32 + i*32;
                 assembly {
                     _tokenIndex := mload(add(message, _offset_elem))
@@ -744,7 +744,7 @@ contract EigenlayerMsgDecoders {
         uint32 offset,
         uint32 tokenTreeProofsOffset,
         uint32 tokenTreeProofsLength
-    ) private view returns (bytes32[] memory) {
+    ) private pure returns (bytes32[] memory) {
 
         uint32 lengthProof;
         assembly {

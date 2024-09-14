@@ -6,12 +6,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 
 import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
-import {BaseSepolia} from "../script/Addresses.sol";
+import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 
 
 /// @title ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them
@@ -22,9 +23,15 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     mapping(bytes32 messageId => uint256) public amountRefundedToMessageIds;
 
     event BridgingWithdrawalToL2(
-        address indexed senderContractL2,
         bytes32 indexed withdrawalTransferRoot,
+        address indexed withdrawalToken,
         uint256 indexed withdrawalAmount
+    );
+
+    event BridgingRewardsToL2(
+        bytes32 indexed rewardsTransferRoot,
+        address indexed rewardToken,
+        uint256 indexed rewardAmount
     );
 
     event RefundingDeposit(
@@ -235,8 +242,8 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 );
 
                 emit BridgingWithdrawalToL2(
-                    senderContractL2,
                     withdrawalTransferRoot,
+                    withdrawalToken,
                     withdrawalAmount
                 );
 
@@ -258,6 +265,36 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         if (functionSelector == IDelegationManager.undelegate.selector) {
             restakingConnector.undelegateWithEigenAgent(message);
             textMsg = "Undelegated by EigenAgent";
+        }
+
+        /// Process Claim (Rewards)
+        if (functionSelector == IRewardsCoordinator.processClaim.selector) {
+            (
+                uint256 withdrawalAmount,
+                address withdrawalToken,
+                string memory messageForL2,
+                bytes32 rewardsTransferRoot
+            ) = restakingConnector.processClaimWithEigenAgent(message);
+
+            if (withdrawalToken == EthSepolia.BridgeToken) {
+
+                this.sendMessagePayNative(
+                    BaseSepolia.ChainSelector, // destination chain
+                    senderContractL2,
+                    messageForL2,
+                    withdrawalToken, // L1 token to burn/lock
+                    withdrawalAmount,
+                    0 // use default gasLimit
+                );
+
+                emit BridgingWithdrawalToL2(
+                    rewardsTransferRoot,
+                    withdrawalToken,
+                    withdrawalAmount
+                );
+            }
+
+            textMsg = "Claiming Rewards with EigenAgent";
         }
     }
 

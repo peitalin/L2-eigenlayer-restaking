@@ -3,11 +3,13 @@ pragma solidity 0.8.22;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 import {Adminable} from "./utils/Adminable.sol";
 
 import {ISenderHooks} from "./interfaces/ISenderHooks.sol";
 import {EigenlayerMsgDecoders, TransferToAgentOwnerMsg} from "./utils/EigenlayerMsgDecoders.sol";
 import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
+import {EthSepolia} from "../script/Addresses.sol";
 
 
 /// @title Sender Hooks: processes SenderCCIP messages and stores state
@@ -19,11 +21,20 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
 
     address internal _senderCCIP;
 
+    mapping(bytes32 => ISenderHooks.RewardsTransfer) public rewardsTransferCommitments;
+    mapping(bytes32 => bool) public rewardsTransferRootsSpent;
+
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
     event SendingWithdrawalToAgentOwner(address indexed, uint256 indexed);
     event WithdrawalTransferRootCommitted(
         bytes32 indexed, // withdrawalTransferRoot
         address indexed, //  withdrawer (eigenAgent)
+        uint256, // amount
+        address  // signer (agentOwner)
+    );
+    event RewardsTransferRootCommitted(
+        bytes32 indexed, // rewardsTransferRoot
+        address indexed, //  recipient
         uint256, // amount
         address  // signer (agentOwner)
     );
@@ -164,6 +175,58 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
     }
 
     /**
+     * @dev Returns rewards transfer fields (rewardsRoot, amount, recipient) associated with
+     * the rewardsTransferRoot that was committed.
+     * @param rewardsTransferRoot is the hash of rewardsRoot, amount, recipient.
+     */
+    function getRewardsTransferCommitment(bytes32 rewardsTransferRoot)
+        external
+        view
+        returns (ISenderHooks.RewardsTransfer memory)
+    {
+        return rewardsTransferCommitments[rewardsTransferRoot];
+    }
+
+    /**
+     * @param rewardsTransferRoot is calculated when dispatching a processClaim message.
+     */
+    function isRewardsTransferRootSpent(bytes32 rewardsTransferRoot)
+        external
+        view
+        returns (bool)
+    {
+        return rewardsTransferRootsSpent[rewardsTransferRoot];
+    }
+
+    /**
+     * @dev Returns the same rewardsRoot calculated in in RestakingConnector during processClaims on L1
+     * @param claim is the RewardsMerkleClaim struct used to processClaim in Eigenlayer.
+     */
+    function calculateRewardsRoot(IRewardsCoordinator.RewardsMerkleClaim memory claim)
+        public
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(claim));
+    }
+
+    /**
+     * @dev Returns the same rewardsTransferRoot calculated in RestakingConnector.
+     * @param rewardsRoot keccak256(abi.encode(claim.rootIndex, claim.earnerIndex))
+     * @param rewardAmount amount of rewards
+     * @param rewardToken token address of reward token
+     * @param agentOwner owner of the EigenAgent executing completeWithdrawals
+     */
+    function calculateRewardsTransferRoot(
+        bytes32 rewardsRoot,
+        uint256 rewardAmount,
+        address rewardToken,
+        address agentOwner
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encode(rewardsRoot, rewardAmount, rewardToken, agentOwner));
+    }
+
+    /**
      * @dev Hook that executes in outbound sendMessagePayNative calls.
      * if the outbound message is completeQueueWithdrawal, it will calculate a withdrawalTransferRoot
      * and store information about the amount and owner of the EigenAgent doing the withdrawal to
@@ -178,6 +241,9 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
             // 0x60d7faed
             _commitWithdrawalTransferRootInfo(message, tokenL2);
+        } else if (functionSelector == IRewardsCoordinator.processClaim.selector) {
+            // 0x3ccc861d
+            _commitRewardsTransferRootInfo(message, tokenL2);
         }
     }
 
@@ -229,6 +295,67 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
                 withdrawal.shares[0], // amount
                 signer // agentOwner
             );
+        }
+    }
+
+
+    function _commitRewardsTransferRootInfo(bytes memory message, address tokenL2) private {
+
+        require(
+            tokenL2 != address(0),
+            "SenderHooks._commitRewardsTransferRootInfo: cannot commit tokenL2 as address(0)"
+        );
+
+        (
+            IRewardsCoordinator.RewardsMerkleClaim memory claim,
+            address recipient,
+            address signer, // signer
+            , // expiry
+            // signature
+        ) = decodeProcessClaimMsg(message);
+
+        for (uint32 i = 0; i < claim.tokenLeaves.length; ++i) {
+
+            uint256 rewardAmount = claim.tokenLeaves[i].cumulativeEarnings;
+            address rewardToken = address(claim.tokenLeaves[i].token);
+            // TODO: validate token is the correct EthSepolia.BridgeToken
+
+            if (rewardToken == EthSepolia.BridgeToken) {
+
+                // Calculate rewardsTransferRoot and commit to it on L2, so that when the
+                // rewardsTransferRoot message is returned from L1 we can lookup and verify
+                // which AgentOwner to transfer rewards to.
+                bytes32 rewardsTransferRoot = calculateRewardsTransferRoot(
+                    calculateRewardsRoot(claim),
+                    rewardAmount,
+                    rewardToken,
+                    recipient
+                );
+                // This prevents griefing attacks where other users put in withdrawalRoot entries
+                // with the wrong agentOwner address, preventing completeWithdrawals
+
+                require(
+                    rewardsTransferRootsSpent[rewardsTransferRoot] == false,
+                    "SenderHooks._commitRewardsTransferRootInfo: rewardsTransferRoot already used"
+                );
+
+                // Commit to RewardsTransfer(claim, amount, token, owner) before sending processClaim message,
+                rewardsTransferCommitments[rewardsTransferRoot] = ISenderHooks.RewardsTransfer({
+                    amount: rewardAmount,
+                    recipient: recipient // recipient is used in handleTransferToAgentOwner
+                });
+
+                emit RewardsTransferRootCommitted(
+                    rewardsTransferRoot,
+                    recipient, // recipient
+                    rewardAmount, // amount
+                    signer // signer
+                );
+            } else {
+                // Briding will continue however only BridgeToken can be claimed back to L2.
+                // Other L1 tokens will be claimed and transferred to AgentOwner on L1.
+            }
+
         }
     }
 

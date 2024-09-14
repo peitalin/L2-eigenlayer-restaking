@@ -4,6 +4,7 @@ pragma solidity 0.8.22;
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 
 
 interface IRestakingConnector {
@@ -23,13 +24,15 @@ interface IRestakingConnector {
     function getEigenlayerContracts() external returns (
         IDelegationManager,
         IStrategyManager,
-        IStrategy
+        IStrategy,
+        IRewardsCoordinator
     );
 
     function setEigenlayerContracts(
         IDelegationManager _delegationManager,
         IStrategyManager _strategyManager,
-        IStrategy _strategy
+        IStrategy _strategy,
+        IRewardsCoordinator _rewardsCoordinator
     ) external;
 
     function getGasLimitForFunctionSelector(bytes4 functionSelector) external returns (uint256);
@@ -67,5 +70,12 @@ interface IRestakingConnector {
     function delegateToWithEigenAgent(bytes memory message) external;
 
     function undelegateWithEigenAgent(bytes memory message) external;
+
+    function processClaimWithEigenAgent(bytes memory message) external returns (
+        uint256 withdrawalAmount,
+        address withdrawalToken,
+        string memory messageForL2,
+        bytes32 rewardsTransferRoot
+    );
 
 }

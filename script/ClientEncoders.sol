@@ -97,6 +97,23 @@ contract ClientEncoders {
         return keccak256(abi.encode(withdrawalRoot, amount, agentOwner));
     }
 
+    function calculateRewardsRoot(IRewardsCoordinator.RewardsMerkleClaim memory claim)
+        public
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(claim));
+    }
+
+    function calculateRewardsTransferRoot(
+        bytes32 rewardsRoot,
+        uint256 rewardAmount,
+        address rewardToken,
+        address agentOwner
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encode(rewardsRoot, rewardAmount, rewardToken, agentOwner));
+    }
+
     function encodeHandleTransferToAgentOwnerMsg(
         bytes32 withdrawalTransferRoot
     ) public pure returns (bytes memory) {
@@ -151,7 +168,6 @@ contract ClientEncoders {
     }
 
     function encodeMintEigenAgentMsg(address recipient) public pure returns (bytes memory) {
-
         return abi.encodeWithSelector(
             // cast sig "mintEigenAgent(bytes)" == 0xcc15a557
             IRestakingConnector.mintEigenAgent.selector,
@@ -163,7 +179,6 @@ contract ClientEncoders {
         IRewardsCoordinator.RewardsMerkleClaim memory claim,
         address recipient
     ) public pure returns (bytes memory) {
-
         return abi.encodeWithSelector(
             // cast sig "processClaim((uint32,uint32,bytes,(address,bytes32),uint32[],bytes[],(address,uint256)[]), address)" == 0x3ccc861d
             IRewardsCoordinator.processClaim.selector,
@@ -173,7 +188,6 @@ contract ClientEncoders {
     }
 
     function encodeSetClaimerForMsg(address claimer) public pure returns (bytes memory) {
-
         return abi.encodeWithSelector(
             IRewardsCoordinator.setClaimerFor.selector,
             claimer

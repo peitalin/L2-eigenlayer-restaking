@@ -24,7 +24,6 @@ library EigenlayerMsgEncoders {
         address token,
         uint256 amount
     ) public pure returns (bytes memory) {
-
         return abi.encodeWithSelector(
             // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
             IStrategyManager.depositIntoStrategy.selector,
@@ -39,7 +38,6 @@ library EigenlayerMsgEncoders {
     function encodeQueueWithdrawalsMsg(
         IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
     ) public pure returns (bytes memory) {
-
         return abi.encodeWithSelector(
             // cast sig "queueWithdrawals((address[],uint256[],address)[])"
             IDelegationManager.queueWithdrawals.selector,
@@ -136,7 +134,6 @@ library EigenlayerMsgEncoders {
     /// @dev Encodes params to mint an EigenAgent from the AgentFactory.sol contract. Can be called by anyone.
     /// @param recipient address to mint an EigenAgent to.
     function encodeMintEigenAgentMsg(address recipient) public pure returns (bytes memory) {
-
         return abi.encodeWithSelector(
             // cast sig "mintEigenAgent(bytes)" == 0xcc15a557
             IRestakingConnector.mintEigenAgent.selector,
@@ -168,12 +165,39 @@ library EigenlayerMsgEncoders {
         return keccak256(abi.encode(withdrawalRoot, amount, agentOwner));
     }
 
+    /**
+     * @dev Returns the same rewardsRoot calculated in in RestakingConnector during processClaims on L1
+     * @param claim is the RewardsMerkleClaim struct used to processClaim in Eigenlayer.
+     */
+    function calculateRewardsRoot(IRewardsCoordinator.RewardsMerkleClaim memory claim)
+        public
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(claim));
+    }
+
+    /**
+     * @dev Returns the same rewardsTransferRoot calculated in RestakingConnector.
+     * @param rewardsRoot keccak256(abi.encode(claim.rootIndex, claim.earnerIndex))
+     * @param rewardAmount amount of rewards
+     * @param rewardToken token address of reward token
+     * @param agentOwner owner of the EigenAgent executing completeWithdrawals
+     */
+    function calculateRewardsTransferRoot(
+        bytes32 rewardsRoot,
+        uint256 rewardAmount,
+        address rewardToken,
+        address agentOwner
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encode(rewardsRoot, rewardAmount, rewardToken, agentOwner));
+    }
+
     /// @dev encodes a message containing the withdrawalTransferRoot when sending message from L1 to L2
     /// @param withdrawalTransferRoot is a hash of withdrawalRoot, amount, and agentOwner.
     function encodeHandleTransferToAgentOwnerMsg(
         bytes32 withdrawalTransferRoot
     ) public pure returns (bytes memory) {
-
         return abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderHooks.handleTransferToAgentOwner.selector,
@@ -237,7 +261,6 @@ library EigenlayerMsgEncoders {
      * @dev Only callable by the `earner`
      */
     function encodeSetClaimerForMsg(address claimer) public pure returns (bytes memory) {
-
         return abi.encodeWithSelector(
             IRewardsCoordinator.setClaimerFor.selector,
             claimer
@@ -246,46 +269,46 @@ library EigenlayerMsgEncoders {
 
 }
 
-    // /**
-    //  * @notice Claim rewards against a given root (read from _distributionRoots[claim.rootIndex]).
-    //  * Earnings are cumulative so earners don't have to claim against all distribution roots they have earnings for,
-    //  * they can simply claim against the latest root and the contract will calculate the difference between
-    //  * their cumulativeEarnings and cumulativeClaimed. This difference is then transferred to recipient address.
-    //  * @param claim The RewardsMerkleClaim to be processed.
-    //  * Contains the root index, earner, token leaves, and required proofs
-    //  * @param recipient The address recipient that receives the ERC20 rewards
-    //  * @dev only callable by the valid claimer, that is
-    //  * if claimerFor[claim.earner] is address(0) then only the earner can claim, otherwise only
-    //  * claimerFor[claim.earner] can claim the rewards.
-    //  */
-    // function processClaim(RewardsMerkleClaim calldata claim, address recipient) external;
+// /**
+//  * @notice Claim rewards against a given root (read from _distributionRoots[claim.rootIndex]).
+//  * Earnings are cumulative so earners don't have to claim against all distribution roots they have earnings for,
+//  * they can simply claim against the latest root and the contract will calculate the difference between
+//  * their cumulativeEarnings and cumulativeClaimed. This difference is then transferred to recipient address.
+//  * @param claim The RewardsMerkleClaim to be processed.
+//  * Contains the root index, earner, token leaves, and required proofs
+//  * @param recipient The address recipient that receives the ERC20 rewards
+//  * @dev only callable by the valid claimer, that is
+//  * if claimerFor[claim.earner] is address(0) then only the earner can claim, otherwise only
+//  * claimerFor[claim.earner] can claim the rewards.
+//  */
+// function processClaim(RewardsMerkleClaim calldata claim, address recipient) external;
 
 
-    // /**
-    //  * @notice A claim against a distribution root called by an
-    //  * earners claimer (could be the earner themselves). Each token claim will claim the difference
-    //  * between the cumulativeEarnings of the earner and the cumulativeClaimed of the claimer.
-    //  * Each claim can specify which of the earner's earned tokens they want to claim.
-    //  * See `processClaim()` for more details.
-    //  * @param rootIndex The index of the root in the list of DistributionRoots
-    //  * @param earnerIndex The index of the earner's account root in the merkle tree
-    //  * @param earnerTreeProof The proof of the earner's EarnerTreeMerkleLeaf against the merkle root
-    //  * @param earnerLeaf The earner's EarnerTreeMerkleLeaf struct, providing the earner address and earnerTokenRoot
-    //  * @param tokenIndices The indices of the token leaves in the earner's subtree
-    //  * @param tokenTreeProofs The proofs of the token leaves against the earner's earnerTokenRoot
-    //  * @param tokenLeaves The token leaves to be claimed
-    //  * @dev The merkle tree is structured with the merkle root at the top and EarnerTreeMerkleLeaf as internal leaves
-    //  * in the tree. Each earner leaf has its own subtree with TokenTreeMerkleLeaf as leaves in the subtree.
-    //  * To prove a claim against a specified rootIndex(which specifies the distributionRoot being used),
-    //  * the claim will first verify inclusion of the earner leaf in the tree against _distributionRoots[rootIndex].root.
-    //  * Then for each token, it will verify inclusion of the token leaf in the earner's subtree against the earner's earnerTokenRoot.
-    //  */
-    // struct RewardsMerkleClaim {
-    //     uint32 rootIndex;
-    //     uint32 earnerIndex;
-    //     bytes earnerTreeProof;
-    //     EarnerTreeMerkleLeaf earnerLeaf;
-    //     uint32[] tokenIndices;
-    //     bytes[] tokenTreeProofs;
-    //     TokenTreeMerkleLeaf[] tokenLeaves;
-    // }
+// /**
+//  * @notice A claim against a distribution root called by an
+//  * earners claimer (could be the earner themselves). Each token claim will claim the difference
+//  * between the cumulativeEarnings of the earner and the cumulativeClaimed of the claimer.
+//  * Each claim can specify which of the earner's earned tokens they want to claim.
+//  * See `processClaim()` for more details.
+//  * @param rootIndex The index of the root in the list of DistributionRoots
+//  * @param earnerIndex The index of the earner's account root in the merkle tree
+//  * @param earnerTreeProof The proof of the earner's EarnerTreeMerkleLeaf against the merkle root
+//  * @param earnerLeaf The earner's EarnerTreeMerkleLeaf struct, providing the earner address and earnerTokenRoot
+//  * @param tokenIndices The indices of the token leaves in the earner's subtree
+//  * @param tokenTreeProofs The proofs of the token leaves against the earner's earnerTokenRoot
+//  * @param tokenLeaves The token leaves to be claimed
+//  * @dev The merkle tree is structured with the merkle root at the top and EarnerTreeMerkleLeaf as internal leaves
+//  * in the tree. Each earner leaf has its own subtree with TokenTreeMerkleLeaf as leaves in the subtree.
+//  * To prove a claim against a specified rootIndex(which specifies the distributionRoot being used),
+//  * the claim will first verify inclusion of the earner leaf in the tree against _distributionRoots[rootIndex].root.
+//  * Then for each token, it will verify inclusion of the token leaf in the earner's subtree against the earner's earnerTokenRoot.
+//  */
+// struct RewardsMerkleClaim {
+//     uint32 rootIndex;
+//     uint32 earnerIndex;
+//     bytes earnerTreeProof;
+//     EarnerTreeMerkleLeaf earnerLeaf;
+//     uint32[] tokenIndices;
+//     bytes[] tokenTreeProofs;
+//     TokenTreeMerkleLeaf[] tokenLeaves;
+// }
