@@ -836,35 +836,6 @@ contract EigenlayerMsgDecoders {
         });
     }
 
-    function decodeSetClaimerForMsg(bytes memory message) public pure returns (
-        address claimer,
-        address signer,
-        uint256 expiry,
-        bytes memory signature
-    ) {
-
-        //////////////////////// Message offsets //////////////////////////
-        // 0000000000000000000000000000000000000000000000000000000000000020 [32]
-        // 0000000000000000000000000000000000000000000000000000000000000064 [64]
-        // a0169ddd                                                         [96] function selector
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [100] claimer
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] signer
-        // 0000000000000000000000000000000000000000000000000000000000015195 [164] expiry
-        // e09d6bcbce4cc65ea74cf310d4000eaf9e294515b67cda2d6c74ffff86eb00c3 [196] sig r
-        // 1b38460132eee48144ca2a99635afb1bad311da4b81a1f4461c94f0a1cacf6f9 [228] sig s
-        // 1c000000000000000000000000000000000000000000000000000000         [260] sig v
-
-        assembly {
-            claimer := mload(add(message, 100))
-        }
-
-        (
-            signer,
-            expiry,
-            signature
-        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 132);
-    }
-
 }
 
 /*

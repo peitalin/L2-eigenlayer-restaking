@@ -179,26 +179,26 @@ contract ClientSigners is Script {
         return messageWithSignature;
     }
 
-    function _logClientEigenAgentExecutionMessage(
-        uint256 chainid,
-        address targetContractAddr,
-        bytes memory messageToEigenlayer,
-        uint256 execNonce,
-        uint256 expiry
-    ) private pure {
-        console.log("chainid:", chainid);
-        console.log("targetContractAddr:", targetContractAddr);
-        console.log("messageToEigenlayer:");
-        console.logBytes(messageToEigenlayer);
-        console.log("execNonce:", execNonce);
-        console.log("expiry:", expiry);
-    }
+    // function _logClientEigenAgentExecutionMessage(
+    //     uint256 chainid,
+    //     address targetContractAddr,
+    //     bytes memory messageToEigenlayer,
+    //     uint256 execNonce,
+    //     uint256 expiry
+    // ) private pure {
+    //     console.log("chainid:", chainid);
+    //     console.log("targetContractAddr:", targetContractAddr);
+    //     console.log("messageToEigenlayer:");
+    //     console.logBytes(messageToEigenlayer);
+    //     console.log("execNonce:", execNonce);
+    //     console.log("expiry:", expiry);
+    // }
 
-    function _logClientSignature(address signer, bytes32 digestHash, bytes memory signatureEigenAgent) private pure {
-        console.log("signer:", signer);
-        console.log("digestHash:");
-        console.logBytes32(digestHash);
-        console.log("signature:");
-        console.logBytes(signatureEigenAgent);
-    }
+    // function _logClientSignature(address signer, bytes32 digestHash, bytes memory signatureEigenAgent) private pure {
+    //     console.log("signer:", signer);
+    //     console.log("digestHash:");
+    //     console.logBytes32(digestHash);
+    //     console.log("signature:");
+    //     console.logBytes(signatureEigenAgent);
+    // }
 }
