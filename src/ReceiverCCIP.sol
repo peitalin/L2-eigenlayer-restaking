@@ -14,8 +14,6 @@ import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 
-import {console} from "forge-std/Test.sol";
-
 
 /// @title ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them
 contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
@@ -32,8 +30,8 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
     event BridgingRewardsToL2(
         bytes32 indexed rewardsTransferRoot,
-        address indexed rewardToken,
-        uint256 indexed rewardAmount
+        address indexed rewardsToken,
+        uint256 indexed rewardsAmount
     );
 
     event RefundingDeposit(
@@ -278,8 +276,6 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 uint256 rewardsAmount
             ) = restakingConnector.processClaimWithEigenAgent(message);
 
-            console.log("rewardsToken:", rewardsToken);
-
             if (rewardsToken == EthSepolia.BridgeToken) {
 
                 this.sendMessagePayNative(
@@ -291,7 +287,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                     0 // use default gasLimit
                 );
 
-                emit BridgingWithdrawalToL2(
+                emit BridgingRewardsToL2(
                     rewardsTransferRoot,
                     rewardsToken,
                     rewardsAmount

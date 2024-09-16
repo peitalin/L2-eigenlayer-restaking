@@ -7,6 +7,7 @@ import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISi
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {console} from "forge-std/Test.sol";
 
 
 struct TransferToAgentOwnerMsg {
@@ -703,15 +704,20 @@ contract EigenlayerMsgDecoders {
         }
         {
             for (uint32 i = 0; i < tokenTreeProofsLength; ++i) {
-                // tokenTreeProofs[bytes_proof, bytes_proof] is an array of bytes.
-                uint32 _offset = tokenTreeProofsOffset + (tokenTreeProofsLength * 32) + (64 + i*64);
+                // tokenTreeProofs = bytes[] is an array of dynamic length bytestrings.
+                // each bytes_proof is a dynamic length element, so it has a length, and value.
+                // So we need the lengths and offsets for each byte_proof element:
+                uint32 _elemLinesOffset = tokenTreeProofsOffset + 32 + (i*32);
+                uint32 _elemOffset;
+                assembly {
+                    _elemOffset := mload(add(message, _elemLinesOffset))
+                }
                 // offset by length of tokenTreeProofs[] + 2 lines offset for each bytes_proof (length and value)
-                tokenTreeProofs[i] = abi.encodePacked(_getTokenTreeProof(
+                tokenTreeProofs[i] = _getTokenTreeProof(
                     message,
-                    _offset,
-                    tokenTreeProofsOffset,
-                    tokenTreeProofsLength
-                ));
+                    _elemOffset, // each i-th element's offset
+                    tokenTreeProofsOffset // root offset of tokenTreeProofs
+                );
             }
         }
         {
@@ -741,30 +747,35 @@ contract EigenlayerMsgDecoders {
 
     function _getTokenTreeProof(
         bytes memory message,
-        uint32 offset,
-        uint32 tokenTreeProofsOffset,
-        uint32 tokenTreeProofsLength
-    ) private pure returns (bytes32[] memory) {
+        uint32 elemOffset,
+        uint32 tokenTreeProofsOffset
+    ) private pure returns (bytes memory) {
 
-        uint32 lengthProof;
+        uint32 elemLengthOffset = elemOffset + 32; // byteproofs element lengths begin on next line
+        uint32 elemValueOffset = elemOffset + 64; // byteproofs element values begin 2 lines after
+
+        uint32 lengthOfProof;
         assembly {
-            lengthProof := mload(add(message, sub(offset, 32))) // 1 line before offset
+            lengthOfProof := mload(add(message, add(tokenTreeProofsOffset, elemLengthOffset)))
         }
+        console.log("elemLengthOffset:", tokenTreeProofsOffset + elemLengthOffset);
+        console.log("lengthOfProof:", lengthOfProof);
+        require(lengthOfProof % 32 == 0, "tokenTreeProof length must be a multiple of 32");
 
-        require(lengthProof % 32 == 0, "tokenTreeProof length must be a multiple of 32");
+        uint32 numLines = lengthOfProof / 32;
+        bytes32[] memory tokenTreeProofArray = new bytes32[](numLines);
 
-        lengthProof = lengthProof / 32;
-        bytes32[] memory tokenTreeProofArray = new bytes32[](lengthProof);
-
-        for (uint32 k = 0; k < lengthProof; ++k) {
+        for (uint32 j = 0; j < numLines; ++j) {
             bytes32 _proofLine;
+            uint32 k = j+1;
             assembly {
-                _proofLine := mload(add(message, add(offset, mul(k, 32))))
+                _proofLine := mload(add(message, add(tokenTreeProofsOffset, elemValueOffset)))
             }
-            tokenTreeProofArray[k] = _proofLine;
+            console.logBytes32(_proofLine);
+            tokenTreeProofArray[j] = _proofLine;
         }
 
-        return tokenTreeProofArray;
+        return abi.encodePacked(tokenTreeProofArray);
     }
 
     function _decodeProcessClaimMsg_Part2(bytes memory message)
