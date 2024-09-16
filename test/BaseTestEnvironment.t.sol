@@ -54,10 +54,15 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
 
     uint256 public deployerKey;
     address public deployer;
-    uint256 public bobKey;
-    address public bob;
+
     uint256 public aliceKey;
     address public alice;
+    uint256 public bobKey;
+    address public bob;
+    uint256 public charlieKey;
+    address public charlie;
+    uint256 public daniKey;
+    address public dani;
 
     uint256 public l2ForkId;
     uint256 public ethForkId;
@@ -68,13 +73,21 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         deployer = vm.addr(deployerKey);
         vm.deal(deployer, 1 ether);
 
-        bobKey = uint256(11156789111);
+        aliceKey = uint256(11111129987760211111);
+        alice = vm.addr(aliceKey);
+        vm.deal(alice, 1 ether);
+
+        bobKey = uint256(2222228139835991222222);
         bob = vm.addr(bobKey);
         vm.deal(bob, 1 ether);
 
-        aliceKey = uint256(22298765222);
-        alice = vm.addr(aliceKey);
-        vm.deal(alice, 1 ether);
+        charlieKey = uint256(333333563892343333333);
+        charlie = vm.addr(charlieKey);
+        vm.deal(charlie, 1 ether);
+
+        daniKey = uint256(4444444471723934444444);
+        dani = vm.addr(daniKey);
+        vm.deal(dani, 1 ether);
 
         l2ForkId = vm.createFork("basesepolia"); // 0
         ethForkId = vm.createFork("ethsepolia"); // 1

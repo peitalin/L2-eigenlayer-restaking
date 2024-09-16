@@ -511,7 +511,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             uint256 execNonce = 0;
             bytes32 mockWithdrawalAgentOwnerRoot = bytes32(abi.encode(123));
 
-            message = encodeHandleTransferToAgentOwnerMsg(
+            message = encodeTransferToAgentOwnerMsg(
                 mockWithdrawalAgentOwnerRoot
             );
 
@@ -565,7 +565,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             uint256 execNonce = 0;
             bytes32 mockWithdrawalAgentOwnerRoot = bytes32(abi.encode(123));
 
-            message = encodeHandleTransferToAgentOwnerMsg(
+            message = encodeTransferToAgentOwnerMsg(
                 mockWithdrawalAgentOwnerRoot
             );
 

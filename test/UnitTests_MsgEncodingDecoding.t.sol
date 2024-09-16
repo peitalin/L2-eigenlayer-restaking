@@ -53,7 +53,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
         bytes memory message1 = hex"00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000044f7e784ef00000000000000000000000000000000000000000000000000000000000000020000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c00000000000000000000000000000000000000000000000000000000";
         bytes4 functionSelector1 = FunctionSelectorDecoder.decodeFunctionSelector(message1);
-        require(functionSelector1 == 0xf7e784ef, "wrong functionSelector");
+        require(functionSelector1 == 0xf7e784ef, "functionSelector invalid");
 
         bytes memory message2 = abi.encode(string(abi.encodeWithSelector(
             bytes4(keccak256("depositIntoStrategyWithSignature(address,address,uint256,address,uint256,bytes)")),
@@ -65,7 +65,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             hex"3de99eb6c4e298a2332589fdcfd751c8e1adf9865da06eff5771b6c59a41c8ee3b8ef0a097ef6f09deee5f94a141db1a8d59bdb1fd96bc1b31020830a18f76d51c"
         )));
         bytes4 functionSelector2 = FunctionSelectorDecoder.decodeFunctionSelector(message2);
-        require(functionSelector2 == 0x32e89ace, "wrong functionSelector");
+        require(functionSelector2 == 0x32e89ace, "functionSelector2 invalid");
     }
 
     function test_Decode_AgentOwnerSignature() public view {
@@ -109,19 +109,16 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         ); // for depositIntoStrategy
 
         // compare vs original inputs
-        require(_signer == vm.addr(deployerKey), "decodeAgentOwnerSignature: signer not original address");
-        require(_expiry == expiry, "decodeAgentOwnerSignature: expiry not original expiry");
-        require(_amount == amount, "decodeAgentOwnerSignature: amount not original amount");
-        require(_token == address(tokenL1), "decodeAgentOwnerSignature: token not original tokenL1");
-        require(_strategy == address(strategy), "decodeAgentOwnerSignature: strategy not original strategy");
+        vm.assertEq(_signer, vm.addr(deployerKey));
+        vm.assertEq(_expiry, expiry);
+        vm.assertEq(_amount, amount);
+        vm.assertEq(_token, address(tokenL1));
+        vm.assertEq(_strategy, address(strategy));
 
         // compare decodeAgentOwner vs decodeDepositIntoStrategy
-        require(_signer == _signer2, "decodeAgentOwnerSignature: signer did not match");
-        require(_expiry == _expiry2, "decodeAgentOwnerSignature: expiry did not match");
-        require(
-            keccak256(_signature) == keccak256(_signature2),
-            "decodeAgentOwnerSignature: signature incorrect"
-        );
+        vm.assertEq(_signer, _signer2);
+        vm.assertEq(_expiry, _expiry2);
+        vm.assertEq(keccak256(_signature), keccak256(_signature2));
     }
 
     function test_Decode_MintEigenAgent() public view {
@@ -133,7 +130,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
         address recipient = eigenlayerMsgDecoders.decodeMintEigenAgent(messageCCIP);
 
-        require(recipient == staker, "mintEigenAgent: staker does not match");
+        vm.assertEq(recipient, staker);
     }
 
     /*
@@ -175,13 +172,13 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             bytes memory _signature
         ) = eigenlayerMsgDecoders.decodeDepositIntoStrategyMsg(messageWithSignatureCCIP);
 
-        require(address(_strategy) == address(strategy), "strategy does not match");
-        require(address(tokenL1) == _token, "token error: decodeDepositIntoStrategyMsg");
-        require(amount == _amount, "amount error: decodeDepositIntoStrategyMsg");
+        vm.assertEq(address(_strategy), address(strategy));
+        vm.assertEq(address(tokenL1), _token);
+        vm.assertEq(amount, _amount);
 
-        require(_signature.length == 65, "invalid signature length");
-        require(_signer == staker, "staker does not match");
-        require(expiry == _expiry, "expiry error: decodeDepositIntoStrategyMsg");
+        vm.assertEq(_signature.length, 65);
+        vm.assertEq(_signer, staker);
+        vm.assertEq(expiry, _expiry);
     }
 
     /*
@@ -270,36 +267,18 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         );
 
         // signature
-        require(_signature.length == 65, "signature bad length: decodeQueueWithdrawalsMsg");
-        require(signer == deployer, "incorrect signer: decodeQueueWithdrawalsMsg");
-        require(expiry == expiry2, "incorrect decoding: decodeQueueWithdrawalsMsg");
+        vm.assertEq(_signature.length, 65);
+        vm.assertEq(signer, deployer);
+        vm.assertEq(expiry, expiry2);
         // strategies
-        require(
-            decodedQW[2].strategies[0] == strategiesToWithdraw2[0],
-            "incorrect decoding: decodeQueueWithdrawalsMsg[2]: strategies"
-        );
+        vm.assertEq(address(decodedQW[2].strategies[0]), address(strategiesToWithdraw2[0]));
         // shares
-        require(
-            decodedQW[0].shares[0] == sharesToWithdraw0[0],
-            "incorrect decoding: decodeQueueWithdrawalsMsg[0]: shares"
-        );
-        require(
-            decodedQW[1].shares[0] == sharesToWithdraw1[0],
-            "incorrect decoding: decodeQueueWithdrawalsMsg[1]: shares"
-        );
+        vm.assertEq(decodedQW[0].shares[0], sharesToWithdraw0[0]);
+        vm.assertEq(decodedQW[1].shares[0], sharesToWithdraw1[0]);
         // withdrawers
-        require(
-            decodedQW[0].withdrawer == QWPArray[0].withdrawer,
-            "incorrect decoding: decodeQueueWithdrawalsMsg[0]: withdrawer"
-        );
-        require(
-            decodedQW[1].withdrawer == QWPArray[1].withdrawer,
-            "incorrect decoding: decodeQueueWithdrawalsMsg[1]: withdrawer"
-        );
-        require(
-            decodedQW[2].withdrawer == QWPArray[2].withdrawer,
-            "incorrect decoding: decodeQueueWithdrawalsMsg[2]: withdrawer"
-        );
+        vm.assertEq(decodedQW[0].withdrawer, QWPArray[0].withdrawer);
+        vm.assertEq(decodedQW[1].withdrawer, QWPArray[1].withdrawer);
+        vm.assertEq(decodedQW[2].withdrawer, QWPArray[2].withdrawer);
     }
 
     function test_Decode_Revert_ZeroLenArray_QueueWithdrawals() public {
@@ -401,25 +380,25 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             ))
         );
 
-        require(_signature.length == 65, "signature incorrect length: decodeCompleteWithdrawalsMsg");
-        require(_signer == deployer, "incorrect signer: decodeCompleteWithdrawalsMsg");
-        require(_expiry == expiry, "incorrect expiry: decodeCompleteWithdrawalsMsg");
+        vm.assertEq(_signature.length, 65);
+        vm.assertEq(_signer, deployer);
+        vm.assertEq(_expiry, expiry);
 
-        require(_withdrawal.shares[0] == withdrawal.shares[0], "decodeCompleteWithdrawalMsg shares error");
-        require(_withdrawal.staker == withdrawal.staker, "decodeCompleteWithdrawalMsg staker error");
-        require(_withdrawal.withdrawer == withdrawal.withdrawer, "decodeCompleteWithdrawalMsg withdrawer error");
-        require(address(_tokensToWithdraw[0]) == address(tokensToWithdraw[0]), "decodeCompleteWithdrawalMsg tokensToWithdraw error");
-        require(_receiveAsTokens == receiveAsTokens, "decodeCompleteWithdrawalMsg error");
+        vm.assertEq(_withdrawal.shares[0], withdrawal.shares[0]);
+        vm.assertEq(_withdrawal.staker, withdrawal.staker);
+        vm.assertEq(_withdrawal.withdrawer, withdrawal.withdrawer);
+        vm.assertEq(address(_tokensToWithdraw[0]), address(tokensToWithdraw[0]));
+        vm.assertEq(_receiveAsTokens, receiveAsTokens);
     }
 
     function test_FunctionSelectors_CompleteQueueWithdrawal() public pure {
         bytes4 fselector1 = IDelegationManager.completeQueuedWithdrawal.selector;
         bytes4 fselector2 = bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)"));
         // bytes4 fselector3 = 0x60d7faed;
-        require(fselector1 == fselector2, "function selectors incorrect: completeQueuedWithdrawal");
+        vm.assertEq(fselector1, fselector2);
     }
 
-    function test_Decode_TransferToAgentOwnerMsg() public view {
+    function test_Decode_WithdrawalTransferToAgentOwnerMsg() public view {
 
         bytes32 withdrawalRoot = 0x8c20d3a37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7d8ec77;
 
@@ -428,7 +407,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
         TransferToAgentOwnerMsg memory tta_msg = eigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(
             abi.encode(string(
-                encodeHandleTransferToAgentOwnerMsg(
+                encodeTransferToAgentOwnerMsg(
                     calculateWithdrawalTransferRoot(
                         withdrawalRoot,
                         amount,
@@ -438,7 +417,39 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             ))
         );
 
-        require(tta_msg.withdrawalTransferRoot == withdrawalTransferRoot, "incorrect withdrawalTransferRoot");
+        vm.assertEq(tta_msg.transferRoot, withdrawalTransferRoot);
+    }
+
+    function test_Decode_RewardTransferToAgentOwnerMsg() public view {
+
+        bytes32 mockRewardsRoot = 0x999eeee37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7eeeeee;
+
+        address bob = vm.addr(8881);
+        uint256 rewardAmount = 1.5 ether;
+        address rewardToken = address(tokenL1);
+        address agentOwner = deployer;
+
+        bytes32 rewardsTransferRoot = EigenlayerMsgEncoders.calculateRewardsTransferRoot(
+            mockRewardsRoot,
+            rewardAmount,
+            rewardToken,
+            agentOwner
+        );
+
+        TransferToAgentOwnerMsg memory tta_msg = eigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(
+            abi.encode(string(
+                encodeTransferToAgentOwnerMsg(
+                    calculateRewardsTransferRoot(
+                        mockRewardsRoot,
+                        rewardAmount,
+                        rewardToken,
+                        agentOwner
+                    )
+                )
+            ))
+        );
+
+        vm.assertEq(tta_msg.transferRoot, rewardsTransferRoot);
     }
 
     /*
@@ -515,18 +526,12 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             // bytes memory _signatureEigenAgent
         ) = DelegationDecoders.decodeDelegateToMsg(message);
 
-        require(operator == _operator, "operator incorrect");
-        require(deployer == _signer, "signer incorrect");
-        require(approverSalt == _approverSalt, "approverSalt incorrect");
+        vm.assertEq(operator, _operator);
+        vm.assertEq(deployer, _signer);
+        vm.assertEq(approverSalt, _approverSalt);
 
-        require(
-            approverSignatureAndExpiry.expiry == _approverSignatureAndExpiry.expiry,
-            "approver signature expiry incorrect"
-        );
-        require(
-            keccak256(approverSignatureAndExpiry.signature) == keccak256(_approverSignatureAndExpiry.signature),
-            "approver signature incorrect"
-        );
+        vm.assertEq(approverSignatureAndExpiry.expiry, _approverSignatureAndExpiry.expiry);
+        vm.assertEq(keccak256(approverSignatureAndExpiry.signature), keccak256(_approverSignatureAndExpiry.signature));
     }
 
     function test_Decode_Undelegate() public {
@@ -564,9 +569,9 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             ))
         );
 
-        require(staker1 == _staker1, "staker incorrect");
-        require(signer == deployer, "signer incorrect");
-        require(expiry == expiryEigenAgent, "signature expiry incorrect");
+        vm.assertEq(staker1, _staker1);
+        vm.assertEq(signer, deployer);
+        vm.assertEq(expiry, expiryEigenAgent);
     }
 
     /*
@@ -660,37 +665,51 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             ))
         );
 
-        require(claim.rootIndex == 84, "decodeProcessClaimMsg: rootIndex incorrect");
-        require(claim.earnerIndex == 66130, "decodeProcessClaimMsg: earnerIndex incorrect");
-        require(
-            keccak256(claim.earnerTreeProof) == keccak256(earnerTreeProof),
-            "decodeProcessClaimMsg: earnerTreeProof incorrect"
-        );
-        require(claim.earnerLeaf.earner == deployer, "decodeProcessClaimMsg: earnerLeaf.earner incorrect");
-        require(claim.earnerLeaf.earnerTokenRoot == earnerTokenRoot, "decodeProcessClaimMsg: earnerLeaf.earnerTokenRoot incorrect");
-        require(claim.tokenIndices[0] == 0, "decodeProcessClaimMsg: earnerLeaf.tokenIndices[0] incorrect");
-        require(claim.tokenIndices[1] == 1, "decodeProcessClaimMsg: earnerLeaf.tokenIndices[1] incorrect");
+        vm.assertEq(claim.rootIndex, 84);
+        vm.assertEq(claim.earnerIndex, 66130);
+        require(keccak256(claim.earnerTreeProof) ==  keccak256(earnerTreeProof), "incorrect earnerTreeProof");
+        vm.assertEq(claim.earnerLeaf.earner, deployer);
+        vm.assertEq(claim.earnerLeaf.earnerTokenRoot, earnerTokenRoot);
+        vm.assertEq(claim.tokenIndices[0], 0);
+        vm.assertEq(claim.tokenIndices[1], 1);
 
-        require(keccak256(claim.tokenTreeProofs[0]) == keccak256(tokenTreeProofs[0]),
-            "decodeProcessClaimMsg: earnerLeaf.tokenTreeProofs[0] incorrect"
-        );
-        require(
-            keccak256(claim.tokenTreeProofs[1]) == keccak256(tokenTreeProofs[1]),
-            "decodeProcessClaimMsg: earnerLeaf.tokenTreeProofs[1] incorrect"
-        );
+        vm.assertEq(keccak256(claim.tokenTreeProofs[0]), keccak256(tokenTreeProofs[0]));
+        vm.assertEq(keccak256(claim.tokenTreeProofs[1]), keccak256(tokenTreeProofs[1]));
 
-        require(claim.tokenLeaves[0].token == tokenLeaves[0].token, "decodeProcessClaimMsg: earnerLeaf.tokenLeaves[0] incorrect");
-        require(
-            claim.tokenLeaves[0].cumulativeEarnings == tokenLeaves[0].cumulativeEarnings,
-            "decodeProcessClaimMsg: tokenLeaves[0].cumulativeEarnings incorrect"
-        );
-        require(claim.tokenLeaves[1].token == tokenLeaves[1].token, "decodeProcessClaimMsg: earnerLeaf.tokenLeaves[1] incorrect");
-        require(
-            claim.tokenLeaves[1].cumulativeEarnings == tokenLeaves[1].cumulativeEarnings,
-            "decodeProcessClaimMsg: tokenLeaves[1].cumulativeEarnings incorrect"
-        );
+        vm.assertEq(address(claim.tokenLeaves[0].token), address(tokenLeaves[0].token));
+        vm.assertEq(claim.tokenLeaves[0].cumulativeEarnings, tokenLeaves[0].cumulativeEarnings);
+        vm.assertEq(address(claim.tokenLeaves[1].token), address(tokenLeaves[1].token));
+        vm.assertEq(claim.tokenLeaves[1].cumulativeEarnings, tokenLeaves[1].cumulativeEarnings);
 
-        require(_signer == deployer, "decodeProcessClaimMsg: signer incorrect");
-        require(_expiry == expiry, "decodeProcessClaimMsg: expiry incorrect");
+        vm.assertEq(_signer, deployer);
+        vm.assertEq(_expiry, expiry);
     }
+
+    function test_Decode_RewardsCoordinator_SetClaimerFor() public view {
+
+        address claimer = deployer;
+
+        bytes memory messageWithSignature_SC = signMessageForEigenAgentExecution(
+            deployerKey,
+            block.chainid, // destination chainid where EigenAgent lives
+            address(123123), // RewardsCoordinator to approve + deposit
+            encodeSetClaimerForMsg(claimer),
+            execNonce,
+            expiry
+        );
+
+        (
+            address claimer2,
+            address signer2,
+            uint256 expiry2,
+            bytes memory signature
+        ) = eigenlayerMsgDecoders.decodeSetClaimerForMsg(
+            abi.encode(string(
+                messageWithSignature_SC
+            ))
+        );
+
+        vm.assertEq(claimer2, claimer);
+    }
+
 }

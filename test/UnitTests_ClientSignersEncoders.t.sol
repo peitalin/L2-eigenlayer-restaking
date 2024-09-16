@@ -374,7 +374,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         );
     }
 
-    function test_ClientEncoder_encodeHandleTransferToAgentOwnerMsg() public view {
+    function test_ClientEncoder_encodeTransferToAgentOwnerMsg() public view {
 
         IDelegationManager.Withdrawal memory withdrawal = makeMockWithdrawal();
         bytes32 withdrawalRoot = clientEncodersTest.calculateWithdrawalRoot(withdrawal);
@@ -386,10 +386,10 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
         vm.assertEq(
             keccak256(abi.encode(
-                clientEncodersTest.encodeHandleTransferToAgentOwnerMsg(withdrawalTransferRoot)
+                clientEncodersTest.encodeTransferToAgentOwnerMsg(withdrawalTransferRoot)
             )),
             keccak256(abi.encode(
-                EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(withdrawalTransferRoot)
+                EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(withdrawalTransferRoot)
             ))
         );
     }
@@ -534,5 +534,29 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         );
     }
 
+    function test_ClientEncoder_encodeRewardsTransferToAgentOwnerMsg() public view {
+
+        IRewardsCoordinator.RewardsMerkleClaim memory claim = makeMockRewardsMerkleClaim();
+        bytes32 rewardsRoot = clientEncodersTest.calculateRewardsRoot(claim);
+        uint256 rewardAmount = 1.5 ether;
+        address rewardToken = address(tokenL1);
+        address agentOwner = deployer;
+
+        bytes32 rewardsTransferRoot = EigenlayerMsgEncoders.calculateRewardsTransferRoot(
+            rewardsRoot,
+            rewardAmount,
+            rewardToken,
+            agentOwner
+        );
+
+        vm.assertEq(
+            keccak256(abi.encode(
+                clientEncodersTest.encodeTransferToAgentOwnerMsg(rewardsTransferRoot)
+            )),
+            keccak256(abi.encode(
+                EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(rewardsTransferRoot)
+            ))
+        );
+    }
 
 }

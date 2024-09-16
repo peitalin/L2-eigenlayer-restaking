@@ -95,9 +95,9 @@ contract ScriptsTests_Deposits_Withdrawals is Test, TestErrorHandlers {
             if (catchErrorStr(errStr, "User must have an EigenAgent")) {
                 console.log("Run depositAndMintEigenAgent script first.");
 
-            } else if (catchErrorStr(errStr, "SenderHooks._commitWithdrawalTransferRootInfo: withdrawalTransferRoot already used")) {
+            } else if (catchErrorStr(errStr, "SenderHooks._commitWithdrawalTransferRootInfo: TransferRoot already used")) {
                 // Note: If step8 has completed withdrawal, this test may warn it failed with:
-                // "SenderHooks._commitWithdrawalTransferRootInfo: withdrawalTransferRoot already used"
+                // "SenderHooks._commitWithdrawalTransferRootInfo: TransferRoot already used"
                 console.log("Make another deposit first, run depositAndMintEigenAgent script.");
             } else {
                 revert(errStr);
