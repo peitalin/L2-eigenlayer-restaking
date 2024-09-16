@@ -75,7 +75,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
 
         // set GasLimits
-        uint256[] memory gasLimits = new uint256[](6);
+        uint256[] memory gasLimits = new uint256[](7);
         gasLimits[0] = 2_100_000; // deposit + mint EigenAgent       [gas: 1,935,006] 1.4mil to mint agent, 500k for deposit
         // https://sepolia.etherscan.io/tx/0x929dc3f03eb10143d2a215cd0695348bca656ea026ed959b9cf449a0af79c2c4
         gasLimits[1] = 1_500_000; // mintEigenAgent                  [gas: 1,500,000?]
@@ -83,8 +83,9 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         gasLimits[3] = 840_000; // completeWithdrawal + transferToL2 [gas: 791,717]
         gasLimits[4] = 650_000; // delegateTo                        [gas: 550,292]
         gasLimits[5] = 400_000; // undelegate                        [gas: ?]
+        gasLimits[6] = 800_000; // processClaim                      [gas: ?]
 
-        bytes4[] memory functionSelectors = new bytes4[](6);
+        bytes4[] memory functionSelectors = new bytes4[](7);
         functionSelectors[0] = 0xe7a050aa;
         // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
         functionSelectors[1] = 0xcc15a557;
@@ -97,6 +98,8 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         // cast sig "delegateTo(address,(bytes,uint256),bytes32)" == 0xeea9064b
         functionSelectors[5] = 0xda8be864;
         // cast sig "undelegate(address)" == 0xda8be864
+        functionSelectors[6] = 0x3ccc861d;
+        // cast sig "processClaim((uint32,uint32,bytes,(address,bytes32),uint32[],bytes[],(address,uint256)[]), address)" == 0x3ccc861d
 
         senderHooksProxy.setGasLimitsForFunctionSelectors(
             functionSelectors,

@@ -97,21 +97,22 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
             amount: amount
         });
-        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: bytes32(0x0),
-            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
-            destTokenAmounts: destTokenAmounts, // Tokens and their amounts in their destination chain representation.
-            data: abi.encode(string(
-                messageWithSignature_D
-            )) // CCIP abi.encodes a string message when sending
-        });
 
         vm.selectFork(ethForkId);
         {
             vm.expectEmit(true, false, true, false); // don't check topic[2] EigenAgent address
             emit AgentFactory.AgentCreated(bob, vm.addr(1111), 1);
-            receiverContract.mockCCIPReceive(any2EvmMessage);
+            receiverContract.mockCCIPReceive(
+                Client.Any2EVMMessage({
+                    messageId: bytes32(0x0),
+                    sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
+                    sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
+                    destTokenAmounts: destTokenAmounts, // Tokens and their amounts in their destination chain representation.
+                    data: abi.encode(string(
+                        messageWithSignature_D
+                    )) // CCIP abi.encodes a string message when sending
+                })
+            );
 
             console.log("--------------- After Deposit -----------------");
             eigenAgent = agentFactory.getEigenAgent(bob);
@@ -327,7 +328,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: BaseSepolia.ChainSelector,
                 sender: abi.encode(deployer),
                 data: abi.encode(string(
                     messageWithSignature_CW

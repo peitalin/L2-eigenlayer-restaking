@@ -1,20 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {console} from "forge-std/Test.sol";
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 
-import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
-import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {Merkle} from "eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
 
-import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
-import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
@@ -30,6 +24,14 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         address signer
     );
 
+    event BridgingRewardsToL2(
+        bytes32 indexed rewardsTransferRoot,
+        address indexed rewardToken,
+        uint256 indexed rewardAmount
+    );
+
+    event SendingFundsToAgentOwner(address indexed, uint256 indexed);
+
     struct TestRewardsTree {
         bytes32 root;
         bytes32 h1;
@@ -44,7 +46,11 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
     address[4] earners;
     uint256[4] amounts;
     bytes32[] leaves;
-    uint32 rewardsCalculationEndTimestamp;
+
+    uint32 secondsInWeek;
+    uint32 nowTime;
+    uint32 startOfTheWeek;
+    uint32 startOfLastWeek;
 
     function setUp() public {
         // setup forked environments for L2 and L1 contracts
@@ -53,6 +59,11 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
 
         vm.prank(deployer);
         eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
+
+        secondsInWeek = 604800;
+        nowTime = uint32(block.timestamp);
+        startOfTheWeek = uint32(block.timestamp) - (uint32(block.timestamp) % secondsInWeek);
+        startOfLastWeek = startOfTheWeek - secondsInWeek;
     }
 
     /*
@@ -66,7 +77,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
     function _createEarnerTreeMerkleLeaves() internal returns (TestRewardsTree memory) {
 
         earners = [
-            address(eigenAgent),  // alice's EigenAgent
+            address(eigenAgent),
             bob,
             charlie,
             dani
@@ -156,6 +167,11 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
 
     function _setupL1State_RewardsMerkleRoots() internal returns (bytes memory, uint32) {
 
+        // Rewind back to the start of last week:
+        vm.warp(startOfLastWeek);
+        // NOTE: we need to rewind time otherwise fork tests with CCIP's router do not work.
+        // CCIP router's are time-sensitive when fetching fees/prices and fails if warping into future.
+
         //// Setup reward merkle roots mock users
         tree = _createEarnerTreeMerkleLeaves();
         //       root
@@ -169,11 +185,12 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         bytes32 generatedRoot = Merkle.processInclusionProofKeccak(proof, tree.h4, earnerIndex);
         vm.assertEq(tree.root, generatedRoot);
 
-        uint32 startTimestamp = 604800; // startTimestamp, must be a multiple of 604800 (7 days)
+        uint32 startTimestamp = startOfLastWeek; // startTimestamp, must be a multiple of 604800 (7 days)
         uint32 duration = 604800; // duration, must be a multiple of 604800
-        rewardsCalculationEndTimestamp = startTimestamp + duration;
 
-        vm.warp(rewardsCalculationEndTimestamp + 1 hours); // wait for root to be activated
+        uint32 rewardsCalculationEndTimestamp = startOfLastWeek + duration;
+        vm.warp(startOfLastWeek + duration + 1 hours);
+        // wait past rewardsCalculation End Timestamp, then submit root
 
 		/////////////////////////////////////////////////////////////////
 		// Submit Rewards Merkle Root
@@ -188,10 +205,9 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
 
         // Send RewardsCoordinator some tokens for rewards claims
         IERC20_CCIPBnM(address(tokenL1)).drip(address(rewardsCoordinator));
-        IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
 
-		// Fast forward another hour
-        vm.warp(rewardsCalculationEndTimestamp + 2 hours);
+		// Fast forward to present time
+        vm.warp(nowTime);
 
         return (proof, earnerIndex);
     }
@@ -225,8 +241,6 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
 
 		require(rewardsCoordinator.checkClaim(claim), "checkClaim(claim) failed, invalid claim.");
 
-		uint256 oldAdminBalance = tokenL1.balanceOf(deployer);
-
         uint256 execNonce = 0;
         uint256 expiry = block.timestamp + 1 hours;
 
@@ -244,18 +258,19 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         );
 
         bytes32 rewardsRoot = calculateRewardsRoot(claim);
-        uint256 rewardAmount = amounts[0];
-        address rewardToken = address(tokenL1);
+        uint256 rewardsAmount = amounts[0];
+        address rewardsToken = address(tokenL1);
 
         bytes32 rewardsTransferRoot = calculateRewardsTransferRoot(
             rewardsRoot,
-            rewardAmount,
-            rewardToken,
+            rewardsAmount,
+            rewardsToken,
             deployer // agentOwner
         );
 
         ///////////////////////////////////////////////
-        // Send a rewards procesClaim message on L2, and fundsTransfer commitment
+        // L2: Send a rewards processClaim message and fundsTransfer commitment
+        ///////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
@@ -274,7 +289,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         emit RewardsTransferRootCommitted(
             rewardsTransferRoot,
             address(eigenAgent), // rewards recipient (eigenAgent)
-            rewardAmount,
+            rewardsAmount,
             deployer // signer (agentOwner)
         );
         senderContract.sendMessagePayNative{value: routerFees}(
@@ -287,14 +302,19 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         );
 
         ///////////////////////////////////////////////
-        // Mock L2 receiver receiving the rewards processClaim message
-        // then dispatching a FundsTransfer message back to L1
+        // L1 Receiver processes the rewards processClaim message
+        // Then dispatches a FundsTransfer message back to L1
+        ///////////////////////////////////////////////
         vm.selectFork(ethForkId);
 
+        uint256 rewardsCoordinatorBalanceBefore = tokenL1.balanceOf(address(rewardsCoordinator));
+
+        vm.expectEmit(true, true, true, false);
+        emit BridgingRewardsToL2(rewardsTransferRoot, rewardsToken, rewardsAmount);
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: BaseSepolia.ChainSelector,
                 sender: abi.encode(deployer),
                 data: abi.encode(string(
                     messageWithSignature_PC
@@ -303,13 +323,38 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
             })
         );
 
-		uint256 newAdminBalance = tokenL1.balanceOf(deployer);
+		vm.assertEq(
+            tokenL1.balanceOf(address(rewardsCoordinator)),
+            rewardsCoordinatorBalanceBefore - rewardsAmount
+        );
 
-		console.log("Before Claiming Rewards -> oldAdminBalance:");
-		console.log(oldAdminBalance);
-		console.log("After processClaim() -> newAdminBalance:");
-		console.log(newAdminBalance);
-		// require(newAdminBalance > oldAdminBalance, "did not claim rewards successfull");
+
+        ///////////////////////////////////////////////
+        // L2 Sender receives tokens from L1 and transfers to agentOwner
+        ///////////////////////////////////////////////
+        vm.selectFork(l2ForkId);
+
+        Client.EVMTokenAmount[] memory destTokenAmountsL2 = new Client.EVMTokenAmount[](1);
+        destTokenAmountsL2[0] = Client.EVMTokenAmount({
+            token: BaseSepolia.BridgeToken, // CCIP-BnM token address on L2
+            amount: rewardsAmount
+        });
+
+        vm.expectEmit(true, true, false, false);
+        emit SendingFundsToAgentOwner(deployer, rewardsAmount);
+        senderContract.mockCCIPReceive(
+            Client.Any2EVMMessage({
+                messageId: bytes32(uint256(9999)),
+                sourceChainSelector: EthSepolia.ChainSelector,
+                sender: abi.encode(address(receiverContract)),
+                data: abi.encode(string(
+                    encodeTransferToAgentOwnerMsg(
+                        rewardsTransferRoot
+                    )
+                )), // CCIP abi.encodes a string message when sending
+                destTokenAmounts: destTokenAmountsL2
+            })
+        );
     }
 
 }

@@ -114,13 +114,13 @@ contract ClientEncoders {
         return keccak256(abi.encode(rewardsRoot, rewardAmount, rewardToken, agentOwner));
     }
 
-    function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalTransferRoot
+    function encodeTransferToAgentOwnerMsg(
+        bytes32 transferRoot
     ) public pure returns (bytes memory) {
         return abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderHooks.handleTransferToAgentOwner.selector,
-            withdrawalTransferRoot
+            transferRoot
         );
     }
 
@@ -184,13 +184,6 @@ contract ClientEncoders {
             IRewardsCoordinator.processClaim.selector,
             claim,
             recipient
-        );
-    }
-
-    function encodeSetClaimerForMsg(address claimer) public pure returns (bytes memory) {
-        return abi.encodeWithSelector(
-            IRewardsCoordinator.setClaimerFor.selector,
-            claimer
         );
     }
 
