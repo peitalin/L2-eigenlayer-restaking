@@ -193,15 +193,19 @@ library EigenlayerMsgEncoders {
         return keccak256(abi.encode(rewardsRoot, rewardAmount, rewardToken, agentOwner));
     }
 
-    /// @dev encodes a message containing the withdrawalTransferRoot when sending message from L1 to L2
-    /// @param withdrawalTransferRoot is a hash of withdrawalRoot, amount, and agentOwner.
-    function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalTransferRoot
+    /**
+     * @dev encodes a message containing the transferRoot when sending message from L1 to L2
+     * @param transferRoot is a hash of:
+     * (1) for withdrawal transfers: withdrawalRoot, amount, and agentOwner.
+     * (2) for rewards transfers: rewardsRoot, rewardAmount, rewardToken, agentOwner.
+     */
+    function encodeTransferToAgentOwnerMsg(
+        bytes32 transferRoot
     ) public pure returns (bytes memory) {
         return abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderHooks.handleTransferToAgentOwner.selector,
-            withdrawalTransferRoot
+            transferRoot
         );
     }
 

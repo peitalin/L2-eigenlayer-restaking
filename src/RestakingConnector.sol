@@ -315,10 +315,10 @@ contract RestakingConnector is
         onlyReceiverCCIP
         returns (
             bool receiveAsTokens,
-            uint256 withdrawalAmount,
-            address withdrawalToken,
             string memory messageForL2,
-            bytes32 withdrawalTransferRoot
+            bytes32 withdrawalTransferRoot,
+            address withdrawalToken,
+            uint256 withdrawalAmount
         )
     {
         // scope to reduce variable count
@@ -353,17 +353,16 @@ contract RestakingConnector is
                 signature
             );
 
-            // assign variables to return to L2
+            // Return variables to return to L2
             receiveAsTokens = _receiveAsTokens;
-            withdrawalAmount = withdrawal.shares[0];
             withdrawalToken = address(tokensToWithdraw[0]);
+            withdrawalAmount = withdrawal.shares[0];
             withdrawalTransferRoot = EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(
                 delegationManager.calculateWithdrawalRoot(withdrawal), // withdrawalRoot
                 withdrawalAmount,
                 signer
             );
-            // hash(withdrawalRoot, signer) to make withdrawalTransferRoot for L2 transfer
-            messageForL2 = string(EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
+            messageForL2 = string(EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(
                 withdrawalTransferRoot
             ));
 
@@ -451,25 +450,24 @@ contract RestakingConnector is
         external
         onlyReceiverCCIP
         returns (
-            uint256 withdrawalAmount,
-            address withdrawalToken,
             string memory messageForL2,
-            bytes32 rewardsTransferRoot
+            bytes32 rewardsTransferRoot,
+            address rewardsToken,
+            uint256 rewardsAmount
         )
     {
         (
             // original message
             IRewardsCoordinator.RewardsMerkleClaim memory claim,
-            address recipient,
+            address recipient, // eigenAgent
             // message signature
             address signer,
             uint256 expiry,
             bytes memory signature
         ) = decodeProcessClaimMsg(messageWithSignature);
 
-        IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(recipient);
-
-        require(address(eigenAgent) != address(0), "User does not have an EigenAgent");
+        // eigenAgent == recipient == msg.sender (in Eigenlayer)
+        IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(recipient));
 
         eigenAgent.executeWithSignature(
             address(rewardsCoordinator),
@@ -479,55 +477,55 @@ contract RestakingConnector is
             signature
         );
 
-        address agentOwner = eigenAgent.owner();
         bytes32 rewardsRoot = EigenlayerMsgEncoders.calculateRewardsRoot(claim);
         // The same rewardsRoot calculated on L2 in SenderHooks.sol
 
         for (uint32 i = 0; i < claim.tokenLeaves.length; ++i) {
 
-            uint256 rewardAmount = claim.tokenLeaves[i].cumulativeEarnings;
-            address rewardToken = address(claim.tokenLeaves[i].token);
+            uint256 _rewardsAmount = claim.tokenLeaves[i].cumulativeEarnings;
+            address _rewardsToken = address(claim.tokenLeaves[i].token);
 
             // (1) EigenAgent approves RestakingConnector to transfer tokens to ReceiverCCIP
             eigenAgent.approveByWhitelistedContract(
                 address(this), // restakingConnector
-                rewardToken,
-                rewardAmount
+                _rewardsToken,
+                _rewardsAmount
             );
 
             // Only transfer BridgeTokens back to L2. Transfer remaining L1 tokens to AgentOwner.
-            if (rewardToken != EthSepolia.BridgeToken) {
+            if (_rewardsToken != EthSepolia.BridgeToken) {
                 // (2) If the token is L1-native and cannot be bridged to L2, transfer to AgentOwner on L1.
-                IERC20(rewardToken).transferFrom(
+                IERC20(_rewardsToken).transferFrom(
                     address(eigenAgent),
-                    agentOwner,
-                    rewardAmount
+                    signer, // AgentOwner
+                    _rewardsAmount
                 );
 
                 emit SendingRewardsToAgentOwnerOnL1(
-                    rewardToken,
-                    agentOwner,
-                    rewardAmount
+                    _rewardsToken,
+                    signer, // AgentOwner
+                    _rewardsAmount
                 );
 
             } else {
                 // (2) RestakingConnector transfers tokens to ReceiverCCIP, to bridge tokens to Router (bridge)
-                IERC20(rewardToken).transferFrom(
+                IERC20(_rewardsToken).transferFrom(
                     address(eigenAgent),
                     _receiverCCIP,
-                    rewardAmount
+                    _rewardsAmount
                 );
+
                 // return variables
-                withdrawalAmount = rewardAmount;
-                withdrawalToken = rewardToken;
+                rewardsToken = _rewardsToken;
+                rewardsAmount = _rewardsAmount;
                 rewardsTransferRoot = EigenlayerMsgEncoders.calculateRewardsTransferRoot(
                     rewardsRoot,
-                    rewardAmount,
-                    rewardToken,
-                    agentOwner
+                    rewardsAmount,
+                    rewardsToken,
+                    signer // AgentOwner
                 );
                 // rewardsTransferRoot for L2 transfer
-                messageForL2 = string(EigenlayerMsgEncoders.encodeHandleTransferToAgentOwnerMsg(
+                messageForL2 = string(EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(
                     rewardsTransferRoot
                 ));
             }

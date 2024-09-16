@@ -5,14 +5,9 @@ import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/
 
 interface ISenderHooks {
 
-    struct WithdrawalTransfer {
+    struct FundsTransfer {
         uint256 amount;
         address agentOwner;
-    }
-
-    struct RewardsTransfer {
-        uint256 amount;
-        address recipient;
     }
 
     function getSenderCCIP() external view returns (address);
@@ -26,11 +21,11 @@ interface ISenderHooks {
         uint256[] memory gasLimits
     ) external;
 
-    function getWithdrawalTransferCommitment(bytes32 withdrawalTransferRoot)
+    function getFundsTransferCommitment(bytes32 transferRoot)
         external
-        returns (ISenderHooks.WithdrawalTransfer memory);
+        returns (ISenderHooks.FundsTransfer memory);
 
-    function isWithdrawalTransferRootSpent(bytes32 withdrawalTransferRoot) external returns (bool);
+    function isTransferRootSpent(bytes32 transferRoot) external returns (bool);
 
     function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
         external

@@ -14,6 +14,8 @@ import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 
+import {console} from "forge-std/Test.sol";
+
 
 /// @title ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them
 contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
@@ -220,10 +222,10 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
             (
                 bool receiveAsTokens,
-                uint256 withdrawalAmount,
-                address withdrawalToken,
                 string memory messageForL2,
-                bytes32 withdrawalTransferRoot
+                bytes32 withdrawalTransferRoot,
+                address withdrawalToken,
+                uint256 withdrawalAmount
             ) = restakingConnector.completeWithdrawalWithEigenAgent(message);
 
             if (receiveAsTokens) {
@@ -270,27 +272,29 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         /// Process Claim (Rewards)
         if (functionSelector == IRewardsCoordinator.processClaim.selector) {
             (
-                uint256 withdrawalAmount,
-                address withdrawalToken,
                 string memory messageForL2,
-                bytes32 rewardsTransferRoot
+                bytes32 rewardsTransferRoot,
+                address rewardsToken,
+                uint256 rewardsAmount
             ) = restakingConnector.processClaimWithEigenAgent(message);
 
-            if (withdrawalToken == EthSepolia.BridgeToken) {
+            console.log("rewardsToken:", rewardsToken);
+
+            if (rewardsToken == EthSepolia.BridgeToken) {
 
                 this.sendMessagePayNative(
                     BaseSepolia.ChainSelector, // destination chain
                     senderContractL2,
                     messageForL2,
-                    withdrawalToken, // L1 token to burn/lock
-                    withdrawalAmount,
+                    rewardsToken, // L1 token to burn/lock
+                    rewardsAmount,
                     0 // use default gasLimit
                 );
 
                 emit BridgingWithdrawalToL2(
                     rewardsTransferRoot,
-                    withdrawalToken,
-                    withdrawalAmount
+                    rewardsToken,
+                    rewardsAmount
                 );
             }
 

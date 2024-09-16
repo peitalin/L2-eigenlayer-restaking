@@ -61,10 +61,10 @@ interface IRestakingConnector {
 
     function completeWithdrawalWithEigenAgent(bytes memory message) external returns (
         bool receiveAsTokens,
-        uint256 withdrawalAmount,
-        address withdrawalToken,
         string memory messageForL2, // CCIP message: transferToAgentOwner on L2
-        bytes32 withdrawalTransferRoot
+        bytes32 withdrawalTransferRoot,
+        address withdrawalToken,
+        uint256 withdrawalAmount
     );
 
     function delegateToWithEigenAgent(bytes memory message) external;
@@ -72,10 +72,10 @@ interface IRestakingConnector {
     function undelegateWithEigenAgent(bytes memory message) external;
 
     function processClaimWithEigenAgent(bytes memory message) external returns (
-        uint256 withdrawalAmount,
-        address withdrawalToken,
         string memory messageForL2,
-        bytes32 rewardsTransferRoot
+        bytes32 rewardsTransferRoot,
+        address rewardsToken,
+        uint256 rewardsAmount
     );
 
 }
