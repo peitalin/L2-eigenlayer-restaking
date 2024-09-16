@@ -7,7 +7,6 @@ import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISi
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {console} from "forge-std/Test.sol";
 
 
 struct TransferToAgentOwnerMsg {
@@ -758,20 +757,18 @@ contract EigenlayerMsgDecoders {
         assembly {
             lengthOfProof := mload(add(message, add(tokenTreeProofsOffset, elemLengthOffset)))
         }
-        console.log("elemLengthOffset:", tokenTreeProofsOffset + elemLengthOffset);
-        console.log("lengthOfProof:", lengthOfProof);
         require(lengthOfProof % 32 == 0, "tokenTreeProof length must be a multiple of 32");
 
         uint32 numLines = lengthOfProof / 32;
         bytes32[] memory tokenTreeProofArray = new bytes32[](numLines);
 
+        // iterate through ech line of the each i-th byteproof and join the byteproofs
         for (uint32 j = 0; j < numLines; ++j) {
             bytes32 _proofLine;
-            uint32 k = j+1;
+            uint32 _elemValueOffset = elemValueOffset + j*32;
             assembly {
-                _proofLine := mload(add(message, add(tokenTreeProofsOffset, elemValueOffset)))
+                _proofLine := mload(add(message, add(tokenTreeProofsOffset, _elemValueOffset)))
             }
-            console.logBytes32(_proofLine);
             tokenTreeProofArray[j] = _proofLine;
         }
 

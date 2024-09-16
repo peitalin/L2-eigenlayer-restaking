@@ -715,9 +715,9 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         bytes[] memory tokenTreeProofs = new bytes[](3);
         // tokenTreeProofs are dynamic sized bytestrings, each a multiple of 32 bytes long.
         // we test three different lengnthed bytestrings for proofs:
-        tokenTreeProofs[0] = hex"aaaaaa78aea3c632bc61f3a0ffa0b57bd9ce9c2cf76f9ad2369f1b46081aaaaaaaaaaa78aea3c632bc61f3a0ffa0b57bd9ce9c2cf76f9ad2369f1b46081aaaaaaaaaaa78aea3c632bc61f3a0ffa0b57bd9ce9c2cf76f9ad2369f1b46081aaaaa";
-        tokenTreeProofs[1] = hex"bbbbbb05d0910fc0a12610e7b59a440050529cf2a5b9e5478642bfa7f78bbbbb";
-        tokenTreeProofs[2] = hex"cccccc05d0910fc0a12610e7b59a440050529cf2a5b9e5478642bfa7f785cccccccccc05d0910fc0a12610e7b59a440050529cf2a5b9e5478642bfa7f785cccc";
+        tokenTreeProofs[0] = hex"aaaaaa78aea3c632bc61f3a0ffa0b57bd666662cf76f9ad2369f1b46081aaaaaaaaaaa78aea3c632bc61f3a0ffa0111111ce9c2cf76f9ad2369f1b46081aaaaaaaaaaa78aea32222bc61f3a0ffa0b57bd9ce9c22226f9ad2369f1b46081aaaaa";
+        tokenTreeProofs[1] = hex"bbbbbb05d0910fc0a12610e7b599999950529cf2a5b9e5478642bfa7f78bbbbb";
+        tokenTreeProofs[2] = hex"cccccc05d0910fc0a12610e7b59a4400599999f2a5b9e5478642bfa7f785cccccccccc05d0910fc0a44440e7b59a440050529444a5b9e5478642bfa7f785cccc";
         bytes memory earnerTreeProof = hex"32c3756cc20bcbdb7f8b25dcb3b904ea271776626d79cf1797932298c3bc5c628a09335bd33183649a1338e1ce19dcc11b6e7500659b71ddeb3680855b6eeffdd879bbbe67f12fc80b7df9df2966012d54b23b2c1265c708cc64b12d38acf88a82277145d984d6a9dc5bdfa13cee09e543b810cef077330bd5828b746b8c92bb622731e95bf8721578fa6c5e1ceaf2e023edb2b9c989c7106af8455ceae4aaad1891758b2b17b58a3de5a98d61349658dd8b58bc3bfa5b08ec98ecf6bb45447bc45497275645c6cc432bf191633578079fc8787b0ee849e5af9c9a60375da395a8f7fbb5bc80c876748e5e000aedc8de1e163bbb930f5f05f49eafdfe43407e1daa8be3a9a68d8aeb17e55e562ae2d9efc90e3ced7e9992663a98c4309703e68728dfe1ec72d08c5516592581f81e8f2d8b703331bfd313ad2e343f9c7a3548821ed079b6f019319b2f7c82937cb24e1a2fde130b23d72b7451a152f71e8576abddb9b0b135ad963dba00860e04a76e8930a74a5513734e50c724b5bd550aa3f06e9d61d236796e70e35026ab17007b95d82293a2aecb1f77af8ee6b448abddb2ddce73dbc52aab08791998257aa5e0736d60e8f2d7ae5b50ef48971836435fd81a8556e13ffad0889903995260194d5330f98205b61e5c6555d8404f97d9fba8c1b83ea7669c5df034056ce24efba683a1303a3a0596997fa29a5028c5c2c39d6e9f04e75babdc9087f61891173e05d73f05da01c36d28e73c3b5594b61c107";
 
         IRewardsCoordinator.RewardsMerkleClaim memory claim = IRewardsCoordinator.RewardsMerkleClaim({
@@ -833,7 +833,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
                 tokenLeaves: tokenLeaves // TokenTreeMerkleLeaf[] tokenLeaves;
             });
 
-            bytes memory messageWithSignature_PC = signMessageForEigenAgentExecution(
+            messageWithSignature_PC = signMessageForEigenAgentExecution(
                 deployerKey,
                 block.chainid, // destination chainid where EigenAgent lives
                 address(123123), // StrategyManager to approve + deposit

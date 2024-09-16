@@ -3,8 +3,12 @@ pragma solidity 0.8.22;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
+import {ERC20Minter} from "./mocks/ERC20Minter.sol";
 
 import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 import {Merkle} from "eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
@@ -12,6 +16,8 @@ import {Merkle} from "eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
+
+import {console} from "forge-std/Test.sol";
 
 
 contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterFees {
@@ -32,6 +38,15 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
 
     event SendingFundsToAgentOwner(address indexed, uint256 indexed);
 
+    event RewardsClaimed(
+        bytes32 root,
+        address indexed earner,
+        address indexed claimer,
+        address indexed recipient,
+        IERC20 token,
+        uint256 claimedAmount
+    );
+
     struct TestRewardsTree {
         bytes32 root;
         bytes32 h1;
@@ -46,6 +61,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
     address[4] earners;
     uint256[4] amounts;
     bytes32[] leaves;
+    IERC20 memecoin;
 
     uint32 secondsInWeek;
     uint32 nowTime;
@@ -57,8 +73,21 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         setUpForkedEnvironment();
         vm.selectFork(ethForkId);
 
-        vm.prank(deployer);
+        vm.startBroadcast(deployer);
         eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
+
+        memecoin = IERC20(address(new TransparentUpgradeableProxy(
+            address(new ERC20Minter()),
+            address(new ProxyAdmin()),
+            abi.encodeWithSelector(
+                ERC20Minter.initialize.selector,
+                "token2",
+                "TKN2"
+            )
+        )));
+        // Send RewardsCoordinator some tokens for rewards claims
+        ERC20Minter(address(memecoin)).mint(address(rewardsCoordinator), 1 ether);
+        vm.stopBroadcast();
 
         secondsInWeek = 604800;
         nowTime = uint32(block.timestamp);
@@ -86,18 +115,30 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         leaves = new bytes32[](4);
         // create earner leaf hashes for each user
         for (uint32 i = 0; i < earners.length; ++i) {
+
+            bytes32 earnerTokenRoot = keccak256(abi.encode(
+                rewardsCoordinator.calculateTokenLeafHash(
+                    IRewardsCoordinator.TokenTreeMerkleLeaf({
+                        token: tokenL1,
+                        cumulativeEarnings: amounts[i]
+                    })
+                ),
+                rewardsCoordinator.calculateTokenLeafHash(
+                    IRewardsCoordinator.TokenTreeMerkleLeaf({
+                        token: memecoin,
+                        cumulativeEarnings: amounts[i]
+                    })
+                )
+            ));
+
             leaves[i] = rewardsCoordinator.calculateEarnerLeafHash(
                 IRewardsCoordinator.EarnerTreeMerkleLeaf({
                     earner: earners[i],
-                    earnerTokenRoot: rewardsCoordinator.calculateTokenLeafHash(
-                        IRewardsCoordinator.TokenTreeMerkleLeaf({
-                            token: tokenL1,
-                            cumulativeEarnings: amounts[i]
-                        })
-                    )
+                    earnerTokenRoot: earnerTokenRoot
                 })
             );
         }
+
         bytes32 h4 = leaves[0];
         bytes32 h3 = leaves[1];
         bytes32 h6 = leaves[2];
@@ -134,25 +175,36 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
     ) public view returns (IRewardsCoordinator.RewardsMerkleClaim memory claim) {
 
 		IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves;
-        tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](1);
+        tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](2);
 		tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
             token: tokenL1,
             cumulativeEarnings: amount
         });
+		tokenLeaves[1] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: memecoin,
+            cumulativeEarnings: amount
+        });
+
+        bytes32 leaf1 = rewardsCoordinator.calculateTokenLeafHash(tokenLeaves[0]);
+        bytes32 leaf2 = rewardsCoordinator.calculateTokenLeafHash(tokenLeaves[1]);
 
 		IRewardsCoordinator.EarnerTreeMerkleLeaf memory earnerLeaf;
         earnerLeaf = IRewardsCoordinator.EarnerTreeMerkleLeaf({
 			earner: earner,
-			earnerTokenRoot: rewardsCoordinator.calculateTokenLeafHash(tokenLeaves[0])
+			earnerTokenRoot: keccak256(abi.encode(
+                leaf1,
+                leaf2
+            ))
 		});
 
-        uint32[] memory tokenIndices = new uint32[](1);
+        uint32[] memory tokenIndices = new uint32[](2);
         tokenIndices[0] = 0;
+        tokenIndices[1] = 1;
 
-		// Only 1 claims entry in the TokenClaim tree, so proof is empty (tokenLeaf = merkle root):
-        // Try generate tokenTree with multiple token claims.
-        bytes[] memory tokenTreeProofs = new bytes[](1);
-        tokenTreeProofs[0] = hex"";
+		// Only 2 claims entries in the TokenClaim tree, so proof is just the other leaf (h(l1, l2) = root):
+        bytes[] memory tokenTreeProofs = new bytes[](2);
+        tokenTreeProofs[0] = abi.encode(leaf2); // proof for leaf1 is the other leaf2
+        tokenTreeProofs[1] = abi.encode(leaf1); // proof for leaf2 is the other leaf1
 
 		return IRewardsCoordinator.RewardsMerkleClaim({
 			rootIndex: 0,
@@ -308,9 +360,36 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         vm.selectFork(ethForkId);
 
         uint256 rewardsCoordinatorBalanceBefore = tokenL1.balanceOf(address(rewardsCoordinator));
+        vm.assertTrue(memecoin.balanceOf(deployer) == 0);
+
+        /// Expect 3 emitted events:
+        /// 1) RewardsClaimed for tokenL1 which will be bridged back to L2
+        /// 2) RewardsClaimed for a memecoin which will just be transferred to AgentOwner on L1.
+        /// 3) BridgingRewardsToL2 event
+
+        vm.expectEmit(true, true, true, false);
+        emit RewardsClaimed(
+            tree.root,
+            address(eigenAgent), // earner
+            address(eigenAgent), // claimer
+            address(eigenAgent), // recipient
+            tokenL1,
+            rewardsAmount
+        );
+
+        vm.expectEmit(true, true, true, false);
+        emit RewardsClaimed(
+            tree.root,
+            address(eigenAgent), // earner
+            address(eigenAgent), // claimer
+            address(eigenAgent), // recipient
+            memecoin,
+            rewardsAmount
+        );
 
         vm.expectEmit(true, true, true, false);
         emit BridgingRewardsToL2(rewardsTransferRoot, rewardsToken, rewardsAmount);
+
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
@@ -323,11 +402,13 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
             })
         );
 
+        // check memecoin rewards were distributed to AgentOwner
+        vm.assertTrue(memecoin.balanceOf(deployer) > 0);
+
 		vm.assertEq(
             tokenL1.balanceOf(address(rewardsCoordinator)),
             rewardsCoordinatorBalanceBefore - rewardsAmount
         );
-
 
         ///////////////////////////////////////////////
         // L2 Sender receives tokens from L1 and transfers to agentOwner
