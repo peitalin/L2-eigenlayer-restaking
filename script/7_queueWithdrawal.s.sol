@@ -130,12 +130,13 @@ contract QueueWithdrawalScript is BaseScript {
         ///////////////////////////
 
         vm.selectFork(l2ForkId);
-        vm.startBroadcast(deployerKey);
 
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
             IDelegationManager.queueWithdrawals.selector
         );
         // gas: 315,798
+
+        vm.startBroadcast(deployerKey);
 
         senderContract.sendMessagePayNative{
             value: getRouterFeesL2(
