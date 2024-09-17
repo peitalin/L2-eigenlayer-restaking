@@ -762,7 +762,7 @@ contract EigenlayerMsgDecoders {
         uint32 numLines = lengthOfProof / 32;
         bytes32[] memory tokenTreeProofArray = new bytes32[](numLines);
 
-        // iterate through ech line of the each i-th byteproof and join the byteproofs
+        // iterate through each line of each i-th byteproof and join the byteproofs
         for (uint32 j = 0; j < numLines; ++j) {
             bytes32 _proofLine;
             uint32 _elemValueOffset = elemValueOffset + j*32;
@@ -776,7 +776,7 @@ contract EigenlayerMsgDecoders {
     }
 
     function _decodeProcessClaimMsg_Part2(bytes memory message)
-        public
+        private
         pure
         returns (bytes memory)
     {

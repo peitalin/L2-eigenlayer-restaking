@@ -134,18 +134,6 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
     }
 
     /**
-     * @dev Returns the same withdrawalRoot calculated in Eigenlayer's DelegationManager during withdrawal
-     * @param withdrawal is the Withdrawal struct used to completeWithdralwas in Eigenlayer.
-     */
-    function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
-        public
-        pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encode(withdrawal));
-    }
-
-    /**
      * @dev Returns the same withdrawalTransferRoot calculated in RestakingConnector.
      * @param withdrawalRoot withdrawalRoot calculated by Eigenlayer to verify withdrawals.
      * @param amount amount in the withdrawal
@@ -157,18 +145,6 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         address agentOwner
     ) public pure returns (bytes32) {
         return keccak256(abi.encode(withdrawalRoot, amount, agentOwner));
-    }
-
-    /**
-     * @dev Returns the same rewardsRoot calculated in in RestakingConnector during processClaims on L1
-     * @param claim is the RewardsMerkleClaim struct used to processClaim in Eigenlayer.
-     */
-    function calculateRewardsRoot(IRewardsCoordinator.RewardsMerkleClaim memory claim)
-        public
-        pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encode(claim));
     }
 
     /**
@@ -185,6 +161,35 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         address agentOwner
     ) public pure returns (bytes32) {
         return keccak256(abi.encode(rewardsRoot, rewardAmount, rewardToken, agentOwner));
+    }
+
+    /**
+     * @dev This function handles inbound L1 -> L2 completeWithdrawal messages after Eigenlayer has
+     * withdrawn funds, and the L1 bridge has bridged them back to L2.
+     * It receives a transferRoot and matches it with the committed transferRoot
+     * to verify which user to transfer the withdrawn funds (or rewards claims) to.
+     */
+    function handleTransferToAgentOwner(bytes memory message) external returns (address, uint256) {
+
+        TransferToAgentOwnerMsg memory transferToAgentOwnerMsg = decodeTransferToAgentOwnerMsg(message);
+
+        bytes32 transferRoot = transferToAgentOwnerMsg.transferRoot;
+
+        require(
+            transferRootsSpent[transferRoot] == false,
+            "SenderHooks.handleTransferToAgentOwner: TransferRoot already used"
+        );
+
+        // Read the withdrawalTransferRoot (or rewardsTransferRoot) that signer previously committed to.
+        ISenderHooks.FundsTransfer memory fundsTransfer = transferCommitments[transferRoot];
+
+        // Mark withdrawalTransferRoot (or rewardsTransferRoot) as spent to prevent double withdrawals/claims
+        transferRootsSpent[transferRoot] = true;
+        delete transferCommitments[transferRoot];
+
+        emit SendingFundsToAgentOwner(fundsTransfer.agentOwner, fundsTransfer.amount);
+
+        return (fundsTransfer.agentOwner, fundsTransfer.amount);
     }
 
     /**
@@ -232,7 +237,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             // and commit to it on L2, so that when the withdrawalTransferRoot message is
             // returned from L1 we can lookup and verify which AgentOwner to transfer funds to.
             bytes32 withdrawalTransferRoot = calculateWithdrawalTransferRoot(
-                calculateWithdrawalRoot(withdrawal),
+                _calculateWithdrawalRoot(withdrawal),
                 withdrawal.shares[0], // amount
                 signer // agentOwner
             );
@@ -287,7 +292,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
                 // rewardsTransferRoot message is returned from L1 we can lookup and verify
                 // which AgentOwner to transfer rewards to.
                 bytes32 rewardsTransferRoot = calculateRewardsTransferRoot(
-                    calculateRewardsRoot(claim),
+                    _calculateRewardsRoot(claim),
                     rewardAmount,
                     rewardToken,
                     signer
@@ -321,33 +326,23 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
     }
 
     /**
-     * @dev This function handles inbound L1 -> L2 completeWithdrawal messages after Eigenlayer has
-     * withdrawn funds, and the L1 bridge has bridged them back to L2.
-     * It receives a transferRoot and matches it with the committed transferRoot
-     * to verify which user to transfer the withdrawn funds (or rewards claims) to.
+     * @dev Returns the same withdrawalRoot calculated in Eigenlayer's DelegationManager during withdrawal
+     * @param withdrawal is the Withdrawal struct used to completeWithdralwas in Eigenlayer.
      */
-    function handleTransferToAgentOwner(bytes memory message) external returns (address, uint256) {
-
-        TransferToAgentOwnerMsg memory transferToAgentOwnerMsg = decodeTransferToAgentOwnerMsg(message);
-
-        bytes32 transferRoot = transferToAgentOwnerMsg.transferRoot;
-
-        require(
-            transferRootsSpent[transferRoot] == false,
-            "SenderHooks.handleTransferToAgentOwner: TransferRoot already used"
-        );
-
-        // Read the withdrawalTransferRoot (or rewardsTransferRoot) that signer previously committed to.
-        ISenderHooks.FundsTransfer memory fundsTransfer = transferCommitments[transferRoot];
-
-        // Mark withdrawalTransferRoot (or rewardsTransferRoot) as spent to prevent double withdrawals/claims
-        transferRootsSpent[transferRoot] = true;
-        delete transferCommitments[transferRoot];
-
-        emit SendingFundsToAgentOwner(fundsTransfer.agentOwner, fundsTransfer.amount);
-
-        return (fundsTransfer.agentOwner, fundsTransfer.amount);
+    function _calculateWithdrawalRoot(
+        IDelegationManager.Withdrawal memory withdrawal
+    ) private pure returns (bytes32) {
+        return keccak256(abi.encode(withdrawal));
     }
 
+    /**
+     * @dev Returns the same rewardsRoot calculated in in RestakingConnector during processClaims on L1
+     * @param claim is the RewardsMerkleClaim struct used to processClaim in Eigenlayer.
+     */
+    function _calculateRewardsRoot(
+        IRewardsCoordinator.RewardsMerkleClaim memory claim
+    ) private pure returns (bytes32) {
+        return keccak256(abi.encode(claim));
+    }
 }
 

@@ -2,6 +2,8 @@
 pragma solidity 0.8.22;
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
+
 
 interface ISenderHooks {
 
@@ -27,16 +29,21 @@ interface ISenderHooks {
 
     function isTransferRootSpent(bytes32 transferRoot) external returns (bool);
 
-    function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
-        external
-        pure
-        returns (bytes32);
+    // function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
+    //     external
+    //     pure
+    //     returns (bytes32);
 
     function calculateWithdrawalTransferRoot(
         bytes32 withdrawalRoot,
         uint256 amount,
         address agentOwner
     ) external pure returns (bytes32);
+
+    // function calculateRewardsRoot(IRewardsCoordinator.RewardsMerkleClaim memory claim)
+    //     external
+    //     pure
+    //     returns (bytes32);
 
     function calculateRewardsTransferRoot(
         bytes32 rewardsRoot,
