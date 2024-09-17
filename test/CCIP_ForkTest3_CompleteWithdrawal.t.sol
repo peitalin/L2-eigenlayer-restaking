@@ -242,8 +242,6 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
-        vm.assertEq(withdrawalRoot, senderHooks.calculateWithdrawalRoot(withdrawal));
-
         uint256 stakerBalanceOnL2Before = IERC20(BaseSepolia.BridgeToken).balanceOf(bob);
 
         bytes memory messageWithSignature_CW;

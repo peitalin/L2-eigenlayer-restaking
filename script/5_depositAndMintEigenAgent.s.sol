@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
+import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 
 import {EthSepolia} from "./Addresses.sol";
 import {BaseScript} from "./BaseScript.sol";
@@ -13,6 +14,9 @@ contract DepositAndMintEigenAgentScript is BaseScript {
     uint256 deployerKey;
     address deployer;
 
+    uint256 stakerKey;
+    address staker;
+
     address TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
     uint256 execNonce = 0;
     IEigenAgent6551 eigenAgent;
@@ -20,13 +24,17 @@ contract DepositAndMintEigenAgentScript is BaseScript {
     function run() public {
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
+        stakerKey = deployerKey;
+        staker = deployer;
         readContractsAndSetupEnvironment(false, deployer);
         return _run();
     }
 
     function mockrun(uint256 mockKey) public {
-        deployerKey = mockKey;
-        deployer = vm.addr(mockKey);
+        deployerKey = vm.envUint("DEPLOYER_KEY");
+        deployer = vm.addr(deployerKey);
+        stakerKey = mockKey;
+        staker = vm.addr(mockKey);
         readContractsAndSetupEnvironment(true, deployer);
         return _run();
     }
@@ -35,38 +43,41 @@ contract DepositAndMintEigenAgentScript is BaseScript {
 
         TARGET_CONTRACT = address(strategyManager);
 
-        //////////////////////////////////////////////////////////
-        /// L1: Get Deposit Inputs
-        //////////////////////////////////////////////////////////
-
         vm.selectFork(ethForkId);
-        vm.startBroadcast(deployerKey);
-
         (
             eigenAgent,
             execNonce
         ) = getEigenAgentAndExecNonce(deployer);
 
-        require(address(eigenAgent) == address(0), "User already has an EigenAgent");
-        /// agentFactory will spawn an EigenAgent after bridging automatically
-        /// if user does not already have an EigenAgent NFT on L1.
-        /// but this costs more gas to be sent up-front for CCIP
-        /// Nonce is then 0.
-        vm.stopBroadcast();
+        if (address(eigenAgent) != address(0)) {
+            // Check if deployer already has an EigenAgent.
+            // If so, generate a new account (to test minting new EigenAgents)
+            // AgentFactory will spawn an EigenAgent after bridging automatically
+            // If user does not already have an EigenAgent NFT on L1.
+            stakerKey = vm.randomUint() / 2 + 1; // EIP-2: secp256k1 curve order / 2
+            staker = vm.addr(stakerKey);
+            execNonce = 0;
+            // Send random new account some ether to mint an EigenAgent
+            vm.selectFork(l2ForkId);
+            vm.startBroadcast(deployerKey);
+            {
+                (bool success, bytes memory res) = staker.call{value: 0.02 ether}("");
+                IERC20_CCIPBnM(address(tokenL2)).drip(staker);
+            }
+            vm.stopBroadcast();
+        }
 
         //////////////////////////////////////////////////////
         /// L2: Dispatch Call
         //////////////////////////////////////////////////////
-        // Make sure we are on BaseSepolia Fork
         vm.selectFork(l2ForkId);
-        vm.startBroadcast(deployerKey);
 
         uint256 amount = 0.0619 ether;
         uint256 expiry = block.timestamp + 1 hours;
 
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
-            deployerKey,
+            stakerKey,
             EthSepolia.ChainId, // destination chainid where EigenAgent lives
             TARGET_CONTRACT, // StrategyManager is the target
             encodeDepositIntoStrategyMsg(
@@ -78,29 +89,30 @@ contract DepositAndMintEigenAgentScript is BaseScript {
             expiry
         );
 
-        tokenL2.approve(address(senderContract), amount);
-
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
             IStrategyManager.depositIntoStrategy.selector
         );
-
-        senderContract.sendMessagePayNative{
-            value: getRouterFeesL2(
-                address(receiverContract),
-                string(messageWithSignature),
-                address(tokenL2),
-                amount,
-                gasLimit
-            )
-        }(
-            EthSepolia.ChainSelector, // destination chain
+        uint256 routerFees = getRouterFeesL2(
             address(receiverContract),
             string(messageWithSignature),
             address(tokenL2),
             amount,
-            gasLimit // use default gasLimit if 0
+            gasLimit
         );
 
+        vm.startBroadcast(stakerKey);
+        {
+            tokenL2.approve(address(senderContract), amount);
+
+            senderContract.sendMessagePayNative{value: routerFees}(
+                EthSepolia.ChainSelector, // destination chain
+                address(receiverContract),
+                string(messageWithSignature),
+                address(tokenL2),
+                amount,
+                gasLimit // use default gasLimit if 0
+            );
+        }
         vm.stopBroadcast();
     }
 }

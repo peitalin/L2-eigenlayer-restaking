@@ -76,14 +76,14 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
 
         // set GasLimits
         uint256[] memory gasLimits = new uint256[](7);
-        gasLimits[0] = 2_100_000; // deposit + mint EigenAgent       [gas: 1,935,006] 1.4mil to mint agent, 500k for deposit
+        gasLimits[0] = 2_000_000; // deposit + mint EigenAgent       [gas: 1,935,006] 1.4mil to mint agent, 500k for deposit
         // https://sepolia.etherscan.io/tx/0x929dc3f03eb10143d2a215cd0695348bca656ea026ed959b9cf449a0af79c2c4
         gasLimits[1] = 1_500_000; // mintEigenAgent                  [gas: 1,500,000?]
-        gasLimits[2] = 580_000; // queueWithdrawals                  [gas: 529,085]
-        gasLimits[3] = 840_000; // completeWithdrawal + transferToL2 [gas: 791,717]
-        gasLimits[4] = 650_000; // delegateTo                        [gas: 550,292]
-        gasLimits[5] = 400_000; // undelegate                        [gas: ?]
-        gasLimits[6] = 600_000; // processClaim                      [gas: ?]
+        gasLimits[2] = 560_000; // queueWithdrawals                  [gas: 529,085]
+        gasLimits[3] = 820_000; // completeWithdrawal + transferToL2 [gas: 791,717]
+        gasLimits[4] = 580_000; // delegateTo                        [gas: 550,292]
+        gasLimits[5] = 800_000; // undelegate                        [gas: 773,565]
+        gasLimits[6] = 980_000; // processClaim                      [gas: 953,587]
 
         bytes4[] memory functionSelectors = new bytes4[](7);
         functionSelectors[0] = 0xe7a050aa;

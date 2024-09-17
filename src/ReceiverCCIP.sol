@@ -169,7 +169,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                     return _refundToSignerAfterExpiry(customError);
                 }
             }
-            // Otherwise revert, and continue allowing manual re-execution tries.
+            // Otherwise for other errors revert, and continue allowing manual re-execution attempts.
             revert(abi.decode(customError, (string)));
         }
     }

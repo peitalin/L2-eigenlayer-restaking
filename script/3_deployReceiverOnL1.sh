@@ -29,6 +29,14 @@ forge script script/3_deployReceiverOnL1.s.sol:DeployReceiverOnL1Script \
 #     src/6551/EigenAgentOwner721.sol:EigenAgentOwner721
 
 # forge verify-contract \
+#     --watch \
+#     --rpc-url ethsepolia \
+#     --etherscan-api-key $ETHERSCAN_API_KEY \
+#     --compiler-version v0.8.22 \
+#     0x953BF3d13eed150072bA47C968D87B160b390364 \
+#     src/6551/AgentFactory.sol:AgentFactory
+
+# forge verify-contract \
 #     --constructor-args $(cast abi-encode "constructor(address,address)" 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59 0x779877A7B0D9E8603169DdbD7836e478b4624789) \
 #     --watch \
 #     --rpc-url ethsepolia \

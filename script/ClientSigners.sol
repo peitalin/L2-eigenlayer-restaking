@@ -186,7 +186,7 @@ contract ClientSigners is Script {
         uint256 execNonce,
         uint256 expiry
     ) private pure {
-        console.log("===== Signature Parameters =====");
+        console.log("===== EigenAgent Signature =====");
         console.log("chainid:", chainid);
         console.log("targetContractAddr:", targetContractAddr);
         console.log("messageToEigenlayer:");

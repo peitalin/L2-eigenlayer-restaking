@@ -8,9 +8,12 @@ import {DelegateToScript} from "../script/6_delegateTo.s.sol";
 import {UndelegateScript} from "../script/6b_undelegate.s.sol";
 import {RedepositScript} from "../script/6c_redeposit.s.sol";
 
+import {SubmitRewardsScript} from "../script/9_submitRewards.s.sol";
+import {ProcessClaimRewardsScript} from "../script/9b_processClaimRewards.s.sol";
 
 
-contract ScriptsTests_Delegation is Test, TestErrorHandlers {
+
+contract ScriptsTests_Delegation_Rewards is Test, TestErrorHandlers {
 
     function setUp() public {}
 
@@ -83,5 +86,37 @@ contract ScriptsTests_Delegation is Test, TestErrorHandlers {
         }
     }
 
+    function test_step9_SubmitRewardsScript() public {
+
+        SubmitRewardsScript submitRewardsScript = new SubmitRewardsScript();
+
+        try submitRewardsScript.mockrun() {
+            //
+        } catch Error(string memory errStr) {
+
+            if (catchErrorStr(errStr, "RewardsCoordinator.submitRoot: new root must be for newer calculated period")) {
+                console.log("Rewards root already submitted for this week.");
+
+            } else {
+                revert(errStr);
+            }
+        }
+    }
+
+    function test_step9b_ProcessClaimRewardsScript() public {
+
+        ProcessClaimRewardsScript processClaimRewardsScript = new ProcessClaimRewardsScript();
+
+        try processClaimRewardsScript.mockrun() {
+            //
+        } catch Error(string memory errStr) {
+            if (catchErrorStr(errStr, "RewardsCoordinator.processClaim: cumulativeEarnings must be gt than cumulativeClaimed")) {
+                console.log("Already claimed. Submit another RewardRoot before trying to claim");
+
+            } else {
+                revert(errStr);
+            }
+        }
+    }
 }
 

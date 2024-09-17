@@ -17,7 +17,6 @@ import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 
-import {console} from "forge-std/Test.sol";
 
 
 contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterFees {
@@ -63,8 +62,17 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
     bytes32[] leaves;
     IERC20 memecoin;
 
+    uint256 execNonce;
+    uint256 expiry;
+    uint256 routerFees;
+
+    bytes32 rewardsRoot;
+    uint256 rewardsAmount;
+    address rewardsToken;
+    bytes32 rewardsTransferRoot;
+
     uint32 secondsInWeek;
-    uint32 nowTime;
+    uint32 timeNow;
     uint32 startOfTheWeek;
     uint32 startOfLastWeek;
 
@@ -76,6 +84,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         vm.startBroadcast(deployer);
         eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
 
+        // Create a second memecoin ERC20 token for multi-token rewards claims
         memecoin = IERC20(address(new TransparentUpgradeableProxy(
             address(new ERC20Minter()),
             address(new ProxyAdmin()),
@@ -90,7 +99,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         vm.stopBroadcast();
 
         secondsInWeek = 604800;
-        nowTime = uint32(block.timestamp);
+        timeNow = uint32(block.timestamp);
         startOfTheWeek = uint32(block.timestamp) - (uint32(block.timestamp) % secondsInWeek);
         startOfLastWeek = startOfTheWeek - secondsInWeek;
     }
@@ -259,7 +268,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         IERC20_CCIPBnM(address(tokenL1)).drip(address(rewardsCoordinator));
 
 		// Fast forward to present time
-        vm.warp(nowTime);
+        vm.warp(timeNow);
 
         return (proof, earnerIndex);
     }
@@ -293,27 +302,23 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
 
 		require(rewardsCoordinator.checkClaim(claim), "checkClaim(claim) failed, invalid claim.");
 
-        uint256 execNonce = 0;
-        uint256 expiry = block.timestamp + 1 hours;
+        execNonce = 0;
+        expiry = block.timestamp + 1 hours;
 
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature_PC = signMessageForEigenAgentExecution(
             deployerKey,
             EthSepolia.ChainId, // destination chainid where EigenAgent lives
             address(rewardsCoordinator),
-            encodeProcessClaimMsg(
-                claim,
-                earners[0] // recipient
-            ),
+            encodeProcessClaimMsg(claim, earners[0]),
             execNonce,
             expiry
         );
 
-        bytes32 rewardsRoot = calculateRewardsRoot(claim);
-        uint256 rewardsAmount = amounts[0];
-        address rewardsToken = address(tokenL1);
-
-        bytes32 rewardsTransferRoot = calculateRewardsTransferRoot(
+        rewardsRoot = calculateRewardsRoot(claim);
+        rewardsAmount = amounts[0];
+        rewardsToken = address(tokenL1);
+        rewardsTransferRoot = calculateRewardsTransferRoot(
             rewardsRoot,
             rewardsAmount,
             rewardsToken,
@@ -325,16 +330,13 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         ///////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
-        uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
-            IRewardsCoordinator.processClaim.selector
-        );
-
-        uint256 routerFees = getRouterFeesL2(
+        routerFees = getRouterFeesL2(
             address(receiverContract),
             string(messageWithSignature_PC),
             address(tokenL2),
             0 ether,
-            gasLimit
+            senderHooks.getGasLimitForFunctionSelector(IRewardsCoordinator.processClaim.selector)
+            // gasLimit
         );
 
         vm.expectEmit(true, true, true, true);
@@ -432,10 +434,43 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
                     encodeTransferToAgentOwnerMsg(
                         rewardsTransferRoot
                     )
-                )), // CCIP abi.encodes a string message when sending
+                )),
                 destTokenAmounts: destTokenAmountsL2
             })
         );
+
+        // attempting to re-use a rewardsTransferRoot should fail
+        vm.expectRevert("SenderHooks.handleTransferToAgentOwner: TransferRoot already used");
+        senderContract.mockCCIPReceive(
+            Client.Any2EVMMessage({
+                messageId: bytes32(uint256(9999)),
+                sourceChainSelector: EthSepolia.ChainSelector,
+                sender: abi.encode(address(receiverContract)),
+                data: abi.encode(string(
+                    encodeTransferToAgentOwnerMsg(rewardsTransferRoot)
+                )),
+                destTokenAmounts: destTokenAmountsL2
+            })
+        );
+
+        uint256 routerFees2 = getRouterFeesL2(
+            address(receiverContract),
+            string(messageWithSignature_PC),
+            address(tokenL2),
+            0 ether,
+            senderHooks.getGasLimitForFunctionSelector(IRewardsCoordinator.processClaim.selector)
+        );
+        // attempting to re-commit a spent claim should fail on L2
+        vm.expectRevert("SenderHooks._commitRewardsTransferRootInfo: TransferRoot already used");
+        senderContract.sendMessagePayNative{value: routerFees2}(
+            EthSepolia.ChainSelector, // destination chain
+            address(receiverContract),
+            string(messageWithSignature_PC),
+            address(tokenL2), // destination token
+            0, // not sending tokens, just message
+            0 // use default gasLimit for this function
+        );
+
     }
 
 }
