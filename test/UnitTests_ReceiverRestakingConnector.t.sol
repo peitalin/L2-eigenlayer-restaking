@@ -24,6 +24,8 @@ import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
     error AddressZero(string msg);
+    error CallerNotWhitelisted(string reason);
+    error SignatureInvalid(string reason);
 
     uint256 expiry;
     uint256 execNonce0;
@@ -123,6 +125,156 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         );
     }
 
+    function test_HandleCustomError_InvalidTargetContract() public {
+
+        uint256 execNonce = 0;
+        uint256 expiryShort = block.timestamp + 60 seconds;
+        uint256 amount = 0.1 ether;
+
+        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
+            bobKey,
+            block.chainid,
+            address(123123), // invalid targetContract to cause revert
+            encodeDepositIntoStrategyMsg(
+                address(strategy),
+                address(tokenL1),
+                amount
+            ),
+            execNonce,
+            expiryShort
+        );
+
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
+            amount: amount
+        });
+        bytes32 messageId1 = bytes32(abi.encode(0x123333444555));
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: messageId1,
+            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
+            sender: abi.encode(deployer),
+            destTokenAmounts: destTokenAmounts,
+            data: abi.encode(string(
+                messageWithSignature
+            ))
+        });
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
+                "digestHash args: targetContract, execNonce, chainId, expiry may be incorrect",
+                "Manually execute to refund after timestamp:",
+                expiryShort
+            )
+        );
+        receiverContract.mockCCIPReceive(any2EvmMessage);
+
+        vm.prank(deployer);
+        receiverContract.setAmountRefundedToMessageId(messageId1, 1 ether);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRestakingConnector.EigenAgentExecutionErrorStr.selector,
+                bob,
+                expiryShort,
+                "digestHash args: targetContract, execNonce, chainId, expiry may be incorrect"
+            )
+        );
+        receiverContract.mockCCIPReceive(any2EvmMessage);
+    }
+
+    function test_HandleCustomError_CallerNotAllowed() public {
+
+        uint256 execNonce = 0;
+        uint256 expiryShort = block.timestamp + 60 seconds;
+        uint256 amount = 0.1 ether;
+
+        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
+            bobKey,
+            block.chainid,
+            address(strategyManager),
+            encodeDepositIntoStrategyMsg(
+                address(strategy),
+                address(tokenL1),
+                amount
+            ),
+            execNonce,
+            expiryShort
+        );
+
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
+            amount: amount
+        });
+        bytes32 messageId1 = bytes32(abi.encode(0x123333444555));
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: messageId1,
+            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
+            sender: abi.encode(deployer),
+            destTokenAmounts: destTokenAmounts,
+            data: abi.encode(string(
+                messageWithSignature
+            ))
+        });
+
+        // introduce error: remove whitelisted caller
+        vm.prank(deployer);
+        eigenAgentOwner721.removeFromWhitelistedCallers(address(restakingConnector));
+
+        vm.expectRevert(abi.encodeWithSelector(CallerNotWhitelisted.selector, "EigenAgent: caller not allowed"));
+        receiverContract.mockCCIPReceive(any2EvmMessage);
+    }
+
+    function test_ReceiverL1_HandleCustomDepositError_BubbleErrorsUp() public {
+
+        uint256 execNonce = 0;
+        // should revert with EigenAgentExecutionError(signer, expiry)
+        address invalidEigenlayerStrategy = vm.addr(4444);
+        // make expiryShort to test refund on expiry feature
+        uint256 expiryShort = block.timestamp + 60 seconds;
+        uint256 amount = 0.1 ether;
+
+        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
+            bobKey,
+            block.chainid, // destination chainid where EigenAgent lives
+            address(strategyManager), // StrategyManager to approve + deposit
+            encodeDepositIntoStrategyMsg(
+                invalidEigenlayerStrategy,
+                address(tokenL1),
+                amount
+            ),
+            execNonce,
+            expiryShort
+        );
+
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
+            amount: amount
+        });
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0x0),
+            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
+            sender: abi.encode(deployer),
+            destTokenAmounts: destTokenAmounts,
+            data: abi.encode(string(
+                messageWithSignature
+            ))
+        });
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
+                "StrategyManager.onlyStrategiesWhitelistedForDeposit: strategy not whitelisted",
+                "Manually execute to refund after timestamp:",
+                expiryShort
+            )
+        );
+        receiverContract.mockCCIPReceive(any2EvmMessage);
+    }
+
     function test_OnlyReceiverCanCall_RestakingConnector() public {
 
         bytes memory mintEigenAgentMessage = encodeMintEigenAgentMsg(bob);
@@ -160,7 +312,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         );
     }
 
-    function test_MintEigenAgent() public {
+    function test_ReceiverL1_MintEigenAgent() public {
 
         bytes memory mintEigenAgentMessageBob = encodeMintEigenAgentMsg(bob);
 

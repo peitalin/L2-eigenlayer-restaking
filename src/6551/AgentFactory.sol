@@ -167,6 +167,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
     function _spawnEigenAgent6551(address user) private nonReentrant returns (IEigenAgent6551) {
 
         require(eigenAgentOwner721.balanceOf(user) == 0, "User already has an EigenAgent");
+        // if the user transfers their AgentOwnerNft they can mint another one.
 
         bytes32 salt = bytes32(abi.encode(user));
         uint256 tokenId = eigenAgentOwner721.mint(user);

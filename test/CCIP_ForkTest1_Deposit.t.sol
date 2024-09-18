@@ -159,7 +159,8 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
-                "Deposit failed: manually execute after expiry for a refund.",
+                "StrategyManager.onlyStrategiesWhitelistedForDeposit: strategy not whitelisted",
+                "Manually execute to refund after timestamp:",
                 expiryShort
             )
         );

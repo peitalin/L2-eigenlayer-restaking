@@ -9,9 +9,11 @@ import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces
 
 interface IRestakingConnector {
 
-    error EigenAgentExecutionError(address signer, uint256 expiry);
+    error EigenAgentExecutionError(address signer, uint256 expiry, bytes err);
 
-    error ExecutionErrorRefundAfterExpiry(string message, uint256 expiry);
+    error EigenAgentExecutionErrorStr(address signer, uint256 expiry, string err);
+
+    error ExecutionErrorRefundAfterExpiry(string err, string refundMessage, uint256 expiry);
 
     function getReceiverCCIP() external view returns (address);
 

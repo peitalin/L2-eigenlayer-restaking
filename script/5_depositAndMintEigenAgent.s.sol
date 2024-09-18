@@ -26,8 +26,7 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         deployer = vm.addr(deployerKey);
         stakerKey = deployerKey;
         staker = deployer;
-        readContractsAndSetupEnvironment(false, deployer);
-        return _run();
+        return _run(false);
     }
 
     function mockrun(uint256 mockKey) public {
@@ -35,11 +34,12 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         deployer = vm.addr(deployerKey);
         stakerKey = mockKey;
         staker = vm.addr(mockKey);
-        readContractsAndSetupEnvironment(true, deployer);
-        return _run();
+        return _run(true);
     }
 
-    function _run() private {
+    function _run(bool isTest) private {
+
+        readContractsAndSetupEnvironment(false, deployer);
 
         TARGET_CONTRACT = address(strategyManager);
 
@@ -60,10 +60,12 @@ contract DepositAndMintEigenAgentScript is BaseScript {
             // Send random new account some ether to mint an EigenAgent
             vm.selectFork(l2ForkId);
             vm.startBroadcast(deployerKey);
-            {
+            if (isTest) {
+                (bool success, bytes memory res) = staker.call{value: 0.1 ether}("");
+            } else {
                 (bool success, bytes memory res) = staker.call{value: 0.02 ether}("");
-                IERC20_CCIPBnM(address(tokenL2)).drip(staker);
             }
+            IERC20_CCIPBnM(address(tokenL2)).drip(staker);
             vm.stopBroadcast();
         }
 
@@ -72,7 +74,7 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         //////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
-        uint256 amount = 0.0619 ether;
+        uint256 amount = 0.0117 ether;
         uint256 expiry = block.timestamp + 1 hours;
 
         // sign the message for EigenAgent to execute Eigenlayer command

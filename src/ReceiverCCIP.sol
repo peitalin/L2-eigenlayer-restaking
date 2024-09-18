@@ -47,6 +47,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     );
 
     error AddressZero(string msg);
+    error AgentCallError(string errorMsg, bytes customErr);
 
     /// @param _router address of the router contract.
     /// @param _link address of the link contract.
@@ -152,25 +153,37 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             );
 
         } catch (bytes memory customError) {
-            // If there were bridged tokens (e.g. DepositIntoStrategy call)...
-            // and the deposit has not been manually refunded by an admin...
-            if (
-                s_lastReceivedTokenAmount > 0 &&
-                s_lastReceivedTokenAddress != address(0) &&
-                amountRefundedToMessageIds[any2EvmMessage.messageId] <= 0
-            ) {
-                // ...then decode and catch the EigenAgentExecutionError
-                bytes4 errorSelector = FunctionSelectorDecoder.decodeErrorSelector(customError);
 
-                if (errorSelector == IRestakingConnector.EigenAgentExecutionError.selector) {
+            bytes4 errorSelector = FunctionSelectorDecoder.decodeErrorSelector(customError);
+            // Decode and try catch the EigenAgentExecutionError
+
+            if (errorSelector == IRestakingConnector.EigenAgentExecutionError.selector) {
+                // If there were bridged tokens (e.g. DepositIntoStrategy call)...
+                // and the deposit has not been manually refunded by an admin...
+                if (
+                    s_lastReceivedTokenAmount > 0 &&
+                    s_lastReceivedTokenAddress != address(0) &&
+                    amountRefundedToMessageIds[any2EvmMessage.messageId] <= 0
+                ) {
                     // ...mark messageId as refunded
                     amountRefundedToMessageIds[any2EvmMessage.messageId] = s_lastReceivedTokenAmount;
                     // ...then initiate a refund back to L2
                     return _refundToSignerAfterExpiry(customError);
+
+                } else {
+                    // Parse EigenAgentExecutionError message and continue allowing manual re-execution tries.
+                    (
+                        address signer,
+                        uint256 expiry,
+                        string memory errStr
+                    ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
+
+                    revert IRestakingConnector.EigenAgentExecutionErrorStr(signer, expiry, errStr);
                 }
+            } else {
+                // For other errors revert and try parse error message
+                revert(string(customError));
             }
-            // Otherwise for other errors revert, and continue allowing manual re-execution attempts.
-            revert(abi.decode(customError, (string)));
         }
     }
 
@@ -312,15 +325,16 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
         (
             address signer,
-            uint256 expiry
-        ) = FunctionSelectorDecoder.decodeEigenAgentExecutionErrorParams(customError);
+            uint256 expiry,
+            string memory errStr
+        ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
 
         if (block.timestamp > expiry) {
             // If message has expired, trigger CCIP call to bridge funds back to L2 signer
             this.sendMessagePayNative(
                 BaseSepolia.ChainSelector, // destination chain
                 signer, // receiver on L2
-                string("EigenAgentExecutionError: refunding deposit to L2 signer"),
+                string.concat(errStr, ": refunding to L2 signer"),
                 s_lastReceivedTokenAddress, // L1 token to burn/lock
                 s_lastReceivedTokenAmount,
                 0 // use default gasLimit for this call
@@ -331,7 +345,8 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         } else {
             // otherwise if message hasn't expired, allow manual execution retries
             revert IRestakingConnector.ExecutionErrorRefundAfterExpiry(
-                "Deposit failed: manually execute after expiry for a refund.",
+                errStr,
+                "Manually execute to refund after timestamp:",
                 expiry
             );
         }

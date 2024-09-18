@@ -32,7 +32,7 @@ contract ScriptsTests_Deposits_Withdrawals is Test, TestErrorHandlers {
         // vm.assume(mockKey < type(uint256).max / 2);
         // vm.assume(mockKey > 1);
         // EIP-2: secp256k1 curve order / 2
-        uint256 mockKey = (vm.randomUint() / 3) + 2;
+        uint256 mockKey = (vm.randomUint() / 2) + 1;
         try depositAndMintEigenAgentScript.mockrun(mockKey) {
             //
         } catch Error(string memory reason) {

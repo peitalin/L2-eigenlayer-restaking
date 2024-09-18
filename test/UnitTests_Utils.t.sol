@@ -9,6 +9,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
+import {BytesLib} from "../src/utils/BytesLib.sol";
 import {BaseScript} from "../script/BaseScript.sol";
 import {AdminableMock} from "./mocks/AdminableMock.sol";
 import {ERC20Minter} from "./mocks/ERC20Minter.sol";
@@ -164,6 +165,24 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
 
         vm.prank(deployer);
         require(adminableMock.mockOnlyAdminOrOwner(), "deployer should pass onlyAdminOrOwner modifier");
+    }
+
+    function test_BytesLib_Slices() public {
+
+        bytes memory bstring = hex"";
+        bytes memory newBstring = BytesLib.slice(bstring, 0, 0);
+
+        vm.assertEq(newBstring, hex"");
+
+        bytes memory bstring2 = hex"123456789a";
+        vm.assertEq(BytesLib.slice(bstring2, 1, 3), hex"345678");
+
+        vm.assertEq("4Vx", string(hex"345678"));
+
+        bytes memory bstring3 = hex"123456789abcdef0";
+        vm.expectRevert("slice_outOfBounds");
+        BytesLib.slice(bstring3, 10, 1000);
+
     }
 
     function test_BaseScript_TopupEthBalance() public {

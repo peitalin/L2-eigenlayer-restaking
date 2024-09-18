@@ -19,14 +19,14 @@ contract EigenAgent6551 is Base6551Account {
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
-    error CallerNotWhitelisted();
-    error SignatureNotFromNftOwner();
+    error CallerNotWhitelisted(string reason);
+    error SignatureInvalid(string reason);
 
     modifier onlyWhitelistedCallers() {
         // get the 721 NFT associated with 6551 account and check if caller is whitelisted
         (uint256 chainId, address contractAddress, uint256 tokenId) = token();
         if (!IEigenAgentOwner721(contractAddress).isWhitelistedCaller(msg.sender)) {
-            revert CallerNotWhitelisted();
+            revert CallerNotWhitelisted("EigenAgent: caller not allowed");
         }
         _;
     }
@@ -90,8 +90,9 @@ contract EigenAgent6551 is Base6551Account {
             expiry
         );
 
-        if (isValidSignature(digestHash, signature) != IERC1271.isValidSignature.selector)
-            revert SignatureNotFromNftOwner();
+        if (isValidSignature(digestHash, signature) != IERC1271.isValidSignature.selector) {
+            revert SignatureInvalid("digestHash args: targetContract, execNonce, chainId, expiry may be incorrect");
+        }
 
         ++execNonce;
         bool success;
@@ -101,7 +102,15 @@ contract EigenAgent6551 is Base6551Account {
             (success, result) = targetContract.call{value: value}(data);
         }
 
-        require(success, string(result));
+        // Forward error strings up the callstack (forward Eigenlayer errors)
+        // https://ethereum.stackexchange.com/questions/109457/how-to-bubble-up-a-custom-error-when-using-delegatecall
+        if (!success) {
+            if (result.length == 0) revert();
+            assembly {
+                revert(add(32, result), mload(result))
+            }
+        }
+
         return result;
     }
 

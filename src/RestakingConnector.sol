@@ -247,12 +247,12 @@ contract RestakingConnector is
                 signature
             ) returns (bytes memory result) {
                 // success, do nothing.
-            } catch {
-                revert IRestakingConnector.EigenAgentExecutionError(signer, expiry);
+            } catch (bytes memory err) {
+                revert IRestakingConnector.EigenAgentExecutionError(signer, expiry, err);
             }
 
-        } catch {
-            revert IRestakingConnector.EigenAgentExecutionError(signer, expiry);
+        } catch (bytes memory err) {
+            revert IRestakingConnector.EigenAgentExecutionError(signer, expiry, err);
         }
 
     }

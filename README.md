@@ -138,6 +138,8 @@ Note: As EigenAgentOwner NFTs are transferrable, a user may try call `completeWi
 
 You can also [claim rewards from L2](https://ccip.chain.link/msg/0xf4b4e2ca7753f29f363c2566011d090ab39259890ef965e6ab163b83469053b5).
 
+The [rewards are bridged back to L2](https://ccip.chain.link/msg/0x1eb6bbbc8080f30b516d5a0194e25a2c3fdbe6bff9fba207179e84b4aa20feee)
+
 
 Only the MAGIC token will be bridged back to L2. Other ERC20 reward tokens will be sent to the EigenAgent owner's wallet on L1.
 
