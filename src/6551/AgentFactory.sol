@@ -166,7 +166,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
      */
     function _spawnEigenAgent6551(address user) private nonReentrant returns (IEigenAgent6551) {
 
-        require(address(getEigenAgent(user)) == address(0), "User already has an EigenAgent");
+        require(eigenAgentOwner721.balanceOf(user) == 0, "User already has an EigenAgent");
 
         bytes32 salt = bytes32(abi.encode(user));
         uint256 tokenId = eigenAgentOwner721.mint(user);
