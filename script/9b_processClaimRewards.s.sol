@@ -83,7 +83,6 @@ contract ProcessClaimRewardsScript is BaseScript {
         ///////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
-
         vm.startBroadcast(deployer);
         senderContract.sendMessagePayNative{
             value: getRouterFeesL2(
