@@ -59,14 +59,12 @@ See [Tenderly transaction for an execution trace](https://dashboard.tenderly.co/
 
 #### 2a. DelegateTo an Operator
 
-You can delegate to Operators, by sending a [delegateTo CCIP call message](https://ccip.chain.link/msg/0x952b6d0e36dd9121ab7e0142f916d562c933fb3a5b2268ec7f87d355a709c482).
-
-Which results in the following [delegation events](https://sepolia.etherscan.io/tx/0xe9d1e9a6c5571e147858beb60909a74ee5b9463ae7601ce76093341b28a77686#eventlog).
+You can delegate to Operators, by sending a [delegateTo message](https://ccip.chain.link/msg/0x952b6d0e36dd9121ab7e0142f916d562c933fb3a5b2268ec7f87d355a709c482), resulting in the following [delegation events](https://sepolia.etherscan.io/tx/0xe9d1e9a6c5571e147858beb60909a74ee5b9463ae7601ce76093341b28a77686#eventlog).
 
 
 #### 2b. Undelegate from an Operator
 
-If a user wants to switch Operators to delegate to, they can send a [undelegate CCIP call](https://ccip.chain.link/msg/0xd88d55c9b01de1eaa64fedc123358191cd863de08e7784701d7268120249c25d) which results in the following [undelegate events](https://sepolia.etherscan.io/tx/0x0220fa337ca1fc33de0048bb7f0b15dd5ca3ae56efe7a45cab336d72745df5f1).
+If a user wants to switch Operators to delegate to, they can send a [undelegate message](https://ccip.chain.link/msg/0xd88d55c9b01de1eaa64fedc123358191cd863de08e7784701d7268120249c25d) which results in the following [undelegate events](https://sepolia.etherscan.io/tx/0x0220fa337ca1fc33de0048bb7f0b15dd5ca3ae56efe7a45cab336d72745df5f1).
 
 Undelegating queues the staker for withdrawal and produces `withdrawalRoots`.
 Front-end clients should keep track of the withdrawal information and `withdrawalRoots` as they will be needed to re-deposit later.
@@ -79,8 +77,8 @@ Then can re-deposit back into Eigenlayer with a [redeposit Message](https://ccip
 
 Re-depositing uses the same function calls as `completeWithdrawals`.
 The `receiveAsTokens` flag in `completeWithdrawals` call determines whether user will:
-- 1. Receive withdrawals as tokens (which are bridged back to L2), or
-- 2. Receive withdrawals as shares in the vault (which can be re-delegated).
+1. Receive withdrawals as tokens (which are bridged back to L2), or
+2. Receive withdrawals as shares in the vault (which can be re-delegated).
 
 There is no way to directly re-delegate to another operator, a staker must undelegate + withdraw, wait 7 days, then restake and re-delegate to a new operator.
 
@@ -108,9 +106,7 @@ Note: As EigenAgentOwner NFTs are transferrable, a user may try call `completeWi
 
 #### 5. Reward Claims from L2
 
-You can also [claim rewards from L2](https://ccip.chain.link/msg/0xf4b4e2ca7753f29f363c2566011d090ab39259890ef965e6ab163b83469053b5). The [rewards are bridged back to L2](https://ccip.chain.link/msg/0x1eb6bbbc8080f30b516d5a0194e25a2c3fdbe6bff9fba207179e84b4aa20feee)
-
-Only the Bridge token will be bridged back to L2. Other ERC20 reward tokens will be sent to the EigenAgent owner's wallet on L1.
+You can also claim staking rewards by [sending a processClaim message from L2](https://ccip.chain.link/msg/0xf4b4e2ca7753f29f363c2566011d090ab39259890ef965e6ab163b83469053b5). The rewards are [bridged back to L2 to the EigenAgent owner](https://ccip.chain.link/msg/0x1eb6bbbc8080f30b516d5a0194e25a2c3fdbe6bff9fba207179e84b4aa20feee). Only the bridge token will be bridged back to L2. Other ERC20 reward tokens will be sent to the EigenAgent owner's wallet on L1.
 
 
 ### ERC-6551 EigenAgents
@@ -130,7 +126,8 @@ forge test --match-test test_step5c_MintEigenAgent -vvvv --gas-report
 ```
 
 Note: at the moment you cannot have more than 1 cross-chain message in-flight at a time because the execution nonce will be stale, causing the EigenAgent execution signature to fail for the 2nd message.
-    - A solution is to track in-flight txs and increment nonces on the client-side for subsequent messages (at least until the messages successfully execute on L1). Note this assumes CCIP messages land on L1 in the correct order.
+- CCIP bridging takes ~20min (Ethereum finality takes ~12.8 min)
+- A solution is to track in-flight txs and increment nonces on the client-side for subsequent messages (at least until the messages successfully execute on L1). Note this assumes CCIP messages land on L1 in the correct order.
 
 
 

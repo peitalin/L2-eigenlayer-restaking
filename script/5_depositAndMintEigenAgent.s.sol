@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
+import {console} from "forge-std/Test.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
@@ -101,6 +102,7 @@ contract DepositAndMintEigenAgentScript is BaseScript {
             amount,
             gasLimit
         );
+        console.log("Router fees:", routerFees);
 
         vm.startBroadcast(stakerKey);
         {
