@@ -9,6 +9,7 @@ import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 
 import {IReceiverCCIPMock} from "./mocks/ReceiverCCIPMock.sol";
 import {ISenderCCIPMock} from "./mocks/SenderCCIPMock.sol";
@@ -43,6 +44,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
     IStrategy public strategy;
+    IRewardsCoordinator public rewardsCoordinator;
     IERC20 public tokenL1;
     IERC20 public tokenL2;
 
@@ -52,10 +54,15 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
 
     uint256 public deployerKey;
     address public deployer;
-    uint256 public bobKey;
-    address public bob;
+
     uint256 public aliceKey;
     address public alice;
+    uint256 public bobKey;
+    address public bob;
+    uint256 public charlieKey;
+    address public charlie;
+    uint256 public daniKey;
+    address public dani;
 
     uint256 public l2ForkId;
     uint256 public ethForkId;
@@ -66,13 +73,21 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         deployer = vm.addr(deployerKey);
         vm.deal(deployer, 1 ether);
 
-        bobKey = uint256(11156789111);
+        aliceKey = uint256(11111129987760211111);
+        alice = vm.addr(aliceKey);
+        vm.deal(alice, 1 ether);
+
+        bobKey = uint256(2222228139835991222222);
         bob = vm.addr(bobKey);
         vm.deal(bob, 1 ether);
 
-        aliceKey = uint256(22298765222);
-        alice = vm.addr(aliceKey);
-        vm.deal(alice, 1 ether);
+        charlieKey = uint256(333333563892343333333);
+        charlie = vm.addr(charlieKey);
+        vm.deal(charlie, 1 ether);
+
+        daniKey = uint256(4444444471723934444444);
+        dani = vm.addr(daniKey);
+        vm.deal(dani, 1 ether);
 
         l2ForkId = vm.createFork("basesepolia"); // 0
         ethForkId = vm.createFork("ethsepolia"); // 1
@@ -102,7 +117,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             , // IStrategyFactory
             , // pauserRegistry
             delegationManager,
-            , // rewardsCoordinator
+            rewardsCoordinator,
             tokenL1
         ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
@@ -151,7 +166,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             receiverContract.allowlistSender(deployer, true);
             receiverContract.allowlistSender(address(senderContract), true);
             // set eigenlayer contracts
-            restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
+            restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy, rewardsCoordinator);
 
             IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
             IERC20_CCIPBnM(address(tokenL1)).drip(address(deployer));
@@ -178,6 +193,8 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
     }
 
     function setUpLocalEnvironment() internal {
+
+        vm.pauseGasMetering();
 
 		deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
@@ -206,7 +223,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             , // IStrategyFactory
             , // pauserRegistry
             delegationManager,
-            , // rewardsCoordinator
+            rewardsCoordinator,
             tokenL1
         ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
@@ -230,7 +247,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             receiverContract.allowlistSender(deployer, true);
             receiverContract.allowlistSender(address(senderContract), true);
             // set eigenlayer contracts
-            restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy);
+            restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy, rewardsCoordinator);
 
             IERC20Minter(address(tokenL1)).mint(address(receiverContract), 1 ether);
             IERC20Minter(address(tokenL1)).mint(deployer, 1 ether);

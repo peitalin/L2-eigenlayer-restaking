@@ -2,13 +2,15 @@
 pragma solidity 0.8.22;
 
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 
+
 struct TransferToAgentOwnerMsg {
-    bytes32 withdrawalTransferRoot;
+    bytes32 transferRoot; // can be either a withdrawalTransferRoot or rewardTransferRoot
 }
 
 library AgentOwnerSignature {
@@ -498,11 +500,12 @@ contract EigenlayerMsgDecoders {
 
     /**
      * @dev This message is dispatched from L1 to L2 by ReceiverCCIP.sol
-     * When sending a completeWithdrawal message, we first commit to a withdrawalTransferRoot on L2
-     * so that when completeWithdrawal finishes on L1 and bridge the funds back to L2, the bridge knows
+     * For Withdrawals: When sending a completeWithdrawal message, we first commit to a withdrawalTransferRoot
+     * on L2 so that when completeWithdrawal finishes on L1 and bridge the funds back to L2, the bridge knows
      * who the original owner associated with that withdrawalTransferRoot is.
+     * For Rewards processClaims: we commit a rewardTransferRoot in the same way.
      * @param message CCIP message to Eigenlayer
-     * @return transferToAgentOwnerMsg contains the withdrawalTransferRoot which is sent back to L2
+     * @return transferToAgentOwnerMsg contains the transferRoot which is sent back to L2
      */
     function decodeTransferToAgentOwnerMsg(bytes memory message)
         public pure
@@ -512,21 +515,324 @@ contract EigenlayerMsgDecoders {
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
         // 0000000000000000000000000000000000000000000000000000000000000064 [64]
         // d8a85b48                                                         [96] function selector
-        // dd900ac4d233ec9d74ac5af4ce89f87c78781d8fd9ee2aad62d312bdfdf78a14 [100] withdrawal root
+        // dd900ac4d233ec9d74ac5af4ce89f87c78781d8fd9ee2aad62d312bdfdf78a14 [100] transferRoot
         // 00000000000000000000000000000000000000000000000000000000
 
         bytes4 functionSelector;
-        bytes32 withdrawalTransferRoot;
+        bytes32 transferRoot;
 
         assembly {
             functionSelector := mload(add(message, 96))
-            withdrawalTransferRoot := mload(add(message, 100))
+            transferRoot := mload(add(message, 100))
         }
 
         return TransferToAgentOwnerMsg({
-            withdrawalTransferRoot: withdrawalTransferRoot
+            transferRoot: transferRoot
         });
     }
+
+    /**
+     * @param message CCIP message to Eigenlayer
+     * @return claim The RewardsMerkleClaim to be processed.
+     * Contains the root index, earner, token leaves, and required proofs
+     * @return recipient The address recipient that receives the ERC20 rewards
+     * @return signer Owner of the EigenAgent
+     * @return expiry Expiry of the signature
+     * @return signature Signed by the user for their EigenAgent to excecute.
+     */
+    function decodeProcessClaimMsg(bytes memory message)
+        public
+        pure
+        returns (
+            IRewardsCoordinator.RewardsMerkleClaim memory claim,
+            address recipient,
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        )
+    {
+        //////////////////////// Message offsets //////////////////////////
+        // 0000000000000000000000000000000000000000000000000000000000000020 [32] string offset
+        // 00000000000000000000000000000000000000000000000000000000000005a5 [64] string length
+        // 3ccc861d                                                         [96] processClaim function selector
+        // 0000000000000000000000000000000000000000000000000000000000000040 [100] [OFFSET_1] RewardsMerkleClaim offset (100+64 = 164)
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] recipient
+        // 0000000000000000000000000000000000000000000000000000000000000054 [164] rootIndex
+        // 0000000000000000000000000000000000000000000000000000000000010252 [196] earnerIndex
+        // 0000000000000000000000000000000000000000000000000000000000000100 [228] [OFFSET_2] earnerTreeProofOffset (164 + 256 = 420)
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [260] earnerLeaf.earner
+        // 899e3bde2c009bda46a51ecacd5b3f6df0af2833168cc21cac5f75e8c610ce0d [292] earnerLeaf.earnerTokenRoot
+        // 0000000000000000000000000000000000000000000000000000000000000340 [324] [OFFSET_2] tokenIndices[] offset (164 + 832 = 996)
+        // 00000000000000000000000000000000000000000000000000000000000003a0 [356] [OFFSET_2] tokenTreeProofs[] offset (164 + 928 = 1092)
+        // 0000000000000000000000000000000000000000000000000000000000000480 [388] [OFFSET_2] tokenLeaves[] offset (164 + 1152 = 1316)
+        // 0000000000000000000000000000000000000000000000000000000000000220 [420] earnerTreeProof length (544 = 17 lines)
+        // 32c3756cc20bcbdb7f8b25dcb3b904ea271776626d79cf1797932298c3bc5c62 [452] earnerTreeProof line 1
+        // 8a09335bd33183649a1338e1ce19dcc11b6e7500659b71ddeb3680855b6eeffd [484]
+        // d879bbbe67f12fc80b7df9df2966012d54b23b2c1265c708cc64b12d38acf88a [516]
+        // 82277145d984d6a9dc5bdfa13cee09e543b810cef077330bd5828b746b8c92bb [548]
+        // 622731e95bf8721578fa6c5e1ceaf2e023edb2b9c989c7106af8455ceae4aaad [580]
+        // 1891758b2b17b58a3de5a98d61349658dd8b58bc3bfa5b08ec98ecf6bb45447b [612]
+        // c45497275645c6cc432bf191633578079fc8787b0ee849e5af9c9a60375da395 [644]
+        // a8f7fbb5bc80c876748e5e000aedc8de1e163bbb930f5f05f49eafdfe43407e1 [676]
+        // daa8be3a9a68d8aeb17e55e562ae2d9efc90e3ced7e9992663a98c4309703e68 [708]
+        // 728dfe1ec72d08c5516592581f81e8f2d8b703331bfd313ad2e343f9c7a35488 [740]
+        // 21ed079b6f019319b2f7c82937cb24e1a2fde130b23d72b7451a152f71e8576a [772]
+        // bddb9b0b135ad963dba00860e04a76e8930a74a5513734e50c724b5bd550aa3f [804]
+        // 06e9d61d236796e70e35026ab17007b95d82293a2aecb1f77af8ee6b448abddb [836]
+        // 2ddce73dbc52aab08791998257aa5e0736d60e8f2d7ae5b50ef48971836435fd [868]
+        // 81a8556e13ffad0889903995260194d5330f98205b61e5c6555d8404f97d9fba [900]
+        // 8c1b83ea7669c5df034056ce24efba683a1303a3a0596997fa29a5028c5c2c39 [932]
+        // d6e9f04e75babdc9087f61891173e05d73f05da01c36d28e73c3b5594b61c107 [964]  earnerTreeProof line 17
+        // 0000000000000000000000000000000000000000000000000000000000000002 [996]  tokenIndices[] length: 2
+        // 0000000000000000000000000000000000000000000000000000000000000000 [1028] tokenIndices[0] value
+        // 0000000000000000000000000000000000000000000000000000000000000001 [1060] tokenIndices[1] value
+        // 0000000000000000000000000000000000000000000000000000000000000002 [1092] tokenTreeProofs[] length: 2
+        // 0000000000000000000000000000000000000000000000000000000000000040 [1124] [OFFSET_3] tokenTreeProofs[0] offset (1124 + 64 = 1188)
+        // 0000000000000000000000000000000000000000000000000000000000000080 [1156] [OFFSET_3] tokenTreeProofs[1] offset (1124 + 128 = 1252)
+        // 0000000000000000000000000000000000000000000000000000000000000020 [1188] tokenTreeProofs[0] length
+        // 30c06778aea3c632bc61f3a0ffa0b57bd9ce9c2cf76f9ad2369f1b46081bc90b [1220] tokenTreeProofs[0] value
+        // 0000000000000000000000000000000000000000000000000000000000000020 [1252] tokenTreeProofs[1] length
+        // c82aa805d0910fc0a12610e7b59a440050529cf2a5b9e5478642bfa7f785fc79 [1284] tokenTreeProofs[1] value
+        // 0000000000000000000000000000000000000000000000000000000000000002 [1316] tokenLeaves[] length: 2
+        // 0000000000000000000000004bd30daf919a3f74ec57f0557716bcc660251ec0 [1348] tokenLeaves[0].token
+        // 0000000000000000000000000000000000000000000000d47bfc8f6569c68ff4 [1380] tokenLeaves[0].cumulativeEarnings
+        // 000000000000000000000000deeeee2b48c121e6728ed95c860e296177849932 [1412] tokenLeaves[1].token
+        // 00000000000000000000000000000000000000000000be0b981f6fde72408340 [1444] tokenLeaves[1].cumulativeEarnings
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [1476] [OFFSET_4] signer
+        // 0000000000000000000000000000000000000000000000000000000000015195 [1508] expiry
+        // 03814b471f1beef18326b0d63c4a0f4431fdb72be167ee8aeb6212c8bd14d8e5 [1540] signature r
+        // 74fa9f4f34373bef152fdcba912a10b0a5c77be53c00d04c4c6c77ae407136e7 [1572] signature s
+        // 1b000000000000000000000000000000000000000000000000000000         [1604] signature v
+
+        uint32 rootIndex;
+        uint32 earnerIndex;
+        uint32[] memory tokenIndices;
+        bytes[] memory tokenTreeProofs;
+        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves;
+
+        uint32 tokenLeavesOffset;
+        {
+            uint32 tokenIndicesOffset;
+            uint32 tokenTreeProofsOffset;
+            assembly {
+                // These are always at these positions/offsets
+                recipient := mload(add(message, 132))
+                rootIndex := mload(add(message, 164))
+                earnerIndex := mload(add(message, 196))
+                // RewardsMerkleClaim struct fields start at 164, add 164
+                tokenIndicesOffset := add(mload(add(message, 324)), 164)
+                tokenTreeProofsOffset := add(mload(add(message, 356)), 164)
+                tokenLeavesOffset := add(mload(add(message, 388)), 164)
+            }
+
+            (tokenIndices, tokenTreeProofs, tokenLeaves) = _decodeProcessClaimMsg_Part1(
+                message,
+                tokenIndicesOffset,
+                tokenTreeProofsOffset,
+                tokenLeavesOffset
+            );
+        }
+
+        claim = IRewardsCoordinator.RewardsMerkleClaim({
+            rootIndex: rootIndex,
+            earnerIndex: earnerIndex,
+            earnerTreeProof: _decodeProcessClaimMsg_Part2(message),
+            earnerLeaf: _decodeProcessClaimMsg_Part3(message),
+            tokenIndices: tokenIndices,
+            tokenTreeProofs: tokenTreeProofs,
+            tokenLeaves: tokenLeaves
+        });
+
+        uint32 tokenLeavesLength;
+        assembly {
+            tokenLeavesLength := mload(add(message, tokenLeavesOffset))
+        }
+        // sig offset is tokenLeaves length position + 1 line + tokenLeavesLength*2 lines.
+        uint256 sigOffset = tokenLeavesOffset + 32 + (tokenLeavesLength * 64);
+
+        (
+            signer,
+            expiry,
+            signature
+        ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, sigOffset);
+
+        return (
+            claim,
+            recipient,
+            signer,
+            expiry,
+            signature
+        );
+    }
+
+    function _decodeProcessClaimMsg_Part1(
+        bytes memory message,
+        uint32 tokenIndicesOffset,
+        uint32 tokenTreeProofsOffset,
+        uint32 tokenLeavesOffset
+    ) private pure returns (
+        uint32[] memory tokenIndices,
+        bytes[] memory tokenTreeProofs,
+        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves
+    ) {
+
+        uint32 tokenIndicesLength;
+        uint32 tokenTreeProofsLength;
+        uint32 tokenLeavesLength;
+
+        assembly {
+            tokenIndicesLength := mload(add(message, tokenIndicesOffset))
+            tokenTreeProofsLength := mload(add(message, tokenTreeProofsOffset))
+            tokenLeavesLength := mload(add(message, tokenLeavesOffset))
+        }
+
+        tokenIndices = new uint32[](tokenIndicesLength);
+        tokenTreeProofs = new bytes[](tokenTreeProofsLength);
+        tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](tokenLeavesLength);
+
+        {
+            for (uint32 i = 0; i < tokenIndicesLength; ++i) {
+                uint32 _tokenIndex;
+                // add +1 line to skip array length, then i*32 for each following element
+                uint32 _offset_elem = tokenIndicesOffset + 32 + i*32;
+                assembly {
+                    _tokenIndex := mload(add(message, _offset_elem))
+                }
+                tokenIndices[i] = _tokenIndex;
+            }
+        }
+        {
+            for (uint32 i = 0; i < tokenTreeProofsLength; ++i) {
+                // tokenTreeProofs = bytes[] is an array of dynamic length bytestrings.
+                // each bytes_proof is a dynamic length element, so it has a length, and value.
+                // So we need the lengths and offsets for each byte_proof element:
+                uint32 _elemLinesOffset = tokenTreeProofsOffset + 32 + (i*32);
+                uint32 _elemOffset;
+                assembly {
+                    _elemOffset := mload(add(message, _elemLinesOffset))
+                }
+                // offset by length of tokenTreeProofs[] + 2 lines offset for each bytes_proof (length and value)
+                tokenTreeProofs[i] = _getTokenTreeProof(
+                    message,
+                    _elemOffset, // each i-th element's offset
+                    tokenTreeProofsOffset // root offset of tokenTreeProofs
+                );
+            }
+        }
+        {
+            for (uint32 i = 0; i < tokenLeavesLength; ++i) {
+                address _tokenLeafToken;
+                uint256 _cumulativeEarnings;
+                uint32 _offset0 = 32 + i*64; // +1 line for array length
+                uint32 _offset1 = 64 + i*64; // +2 lines for array length + token value
+                // then add i*2 lines for each successive element.
+                assembly {
+                    _tokenLeafToken := mload(add(message, add(tokenLeavesOffset, _offset0)))
+                    _cumulativeEarnings := mload(add(message, add(tokenLeavesOffset, _offset1)))
+                }
+                tokenLeaves[i] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+                    token: IERC20(_tokenLeafToken),
+                    cumulativeEarnings: _cumulativeEarnings
+                });
+            }
+        }
+
+        return (
+            tokenIndices,
+            tokenTreeProofs,
+            tokenLeaves
+        );
+    }
+
+    function _getTokenTreeProof(
+        bytes memory message,
+        uint32 elemOffset,
+        uint32 tokenTreeProofsOffset
+    ) private pure returns (bytes memory) {
+
+        uint32 elemLengthOffset = elemOffset + 32; // byteproofs element lengths begin on next line
+        uint32 elemValueOffset = elemOffset + 64; // byteproofs element values begin 2 lines after
+
+        uint32 lengthOfProof;
+        assembly {
+            lengthOfProof := mload(add(message, add(tokenTreeProofsOffset, elemLengthOffset)))
+        }
+        require(lengthOfProof % 32 == 0, "tokenTreeProof length must be a multiple of 32");
+
+        uint32 numLines = lengthOfProof / 32;
+        bytes32[] memory tokenTreeProofArray = new bytes32[](numLines);
+
+        // iterate through each line of each i-th byteproof and join the byteproofs
+        for (uint32 j = 0; j < numLines; ++j) {
+            bytes32 _proofLine;
+            uint32 _elemValueOffset = elemValueOffset + j*32;
+            assembly {
+                _proofLine := mload(add(message, add(tokenTreeProofsOffset, _elemValueOffset)))
+            }
+            tokenTreeProofArray[j] = _proofLine;
+        }
+
+        return abi.encodePacked(tokenTreeProofArray);
+    }
+
+    function _decodeProcessClaimMsg_Part2(bytes memory message)
+        private
+        pure
+        returns (bytes memory)
+    {
+        uint32 earnerTreeProofOffset;
+        uint32 earnerTreeProofLength;
+
+        assembly {
+            // earnerTreeProofOffset is always at position 228.
+            // RewardsMerkleClaim struct fields start at 164
+            earnerTreeProofOffset := add(mload(add(message, 228)), 164)
+            earnerTreeProofLength := mload(add(message, earnerTreeProofOffset)) // 544
+        }
+
+        require(earnerTreeProofLength % 32 == 0, "earnerTreeProofLength must be divisible by 32");
+
+        uint32 earnerTreeProofLines = earnerTreeProofLength / 32; // 544/32 = 17 lines
+        bytes32[] memory earnerTreeProofArray = new bytes32[](earnerTreeProofLines);
+
+        for (uint32 i = 0; i < earnerTreeProofLines; ++i) {
+            bytes32 proofChunk;
+            assembly {
+                proofChunk := mload(add(
+                    add(message, add(earnerTreeProofOffset, 32)), // first 32bytes is length, proof starts after
+                    mul(i, 32) // increment by 32-byte lines
+                ))
+            }
+            earnerTreeProofArray[i] = proofChunk;
+        }
+
+        bytes memory earnerTreeProof = abi.encodePacked(earnerTreeProofArray);
+        return earnerTreeProof;
+    }
+
+    function _decodeProcessClaimMsg_Part3(bytes memory message)
+        private
+        pure
+        returns (
+            IRewardsCoordinator.EarnerTreeMerkleLeaf memory earnerLeaf
+        )
+    {
+        address earner;
+        bytes32 earnerTokenRoot;
+
+        assembly {
+            // EarnerLeaf.earner is always at position 260
+            earner := mload(add(message, 260))
+            // EarnerLeaf.earnerTokenRoot is always at position 292
+            earnerTokenRoot := mload(add(message, 292))
+        }
+
+        earnerLeaf = IRewardsCoordinator.EarnerTreeMerkleLeaf({
+            earner: earner,
+            earnerTokenRoot: earnerTokenRoot
+        });
+    }
+
 }
 
 /*
@@ -672,4 +978,5 @@ library DelegationDecoders {
             signature
         );
     }
+
 }

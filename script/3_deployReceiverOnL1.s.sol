@@ -9,6 +9,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
@@ -46,6 +47,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
     IStrategy public strategy;
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
+    IRewardsCoordinator public rewardsCoordinator;
 
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
     address deployer = vm.addr(deployerKey);
@@ -81,7 +83,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
             , // strategyFactory
             , // pauserRegistry
             delegationManager,
-            , // _rewardsCoordinator
+            rewardsCoordinator,
             // token
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
 
@@ -138,7 +140,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         );
 
         restakingProxy.addAdmin(deployer);
-        restakingProxy.setEigenlayerContracts(delegationManager, strategyManager, strategy);
+        restakingProxy.setEigenlayerContracts(delegationManager, strategyManager, strategy, rewardsCoordinator);
         agentFactoryProxy.addAdmin(deployer);
         agentFactoryProxy.setRestakingConnector(address(restakingProxy));
 

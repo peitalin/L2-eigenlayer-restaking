@@ -4,6 +4,8 @@ pragma solidity 0.8.22;
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {ISignatureUtils} from "eigenlayer-contracts/src/contracts/interfaces/ISignatureUtils.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ISenderHooks} from "../interfaces/ISenderHooks.sol";
 import {IRestakingConnector} from "../interfaces/IRestakingConnector.sol";
@@ -22,15 +24,13 @@ library EigenlayerMsgEncoders {
         address token,
         uint256 amount
     ) public pure returns (bytes memory) {
-
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
             IStrategyManager.depositIntoStrategy.selector,
             strategy,
             token,
             amount
         );
-        return message_bytes;
     }
 
     /// @dev Encodes a queueWithdrawals() message for Eigenlayer's DelegationManager.sol contract
@@ -38,14 +38,11 @@ library EigenlayerMsgEncoders {
     function encodeQueueWithdrawalsMsg(
         IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
     ) public pure returns (bytes memory) {
-
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "queueWithdrawals((address[],uint256[],address)[])"
             IDelegationManager.queueWithdrawals.selector,
             queuedWithdrawalParams
         );
-
-        return message_bytes;
     }
 
     /**
@@ -80,7 +77,7 @@ library EigenlayerMsgEncoders {
         //         uint256[] shares;
         //     }
 
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
             IDelegationManager.completeQueuedWithdrawal.selector,
             withdrawal,
@@ -88,8 +85,6 @@ library EigenlayerMsgEncoders {
             middlewareTimesIndex,
             receiveAsTokens
         );
-
-        return message_bytes;
     }
 
     /**
@@ -116,14 +111,13 @@ library EigenlayerMsgEncoders {
         //         uint256 expiry;
         //     }
 
-        bytes memory message_bytes = abi.encodeWithSelector(
+        return abi.encodeWithSelector(
             // cast sig "delegateTo(address,(bytes,uint256),bytes32)" == 0xeea9064b
             IDelegationManager.delegateTo.selector,
             operator,
             approverSignatureAndExpiry,
             approverSalt
         );
-        return message_bytes;
     }
 
     /// @dev Encodes params for a undelegate() call to Eigenlayer's DelegationManager.sol
@@ -139,14 +133,12 @@ library EigenlayerMsgEncoders {
 
     /// @dev Encodes params to mint an EigenAgent from the AgentFactory.sol contract. Can be called by anyone.
     /// @param recipient address to mint an EigenAgent to.
-    function encodeMintEigenAgent(address recipient) public pure returns (bytes memory) {
-
-        bytes memory message_bytes = abi.encodeWithSelector(
+    function encodeMintEigenAgentMsg(address recipient) public pure returns (bytes memory) {
+        return abi.encodeWithSelector(
             // cast sig "mintEigenAgent(bytes)" == 0xcc15a557
             IRestakingConnector.mintEigenAgent.selector,
             recipient
         );
-        return message_bytes;
     }
 
     /*
@@ -173,17 +165,98 @@ library EigenlayerMsgEncoders {
         return keccak256(abi.encode(withdrawalRoot, amount, agentOwner));
     }
 
-    /// @dev encodes a message containing the withdrawalTransferRoot when sending message from L1 to L2
-    /// @param withdrawalTransferRoot is a hash of withdrawalRoot, amount, and agentOwner.
-    function encodeHandleTransferToAgentOwnerMsg(
-        bytes32 withdrawalTransferRoot
-    ) public pure returns (bytes memory) {
+    /**
+     * @dev Returns the same rewardsRoot calculated in in RestakingConnector during processClaims on L1
+     * @param claim is the RewardsMerkleClaim struct used to processClaim in Eigenlayer.
+     */
+    function calculateRewardsRoot(IRewardsCoordinator.RewardsMerkleClaim memory claim)
+        public
+        pure
+        returns (bytes32)
+    {
+        return keccak256(abi.encode(claim));
+    }
 
-        bytes memory message_bytes = abi.encodeWithSelector(
+    /**
+     * @dev Returns the same rewardsTransferRoot calculated in RestakingConnector.
+     * @param rewardsRoot keccak256(abi.encode(claim.rootIndex, claim.earnerIndex))
+     * @param rewardAmount amount of rewards
+     * @param rewardToken token address of reward token
+     * @param agentOwner owner of the EigenAgent executing completeWithdrawals
+     */
+    function calculateRewardsTransferRoot(
+        bytes32 rewardsRoot,
+        uint256 rewardAmount,
+        address rewardToken,
+        address agentOwner
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encode(rewardsRoot, rewardAmount, rewardToken, agentOwner));
+    }
+
+    /**
+     * @dev encodes a message containing the transferRoot when sending message from L1 to L2
+     * @param transferRoot is a hash of:
+     * (1) for withdrawal transfers: withdrawalRoot, amount, and agentOwner.
+     * (2) for rewards transfers: rewardsRoot, rewardAmount, rewardToken, agentOwner.
+     */
+    function encodeTransferToAgentOwnerMsg(
+        bytes32 transferRoot
+    ) public pure returns (bytes memory) {
+        return abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderHooks.handleTransferToAgentOwner.selector,
-            withdrawalTransferRoot
+            transferRoot
         );
-        return message_bytes;
     }
+
+    /*
+     *
+     *         Rewards Claims
+     *
+     *
+    */
+
+    /**
+     * @notice Claim rewards against a given root (read from _distributionRoots[claim.rootIndex]).
+     * Earnings are cumulative so earners don't have to claim against all distribution roots they have earnings for,
+     * they can simply claim against the latest root and the contract will calculate the difference between
+     * their cumulativeEarnings and cumulativeClaimed. This difference is then transferred to recipient address.
+     * @param claim The RewardsMerkleClaim to be processed.
+     * Contains the root index, earner, token leaves, and required proofs
+     * @param recipient The address recipient that receives the ERC20 rewards
+     * @dev only callable by the valid claimer, that is
+     * if claimerFor[claim.earner] is address(0) then only the earner can claim, otherwise only
+     * claimerFor[claim.earner] can claim the rewards.
+     */
+    function encodeProcessClaimMsg(
+        IRewardsCoordinator.RewardsMerkleClaim memory claim,
+        address recipient
+    ) public pure returns (bytes memory) {
+
+        // struct RewardsMerkleClaim {
+        //     uint32 rootIndex;
+        //     uint32 earnerIndex;
+        //     bytes earnerTreeProof;
+        //     EarnerTreeMerkleLeaf earnerLeaf;
+        //     uint32[] tokenIndices;
+        //     bytes[] tokenTreeProofs;
+        //     TokenTreeMerkleLeaf[] tokenLeaves;
+        // }
+        // struct EarnerTreeMerkleLeaf {
+        //     address earner;
+        //     bytes32 earnerTokenRoot;
+        // }
+        // struct TokenTreeMerkleLeaf {
+        //     IERC20 token;
+        //     uint256 cumulativeEarnings;
+        // }
+
+        return abi.encodeWithSelector(
+            // cast sig "processClaim((uint32,uint32,bytes,(address,bytes32),uint32[],bytes[],(address,uint256)[]), address)" == 0x3ccc861d
+            IRewardsCoordinator.processClaim.selector,
+            claim,
+            recipient
+        );
+    }
+
 }

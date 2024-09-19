@@ -134,6 +134,17 @@ When the withdrawn funds arrive on L2, the original `0.0619` tokens are [transfe
 Note: As EigenAgentOwner NFTs are transferrable, a user may try call `completeWithdrawal` then attempt to sell the NFT while the withdrawal is in flight. If users are trading these NFTs they need to be careful about this.
 
 
+#### 5. Reward Claims from L2
+
+You can also [claim rewards from L2](https://ccip.chain.link/msg/0xf4b4e2ca7753f29f363c2566011d090ab39259890ef965e6ab163b83469053b5).
+
+The [rewards are bridged back to L2](https://ccip.chain.link/msg/0x1eb6bbbc8080f30b516d5a0194e25a2c3fdbe6bff9fba207179e84b4aa20feee)
+
+
+Only the MAGIC token will be bridged back to L2. Other ERC20 reward tokens will be sent to the EigenAgent owner's wallet on L1.
+
+
+
 ### ERC-6551 EigenAgents
 
 EigenAgent accounts will only execute calls if the signature came from the user who owns the associated EigenAgentOwner 721 NFT.
@@ -178,6 +189,7 @@ forge test --match-test test_step5b_MintEigenAgent -vvvv --gas-report
 - [ ] Adapt the repo to ZkSync if need be (CREATE2 issues)
     - Luckily ERC-6551 EigenAgents operate on L1, not L2.
 
-
+- [ ] Note: at the moment you cannot have more than 1 cross-chain message in-flight at a time because the execution nonce will be stale, causing the EigenAgent execution signature to fail for the 2nd message.
+    - [ ] A solution is to track in-flight txs and increment nonces on the client-side for subsequent messages (at least until the messages successfully execute on L1). Note this assumes CCIP messages land on L1 in the correct order.
 
 

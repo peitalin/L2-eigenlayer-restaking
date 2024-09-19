@@ -10,6 +10,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
@@ -23,6 +24,8 @@ import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
     error AddressZero(string msg);
+    error CallerNotWhitelisted(string reason);
+    error SignatureInvalid(string reason);
 
     uint256 expiry;
     uint256 execNonce0;
@@ -122,9 +125,159 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         );
     }
 
+    function test_HandleCustomError_InvalidTargetContract() public {
+
+        uint256 execNonce = 0;
+        uint256 expiryShort = block.timestamp + 60 seconds;
+        uint256 amount = 0.1 ether;
+
+        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
+            bobKey,
+            block.chainid,
+            address(123123), // invalid targetContract to cause revert
+            encodeDepositIntoStrategyMsg(
+                address(strategy),
+                address(tokenL1),
+                amount
+            ),
+            execNonce,
+            expiryShort
+        );
+
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
+            amount: amount
+        });
+        bytes32 messageId1 = bytes32(abi.encode(0x123333444555));
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: messageId1,
+            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
+            sender: abi.encode(deployer),
+            destTokenAmounts: destTokenAmounts,
+            data: abi.encode(string(
+                messageWithSignature
+            ))
+        });
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
+                "Invalid signer, or incorrect digestHash parameters.",
+                "Manually execute to refund after timestamp:",
+                expiryShort
+            )
+        );
+        receiverContract.mockCCIPReceive(any2EvmMessage);
+
+        vm.prank(deployer);
+        receiverContract.setAmountRefundedToMessageId(messageId1, 1 ether);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRestakingConnector.EigenAgentExecutionErrorStr.selector,
+                bob,
+                expiryShort,
+                "Invalid signer, or incorrect digestHash parameters."
+            )
+        );
+        receiverContract.mockCCIPReceive(any2EvmMessage);
+    }
+
+    function test_HandleCustomError_CallerNotAllowed() public {
+
+        uint256 execNonce = 0;
+        uint256 expiryShort = block.timestamp + 60 seconds;
+        uint256 amount = 0.1 ether;
+
+        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
+            bobKey,
+            block.chainid,
+            address(strategyManager),
+            encodeDepositIntoStrategyMsg(
+                address(strategy),
+                address(tokenL1),
+                amount
+            ),
+            execNonce,
+            expiryShort
+        );
+
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
+            amount: amount
+        });
+        bytes32 messageId1 = bytes32(abi.encode(0x123333444555));
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: messageId1,
+            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
+            sender: abi.encode(deployer),
+            destTokenAmounts: destTokenAmounts,
+            data: abi.encode(string(
+                messageWithSignature
+            ))
+        });
+
+        // introduce error: remove whitelisted caller
+        vm.prank(deployer);
+        eigenAgentOwner721.removeFromWhitelistedCallers(address(restakingConnector));
+
+        vm.expectRevert(abi.encodeWithSelector(CallerNotWhitelisted.selector, "EigenAgent: caller not allowed"));
+        receiverContract.mockCCIPReceive(any2EvmMessage);
+    }
+
+    function test_ReceiverL1_HandleCustomDepositError_BubbleErrorsUp() public {
+
+        uint256 execNonce = 0;
+        // should revert with EigenAgentExecutionError(signer, expiry)
+        address invalidEigenlayerStrategy = vm.addr(4444);
+        // make expiryShort to test refund on expiry feature
+        uint256 expiryShort = block.timestamp + 60 seconds;
+        uint256 amount = 0.1 ether;
+
+        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
+            bobKey,
+            block.chainid, // destination chainid where EigenAgent lives
+            address(strategyManager), // StrategyManager to approve + deposit
+            encodeDepositIntoStrategyMsg(
+                invalidEigenlayerStrategy,
+                address(tokenL1),
+                amount
+            ),
+            execNonce,
+            expiryShort
+        );
+
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
+            amount: amount
+        });
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0x0),
+            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
+            sender: abi.encode(deployer),
+            destTokenAmounts: destTokenAmounts,
+            data: abi.encode(string(
+                messageWithSignature
+            ))
+        });
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
+                "StrategyManager.onlyStrategiesWhitelistedForDeposit: strategy not whitelisted",
+                "Manually execute to refund after timestamp:",
+                expiryShort
+            )
+        );
+        receiverContract.mockCCIPReceive(any2EvmMessage);
+    }
+
     function test_OnlyReceiverCanCall_RestakingConnector() public {
 
-        bytes memory mintEigenAgentMessage = encodeMintEigenAgent(bob);
+        bytes memory mintEigenAgentMessage = encodeMintEigenAgentMsg(bob);
 
         bytes memory ccipMessage = abi.encode(string(mintEigenAgentMessage));
 
@@ -159,9 +312,9 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         );
     }
 
-    function test_MintEigenAgent() public {
+    function test_ReceiverL1_MintEigenAgent() public {
 
-        bytes memory mintEigenAgentMessageBob = encodeMintEigenAgent(bob);
+        bytes memory mintEigenAgentMessageBob = encodeMintEigenAgentMsg(bob);
 
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
@@ -180,7 +333,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             "Bob should have minted a new EigenAgent"
         );
 
-        bytes memory mintEigenAgentMessageAlice = encodeMintEigenAgent(alice);
+        bytes memory mintEigenAgentMessageAlice = encodeMintEigenAgentMsg(alice);
 
         vm.prank(bob);
         receiverContract.mockCCIPReceive(
@@ -247,7 +400,8 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         restakingConnector.setEigenlayerContracts(
             delegationManager,
             strategyManager,
-            strategy
+            strategy,
+            rewardsCoordinator
         );
 
         vm.startBroadcast(deployer);
@@ -258,7 +412,8 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             restakingConnector.setEigenlayerContracts(
                 IDelegationManager(address(0)),
                 strategyManager,
-                strategy
+                strategy,
+                rewardsCoordinator
             );
 
             vm.expectRevert(
@@ -267,7 +422,8 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             restakingConnector.setEigenlayerContracts(
                 delegationManager,
                 IStrategyManager(address(0)),
-                strategy
+                strategy,
+                rewardsCoordinator
             );
 
             vm.expectRevert(
@@ -276,24 +432,39 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             restakingConnector.setEigenlayerContracts(
                 delegationManager,
                 strategyManager,
-                IStrategy(address(0))
+                IStrategy(address(0)),
+                rewardsCoordinator
             );
+
+            vm.expectRevert(
+                abi.encodeWithSelector(AddressZero.selector, "_rewardsCoordinator cannot be address(0)")
+            );
+            restakingConnector.setEigenlayerContracts(
+                delegationManager,
+                strategyManager,
+                strategy,
+                IRewardsCoordinator(address(0))
+            );
+
 
             restakingConnector.setEigenlayerContracts(
                 delegationManager,
                 strategyManager,
-                strategy
+                strategy,
+                rewardsCoordinator
             );
 
             (
                 IDelegationManager _delegationManager,
                 IStrategyManager _strategyManager,
-                IStrategy _strategy
+                IStrategy _strategy,
+                IRewardsCoordinator _rewardsCoordinator
             ) = restakingConnector.getEigenlayerContracts();
 
             vm.assertEq(address(delegationManager), address(_delegationManager));
             vm.assertEq(address(strategyManager), address(_strategyManager));
             vm.assertEq(address(strategy), address(_strategy));
+            vm.assertEq(address(rewardsCoordinator), address(_rewardsCoordinator));
         }
         vm.stopBroadcast();
     }
@@ -353,7 +524,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
                 sourceChainSelector: BaseSepolia.ChainSelector,
                 sender: abi.encode(deployer),
                 data: abi.encode(string(
-                    encodeMintEigenAgent(deployer)
+                    encodeMintEigenAgentMsg(deployer)
                 )),
                 destTokenAmounts: new Client.EVMTokenAmount[](0)
             }),

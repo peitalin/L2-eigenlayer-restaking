@@ -24,8 +24,8 @@ import {IBase6551Account} from "../src/6551/Base6551Account.sol";
 
 contract UnitTests_EigenAgent is BaseTestEnvironment {
 
-    error CallerNotWhitelisted();
-    error SignatureNotFromNftOwner();
+    error CallerNotWhitelisted(string reason);
+    error SignatureInvalid(string reason);
     error AlreadySigned();
 
     uint256 expiry;
@@ -68,9 +68,9 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         );
     }
 
-    function test_EigenAgent_Client_DigestHashsEqual() public {
+    function test_EigenAgent_Client_DigestHashsEqual() public view {
 
-        bytes memory message1 = encodeMintEigenAgent(deployer);
+        bytes memory message1 = encodeMintEigenAgentMsg(deployer);
 
         bytes32 digestHashClient = createEigenAgentCallDigestHash(
             address(delegationManager),
@@ -191,7 +191,10 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         );
 
         // alice attempts to execute using deployer's EigenAgent
-        vm.expectRevert(abi.encodeWithSelector(SignatureNotFromNftOwner.selector));
+        vm.expectRevert(abi.encodeWithSelector(
+            SignatureInvalid.selector,
+            "Invalid signer, or incorrect digestHash parameters."
+        ));
         eigenAgent.executeWithSignature(
             address(strategyManager), // strategyManager
             0,
@@ -318,7 +321,10 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
         // trying to execute call without having 2 signers on the multsig fails
         vm.prank(address(multisig));
-        vm.expectRevert(abi.encodeWithSelector(SignatureNotFromNftOwner.selector));
+        vm.expectRevert(abi.encodeWithSelector(
+            SignatureInvalid.selector,
+            "Invalid signer, or incorrect digestHash parameters."
+        ));
         eigenAgent2.executeWithSignature(
             targetContract,
             0 ether,
@@ -365,7 +371,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         IERC6551Executable(address(eigenAgent)).execute(
             address(agentFactory),
             0 ether,
-            encodeMintEigenAgent(alice), // should fail as targetContract does not have this function
+            encodeMintEigenAgentMsg(alice), // should fail as targetContract does not have this function
             0 // operation code
         );
 
@@ -388,7 +394,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         eigenAgent.executeWithSignature(
             address(strategyManager), // strategyManager
             0,
-            encodeMintEigenAgent(alice), // should fail as targetContract does not have this function
+            encodeMintEigenAgentMsg(alice), // should fail as targetContract does not have this function
             expiry,
             signature1
         );
@@ -398,7 +404,10 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
         address someSpenderContract = address(agentFactory);
 
-        vm.expectRevert(abi.encodeWithSelector(CallerNotWhitelisted.selector));
+        vm.expectRevert(abi.encodeWithSelector(
+            CallerNotWhitelisted.selector,
+            "EigenAgent: caller not allowed"
+        ));
         eigenAgent.approveByWhitelistedContract(
             someSpenderContract,
             address(tokenL1),
@@ -419,7 +428,10 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 amount
             );
             eigenAgentOwner721.removeFromWhitelistedCallers(deployer);
-            vm.expectRevert(abi.encodeWithSelector(CallerNotWhitelisted.selector));
+            vm.expectRevert(abi.encodeWithSelector(
+                CallerNotWhitelisted.selector,
+                "EigenAgent: caller not allowed"
+            ));
             eigenAgent.approveByWhitelistedContract(
                 someSpenderContract,
                 address(tokenL1),

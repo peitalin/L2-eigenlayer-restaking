@@ -6,12 +6,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 
 import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
-import {BaseSepolia} from "../script/Addresses.sol";
+import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 
 
 /// @title ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them
@@ -22,9 +23,15 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     mapping(bytes32 messageId => uint256) public amountRefundedToMessageIds;
 
     event BridgingWithdrawalToL2(
-        address indexed senderContractL2,
         bytes32 indexed withdrawalTransferRoot,
+        address indexed withdrawalToken,
         uint256 indexed withdrawalAmount
+    );
+
+    event BridgingRewardsToL2(
+        bytes32 indexed rewardsTransferRoot,
+        address indexed rewardsToken,
+        uint256 indexed rewardsAmount
     );
 
     event RefundingDeposit(
@@ -40,6 +47,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     );
 
     error AddressZero(string msg);
+    error AgentCallError(string errorMsg, bytes customErr);
 
     /// @param _router address of the router contract.
     /// @param _link address of the link contract.
@@ -145,25 +153,37 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             );
 
         } catch (bytes memory customError) {
-            // If there were bridged tokens (e.g. DepositIntoStrategy call)...
-            // and the deposit has not been manually refunded by an admin...
-            if (
-                s_lastReceivedTokenAmount > 0 &&
-                s_lastReceivedTokenAddress != address(0) &&
-                amountRefundedToMessageIds[any2EvmMessage.messageId] <= 0
-            ) {
-                // ...then decode and catch the EigenAgentExecutionError
-                bytes4 errorSelector = FunctionSelectorDecoder.decodeErrorSelector(customError);
 
-                if (errorSelector == IRestakingConnector.EigenAgentExecutionError.selector) {
+            bytes4 errorSelector = FunctionSelectorDecoder.decodeErrorSelector(customError);
+            // Decode and try catch the EigenAgentExecutionError
+
+            if (errorSelector == IRestakingConnector.EigenAgentExecutionError.selector) {
+                // If there were bridged tokens (e.g. DepositIntoStrategy call)...
+                // and the deposit has not been manually refunded by an admin...
+                if (
+                    s_lastReceivedTokenAmount > 0 &&
+                    s_lastReceivedTokenAddress != address(0) &&
+                    amountRefundedToMessageIds[any2EvmMessage.messageId] <= 0
+                ) {
                     // ...mark messageId as refunded
                     amountRefundedToMessageIds[any2EvmMessage.messageId] = s_lastReceivedTokenAmount;
                     // ...then initiate a refund back to L2
                     return _refundToSignerAfterExpiry(customError);
+
+                } else {
+                    // Parse EigenAgentExecutionError message and continue allowing manual re-execution tries.
+                    (
+                        address signer,
+                        uint256 expiry,
+                        string memory errStr
+                    ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
+
+                    revert IRestakingConnector.EigenAgentExecutionErrorStr(signer, expiry, errStr);
                 }
+            } else {
+                // For other errors revert and try parse error message
+                revert(string(customError));
             }
-            // Otherwise revert, and continue allowing manual re-execution tries.
-            revert(abi.decode(customError, (string)));
         }
     }
 
@@ -213,10 +233,10 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
             (
                 bool receiveAsTokens,
-                uint256 withdrawalAmount,
-                address withdrawalToken,
                 string memory messageForL2,
-                bytes32 withdrawalTransferRoot
+                bytes32 withdrawalTransferRoot,
+                address withdrawalToken,
+                uint256 withdrawalAmount
             ) = restakingConnector.completeWithdrawalWithEigenAgent(message);
 
             if (receiveAsTokens) {
@@ -235,8 +255,8 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 );
 
                 emit BridgingWithdrawalToL2(
-                    senderContractL2,
                     withdrawalTransferRoot,
+                    withdrawalToken,
                     withdrawalAmount
                 );
 
@@ -259,6 +279,36 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             restakingConnector.undelegateWithEigenAgent(message);
             textMsg = "Undelegated by EigenAgent";
         }
+
+        /// Process Claim (Rewards)
+        if (functionSelector == IRewardsCoordinator.processClaim.selector) {
+            (
+                string memory messageForL2,
+                bytes32 rewardsTransferRoot,
+                address rewardsToken,
+                uint256 rewardsAmount
+            ) = restakingConnector.processClaimWithEigenAgent(message);
+
+            if (rewardsToken == EthSepolia.BridgeToken) {
+
+                this.sendMessagePayNative(
+                    BaseSepolia.ChainSelector, // destination chain
+                    senderContractL2,
+                    messageForL2,
+                    rewardsToken, // L1 token to burn/lock
+                    rewardsAmount,
+                    0 // use default gasLimit
+                );
+
+                emit BridgingRewardsToL2(
+                    rewardsTransferRoot,
+                    rewardsToken,
+                    rewardsAmount
+                );
+            }
+
+            textMsg = "Claiming Rewards with EigenAgent";
+        }
     }
 
     /**
@@ -275,15 +325,16 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
         (
             address signer,
-            uint256 expiry
-        ) = FunctionSelectorDecoder.decodeEigenAgentExecutionErrorParams(customError);
+            uint256 expiry,
+            string memory errStr
+        ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
 
         if (block.timestamp > expiry) {
             // If message has expired, trigger CCIP call to bridge funds back to L2 signer
             this.sendMessagePayNative(
                 BaseSepolia.ChainSelector, // destination chain
                 signer, // receiver on L2
-                string("EigenAgentExecutionError: refunding deposit to L2 signer"),
+                string.concat(errStr, ": refunding to L2 signer"),
                 s_lastReceivedTokenAddress, // L1 token to burn/lock
                 s_lastReceivedTokenAmount,
                 0 // use default gasLimit for this call
@@ -294,7 +345,8 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         } else {
             // otherwise if message hasn't expired, allow manual execution retries
             revert IRestakingConnector.ExecutionErrorRefundAfterExpiry(
-                "Deposit failed: manually execute after expiry for a refund.",
+                errStr,
+                "Manually execute to refund after timestamp:",
                 expiry
             );
         }

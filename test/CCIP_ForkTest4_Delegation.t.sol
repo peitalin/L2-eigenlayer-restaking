@@ -216,7 +216,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
     }
 
 
-    function test_Eigenlayer_Undelegate_Delegate_Redeposit() public {
+    function test_FullFlow_Undelegate_Delegate_Redeposit() public {
 
         // This test follows the order:
         // (1) delegate

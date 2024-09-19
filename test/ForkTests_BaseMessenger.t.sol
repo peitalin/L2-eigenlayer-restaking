@@ -32,7 +32,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         // call params
         amount = 0.0028 ether;
         expiry = block.timestamp + 1 days;
-        message = encodeMintEigenAgent(bob);
+        message = encodeMintEigenAgentMsg(bob);
 
     }
 
@@ -511,7 +511,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             uint256 execNonce = 0;
             bytes32 mockWithdrawalAgentOwnerRoot = bytes32(abi.encode(123));
 
-            message = encodeHandleTransferToAgentOwnerMsg(
+            message = encodeTransferToAgentOwnerMsg(
                 mockWithdrawalAgentOwnerRoot
             );
 
@@ -565,7 +565,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             uint256 execNonce = 0;
             bytes32 mockWithdrawalAgentOwnerRoot = bytes32(abi.encode(123));
 
-            message = encodeHandleTransferToAgentOwnerMsg(
+            message = encodeTransferToAgentOwnerMsg(
                 mockWithdrawalAgentOwnerRoot
             );
 
@@ -594,7 +594,10 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
         // send receiverContract's ETH balance to bob, to trigger NotEnoughBalance error
         vm.prank(address(receiverContract));
-        address(bob).call{value: address(receiverContract).balance}("");
+        (
+            bool _success,
+            bytes memory _result
+        ) = address(bob).call{value: address(receiverContract).balance}("");
 
         vm.expectRevert(abi.encodeWithSelector(BaseMessengerCCIP.NotEnoughBalance.selector, 0, fees));
         // don't send gas to receiver contract

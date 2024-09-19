@@ -19,14 +19,14 @@ contract EigenAgent6551 is Base6551Account {
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
-    error CallerNotWhitelisted();
-    error SignatureNotFromNftOwner();
+    error CallerNotWhitelisted(string reason);
+    error SignatureInvalid(string reason);
 
     modifier onlyWhitelistedCallers() {
         // get the 721 NFT associated with 6551 account and check if caller is whitelisted
         (uint256 chainId, address contractAddress, uint256 tokenId) = token();
         if (!IEigenAgentOwner721(contractAddress).isWhitelistedCaller(msg.sender)) {
-            revert CallerNotWhitelisted();
+            revert CallerNotWhitelisted("EigenAgent: caller not allowed");
         }
         _;
     }
@@ -48,12 +48,12 @@ contract EigenAgent6551 is Base6551Account {
     }
 
     /**
-     * @dev EigenAgent receives CCIP messages and executes Eigenlayer commands on behalf of it's owner
+     * @dev EigenAgent receives messages (data) and executes commands on behalf of it's owner
      * on L2. The EigenAgent will only execute if provided a valid signature from the owner of the
      * EigenAgentOwner721 NFT associated with the ERC-6551 EigenAgent account.
      * @param targetContract is the contract to call
      * @param value amount of ETH to send with the call
-     * @param data the data to send to targetContract (e.g. depositIntoStrategy calldata)
+     * @param data the data (message) to send to targetContract (e.g. depositIntoStrategy calldata)
      * @param expiry expiry of the signature, currently only used to give users an option to withdraw
      * bridged funds (for a deposit) if the call reverts after a period of a time (e.g in case an
      * Operator deactivates in the time it takes to bridge from L2 to L1 and deposit).
@@ -72,14 +72,11 @@ contract EigenAgent6551 is Base6551Account {
         virtual
         returns (bytes memory result)
     {
-        /// Expiry: does not revert on expiry. CCIP may take hours to deliver messages if gas spikes.
-        /// We would need to return funds to the user on L2 this case, as the transaction may
-        /// no longer be manually executable after gas lowers later (e.g. Operator goes offline).
-        ///
-        /// Instead, we use expiry for specific purposes, such as allowing users to trigger
-        /// a refund if their deposit fails on L1 manually after expiry.
 
         // require(expiry >= block.timestamp, "Signature for EigenAgent execution expired");
+        /// Note: do not revert on expiry. CCIP may take hours to deliver messages if gas spikes.
+        /// We would need to return funds to the user on L2, as the transaction may no longer be
+        /// manually executable after gas lowers later (e.g. Operator goes offline).
 
         bytes32 digestHash = createEigenAgentCallDigestHash(
             targetContract,
@@ -90,18 +87,22 @@ contract EigenAgent6551 is Base6551Account {
             expiry
         );
 
-        if (isValidSignature(digestHash, signature) != IERC1271.isValidSignature.selector)
-            revert SignatureNotFromNftOwner();
+        if (isValidSignature(digestHash, signature) != IERC1271.isValidSignature.selector) {
+            revert SignatureInvalid("Invalid signer, or incorrect digestHash parameters.");
+        }
 
         ++execNonce;
         bool success;
 
-        {
-            // solhint-disable-next-line avoid-low-level-calls
-            (success, result) = targetContract.call{value: value}(data);
+        (success, result) = targetContract.call{value: value}(data);
+
+        // Forward error strings up the callstack
+        if (!success) {
+            assembly {
+                revert(add(result, 32), mload(result))
+            }
         }
 
-        require(success, string(result));
         return result;
     }
 

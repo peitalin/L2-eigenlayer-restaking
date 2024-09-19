@@ -17,8 +17,6 @@ import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 
 contract UnitTests_AgentFactory is BaseTestEnvironment {
 
-    error CallerNotWhitelisted();
-    error SignatureNotFromNftOwner();
     error AddressZero(string msg);
 
     uint256 expiry;

@@ -46,9 +46,6 @@ contract DelegateToScript is BaseScript {
         operator = vm.addr(operatorKey);
 
         if (!delegationManager.isOperator(operator) || isTest) {
-            vm.startBroadcast(deployerKey);
-            topupEthBalance(operator);
-            vm.stopBroadcast();
 
             vm.startBroadcast(operatorKey);
             {
@@ -72,8 +69,9 @@ contract DelegateToScript is BaseScript {
         //// Get User's EigenAgent
         IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(deployer);
         require(address(eigenAgent) != address(0), "User must have an EigenAgent");
+        require(!delegationManager.isDelegated(address(eigenAgent)), "EigenAgent is already actively delegated");
         require(
-            strategyManager.stakerStrategyShares(address(eigenAgent), strategy) >= 0,
+            strategyManager.stakerStrategyShares(address(eigenAgent), strategy) > 0,
             "EigenAgent has no deposit in Eigenlayer"
         );
 

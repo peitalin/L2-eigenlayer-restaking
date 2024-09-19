@@ -5,6 +5,7 @@ import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
+import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 
 import {SenderHooks} from "../src/SenderHooks.sol";
@@ -99,7 +100,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         sHooks.initialize();
     }
 
-    function test_BeforeSend_Commits_WithdrawalAgentOwnerRoot() public {
+    function test_BeforeSend_Commits_WithdrawalTransferRoot() public {
 
         vm.startBroadcast(address(senderContract));
 
@@ -130,7 +131,6 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         vm.stopBroadcast();
     }
 
-
     function test_BeforeSendCCIPMessage_OnlySenderCCIP(uint256 signerKey) public {
 
         vm.assume(signerKey < type(uint256).max / 2); // EIP-2: secp256k1 curve order / 2
@@ -154,7 +154,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         vm.stopBroadcast();
     }
 
-    function test_BeforeSendCCIPMessage_TokenCannotBeNull() public {
+    function test_BeforeSendCCIPMessage_WithdrawalTransferRoot_TokenCannotBeNull() public {
 
         vm.startBroadcast(address(senderContract));
 
@@ -174,6 +174,73 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         vm.stopBroadcast();
     }
 
+    function test_BeforeSendCCIPMessage_RewardsTransferRoot_TokenCannotBeNull() public {
+
+        vm.startBroadcast(address(senderContract));
+
+        (
+            bytes32 rewardsRoot,
+            bytes memory messageWithSignature_PC
+        ) = mockRewardsClaimMessage(bobKey);
+
+        require(rewardsRoot != bytes32(abi.encode(0)), "rewardsRoot cannot be 0x0");
+
+        vm.expectRevert("SenderHooks._commitRewardsTransferRootInfo: cannot commit tokenL2 as address(0)");
+        senderHooks.beforeSendCCIPMessage(
+            abi.encode(string(messageWithSignature_PC)), // CCIP string encodes when messaging
+            address(0) // tokenL2
+        );
+
+        vm.stopBroadcast();
+    }
+
+    function mockRewardsClaimMessage(uint256 signerKey) public view returns (
+        bytes32 rewardsRoot,
+        bytes memory messageWithSignature_PC
+    ) {
+
+		IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves;
+        tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](1);
+		tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: tokenL1,
+            cumulativeEarnings: 1 ether
+        });
+
+        address signer = vm.addr(signerKey);
+
+		IRewardsCoordinator.EarnerTreeMerkleLeaf memory earnerLeaf;
+        earnerLeaf = IRewardsCoordinator.EarnerTreeMerkleLeaf({
+			earner: signer,
+			earnerTokenRoot: rewardsCoordinator.calculateTokenLeafHash(tokenLeaves[0])
+		});
+
+        uint32[] memory tokenIndices = new uint32[](1);
+        bytes[] memory tokenTreeProofs = new bytes[](1);
+        tokenIndices[0] = 0;
+        tokenTreeProofs[0] = abi.encode(bytes32(0x0));
+
+		IRewardsCoordinator.RewardsMerkleClaim memory claim = IRewardsCoordinator.RewardsMerkleClaim({
+			rootIndex: 0,
+			earnerIndex: 0,
+			earnerTreeProof: hex"",
+			earnerLeaf: earnerLeaf,
+			tokenIndices: tokenIndices,
+			tokenTreeProofs: tokenTreeProofs,
+			tokenLeaves: tokenLeaves
+		});
+
+        // sign the message for EigenAgent to execute Eigenlayer command
+        messageWithSignature_PC = signMessageForEigenAgentExecution(
+            signerKey,
+            EthSepolia.ChainId, // destination chainid where EigenAgent lives
+            address(rewardsCoordinator),
+            encodeProcessClaimMsg(claim, signer),
+            execNonce,
+            expiry
+        );
+
+        rewardsRoot = calculateRewardsRoot(claim);
+    }
 
     function mockCompleteWithdrawalMessage(uint256 signerKey) public view
         returns (
@@ -197,7 +264,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             shares: sharesToWithdraw
         });
 
-        withdrawalRoot = senderHooks.calculateWithdrawalRoot(withdrawal);
+        withdrawalRoot = calculateWithdrawalRoot(withdrawal);
 
         bytes memory completeWithdrawalMessage;
         {

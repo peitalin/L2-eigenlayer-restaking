@@ -19,5 +19,5 @@ forge script script/2b_upgradeSenderOnL2.s.sol:UpgradeSenderOnL2Script \
 #     --rpc-url basesepolia \
 #     --etherscan-api-key $BASESCAN_API_KEY \
 #     --compiler-version v0.8.22 \
-#     0x796f1dEA914878713d5D3573F294EAf7302b56B8 \
+#     0xFb615DcC9f7AA88657A13055D87bE260446bd89A \
 #     ./src/SenderCCIP.sol:SenderCCIP
