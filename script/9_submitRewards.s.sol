@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
-import {Merkle} from "eigenlayer-contracts/src/contracts/libraries/Merkle.sol";
+import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {Merkle} from "@eigenlayer-contracts/libraries/Merkle.sol";
 
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {BaseScript} from "./BaseScript.sol";

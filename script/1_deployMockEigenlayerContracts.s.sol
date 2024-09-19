@@ -7,25 +7,25 @@ import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.s
 import {IBeacon} from "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 
-import {IETHPOSDeposit} from "eigenlayer-contracts/src/contracts/interfaces/IETHPOSDeposit.sol";
-import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
-import {IStrategyManager} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyManager.sol";
-import {IStrategyFactory} from "eigenlayer-contracts/src/contracts/interfaces/IStrategyFactory.sol";
-import {IRewardsCoordinator} from "eigenlayer-contracts/src/contracts/interfaces/IRewardsCoordinator.sol";
-import {IPauserRegistry} from "eigenlayer-contracts/src/contracts/interfaces/IPauserRegistry.sol";
-import {ISlasher} from "eigenlayer-contracts/src/contracts/interfaces/ISlasher.sol";
-import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
-import {IEigenPodManager} from "eigenlayer-contracts/src/contracts/interfaces/IEigenPodManager.sol";
+import {IETHPOSDeposit} from "@eigenlayer-contracts/interfaces/IETHPOSDeposit.sol";
+import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
+import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
+import {IStrategyFactory} from "@eigenlayer-contracts/interfaces/IStrategyFactory.sol";
+import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {IPauserRegistry} from "@eigenlayer-contracts/interfaces/IPauserRegistry.sol";
+import {ISlasher} from "@eigenlayer-contracts/interfaces/ISlasher.sol";
+import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IEigenPodManager} from "@eigenlayer-contracts/interfaces/IEigenPodManager.sol";
 
-import {PauserRegistry} from "eigenlayer-contracts/src/contracts/permissions/PauserRegistry.sol";
-import {StrategyManager} from  "eigenlayer-contracts/src/contracts/core/StrategyManager.sol";
-import {DelegationManager} from "eigenlayer-contracts/src/contracts/core/DelegationManager.sol";
-import {RewardsCoordinator} from "eigenlayer-contracts/src/contracts/core/RewardsCoordinator.sol";
-import {EigenPodManager} from "eigenlayer-contracts/src/contracts/pods/EigenPodManager.sol";
+import {PauserRegistry} from "@eigenlayer-contracts/permissions/PauserRegistry.sol";
+import {StrategyManager} from  "@eigenlayer-contracts/core/StrategyManager.sol";
+import {DelegationManager} from "@eigenlayer-contracts/core/DelegationManager.sol";
+import {RewardsCoordinator} from "@eigenlayer-contracts/core/RewardsCoordinator.sol";
+import {EigenPodManager} from "@eigenlayer-contracts/pods/EigenPodManager.sol";
 import {EmptyContract} from "eigenlayer-contracts/src/test/mocks/EmptyContract.sol";
-import {StrategyBase} from  "eigenlayer-contracts/src/contracts/strategies/StrategyBase.sol";
-import {StrategyFactory} from "eigenlayer-contracts/src/contracts/strategies/StrategyFactory.sol";
-import {StrategyBaseTVLLimits} from "eigenlayer-contracts/src/contracts/strategies/StrategyBaseTVLLimits.sol";
+import {StrategyBase} from  "@eigenlayer-contracts/strategies/StrategyBase.sol";
+import {StrategyFactory} from "@eigenlayer-contracts/strategies/StrategyFactory.sol";
+import {StrategyBaseTVLLimits} from "@eigenlayer-contracts/strategies/StrategyBaseTVLLimits.sol";
 
 import {ERC20Minter} from "../test/mocks/ERC20Minter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -59,8 +59,8 @@ contract DeployMockEigenlayerContractsScript is Script {
     uint32 public MAX_FUTURE_LENGTH = 2419200; // 28 days
     uint32 public GENESIS_REWARDS_TIMESTAMP = 0;
 
-    uint256 public USER_DEPOSIT_LIMIT = 1_000 * 1e18;  // uint256 _maxPerDeposit,
-    uint256 public TOTAL_DEPOSIT_LIMIT = 100_000 * 1e18; // uint256 _maxTotalDeposits,
+    uint256 public USER_DEPOSIT_LIMIT = 100_000 ether;  // uint256 _maxPerDeposit,
+    uint256 public TOTAL_DEPOSIT_LIMIT = 10_000_000 ether; // uint256 _maxTotalDeposits,
 
     function run() public returns (
         IStrategy,
