@@ -15,12 +15,12 @@ The scripts run on Base Sepolia, and Eth Sepolia and bridges CCIP's BnM ERC20 to
 
 Test deposit and withdrawal:
 ```
-forge test --match-test test_CCIP_Eigenlayer_CompleteWithdrawal -vvv
+forge test --match-test test_FullFlow_CompleteWithdrawal -vvvv
 ```
 
 Test delegating, undelegating, and re-depositing:
 ```
-forge test --match-test test_Eigenlayer_Undelegate_Delegate_Redeposit -vvv
+forge test --match-test test_FullFlow_Undelegate_Delegate_Redeposit -vvvv
 ```
 
 Test coverage:

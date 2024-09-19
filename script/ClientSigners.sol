@@ -193,6 +193,7 @@ contract ClientSigners is Script {
         console.logBytes(messageToEigenlayer);
         console.log("execNonce:", execNonce);
         console.log("expiry:", expiry);
+        console.log("--------------------------------");
     }
 
     function _logClientSignature(address signer, bytes32 digestHash, bytes memory signatureEigenAgent) private pure {
@@ -201,5 +202,6 @@ contract ClientSigners is Script {
         console.logBytes32(digestHash);
         console.log("signature:");
         console.logBytes(signatureEigenAgent);
+        console.log("================================");
     }
 }
