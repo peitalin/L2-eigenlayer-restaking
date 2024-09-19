@@ -1,8 +1,8 @@
 {
   "chainInfo": {
-    "block": 6699876,
+    "block": 6718928,
     "chainid": 11155111,
-    "timestamp": 1726450704
+    "timestamp": 1726716204
   },
   "contracts": {
     "agentFactory": "0x4aa3fE9cbc67ec0f20FD79108636BC06aC796b49",

@@ -10,6 +10,9 @@ fs_permissions = [
 # https://github.com/foundry-rs/foundry/issues/3971
 # memory_limit = 335544320
 
+# optimizer is enabled by default, can produce different bytecode and mess with contract verification
+# optimizer = false
+
 remappings = [
   "@chainlink/local/=lib/chainlink-local/",
   "@chainlink/contracts-ccip/=lib/chainlink-local/lib/ccip/contracts/",

@@ -44,6 +44,7 @@ interface IERC6551Executable {
  * (1) renaming `state` variable to `execNonce` for creating executeWithSignature digests, and
  * (2) add `virtual` to the execute() function to make it overridable
  * (3) isValidSignature has no implementation, to be overidden in EigenAgent6551.sol
+ * (4) isValidSignature has no implementation, to be overidden in EigenAgent6551.sol
 */
 abstract contract Base6551Account is IERC165, IERC1271, IBase6551Account, IERC6551Executable {
 

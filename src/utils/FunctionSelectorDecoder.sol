@@ -2,7 +2,6 @@
 pragma solidity 0.8.22;
 
 import {BytesLib} from "./BytesLib.sol";
-import {console} from "forge-std/Test.sol";
 
 
 library FunctionSelectorDecoder {
@@ -140,4 +139,3 @@ library FunctionSelectorDecoder {
         errBytes = BytesLib.slice(errPacked, 0, errLength);
     }
 }
-
