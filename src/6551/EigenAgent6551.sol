@@ -74,8 +74,7 @@ contract EigenAgent6551 is Base6551Account {
     {
 
         // require(expiry >= block.timestamp, "Signature for EigenAgent execution expired");
-        //
-        /// Note: Expiry: does not revert on expiry. CCIP may take hours to deliver messages if gas spikes.
+        /// Note: do not revert on expiry. CCIP may take hours to deliver messages if gas spikes.
         /// We would need to return funds to the user on L2, as the transaction may no longer be
         /// manually executable after gas lowers later (e.g. Operator goes offline).
 
@@ -89,7 +88,7 @@ contract EigenAgent6551 is Base6551Account {
         );
 
         if (isValidSignature(digestHash, signature) != IERC1271.isValidSignature.selector) {
-            revert SignatureInvalid("digestHash args: targetContract, execNonce, chainId, expiry may be incorrect");
+            revert SignatureInvalid("Invalid signer, or incorrect digestHash parameters.");
         }
 
         ++execNonce;

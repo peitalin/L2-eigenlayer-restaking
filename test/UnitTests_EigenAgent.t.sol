@@ -193,7 +193,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         // alice attempts to execute using deployer's EigenAgent
         vm.expectRevert(abi.encodeWithSelector(
             SignatureInvalid.selector,
-            "digestHash args: targetContract, execNonce, chainId, expiry may be incorrect"
+            "Invalid signer, or incorrect digestHash parameters."
         ));
         eigenAgent.executeWithSignature(
             address(strategyManager), // strategyManager
@@ -323,7 +323,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         vm.prank(address(multisig));
         vm.expectRevert(abi.encodeWithSelector(
             SignatureInvalid.selector,
-            "digestHash args: targetContract, execNonce, chainId, expiry may be incorrect"
+            "Invalid signer, or incorrect digestHash parameters."
         ));
         eigenAgent2.executeWithSignature(
             targetContract,

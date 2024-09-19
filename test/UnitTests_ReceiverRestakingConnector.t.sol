@@ -163,7 +163,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
-                "digestHash args: targetContract, execNonce, chainId, expiry may be incorrect",
+                "Invalid signer, or incorrect digestHash parameters.",
                 "Manually execute to refund after timestamp:",
                 expiryShort
             )
@@ -178,7 +178,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
                 IRestakingConnector.EigenAgentExecutionErrorStr.selector,
                 bob,
                 expiryShort,
-                "digestHash args: targetContract, execNonce, chainId, expiry may be incorrect"
+                "Invalid signer, or incorrect digestHash parameters."
             )
         );
         receiverContract.mockCCIPReceive(any2EvmMessage);
