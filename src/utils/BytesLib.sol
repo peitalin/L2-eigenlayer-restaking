@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
-
-// BytesLib
-// https://github.com/GNSPS/solidity-bytes-utils/blob/df88556cbbc267b33a787a3a6eaa32fd7247b589/contracts/BytesLib.sol#L228
+/*
+ * @title Solidity Bytes Arrays Utils
+ * @author Gonçalo Sá <goncalo.sa@consensys.net>
+ *
+ * @dev Bytes tightly packed arrays utility library for ethereum contracts written in Solidity.
+ *      The library lets you concatenate, slice and type cast bytes arrays both in memory and storage.
+ *
+ *  https://github.com/GNSPS/solidity-bytes-utils/blob/df88556cbbc267b33a787a3a6eaa32fd7247b589/contracts/BytesLib.sol#L228
+ */
 library BytesLib {
     function slice(
         bytes memory _bytes,
