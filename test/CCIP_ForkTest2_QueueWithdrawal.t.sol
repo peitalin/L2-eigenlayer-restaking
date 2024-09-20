@@ -4,7 +4,7 @@ pragma solidity 0.8.22;
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
-import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 

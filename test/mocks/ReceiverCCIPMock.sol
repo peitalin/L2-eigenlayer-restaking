@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {ReceiverCCIP} from "../../src/ReceiverCCIP.sol";
 import {IReceiverCCIP} from "../../src/interfaces/IReceiverCCIP.sol";
 

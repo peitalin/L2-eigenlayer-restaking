@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import {Script} from "forge-std/Script.sol";
 // CCIP interfaces
-import {IRouterClient} from "@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol";
+import {IRouterClient} from "@chainlink/ccip/interfaces/IRouterClient.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 // Eigenlayer interfaecs

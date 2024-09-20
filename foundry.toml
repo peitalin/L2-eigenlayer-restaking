@@ -14,16 +14,16 @@ fs_permissions = [
 # optimizer = false
 
 remappings = [
-  "@chainlink/local/=lib/chainlink-local/",
-  "@chainlink/contracts-ccip/=lib/chainlink-local/lib/ccip/contracts/",
+  "@chainlink/ccip/=lib/ccip/contracts/src/v0.8/ccip/",
+  "@chainlink/ccip-vendor/=lib/ccip/contracts/src/v0.8/vendor/",
   "forge-std/=lib/forge-std/src/",
   "@6551/=lib/reference/src/",
-  "@eigenlayer-contracts/=lib/eigenlayer-contracts/src/contracts",
-  "@openzeppelin-v5/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts",
-  "@openzeppelin-v5/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts",
+  "@eigenlayer-contracts/=lib/eigenlayer-contracts/src/contracts/",
+  "@openzeppelin-v5/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
+  "@openzeppelin-v5/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
   ### Note: Eigenlayer usees OpenZeppelin v4
-  "@openzeppelin/contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts",
-  "@openzeppelin/contracts-upgradeable/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable/contracts"
+  "@openzeppelin/contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/",
+  "@openzeppelin/contracts-upgradeable/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable/contracts/"
 ]
 
 [rpc_endpoints]

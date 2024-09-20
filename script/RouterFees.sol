@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
-import {IRouterClient} from "@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol";
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
+import {IRouterClient} from "@chainlink/ccip/interfaces/IRouterClient.sol";
 import {EthSepolia, BaseSepolia} from "./Addresses.sol";
 
 

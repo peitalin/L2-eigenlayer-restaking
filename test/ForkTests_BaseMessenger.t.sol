@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
-import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
