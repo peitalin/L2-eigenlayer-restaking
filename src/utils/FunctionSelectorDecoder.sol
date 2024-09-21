@@ -13,8 +13,7 @@ library FunctionSelectorDecoder {
         pure
         returns (bytes4 functionSelector)
     {
-        // CCIP abi.encodes(string(message)) wraps messages adding 64 bytes),
-        // so functionSelector begins at 96
+        // CCIP abi.encodes(string(message)) messages adding 64 bytes, functionSelector begins at 96
         assembly {
             // string_offset := mload(add(message, 32))
             // string_length := mload(add(message, 64))

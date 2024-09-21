@@ -3,13 +3,9 @@ pragma solidity 0.8.22;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-
 interface IAdminable {
-
     function addAdmin(address a) external;
-
     function removeAdmin(address a) external;
-
     function isAdmin(address a) external view returns(bool);
 }
 

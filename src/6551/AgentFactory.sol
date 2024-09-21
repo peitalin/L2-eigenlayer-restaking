@@ -169,6 +169,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
      * The resulting ERC-6551 EigenAgent account address is deterministic and depends on
      * (1) the user's address, (2) chainId, (3) Eigenagent6551 implementation contract,
      * (4) contract address of EigenAgentOwner721 NFT, and (5) tokenId of the EigenAgentOwner NFT.
+     * @param user the address to spawn an EigenAgent 6551 account and EigenAgentOwner721 NFT for.
      */
     function _spawnEigenAgent6551(address user) private nonReentrant returns (IEigenAgent6551) {
 
@@ -177,8 +178,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
 
         bytes32 salt = bytes32(abi.encode(user));
         uint256 tokenId = eigenAgentOwner721.mint(user);
-        // sets userToEigenAgentTokenIds[user] = tokenId in
-        // _afterTokenTransfer() -> updateEigenAgentOwnerTokenId
+        // userToEigenAgentTokenIds[user] = tokenId is set in EigenAgentOwner721._afterTokenTransfer
 
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(
             erc6551Registry.createAccount(
