@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgent6551} from "./IEigenAgent6551.sol";
@@ -21,6 +22,8 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
 
     mapping(address => uint256) public userToEigenAgentTokenIds;
     mapping(uint256 => address) public tokenIdToEigenAgents;
+
+    EigenAgent6551 baseEigenAgent;
 
     event AgentCreated(
         address indexed owner,
@@ -54,6 +57,9 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
 
         erc6551Registry = _erc6551Registry;
         eigenAgentOwner721 = _eigenAgentOwner721;
+
+        // Deploy base EigenAgent which is cloned when spawning EigenAgents for users
+        baseEigenAgent = new EigenAgent6551();
 
         __Adminable_init();
         __ReentrancyGuard_init();
@@ -176,7 +182,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
 
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(
             erc6551Registry.createAccount(
-                address(new EigenAgent6551()),
+                Clones.clone(address(baseEigenAgent)), // ERC-1167 minimal viable proxy clone
                 salt,
                 block.chainid,
                 address(eigenAgentOwner721),
