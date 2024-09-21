@@ -194,8 +194,6 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
 
     function setUpLocalEnvironment() internal {
 
-        vm.pauseGasMetering();
-
 		deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
         vm.deal(deployer, 1 ether);

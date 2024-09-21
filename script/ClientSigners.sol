@@ -3,8 +3,8 @@ pragma solidity 0.8.22;
 
 import {Script, console} from "forge-std/Script.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SignatureChecker} from "@openzeppelin-v5/contracts/utils/cryptography/SignatureChecker.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
-import {SignatureCheckerV5} from "../src/utils/SignatureCheckerV5.sol";
 
 
 /// @dev Retrieve these struct hashes by calling Eigenlayer contracts, or storing the hash.
@@ -37,7 +37,7 @@ contract ClientSigners is Script {
         bytes32 digestHash,
         bytes memory signature
     ) public view {
-        SignatureCheckerV5.isValidSignatureNow(signer, digestHash, signature);
+        SignatureChecker.isValidSignatureNow(signer, digestHash, signature);
     }
 
     function createEigenlayerDepositDigest(
