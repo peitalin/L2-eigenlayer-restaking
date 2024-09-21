@@ -6,6 +6,7 @@ ffi = true
 fs_permissions = [
   { access = "read-write", path = "./"},
 ]
+evm_version = "Cancun"
 # Note: If DeployScripts tests run into OutofGas errors, could be a memory issue:
 # https://github.com/foundry-rs/foundry/issues/3971
 # memory_limit = 335544320

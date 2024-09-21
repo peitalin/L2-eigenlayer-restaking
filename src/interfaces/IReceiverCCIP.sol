@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {IRestakingConnector} from "./IRestakingConnector.sol";
 import {IBaseMessengerCCIP} from "./IBaseMessengerCCIP.sol";

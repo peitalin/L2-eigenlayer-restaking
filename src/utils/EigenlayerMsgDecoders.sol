@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
@@ -757,22 +757,38 @@ contract EigenlayerMsgDecoders {
         assembly {
             lengthOfProof := mload(add(message, add(tokenTreeProofsOffset, elemLengthOffset)))
         }
+
         require(lengthOfProof % 32 == 0, "tokenTreeProof length must be a multiple of 32");
+        // allocate memory for proof (32 bytes for length + lengthOfProof bytes)
+        bytes memory tokenTreeProof = new bytes(lengthOfProof);
 
-        uint32 numLines = lengthOfProof / 32;
-        bytes32[] memory tokenTreeProofArray = new bytes32[](numLines);
-
-        // iterate through each line of each i-th byteproof and join the byteproofs
-        for (uint32 j = 0; j < numLines; ++j) {
-            bytes32 _proofLine;
-            uint32 _elemValueOffset = elemValueOffset + j*32;
-            assembly {
-                _proofLine := mload(add(message, add(tokenTreeProofsOffset, _elemValueOffset)))
-            }
-            tokenTreeProofArray[j] = _proofLine;
+        assembly {
+            // mcopy is only available in solc > 0.8.24
+            mcopy(
+                // shift 32 bytes past byte array length, copy proof value here
+                add(tokenTreeProof, 0x20),
+                // memory location of tokenTreeProof value
+                add(message, add(tokenTreeProofsOffset, elemValueOffset)),
+                // length of tokenTreeProof in bytes
+                lengthOfProof
+            )
         }
 
-        return abi.encodePacked(tokenTreeProofArray);
+        return tokenTreeProof;
+
+        //// Alternatively if using solc < 0.8.24
+        // uint32 numLines = lengthOfProof / 32;
+        // bytes32[] memory tokenTreeProofArray = new bytes32[](numLines);
+        // // iterate through each line of each i-th byteproof and join the byteproofs
+        // for (uint32 j = 0; j < numLines; ++j) {
+        //     bytes32 _proofLine;
+        //     uint32 _elemValueOffset = elemValueOffset + j*32;
+        //     assembly {
+        //         _proofLine := mload(add(message, add(tokenTreeProofsOffset, _elemValueOffset)))
+        //     }
+        //     tokenTreeProofArray[j] = _proofLine;
+        // }
+        // return abi.encodePacked(tokenTreeProofArray);
     }
 
     function _decodeProcessClaimMsg_Part2(bytes memory message)
@@ -791,23 +807,38 @@ contract EigenlayerMsgDecoders {
         }
 
         require(earnerTreeProofLength % 32 == 0, "earnerTreeProofLength must be divisible by 32");
+        // allocate memory for proof (32 bytes for length + lengthOfProof bytes)
+        bytes memory earnerTreeProof = new bytes(earnerTreeProofLength);
 
-        uint32 earnerTreeProofLines = earnerTreeProofLength / 32; // 544/32 = 17 lines
-        bytes32[] memory earnerTreeProofArray = new bytes32[](earnerTreeProofLines);
-
-        for (uint32 i = 0; i < earnerTreeProofLines; ++i) {
-            bytes32 proofChunk;
-            assembly {
-                proofChunk := mload(add(
-                    add(message, add(earnerTreeProofOffset, 32)), // first 32bytes is length, proof starts after
-                    mul(i, 32) // increment by 32-byte lines
-                ))
-            }
-            earnerTreeProofArray[i] = proofChunk;
+        assembly {
+            // mcopy is only available in solc > 0.8.24
+            mcopy(
+                // shift 32 bytes past byte array length, copy proof value here
+                add(earnerTreeProof, 0x20),
+                // first 32bytes is length, proof starts after so add 0x20
+                add(message, add(earnerTreeProofOffset, 0x20)),
+                // length of earnerTreeProof in bytes
+                earnerTreeProofLength
+            )
         }
 
-        bytes memory earnerTreeProof = abi.encodePacked(earnerTreeProofArray);
         return earnerTreeProof;
+
+        //// Alternatively if using solc < 0.8.24
+        // uint32 earnerTreeProofLines = earnerTreeProofLength / 32; // 544/32 = 17 lines
+        // bytes32[] memory earnerTreeProofArray = new bytes32[](earnerTreeProofLines);
+        //
+        // for (uint32 i = 0; i < earnerTreeProofLines; ++i) {
+        //     bytes32 proofChunk;
+        //     assembly {
+        //         proofChunk := mload(add(
+        //             add(message, add(earnerTreeProofOffset, 32)), // first 32bytes is length, proof starts after
+        //             mul(i, 32) // increment by 32-byte lines
+        //         ))
+        //     }
+        //     earnerTreeProofArray[i] = proofChunk;
+        // }
+        // return abi.encodePacked(earnerTreeProofArray);
     }
 
     function _decodeProcessClaimMsg_Part3(bytes memory message)

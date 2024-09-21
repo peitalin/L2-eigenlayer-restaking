@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {IRouterClient} from "@chainlink/ccip/interfaces/IRouterClient.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";

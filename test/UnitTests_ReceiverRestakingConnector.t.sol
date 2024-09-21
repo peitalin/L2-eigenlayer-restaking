@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
@@ -514,6 +514,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
     function test_ReceiverL1_dispatchMessageToEigenAgent_InternalCallsOnly(address user) public {
 
         vm.assume(user != address(receiverContract));
+        vm.assume(user != deployer);
 
         vm.prank(user);
 
