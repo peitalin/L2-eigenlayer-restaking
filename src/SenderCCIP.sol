@@ -60,23 +60,25 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
             abi.decode(any2EvmMessage.sender, (address))
         )
     {
+        address tokenAddress;
+        uint256 tokenAmount;
+
         if (any2EvmMessage.destTokenAmounts.length > 0) {
-            s_lastReceivedTokenAddress = any2EvmMessage.destTokenAmounts[0].token;
-            s_lastReceivedTokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
+            tokenAddress = any2EvmMessage.destTokenAmounts[0].token;
+            tokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
         } else {
-            s_lastReceivedTokenAddress = address(0);
-            s_lastReceivedTokenAmount = 0;
+            tokenAddress = address(0);
+            tokenAmount = 0;
         }
 
-        string memory textMsg = _afterCCIPReceiveMessage(any2EvmMessage);
+        _afterCCIPReceiveMessage(any2EvmMessage);
 
         emit MessageReceived(
             any2EvmMessage.messageId,
             any2EvmMessage.sourceChainSelector,
             abi.decode(any2EvmMessage.sender, (address)),
-            textMsg,
-            s_lastReceivedTokenAddress,
-            s_lastReceivedTokenAmount
+            tokenAddress,
+            tokenAmount
         );
     }
 
@@ -86,10 +88,8 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
      * This is so when the SenderCCIP bridge receives the withdrawn funds from L1, it knows who to
      * transfer the funds to.
      */
-    function _afterCCIPReceiveMessage(Client.Any2EVMMessage memory any2EvmMessage)
-        internal
-        returns (string memory textMsg)
-    {
+    function _afterCCIPReceiveMessage(Client.Any2EVMMessage memory any2EvmMessage) internal {
+
         bytes memory message = any2EvmMessage.data;
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
@@ -102,14 +102,10 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
             // agentOwner is the signer, first committed when sending completeWithdrawal
             IERC20(any2EvmMessage.destTokenAmounts[0].token).transfer(agentOwner, amount);
-            textMsg = "Transferring funds to EigenAgent owner";
 
         } else {
             emit MatchedReceivedFunctionSelector(functionSelector);
-            textMsg = "unknown message";
         }
-
-        return textMsg;
     }
 
     /*

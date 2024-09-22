@@ -127,29 +127,29 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             abi.decode(any2EvmMessage.sender, (address))
         )
     {
-        s_lastReceivedMessageId = any2EvmMessage.messageId; // fetch the messageId
-        s_lastReceivedText = abi.decode(any2EvmMessage.data, (string)); // abi-decoding of the sent text
+        address tokenAddress;
+        uint256 tokenAmount;
+
         if (any2EvmMessage.destTokenAmounts.length > 0) {
-            s_lastReceivedTokenAddress = any2EvmMessage.destTokenAmounts[0].token;
-            s_lastReceivedTokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
+            tokenAddress = any2EvmMessage.destTokenAmounts[0].token;
+            tokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
         } else {
-            s_lastReceivedTokenAddress = address(0);
-            s_lastReceivedTokenAmount = 0;
+            tokenAddress = address(0);
+            tokenAmount = 0;
         }
 
         try this.dispatchMessageToEigenAgent(
             any2EvmMessage,
-            s_lastReceivedTokenAddress,
-            s_lastReceivedTokenAmount
-        ) returns (string memory textMsg) {
+            tokenAddress,
+            tokenAmount
+        ) {
             // EigenAgent executes message successfully.
             emit MessageReceived(
                 any2EvmMessage.messageId,
                 any2EvmMessage.sourceChainSelector, // fetch the source chain identifier (aka selector)
                 abi.decode(any2EvmMessage.sender, (address)), // abi-decoding of the sender address,
-                textMsg,
-                s_lastReceivedTokenAddress,
-                s_lastReceivedTokenAmount
+                tokenAddress,
+                tokenAmount
             );
 
         } catch (bytes memory customError) {
@@ -161,14 +161,14 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 // If there were bridged tokens (e.g. DepositIntoStrategy call)...
                 // and the deposit has not been manually refunded by an admin...
                 if (
-                    s_lastReceivedTokenAmount > 0 &&
-                    s_lastReceivedTokenAddress != address(0) &&
+                    tokenAmount > 0 &&
+                    tokenAddress != address(0) &&
                     amountRefundedToMessageIds[any2EvmMessage.messageId] <= 0
                 ) {
                     // ...mark messageId as refunded
-                    amountRefundedToMessageIds[any2EvmMessage.messageId] = s_lastReceivedTokenAmount;
+                    amountRefundedToMessageIds[any2EvmMessage.messageId] = tokenAmount;
                     // ...then initiate a refund back to L2
-                    return _refundToSignerAfterExpiry(customError);
+                    return _refundToSignerAfterExpiry(customError, tokenAddress, tokenAmount);
 
                 } else {
                     // Parse EigenAgentExecutionError message and continue allowing manual re-execution tries.
@@ -197,13 +197,12 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         Client.Any2EVMMessage memory any2EvmMessage,
         address token,
         uint256 amount
-    ) external returns (string memory textMsg) {
+    ) external {
 
         require(msg.sender == address(this), "Function not called internally");
 
         bytes memory message = any2EvmMessage.data;
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
-        textMsg = "no matching Eigenlayer function selector";
 
         /// Deposit Into Strategy
         if (functionSelector == IStrategyManager.depositIntoStrategy.selector) {
@@ -211,21 +210,18 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             IERC20(token).approve(address(restakingConnector), amount);
             // approve RestakingConnector to transfer tokens to EigenAgent
             restakingConnector.depositWithEigenAgent(message);
-            textMsg = "Deposited by EigenAgent";
         }
 
         /// Mint EigenAgent
         if (functionSelector == IRestakingConnector.mintEigenAgent.selector) {
             // cast sig "mintEigenAgent(bytes)" == 0xcc15a557
             restakingConnector.mintEigenAgent(message);
-            textMsg = "called mintEigenAgent";
         }
 
         /// Queue Withdrawals
         if (functionSelector == IDelegationManager.queueWithdrawals.selector) {
             // cast sig "queueWithdrawals((address[],uint256[],address)[])" == 0x0dd8dd02
             restakingConnector.queueWithdrawalsWithEigenAgent(message);
-            textMsg = "Withdrawal queued by EigenAgent";
         }
 
         /// Complete Withdrawal
@@ -260,7 +256,6 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                     withdrawalAmount
                 );
 
-                textMsg = "Complete Queued Withdrawal by EigenAgent";
             } else {
                 /// Otherwise if `receiveAsTokens == false`, withdrawal is redeposited in Eigenlayer
                 /// as shares, re-delegated to a new Operator as part of the `undelegate` flow.
@@ -271,13 +266,11 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         /// Delegate To
         if (functionSelector == IDelegationManager.delegateTo.selector) {
             restakingConnector.delegateToWithEigenAgent(message);
-            textMsg = "Delegated to Operator by EigenAgent";
         }
 
         /// Undelegate
         if (functionSelector == IDelegationManager.undelegate.selector) {
             restakingConnector.undelegateWithEigenAgent(message);
-            textMsg = "Undelegated by EigenAgent";
         }
 
         /// Process Claim (Rewards)
@@ -306,8 +299,6 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                     rewardsAmount
                 );
             }
-
-            textMsg = "Claiming Rewards with EigenAgent";
         }
     }
 
@@ -321,7 +312,11 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
      *
      * No other Eigenlayer function call bridges tokens, this is the main UX edgecase to cover.
      */
-    function _refundToSignerAfterExpiry(bytes memory customError) private {
+    function _refundToSignerAfterExpiry(
+        bytes memory customError,
+        address tokenAddress,
+        uint256 tokenAmount
+    ) private {
 
         (
             address signer,
@@ -335,12 +330,12 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 BaseSepolia.ChainSelector, // destination chain
                 signer, // receiver on L2
                 string.concat(errStr, ": refunding to L2 signer"),
-                s_lastReceivedTokenAddress, // L1 token to burn/lock
-                s_lastReceivedTokenAmount,
+                tokenAddress, // L1 token to burn/lock
+                tokenAmount,
                 0 // use default gasLimit for this call
             );
 
-            emit RefundingDeposit(signer, s_lastReceivedTokenAddress, s_lastReceivedTokenAmount);
+            emit RefundingDeposit(signer, tokenAddress, tokenAmount);
 
         } else {
             // otherwise if message hasn't expired, allow manual execution retries
