@@ -13,11 +13,11 @@ library FunctionSelectorDecoder {
         pure
         returns (bytes4 functionSelector)
     {
-        // CCIP abi.encodes(string(message)) messages adding 64 bytes, functionSelector begins at 96
+        // CCIP abi.encodes(string(message)) messages, adding 64 bytes. functionSelector begins at 0x60 (96)
         assembly {
-            // string_offset := mload(add(message, 32))
-            // string_length := mload(add(message, 64))
-            functionSelector := mload(add(message, 96))
+            // string_offset := mload(add(message, 0x20))
+            // string_length := mload(add(message, 0x40))
+            functionSelector := mload(add(message, 0x60))
         }
     }
 
@@ -31,7 +31,7 @@ library FunctionSelectorDecoder {
         // [59b170e3]0000000000000000000000004ef1575822436f6fc6935aa3f025c7ea [32]
         // bytes4 takes the leading 4 bytes of the 32 byte word.
         assembly {
-            errorSelector := mload(add(customError, 32))
+            errorSelector := mload(add(customError, 0x20))
         }
     }
 
@@ -118,23 +118,37 @@ library FunctionSelectorDecoder {
             errLength := mload(add(customError, errMessageOffset))
         }
 
-        // Round up to nearest 32, then divided by 32 to get number of lines the error string takes
-        uint32 numErrLines = (errLength - errLength % 32 + 32) / 32 ;
-        bytes32[] memory errStringArray = new bytes32[](numErrLines);
 
-        for (uint32 i = 0; i < numErrLines; ++i) {
+        bytes memory errPacked = new bytes(errLength);
 
-            bytes32 _errLine;
-            uint32 offset = errMessageOffset + 32 + i*32;
-            // Add +32 bytes to skip 1st line (length), then loop through error string lines with i*32
-            assembly {
-                _errLine := mload(add(customError, offset))
-            }
-
-            errStringArray[i] = _errLine;
+        assembly {
+            // mcopy is only available in solc ^0.8.24
+            mcopy(
+                // Add +32 bytes to skip 1st line (length)
+                add(errPacked, 0x20),
+                add(customError, add(errMessageOffset, 0x20)),
+                errLength
+            )
         }
-        // Pack the error bytestrings together, and slice off trailing 0s.
-        bytes memory errPacked = abi.encodePacked(errStringArray);
-        errBytes = BytesLib.slice(errPacked, 0, errLength);
+        return BytesLib.slice(errPacked, 0, errLength);
+
+        //// Alternatively if using solc < 0.8.24
+        //
+        // // Round up to nearest 32, then divided by 32 to get number of lines the error string takes
+        // uint32 numErrLines = (errLength - errLength % 32 + 32) / 32 ;
+        // bytes32[] memory errStringArray = new bytes32[](numErrLines);
+        //
+        // for (uint32 i = 0; i < numErrLines; ++i) {
+        //     bytes32 _errLine;
+        //     uint32 offset = errMessageOffset + 32 + i*32;
+        //     // Add +32 bytes to skip 1st line (length), then loop through error string lines with i*32
+        //     assembly {
+        //         _errLine := mload(add(customError, offset))
+        //     }
+        //     errStringArray[i] = _errLine;
+        // }
+        // // Pack the error bytestrings together, and slice off trailing 0s.
+        // bytes memory errPacked = abi.encodePacked(errStringArray);
+        // errBytes = BytesLib.slice(errPacked, 0, errLength);
     }
 }

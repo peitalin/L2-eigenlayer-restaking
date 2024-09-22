@@ -763,7 +763,7 @@ contract EigenlayerMsgDecoders {
         bytes memory tokenTreeProof = new bytes(lengthOfProof);
 
         assembly {
-            // mcopy is only available in solc > 0.8.24
+            // mcopy is only available in solc ^0.8.24
             mcopy(
                 // shift 32 bytes past byte array length, copy proof value here
                 add(tokenTreeProof, 0x20),
@@ -811,7 +811,7 @@ contract EigenlayerMsgDecoders {
         bytes memory earnerTreeProof = new bytes(earnerTreeProofLength);
 
         assembly {
-            // mcopy is only available in solc > 0.8.24
+            // mcopy is only available in solc ^0.8.24
             mcopy(
                 // shift 32 bytes past byte array length, copy proof value here
                 add(earnerTreeProof, 0x20),
