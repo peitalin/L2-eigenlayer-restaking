@@ -134,19 +134,18 @@ contract QueueWithdrawalScript is BaseScript {
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
             IDelegationManager.queueWithdrawals.selector
         );
+        uint256 routerFees = getRouterFeesL2(
+            address(receiverContract),
+            string(messageWithSignature),
+            address(tokenL2),
+            0, // not bridging, just sending message
+            gasLimit
+        );
         // gas: 315,798
 
         vm.startBroadcast(deployerKey);
 
-        senderContract.sendMessagePayNative{
-            value: getRouterFeesL2(
-                address(receiverContract),
-                string(messageWithSignature),
-                address(tokenL2),
-                0, // not bridging, just sending message
-                gasLimit
-            )
-        }(
+        senderContract.sendMessagePayNative{value: routerFees}(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature),

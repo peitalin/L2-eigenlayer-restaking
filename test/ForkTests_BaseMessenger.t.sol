@@ -474,7 +474,6 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 bytes32(0x0), // indexed messageId
                 EthSepolia.ChainSelector, // indexed destinationChainSelector
                 address(receiverContract), // receiver
-                "dispatched call", // message (text)
                 address(tokenL2), // token
                 0.1 ether, // token amount
                 address(0), // native gas for fees
@@ -532,7 +531,6 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             bytes32(0x0), // indexed messageId
             BaseSepolia.ChainSelector, // destinationChainSelector
             address(senderContract), // receiver
-            "dispatched call", // message
             address(tokenL1), // token to send
             0 ether, // token amount
             address(0), // native gas for fees

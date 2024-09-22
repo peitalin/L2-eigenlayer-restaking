@@ -28,7 +28,7 @@ contract CheckMintEigenAgentGasCostsScript is BaseScript {
         IAgentFactory agentFactory = readAgentFactory();
 
         // Just for testing gas costs
-        // forge test --match-test test_step5c_CheckMintEigenAgentGasCosts -vvvv --gas-report
+        // forge test --match-test test_step5d_CheckMintEigenAgentGasCosts -vvvv --gas-report
 
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployer);

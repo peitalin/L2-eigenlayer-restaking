@@ -82,17 +82,20 @@ contract ProcessClaimRewardsScript is BaseScript {
         ///////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
+        uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
+            IRewardsCoordinator.processClaim.selector
+        );
+        uint256 routerFees = getRouterFeesL2(
+            address(receiverContract),
+            string(messageWithSignature_PC),
+            address(tokenL2),
+            0 ether,
+            gasLimit
+        );
+
         vm.startBroadcast(deployer);
-        senderContract.sendMessagePayNative{
-            value: getRouterFeesL2(
-                address(receiverContract),
-                string(messageWithSignature_PC),
-                address(tokenL2),
-                0 ether,
-                senderHooks.getGasLimitForFunctionSelector(IRewardsCoordinator.processClaim.selector)
-                // gasLimit
-            )
-        }(
+
+        senderContract.sendMessagePayNative{value: routerFees}(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_PC),
@@ -100,8 +103,8 @@ contract ProcessClaimRewardsScript is BaseScript {
             0, // not sending tokens, just message
             0 // use default gasLimit for this function
         );
-        vm.stopBroadcast();
 
+        vm.stopBroadcast();
     }
 
     /*

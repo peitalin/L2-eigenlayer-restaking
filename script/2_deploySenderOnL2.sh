@@ -18,6 +18,6 @@ forge script script/2_deploySenderOnL2.s.sol:DeploySenderOnL2Script \
 #     --watch \
 #     --verifier-url https://sepolia.basescan.org/api \
 #     --etherscan-api-key $BASESCAN_API_KEY \
-#     --compiler-version v0.8.22 \
+#     --compiler-version v0.8.25 \
 #     0x92EE79732857189A16f5f3139F13c22F1d40C247 \
 #     ./src/SenderCCIP.sol:SenderCCIP

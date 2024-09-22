@@ -176,7 +176,6 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             bytes32(0x0), // messageId
             BaseSepolia.ChainSelector, // destination chain
             bob, // receiver
-            "dispatched call",
             address(tokenL1),
             amount, // amount of tokens to send
             address(0), // 0 for native gas

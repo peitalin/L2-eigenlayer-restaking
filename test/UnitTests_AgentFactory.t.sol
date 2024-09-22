@@ -10,7 +10,6 @@ import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
-import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 
 
@@ -72,10 +71,12 @@ contract UnitTests_AgentFactory is BaseTestEnvironment {
 
         ProxyAdmin pa = new ProxyAdmin();
         AgentFactory agentFactoryImpl = new AgentFactory();
+        address mockBaseEigenAgent = vm.addr(4321);
+        address mock6551Registry  = vm.addr(12341234);
 
         vm.expectRevert(abi.encodeWithSelector(
             AddressZero.selector,
-            "ERC6551Registry cannot be address(0)"
+            "_erc6551Registry cannot be address(0)"
         ));
         IAgentFactory(payable(address(
             new TransparentUpgradeableProxy(
@@ -84,14 +85,15 @@ contract UnitTests_AgentFactory is BaseTestEnvironment {
                 abi.encodeWithSelector(
                     AgentFactory.initialize.selector,
                     address(0), // 6551 registry
-                    eigenAgentOwner721
+                    eigenAgentOwner721,
+                    mockBaseEigenAgent
                 )
             )
         )));
 
         vm.expectRevert(abi.encodeWithSelector(
             AddressZero.selector,
-            "EigenAgentOwner721 cannot be address(0)"
+            "_eigenAgentOwner721 cannot be address(0)"
         ));
         IAgentFactory(payable(address(
             new TransparentUpgradeableProxy(
@@ -99,11 +101,45 @@ contract UnitTests_AgentFactory is BaseTestEnvironment {
                 address(pa),
                 abi.encodeWithSelector(
                     AgentFactory.initialize.selector,
-                    vm.addr(123123), // 6551 registry
-                    address(0)
+                    mock6551Registry,
+                    address(0), // eigenAgentOwner721
+                    mockBaseEigenAgent
                 )
             )
         )));
+
+        vm.expectRevert(abi.encodeWithSelector(
+            AddressZero.selector,
+            "_baseEigenAgent cannot be address(0)"
+        ));
+        IAgentFactory(payable(address(
+            new TransparentUpgradeableProxy(
+                address(agentFactoryImpl),
+                address(pa),
+                abi.encodeWithSelector(
+                    AgentFactory.initialize.selector,
+                    mock6551Registry,
+                    eigenAgentOwner721,
+                    address(0) // baseEigenAgent
+                )
+            )
+        )));
+
+
+        IAgentFactory agentFactory2 = IAgentFactory(payable(address(
+            new TransparentUpgradeableProxy(
+                address(agentFactoryImpl),
+                address(pa),
+                abi.encodeWithSelector(
+                    AgentFactory.initialize.selector,
+                    mock6551Registry,
+                    eigenAgentOwner721,
+                    mockBaseEigenAgent
+                )
+            )
+        )));
+
+        vm.assertEq(agentFactory2.baseEigenAgent(), mockBaseEigenAgent);
     }
 
     function test_EigenAgentOwner721_SetAgentFactory() public {

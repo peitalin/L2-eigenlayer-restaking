@@ -84,7 +84,6 @@ contract UndelegateScript is BaseScript {
         /////// Broadcast Undelegate message on L2
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
-        vm.startBroadcast(deployerKey);
 
         // Encode undelegate message, and append user signature for EigenAgent execution
         bytes memory messageWithSignature_UD = signMessageForEigenAgentExecution(
@@ -99,16 +98,17 @@ contract UndelegateScript is BaseScript {
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
             IDelegationManager.undelegate.selector
         );
+        uint256 routerFees = getRouterFeesL2(
+            address(receiverContract),
+            string(messageWithSignature_UD),
+            address(tokenL2),
+            0, // not bridging, just sending message
+            gasLimit
+        );
 
-        senderContract.sendMessagePayNative{
-            value: getRouterFeesL2(
-                address(receiverContract),
-                string(messageWithSignature_UD),
-                address(tokenL2),
-                0, // not bridging, just sending message
-                gasLimit
-            )
-        }(
+        vm.startBroadcast(deployerKey);
+
+        senderContract.sendMessagePayNative{value: routerFees}(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_UD),

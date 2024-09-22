@@ -34,9 +34,7 @@ contract DepositIntoStrategyScript is BaseScript {
         //////////////////////////////////////////////////////////
         /// L1: Get Deposit Inputs
         //////////////////////////////////////////////////////////
-
         vm.selectFork(ethForkId);
-        vm.startBroadcast(deployerKey);
 
         uint256 execNonce = 0;
         /// ReceiverCCIP spawns an EigenAgent when CCIP message reaches L1
@@ -48,14 +46,11 @@ contract DepositIntoStrategyScript is BaseScript {
 
         require(address(eigenAgent) != address(0), "User must have an EigenAgent");
 
-        vm.stopBroadcast();
-
         //////////////////////////////////////////////////////
         /// L2: Dispatch Call
         //////////////////////////////////////////////////////
         // Make sure we are on BaseSepolia Fork
         vm.selectFork(l2ForkId);
-        vm.startBroadcast(deployerKey);
 
         uint256 amount = 0.00797 ether;
         uint256 expiry = block.timestamp + 45 minutes;
@@ -74,20 +69,20 @@ contract DepositIntoStrategyScript is BaseScript {
             expiry
         );
 
+        uint256 gasLimit = 570_000; // gas: 564,969
+        uint256 routerFees = getRouterFeesL2(
+            address(receiverContract),
+            string(messageWithSignature),
+            address(tokenL2),
+            amount,
+            gasLimit
+        );
+
+        vm.startBroadcast(deployerKey);
         // token approval
         tokenL2.approve(address(senderContract), amount);
 
-        uint256 gasLimit = 600_000; // gas: 564,969
-
-        senderContract.sendMessagePayNative{
-            value: getRouterFeesL2(
-                address(receiverContract),
-                string(messageWithSignature),
-                address(tokenL2),
-                amount,
-                gasLimit
-            )
-        }(
+        senderContract.sendMessagePayNative{value: routerFees}(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature),

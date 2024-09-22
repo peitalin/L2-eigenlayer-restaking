@@ -131,18 +131,17 @@ contract CompleteWithdrawalScript is BaseScript {
             uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
                 IDelegationManager.completeQueuedWithdrawal.selector
             );
+            uint256 routerFees = getRouterFeesL2(
+                address(receiverContract),
+                string(messageWithSignature),
+                address(tokenL2),
+                0,
+                gasLimit // only sending message, not bridging tokens
+            );
 
             vm.startBroadcast(deployerKey);
 
-            senderContract.sendMessagePayNative{
-                value: getRouterFeesL2(
-                    address(receiverContract),
-                    string(messageWithSignature),
-                    address(tokenL2),
-                    0,
-                    gasLimit // only sending message, not bridging tokens
-                )
-            }(
+            senderContract.sendMessagePayNative{value: routerFees}(
                 EthSepolia.ChainSelector, // destination chain
                 address(receiverContract),
                 string(messageWithSignature),
@@ -152,7 +151,6 @@ contract CompleteWithdrawalScript is BaseScript {
             );
 
             vm.stopBroadcast();
-
 
             vm.selectFork(ethForkId);
             string memory filePath = "script/withdrawals-completed/";

@@ -94,7 +94,6 @@ contract EigenAgent6551 is ERC6551 {
             revert SignatureInvalid("Invalid signer, or incorrect digestHash parameters.");
         }
 
-        ++state; // defined in ERC6551Account.sol
         ++execNonce;
         bool success;
 

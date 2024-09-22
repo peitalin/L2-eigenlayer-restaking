@@ -16,6 +16,8 @@ interface IAgentFactory is IAdminable {
 
     function eigenAgentOwner721() external view returns (IEigenAgentOwner721);
 
+    function baseEigenAgent() external view returns (address);
+
     function getRestakingConnector() external view returns (address);
 
     function setRestakingConnector(address newRestakingConnector) external;

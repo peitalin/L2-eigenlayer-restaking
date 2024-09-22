@@ -86,7 +86,6 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
                 ccipMessage.messageId,
                 ccipMessage.sourceChainSelector,
                 address(deployer),
-                "unknown message",
                 destTokenAmounts[0].token,
                 destTokenAmounts[0].amount
             );
@@ -94,7 +93,6 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
             //     bytes32 indexed messageId,
             //     uint64 indexed sourceChainSelector,
             //     address sender,
-            //     string text,
             //     address token,
             //     uint256 tokenAmount
             // );
@@ -130,7 +128,6 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
                 ccipMessage.messageId,
                 ccipMessage.sourceChainSelector,
                 address(deployer),
-                "unknown message",
                 address(0),
                 0
             );
@@ -138,7 +135,6 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
             //     bytes32 indexed messageId,
             //     uint64 indexed sourceChainSelector,
             //     address sender,
-            //     string text,
             //     address token,
             //     uint256 tokenAmount
             // );

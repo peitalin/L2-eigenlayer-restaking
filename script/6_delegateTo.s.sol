@@ -82,7 +82,6 @@ contract DelegateToScript is BaseScript {
         /////// Broadcast DelegateTo message on L2
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
-        vm.startBroadcast(deployerKey);
 
         // Operator Approver signs the delegateTo call
         uint256 randomSalt = vm.randomUint();
@@ -126,16 +125,17 @@ contract DelegateToScript is BaseScript {
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
             IDelegationManager.delegateTo.selector
         );
+        uint256 routerFees = getRouterFeesL2(
+            address(receiverContract),
+            string(messageWithSignature_DT),
+            address(tokenL2),
+            0, // not bridging, just sending message
+            gasLimit
+        );
 
-        senderContract.sendMessagePayNative{
-            value: getRouterFeesL2(
-                address(receiverContract),
-                string(messageWithSignature_DT),
-                address(tokenL2),
-                0, // not bridging, just sending message
-                gasLimit
-            )
-        }(
+        vm.startBroadcast(deployerKey);
+
+        senderContract.sendMessagePayNative{value: routerFees}(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_DT),

@@ -16,7 +16,7 @@ forge script script/5_depositAndMintEigenAgent.s.sol:DepositAndMintEigenAgentScr
 #     --watch \
 #     --rpc-url ethsepolia \
 #     --etherscan-api-key $ETHERSCAN_API_KEY \
-#     --compiler-version v0.8.22 \
+#     --compiler-version v0.8.25 \
 #     0x0aEDf2bfF862E2e8D31951E20f329F3776ceF974 \
 #     src/6551/EigenAgent6551.sol:EigenAgent6551
 
