@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -113,18 +113,17 @@ contract RedepositScript is BaseScript {
             uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
                 IDelegationManager.completeQueuedWithdrawal.selector
             );
+            uint256 routerFees = getRouterFeesL2(
+                address(receiverContract),
+                string(messageWithSignature),
+                address(tokenL2),
+                0, // not bridging, just sending message
+                gasLimit
+            );
 
             vm.startBroadcast(deployerKey);
 
-            senderContract.sendMessagePayNative{
-                value: getRouterFeesL2(
-                    address(receiverContract),
-                    string(messageWithSignature),
-                    address(tokenL2),
-                    0, // not bridging, just sending message
-                    gasLimit
-                )
-            }(
+            senderContract.sendMessagePayNative{value: routerFees}(
                 EthSepolia.ChainSelector, // destination chain
                 address(receiverContract),
                 string(messageWithSignature),

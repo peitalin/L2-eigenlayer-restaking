@@ -6,12 +6,13 @@ ffi = true
 fs_permissions = [
   { access = "read-write", path = "./"},
 ]
+evm_version = "Cancun"
+# optimizer is enabled by default, can produce different bytecode and mess with contract verification
+# optimizer = false
+
 # Note: If DeployScripts tests run into OutofGas errors, could be a memory issue:
 # https://github.com/foundry-rs/foundry/issues/3971
 # memory_limit = 335544320
-
-# optimizer is enabled by default, can produce different bytecode and mess with contract verification
-# optimizer = false
 
 remappings = [
   "@chainlink/ccip/=lib/ccip/contracts/src/v0.8/ccip/",
@@ -21,7 +22,7 @@ remappings = [
   "@eigenlayer-contracts/=lib/eigenlayer-contracts/src/contracts/",
   "@openzeppelin-v5/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
   "@openzeppelin-v5/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
-  ### Note: Eigenlayer usees OpenZeppelin v4
+  # Note: Eigenlayer uses OpenZeppelin v4
   "@openzeppelin/contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/",
   "@openzeppelin/contracts-upgradeable/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable/contracts/"
 ]
@@ -29,7 +30,7 @@ remappings = [
 [rpc_endpoints]
 localhost = "http://localhost:8545"
 holesky = "https://holesky.drpc.org"
-## Note: Free RPCs may sometimes fail when deploying and verifying contracts.
+# Note: Free RPCs may sometimes fail
 # ethsepolia = "https://sepolia.drpc.org"
 ethsepolia = "https://sepolia.infura.io/v3/${INFURA_API_KEY}"
 basesepolia = "https://sepolia.base.org"

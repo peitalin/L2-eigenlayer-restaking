@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
@@ -9,6 +9,10 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
+import {
+    IERC6551Executable,
+    IERC6551Account as IERC6551
+} from "@6551/examples/simple/ERC6551Account.sol";
 
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
@@ -17,9 +21,6 @@ import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {MockMultisigSigner} from "./mocks/MockMultisigSigner.sol";
-
-import {IERC6551Executable} from "@6551/interfaces/IERC6551Executable.sol";
-import {IBase6551Account} from "../src/6551/Base6551Account.sol";
 
 
 contract UnitTests_EigenAgent is BaseTestEnvironment {
@@ -224,7 +225,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
         // EigenAgent can execute as NFT owner() == multisig
         vm.prank(address(multisig));
-        IERC6551Executable(address(eigenAgent2)).execute(
+        eigenAgent2.execute(
             payable(alice),
             0.5 ether,
             "",
@@ -233,12 +234,15 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
         vm.assertEq(address(eigenAgent2).balance, 0.5 ether);
         vm.assertEq(alice.balance, aliceBalanceBefore + 0.5 ether);
-        vm.assertEq(eigenAgent2.execNonce(), 1);
+        // execute() only increments state variable, not execNonce (only for executeWithSignature)
+        // this prevents L1 executions from invalidating async L2 executeWithSignature calls
+        vm.assertEq(eigenAgent2.execNonce(), 0);
+        vm.assertEq(eigenAgent2.state(), 1);
 
         // operation must == 0 (call operations only)
         vm.prank(address(multisig));
         vm.expectRevert("Only call operations are supported");
-        IERC6551Executable(address(eigenAgent2)).execute(
+        eigenAgent2.execute(
             payable(alice),
             0.1 ether,
             "",
@@ -368,7 +372,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         // try call agentFactory with the wrong function selectors
         vm.prank(deployer);
         vm.expectRevert();
-        IERC6551Executable(address(eigenAgent)).execute(
+        eigenAgent.execute(
             address(agentFactory),
             0 ether,
             encodeMintEigenAgentMsg(alice), // should fail as targetContract does not have this function
@@ -683,12 +687,12 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
         // bob is not valid signer
         vm.assertTrue(
-            eigenAgent.isValidSigner(bob, "") != IBase6551Account.isValidSigner.selector
+            eigenAgent.isValidSigner(bob, "") != IERC6551.isValidSigner.selector
         );
         // deployer is the owner of the eigenAgent, valid signer
         vm.assertEq(
             eigenAgent.isValidSigner(deployer, ""),
-            IBase6551Account.isValidSigner.selector
+            IERC6551.isValidSigner.selector
         );
 
         vm.deal(address(eigenAgent), 1 ether);
@@ -696,7 +700,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         uint256 aliceBalanceBefore = alice.balance;
 
         vm.prank(deployer);
-        IERC6551Executable(address(eigenAgent)).execute(
+        eigenAgent.execute(
             payable(alice),
             0.5 ether,
             "",
@@ -705,20 +709,21 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
         vm.assertEq(address(eigenAgent).balance, 0.5 ether);
         vm.assertEq(alice.balance, aliceBalanceBefore + 0.5 ether);
-        vm.assertEq(eigenAgent.execNonce(), 1);
+        // execute() only increments state variable, not execNonce (only for executeWithSignature)
+        // this prevents L1 executions from invalidating async L2 executeWithSignature calls
+        vm.assertEq(eigenAgent.execNonce(), 0);
+        vm.assertEq(eigenAgent.state(), 1);
     }
 
     function test_EigenAgent_SupportsInterface() public view {
 
-        IBase6551Account accountInstance = IBase6551Account(payable(eigenAgent));
-
-        accountInstance.supportsInterface(
+        eigenAgent.supportsInterface(
             type(IERC165).interfaceId
         );
-        accountInstance.supportsInterface(
-            type(IBase6551Account).interfaceId
+        eigenAgent.supportsInterface(
+            type(IERC6551).interfaceId
         );
-        accountInstance.supportsInterface(
+        eigenAgent.supportsInterface(
             type(IERC6551Executable).interfaceId
         );
     }

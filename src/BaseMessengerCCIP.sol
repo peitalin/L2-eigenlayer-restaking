@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {IRouterClient} from "@chainlink/ccip/interfaces/IRouterClient.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
@@ -13,11 +13,6 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     using SafeERC20 for IERC20;
 
-    bytes32 internal s_lastReceivedMessageId;
-    address internal s_lastReceivedTokenAddress;
-    uint256 internal s_lastReceivedTokenAmount;
-    string internal s_lastReceivedText;
-
     mapping(uint64 => bool) public allowlistedDestinationChains;
     mapping(uint64 => bool) public allowlistedSourceChains;
     mapping(address => bool) public allowlistedSenders;
@@ -30,13 +25,12 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
 
-    uint256[42] private __gap;
+    uint256[46] private __gap;
 
     event MessageSent(
         bytes32 indexed messageId,
         uint64 indexed destinationChainSelector,
         address receiver,
-        string text,
         address token,
         uint256 tokenAmount,
         address feeToken,
@@ -47,7 +41,6 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         bytes32 indexed messageId,
         uint64 indexed sourceChainSelector,
         address sender,
-        string text,
         address token,
         uint256 tokenAmount
     );
@@ -178,13 +171,10 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
             evm2AnyMessage
         );
 
-        string memory text_msg = "dispatched call";
-
         emit MessageSent(
             messageId,
             _destinationChainSelector,
             _receiver,
-            text_msg,
             _token,
             _amount,
             address(0),

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {Script} from "forge-std/Script.sol";
 
@@ -23,10 +23,10 @@ import {FileReader} from "./FileReader.sol";
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
-import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
-
 import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
+import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
+import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 
@@ -111,6 +111,9 @@ contract DeployReceiverOnL1Script is Script, FileReader {
             ))
         );
 
+        // base EigenAgent implementation to spawn clones
+        EigenAgent6551 baseEigenAgent = new EigenAgent6551();
+
         agentFactoryProxy = IAgentFactory(
             payable(address(
                 new TransparentUpgradeableProxy(
@@ -119,7 +122,8 @@ contract DeployReceiverOnL1Script is Script, FileReader {
                     abi.encodeWithSelector(
                         AgentFactory.initialize.selector,
                         registry6551,
-                        eigenAgentOwner721
+                        eigenAgentOwner721,
+                        baseEigenAgent
                     )
                 )
             ))
@@ -215,6 +219,10 @@ contract DeployReceiverOnL1Script is Script, FileReader {
             address(agentFactoryProxy.erc6551Registry()) == address(registry6551),
             "agentFactory: missing erc6551registry"
         );
+        require(
+            address(agentFactoryProxy.baseEigenAgent()) == address(baseEigenAgent),
+            "agentFactory: missing baseEigenAgent"
+        );
 
         vm.stopBroadcast();
 
@@ -225,6 +233,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
                 address(agentFactoryProxy),
                 address(registry6551),
                 address(eigenAgentOwner721),
+                address(baseEigenAgent),
                 address(proxyAdmin),
                 FILEPATH_BRIDGE_CONTRACTS_L1
             );

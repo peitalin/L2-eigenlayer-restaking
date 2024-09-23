@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
-import {IBase6551Account} from "./Base6551Account.sol";
+import {
+    IERC6551Executable,
+    IERC6551Account as IERC6551
+} from "@6551/examples/simple/ERC6551Account.sol";
 
 
-interface IEigenAgent6551 is IBase6551Account {
+interface IEigenAgent6551 is IERC6551, IERC6551Executable {
 
     function execNonce() external view returns (uint256);
 
@@ -52,4 +55,6 @@ interface IEigenAgent6551 is IBase6551Account {
         address contractAddr,
         uint256 chainid
     ) external pure returns (bytes32);
+
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool);
 }

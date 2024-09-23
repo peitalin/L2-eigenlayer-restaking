@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgent6551} from "./IEigenAgent6551.sol";
@@ -17,6 +18,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
 
     IERC6551Registry public erc6551Registry;
     IEigenAgentOwner721 public eigenAgentOwner721;
+    address public baseEigenAgent;
     address private _restakingConnector;
 
     mapping(address => uint256) public userToEigenAgentTokenIds;
@@ -43,17 +45,22 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
 
     function initialize(
         IERC6551Registry _erc6551Registry,
-        IEigenAgentOwner721 _eigenAgentOwner721
+        IEigenAgentOwner721 _eigenAgentOwner721,
+        address _baseEigenAgent
     ) external initializer {
 
         if (address(_erc6551Registry) == address(0))
-            revert AddressZero("ERC6551Registry cannot be address(0)");
+            revert AddressZero("_erc6551Registry cannot be address(0)");
 
         if (address(_eigenAgentOwner721) == address(0))
-            revert AddressZero("EigenAgentOwner721 cannot be address(0)");
+            revert AddressZero("_eigenAgentOwner721 cannot be address(0)");
+
+        if (_baseEigenAgent == address(0))
+            revert AddressZero("_baseEigenAgent cannot be address(0)");
 
         erc6551Registry = _erc6551Registry;
         eigenAgentOwner721 = _eigenAgentOwner721;
+        baseEigenAgent = _baseEigenAgent;
 
         __Adminable_init();
         __ReentrancyGuard_init();
@@ -163,6 +170,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
      * The resulting ERC-6551 EigenAgent account address is deterministic and depends on
      * (1) the user's address, (2) chainId, (3) Eigenagent6551 implementation contract,
      * (4) contract address of EigenAgentOwner721 NFT, and (5) tokenId of the EigenAgentOwner NFT.
+     * @param user the address to spawn an EigenAgent 6551 account and EigenAgentOwner721 NFT for.
      */
     function _spawnEigenAgent6551(address user) private nonReentrant returns (IEigenAgent6551) {
 
@@ -171,12 +179,11 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
 
         bytes32 salt = bytes32(abi.encode(user));
         uint256 tokenId = eigenAgentOwner721.mint(user);
-        // sets userToEigenAgentTokenIds[user] = tokenId in
-        // _afterTokenTransfer() -> updateEigenAgentOwnerTokenId
+        // userToEigenAgentTokenIds[user] = tokenId is set in EigenAgentOwner721._afterTokenTransfer
 
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(
             erc6551Registry.createAccount(
-                address(new EigenAgent6551()),
+                Clones.clone(baseEigenAgent), // ERC-1167 minimal viable proxy clone
                 salt,
                 block.chainid,
                 address(eigenAgentOwner721),

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {BaseScript} from "./BaseScript.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
@@ -28,7 +28,7 @@ contract CheckMintEigenAgentGasCostsScript is BaseScript {
         IAgentFactory agentFactory = readAgentFactory();
 
         // Just for testing gas costs
-        // forge test --match-test test_step5c_CheckMintEigenAgentGasCosts -vvvv --gas-report
+        // forge test --match-test test_step5d_CheckMintEigenAgentGasCosts -vvvv --gas-report
 
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployer);

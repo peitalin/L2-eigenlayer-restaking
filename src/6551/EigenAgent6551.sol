@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SignatureChecker} from "@openzeppelin-v5/contracts/utils/cryptography/SignatureChecker.sol";
+import {ERC6551Account as ERC6551} from "@6551/examples/simple/ERC6551Account.sol";
 
-import {Base6551Account} from "./Base6551Account.sol";
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
-import {SignatureCheckerV5} from "../utils/SignatureCheckerV5.sol";
 
 
-contract EigenAgent6551 is Base6551Account {
+contract EigenAgent6551 is ERC6551 {
 
     /// @notice The EIP-712 typehash for the deposit struct used by the contract
     bytes32 public constant EIGEN_AGENT_EXEC_TYPEHASH = keccak256(
@@ -18,6 +18,9 @@ contract EigenAgent6551 is Base6551Account {
 
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
+
+    /// @notice Nonce for signing executeWithSignature calls
+    uint256 public execNonce;
 
     error CallerNotWhitelisted(string reason);
     error SignatureInvalid(string reason);
@@ -117,7 +120,7 @@ contract EigenAgent6551 is Base6551Account {
         bytes memory signature
     ) public view virtual override returns (bytes4) {
         address signer = owner();
-        if (SignatureCheckerV5.isValidSignatureNow(signer, digestHash, signature)) {
+        if (SignatureChecker.isValidSignatureNow(signer, digestHash, signature)) {
             return IERC1271.isValidSignature.selector;
         } else {
             return bytes4(0);

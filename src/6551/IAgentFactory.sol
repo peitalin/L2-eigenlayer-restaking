@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgent6551} from "./IEigenAgent6551.sol";
@@ -15,6 +15,8 @@ interface IAgentFactory is IAdminable {
     function erc6551Registry() external view returns (IERC6551Registry);
 
     function eigenAgentOwner721() external view returns (IEigenAgentOwner721);
+
+    function baseEigenAgent() external view returns (address);
 
     function getRestakingConnector() external view returns (address);
 

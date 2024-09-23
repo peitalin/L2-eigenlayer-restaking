@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -61,9 +61,6 @@ contract RestakingConnector is
             revert AddressZero("AgentFactory cannot be address(0)");
 
         agentFactory = newAgentFactory;
-
-        // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48 // [gas: 268_420]
-        _gasLimitsForFunctionSelectors[0xd8a85b48] = 290_000;
 
         __Adminable_init();
     }

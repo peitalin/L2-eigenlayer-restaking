@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {Script} from "forge-std/Script.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
@@ -76,14 +76,14 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
 
         // set GasLimits
         uint256[] memory gasLimits = new uint256[](7);
-        gasLimits[0] = 2_000_000; // deposit + mint EigenAgent       [gas: 1,935,006] 1.4mil to mint agent, 500k for deposit
-        // https://sepolia.etherscan.io/tx/0x929dc3f03eb10143d2a215cd0695348bca656ea026ed959b9cf449a0af79c2c4
-        gasLimits[1] = 1_500_000; // mintEigenAgent                  [gas: 1,500,000?]
-        gasLimits[2] = 560_000; // queueWithdrawals                  [gas: 529,085]
-        gasLimits[3] = 820_000; // completeWithdrawal + transferToL2 [gas: 791,717]
-        gasLimits[4] = 580_000; // delegateTo                        [gas: 550,292]
-        gasLimits[5] = 800_000; // undelegate                        [gas: 773,565]
-        gasLimits[6] = 980_000; // processClaim                      [gas: 953,587]
+        gasLimits[0] = 410_000; // deposit                           [gas: 399,689]
+        // note: set manual gasLimit for deposit + mint EigenAgent:  [gas: 724,044] ~300k mint + 400k deposit
+        gasLimits[1] = 290_000; // mintEigenAgent                    [gas: 284,571]
+        gasLimits[2] = 315_000; // queueWithdrawals                  [gas: 308,462]
+        gasLimits[3] = 560_000; // completeWithdrawal + transferToL2 [gas: 554,421]
+        gasLimits[4] = 350_000; // delegateTo                        [gas: 344,050]
+        gasLimits[5] = 340_000; // undelegate                        [gas: 336,421]
+        gasLimits[6] = 540_000; // processClaim + transferToL2       [gas: 536,908]
 
         bytes4[] memory functionSelectors = new bytes4[](7);
         functionSelectors[0] = 0xe7a050aa;
@@ -144,7 +144,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         // Remember to fund L1 receiver with gas and tokens in production.
 
         uint256[] memory gasLimits_R = new uint256[](1);
-        gasLimits_R[0] = 295_000; // handleTransferToAgentOwner [gas: 268_420]
+        gasLimits_R[0] = 270_000; // handleTransferToAgentOwner [gas: 261,029]
 
         bytes4[] memory functionSelectors_R = new bytes4[](1);
         functionSelectors_R[0] = 0xd8a85b48;

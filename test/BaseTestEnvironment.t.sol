@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -193,8 +193,6 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
     }
 
     function setUpLocalEnvironment() internal {
-
-        vm.pauseGasMetering();
 
 		deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);

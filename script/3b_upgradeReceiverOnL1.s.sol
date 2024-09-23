@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {Script} from "forge-std/Script.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -40,6 +40,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
 
     IERC6551Registry public registry6551;
     IEigenAgentOwner721 public eigenAgentOwner721Proxy;
+    address public baseEigenAgent;
 
     IStrategy public strategy;
     IStrategyManager public strategyManager;
@@ -77,13 +78,13 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
             IRestakingConnector restakingConnectorProxy
         ) = readReceiverRestakingConnector();
 
-
         (
             eigenAgentOwner721Proxy,
             registry6551
         ) = readEigenAgent721AndRegistry();
         senderProxy = readSenderContract();
         agentFactoryProxy = readAgentFactory();
+        baseEigenAgent = readBaseEigenAgent();
         proxyAdmin = ProxyAdmin(readProxyAdminL1());
 
         /////////////////////////////
@@ -163,6 +164,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
                 address(agentFactoryProxy),
                 address(registry6551),
                 address(eigenAgentOwner721Proxy),
+                address(baseEigenAgent),
                 address(proxyAdmin),
                 FILEPATH_BRIDGE_CONTRACTS_L1
             );

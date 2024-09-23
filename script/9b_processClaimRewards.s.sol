@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
-import {IERC6551Executable} from "../src/6551/Base6551Account.sol";
 
 import {BaseScript} from "./BaseScript.sol";
 import {EthSepolia} from "./Addresses.sol";
@@ -49,13 +48,24 @@ contract ProcessClaimRewardsScript is BaseScript {
         expiry = block.timestamp + 1 hours;
 
         IRewardsCoordinator.DistributionRoot memory distRoot = rewardsCoordinator.getCurrentDistributionRoot();
-        // rewardsCoordinator.getCurrentClaimableDistributionRoot();
+        uint32 currentDistRootIndex = uint32(rewardsCoordinator.getDistributionRootsLength()) - 1;
 
         IRewardsCoordinator.RewardsMerkleClaim memory claim = createClaim(
+            currentDistRootIndex,
             address(eigenAgent),
             0.1 ether, // amount to claim
-            hex"", // proof is empty as theres only 1 claim (roof)
+            hex"", // proof is empty as theres only 1 claim (root)
             0 // earnerIndex
+        );
+
+        // Simulate claiming via EigenAgent on L1
+        // Note: do not put this between vm.startBroadcast()
+        vm.prank(deployer);
+        eigenAgent.execute(
+            address(rewardsCoordinator), // to
+            0, // value
+            encodeProcessClaimMsg(claim, address(eigenAgent)),
+            0 // operation: 0 for calls
         );
 
         // sign the message for EigenAgent to execute Eigenlayer command
@@ -68,32 +78,25 @@ contract ProcessClaimRewardsScript is BaseScript {
             expiry
         );
 
-        // Simulate claiming via EigenAgent on L1
-        // Note: do not put this between vm.startBroadcast()
-        vm.prank(deployer);
-        IERC6551Executable(address(eigenAgent)).execute(
-            address(rewardsCoordinator), // to
-            0, // value
-            encodeProcessClaimMsg(claim, address(eigenAgent)),
-            0 // operation: 0 for calls
-        );
-
         ///////////////////////////////////////////////
         // L2: Send a rewards processClaim message
         ///////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
+        uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
+            IRewardsCoordinator.processClaim.selector
+        );
+        uint256 routerFees = getRouterFeesL2(
+            address(receiverContract),
+            string(messageWithSignature_PC),
+            address(tokenL2),
+            0 ether,
+            gasLimit
+        );
+
         vm.startBroadcast(deployer);
-        senderContract.sendMessagePayNative{
-            value: getRouterFeesL2(
-                address(receiverContract),
-                string(messageWithSignature_PC),
-                address(tokenL2),
-                0 ether,
-                senderHooks.getGasLimitForFunctionSelector(IRewardsCoordinator.processClaim.selector)
-                // gasLimit
-            )
-        }(
+
+        senderContract.sendMessagePayNative{value: routerFees}(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_PC),
@@ -101,8 +104,8 @@ contract ProcessClaimRewardsScript is BaseScript {
             0, // not sending tokens, just message
             0 // use default gasLimit for this function
         );
-        vm.stopBroadcast();
 
+        vm.stopBroadcast();
     }
 
     /*
@@ -114,6 +117,7 @@ contract ProcessClaimRewardsScript is BaseScript {
      */
 
 	function createClaim(
+        uint32 rootIndex,
         address earner,
         uint256 amount,
         bytes memory proof,
@@ -140,7 +144,7 @@ contract ProcessClaimRewardsScript is BaseScript {
         tokenTreeProofs[0] = hex"";
 
 		return IRewardsCoordinator.RewardsMerkleClaim({
-			rootIndex: 0,
+			rootIndex: rootIndex,
 			earnerIndex: earnerIndex,
 			earnerTreeProof: proof,
 			earnerLeaf: earnerLeaf,

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {Test} from "forge-std/Test.sol";
 import {TestErrorHandlers} from "./TestErrorHandlers.sol";
@@ -56,6 +56,7 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
     function test_FileReader_ReadContracts() public {
         fileReaderTest.readAgentFactory();
         fileReaderTest.readEigenAgent721AndRegistry();
+        fileReaderTest.readBaseEigenAgent();
         fileReaderTest.readReceiverRestakingConnector();
         fileReaderTest.readProxyAdminL1();
         fileReaderTest.readProxyAdminL2();
@@ -68,6 +69,7 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
             vm.addr(4),
             vm.addr(5),
             vm.addr(6),
+            vm.addr(7),
             "test/temp-files/bridgeContractsL1.config.json"
         );
         fileReaderTest.saveSenderBridgeContracts(

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import {console} from "forge-std/Test.sol";
-import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 
@@ -48,36 +47,32 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         (
             eigenAgent,
             execNonce
-        ) = getEigenAgentAndExecNonce(deployer);
+        ) = getEigenAgentAndExecNonce(staker);
 
-        if (address(eigenAgent) != address(0)) {
-            // Check if deployer already has an EigenAgent.
-            // If so, generate a new account (to test minting new EigenAgents)
-            // AgentFactory will spawn an EigenAgent after bridging automatically
-            // If user does not already have an EigenAgent NFT on L1.
-            stakerKey = vm.randomUint() / 2 + 1; // EIP-2: secp256k1 curve order / 2
-            staker = vm.addr(stakerKey);
-            execNonce = 0;
-            // Send random new account some ether to mint an EigenAgent
-            vm.selectFork(l2ForkId);
-            vm.startBroadcast(deployerKey);
-            if (isTest) {
-                (bool success, bytes memory res) = staker.call{value: 0.5 ether}("");
-            } else {
-                if (address(staker).balance < 0.05 ether) {
-                    (bool success, bytes memory res) = staker.call{value: 0.04 ether}("");
-                }
+        require(address(eigenAgent) == address(0), "User already has an EigenAgent");
+
+        //////////////////////////////////////////////////////
+        /// L2: Fund staker account
+        //////////////////////////////////////////////////////
+        vm.selectFork(l2ForkId);
+        vm.startBroadcast(deployerKey);
+        if (isTest) {
+            vm.deal(staker, 1 ether);
+            staker.call{value: 0.5 ether}("");
+        } else {
+            if (address(staker).balance < 0.04 ether) {
+                staker.call{value: 0.03 ether}("");
             }
-            IERC20_CCIPBnM(address(tokenL2)).drip(staker);
-            vm.stopBroadcast();
         }
+        IERC20_CCIPBnM(address(tokenL2)).drip(staker);
+        vm.stopBroadcast();
 
         //////////////////////////////////////////////////////
         /// L2: Dispatch Call
         //////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
-        uint256 amount = 0.0117 ether;
+        uint256 amount = 0.0887 ether;
         uint256 expiry = block.timestamp + 1 hours;
 
         // sign the message for EigenAgent to execute Eigenlayer command
@@ -94,9 +89,9 @@ contract DepositAndMintEigenAgentScript is BaseScript {
             expiry
         );
 
-        uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
-            IStrategyManager.depositIntoStrategy.selector
-        );
+        uint256 gasLimit = 730_000;
+        // Note: must set gasLimit for deposit + mint EigenAgent: [gas: 724,221]
+
         uint256 routerFees = getRouterFeesL2(
             address(receiverContract),
             string(messageWithSignature),
