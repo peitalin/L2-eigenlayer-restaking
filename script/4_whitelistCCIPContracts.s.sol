@@ -77,13 +77,13 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         // set GasLimits
         uint256[] memory gasLimits = new uint256[](7);
         gasLimits[0] = 410_000; // deposit                           [gas: 399,689]
-        // note: set manual gasLimit for deposit + mint EigenAgent:  [gas: 724,044] 285k deposit + 565k deposit
+        // note: set manual gasLimit for deposit + mint EigenAgent:  [gas: 724,044] ~300k mint + 400k deposit
         gasLimits[1] = 290_000; // mintEigenAgent                    [gas: 284,571]
-        gasLimits[2] = 540_000; // queueWithdrawals                  [gas: 529,085]
-        gasLimits[3] = 800_000; // completeWithdrawal + transferToL2 [gas: 791,717]
-        gasLimits[4] = 560_000; // delegateTo                        [gas: 550,292]
-        gasLimits[5] = 780_000; // undelegate                        [gas: 773,565]
-        gasLimits[6] = 960_000; // processClaim                      [gas: 953,587]
+        gasLimits[2] = 315_000; // queueWithdrawals                  [gas: 308,462]
+        gasLimits[3] = 560_000; // completeWithdrawal + transferToL2 [gas: 554,421]
+        gasLimits[4] = 350_000; // delegateTo                        [gas: 344,050]
+        gasLimits[5] = 340_000; // undelegate                        [gas: 336,421]
+        gasLimits[6] = 540_000; // processClaim + transferToL2       [gas: 536,908]
 
         bytes4[] memory functionSelectors = new bytes4[](7);
         functionSelectors[0] = 0xe7a050aa;
@@ -144,7 +144,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader {
         // Remember to fund L1 receiver with gas and tokens in production.
 
         uint256[] memory gasLimits_R = new uint256[](1);
-        gasLimits_R[0] = 280_000; // handleTransferToAgentOwner [gas: 268_420]
+        gasLimits_R[0] = 270_000; // handleTransferToAgentOwner [gas: 261,029]
 
         bytes4[] memory functionSelectors_R = new bytes4[](1);
         functionSelectors_R[0] = 0xd8a85b48;

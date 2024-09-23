@@ -57,10 +57,11 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         vm.selectFork(l2ForkId);
         vm.startBroadcast(deployerKey);
         if (isTest) {
-            (bool success, bytes memory res) = staker.call{value: 0.5 ether}("");
+            vm.deal(staker, 1 ether);
+            staker.call{value: 0.5 ether}("");
         } else {
             if (address(staker).balance < 0.04 ether) {
-                (bool success, bytes memory res) = staker.call{value: 0.03 ether}("");
+                staker.call{value: 0.03 ether}("");
             }
         }
         IERC20_CCIPBnM(address(tokenL2)).drip(staker);
@@ -88,9 +89,8 @@ contract DepositAndMintEigenAgentScript is BaseScript {
             expiry
         );
 
-        uint256 gasLimit = 860_000;
-        // Note: must set gasLimit for deposit + mint EigenAgent:
-        // [gas: 1,032,593] 285k deposit + 565k deposit = 850k
+        uint256 gasLimit = 730_000;
+        // Note: must set gasLimit for deposit + mint EigenAgent: [gas: 724,221]
 
         uint256 routerFees = getRouterFeesL2(
             address(receiverContract),

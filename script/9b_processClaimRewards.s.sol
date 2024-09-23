@@ -48,23 +48,14 @@ contract ProcessClaimRewardsScript is BaseScript {
         expiry = block.timestamp + 1 hours;
 
         IRewardsCoordinator.DistributionRoot memory distRoot = rewardsCoordinator.getCurrentDistributionRoot();
-        // rewardsCoordinator.getCurrentClaimableDistributionRoot();
+        uint32 currentDistRootIndex = uint32(rewardsCoordinator.getDistributionRootsLength()) - 1;
 
         IRewardsCoordinator.RewardsMerkleClaim memory claim = createClaim(
+            currentDistRootIndex,
             address(eigenAgent),
             0.1 ether, // amount to claim
-            hex"", // proof is empty as theres only 1 claim (roof)
+            hex"", // proof is empty as theres only 1 claim (root)
             0 // earnerIndex
-        );
-
-        // sign the message for EigenAgent to execute Eigenlayer command
-        bytes memory messageWithSignature_PC = signMessageForEigenAgentExecution(
-            deployerKey,
-            EthSepolia.ChainId, // destination chainid where EigenAgent lives
-            address(rewardsCoordinator),
-            encodeProcessClaimMsg(claim, address(eigenAgent)),
-            execNonce,
-            expiry
         );
 
         // Simulate claiming via EigenAgent on L1
@@ -75,6 +66,16 @@ contract ProcessClaimRewardsScript is BaseScript {
             0, // value
             encodeProcessClaimMsg(claim, address(eigenAgent)),
             0 // operation: 0 for calls
+        );
+
+        // sign the message for EigenAgent to execute Eigenlayer command
+        bytes memory messageWithSignature_PC = signMessageForEigenAgentExecution(
+            deployerKey,
+            EthSepolia.ChainId, // destination chainid where EigenAgent lives
+            address(rewardsCoordinator),
+            encodeProcessClaimMsg(claim, address(eigenAgent)),
+            execNonce,
+            expiry
         );
 
         ///////////////////////////////////////////////
@@ -116,6 +117,7 @@ contract ProcessClaimRewardsScript is BaseScript {
      */
 
 	function createClaim(
+        uint32 rootIndex,
         address earner,
         uint256 amount,
         bytes memory proof,
@@ -142,7 +144,7 @@ contract ProcessClaimRewardsScript is BaseScript {
         tokenTreeProofs[0] = hex"";
 
 		return IRewardsCoordinator.RewardsMerkleClaim({
-			rootIndex: 0,
+			rootIndex: rootIndex,
 			earnerIndex: earnerIndex,
 			earnerTreeProof: proof,
 			earnerLeaf: earnerLeaf,
