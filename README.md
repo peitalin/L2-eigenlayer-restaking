@@ -50,8 +50,11 @@ We first bridge `0.0619` tokens from L2 to L1 with a message to mint an ERC-6551
 We can see tokens routing through the [6551 EigenAgent contract here](https://sepolia.etherscan.io/address/0x2fd5589daa0eb790b9237a300479924f9023efef#tokentxns).
 
 ```
-Cost: 0.00272 ETH on Sepolia at 1.4 GWEI (1,925,000 gas)
-Assuming 5~10 GWEI on mainnet: 0.009 ~ 0.018 ETH
+Cost: 0.014686 ETH on Sepolia at 20.27 GWEI (724,221 gas)
+approx. $38
+
+Assuming 10 GWEI on mainnet: 0.00724 ETH
+Assuming 30 GWEI on mainnet: 0.0217 ETH
 ```
 
 See [Tenderly transaction for an execution trace](https://dashboard.tenderly.co/tx/sepolia/0xc13273ab04e87f91b30eeac7d2ed23979904aec02cb1e090f1a85596e2fbb497).
