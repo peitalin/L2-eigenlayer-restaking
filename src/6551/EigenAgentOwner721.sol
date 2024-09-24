@@ -85,6 +85,7 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
         address to,
         uint256 tokenId
     ) internal override virtual {
+        require(balanceOf(to) <= 1, "Cannot own more than one EigenAgentOwner721 at a time.");
         agentFactory.updateEigenAgentOwnerTokenId(from, to, tokenId);
     }
 }
