@@ -96,7 +96,6 @@ contract ScriptsTests_Delegation_Rewards is Test, TestErrorHandlers {
 
             if (catchErrorStr(errStr, "RewardsCoordinator.submitRoot: new root must be for newer calculated period")) {
                 console.log("Rewards root already submitted for this week.");
-
             } else {
                 revert(errStr);
             }
@@ -111,7 +110,10 @@ contract ScriptsTests_Delegation_Rewards is Test, TestErrorHandlers {
             //
         } catch Error(string memory errStr) {
             if (catchErrorStr(errStr, "RewardsCoordinator.processClaim: cumulativeEarnings must be gt than cumulativeClaimed")) {
-                console.log("Already claimed. Submit another RewardRoot before trying to claim");
+                console.log("Already claimed. Submit another RewardRoot before trying to claim.");
+
+            } else if (catchErrorStr(errStr, "RewardsCoordinator._verifyEarnerClaimProof: invalid earner claim proof")) {
+                console.log("Either an invalid claim, or run script 9 and submit a root first.");
 
             } else {
                 revert(errStr);

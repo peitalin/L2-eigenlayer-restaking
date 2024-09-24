@@ -78,7 +78,7 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
 
     /**
      * @dev Hook to update EigenAgentOwner721 NFT owner whenever a NFT transfer occurs.
-     * This  updates AgentFactory and keeps users matched with tokenIds (and associated ERC-6551 EigenAgents).
+     * This updates AgentFactory and keeps users matched with tokenIds (and associated ERC-6551 EigenAgents).
      */
     function _afterTokenTransfer(
         address from,

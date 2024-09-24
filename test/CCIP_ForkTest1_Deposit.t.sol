@@ -241,7 +241,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         });
 
         // Call will revert because AgentFactory._restakingConnector is set to a random address:
-        // "Caller does not match: AgentFactory._restakingConnector"
+        // "AgentFactory: not called by RestakingConnector"
         //
         // But as it is after expiry, we instead trigger the refund (emitting an event)
         vm.expectEmit(true, true, true, false);

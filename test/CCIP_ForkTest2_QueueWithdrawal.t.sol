@@ -40,7 +40,7 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
         vm.startBroadcast(deployerKey);
         {
             // should revert
-            vm.expectRevert("Caller does not match: AgentFactory._restakingConnector");
+            vm.expectRevert("AgentFactory: not called by RestakingConnector");
             eigenAgent = agentFactory.tryGetEigenAgentOrSpawn(bob);
 
             // for testing purposes, spawn eigenAgent with admin
