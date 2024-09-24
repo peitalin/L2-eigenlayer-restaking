@@ -147,16 +147,12 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
         }
 
         bytes memory message = abi.encode(_text);
-        uint256 gasLimit;
+
+        uint256 gasLimit = senderHooks.beforeSendCCIPMessage(message, _token, _amount);
 
         if (_overrideGasLimit > 0) {
             gasLimit = _overrideGasLimit;
-        } else {
-            bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
-            gasLimit = senderHooks.getGasLimitForFunctionSelector(functionSelector);
         }
-
-        senderHooks.beforeSendCCIPMessage(message, _token);
 
         return
             Client.EVM2AnyMessage({

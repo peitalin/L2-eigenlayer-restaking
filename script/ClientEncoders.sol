@@ -82,6 +82,41 @@ contract ClientEncoders {
         );
     }
 
+    function encodeCompleteWithdrawalsMsg(
+        IDelegationManager.Withdrawal[] memory withdrawals,
+        IERC20[][] memory tokens,
+        uint256[] memory middlewareTimesIndexes,
+        bool[] memory receiveAsTokens
+    ) public pure returns (bytes memory) {
+
+        // Function Signature:
+        //     completeQueuedWithdrawals(
+        //         Withdrawal[] withdrawals,
+        //         IERC20[][] tokens,
+        //         uint256[] middlewareTimesIndexes,
+        //         bool[] receiveAsTokens
+        //     )
+        // Where:
+        //     struct Withdrawal {
+        //         address staker;
+        //         address delegatedTo;
+        //         address withdrawer;
+        //         uint256 nonce;
+        //         uint32 startBlock;
+        //         IStrategy[] strategies;
+        //         uint256[] shares;
+        //     }
+
+        return abi.encodeWithSelector(
+            // cast sig "completeQueuedWithdrawals((address,address,address,uint256,uint32,address[],uint256[])[],address[][],uint256[],bool[])" == 0x33404396
+            IDelegationManager.completeQueuedWithdrawals.selector,
+            withdrawals,
+            tokens,
+            middlewareTimesIndexes,
+            receiveAsTokens
+        );
+    }
+
     function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
         public
         pure

@@ -52,7 +52,11 @@ interface ISenderHooks {
         address agentOwner
     ) external pure returns (bytes32);
 
-    function beforeSendCCIPMessage(bytes memory message, address tokenL2) external;
+    function beforeSendCCIPMessage(
+        bytes memory message,
+        address tokenL2,
+        uint256 amount
+    ) external returns (uint256 gasLimit);
 
     function handleTransferToAgentOwner(bytes memory message)
         external

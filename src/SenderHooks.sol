@@ -3,6 +3,7 @@ pragma solidity 0.8.25;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {Adminable} from "./utils/Adminable.sol";
 
@@ -41,6 +42,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
     );
 
     error AddressZero(string msg);
+    error OnlySendFundsForDeposits(string msg);
 
     constructor() {
         _disableInitializers();
@@ -79,7 +81,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * @return gasLimit a default gasLimit of 400_000 functionSelector parameter finds no matches.
      */
     function getGasLimitForFunctionSelector(bytes4 functionSelector)
-        external
+        public
         view
         returns (uint256)
     {
@@ -200,17 +202,34 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * @param message is the outbound message passed to CCIP's _buildCCIPMessage function
      * @param tokenL2 token on L2 for TransferToAgentOwner callback
      */
-    function beforeSendCCIPMessage(bytes memory message, address tokenL2) external onlySenderCCIP {
+    function beforeSendCCIPMessage(
+        bytes memory message,
+        address tokenL2,
+        uint256 amount
+    ) external onlySenderCCIP returns (uint256 gasLimit) {
 
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
-        // When a user sends a message to `completeQueuedWithdrawal` from L2 to L1:
+
         if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
             // 0x60d7faed
             _commitWithdrawalTransferRootInfo(message, tokenL2);
+
         } else if (functionSelector == IRewardsCoordinator.processClaim.selector) {
             // 0x3ccc861d
             _commitRewardsTransferRootInfo(message, tokenL2);
         }
+
+        // check tokens are only bridged for deposit calls
+        if (
+            amount > 0 &&
+            functionSelector != bytes4(0) &&
+            functionSelector != IStrategyManager.depositIntoStrategy.selector
+            // matched a function selector that is not a deposit message
+        ) {
+            revert OnlySendFundsForDeposits("Only send funds for deposit messages");
+        }
+
+        return getGasLimitForFunctionSelector(functionSelector);
     }
 
     function _commitWithdrawalTransferRootInfo(bytes memory message, address tokenL2) private {

@@ -22,6 +22,13 @@ contract EigenAgent6551 is ERC6551 {
     /// @notice Nonce for signing executeWithSignature calls
     uint256 public execNonce;
 
+    event ExecutedSignedCall(
+        address indexed targetContract,
+        bool indexed success,
+        bytes indexed result
+    );
+    event SignatureInvalidEvent(bytes32 indexed digestHash, bytes signature);
+
     error CallerNotWhitelisted(string reason);
     error SignatureInvalid(string reason);
 
@@ -91,6 +98,7 @@ contract EigenAgent6551 is ERC6551 {
         );
 
         if (isValidSignature(digestHash, signature) != IERC1271.isValidSignature.selector) {
+            emit SignatureInvalidEvent(digestHash, signature);
             revert SignatureInvalid("Invalid signer, or incorrect digestHash parameters.");
         }
 
@@ -98,6 +106,8 @@ contract EigenAgent6551 is ERC6551 {
         bool success;
 
         (success, result) = targetContract.call{value: value}(data);
+
+        emit ExecutedSignedCall(targetContract, success, result);
 
         // Forward error strings up the callstack
         if (!success) {

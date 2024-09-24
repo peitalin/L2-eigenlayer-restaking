@@ -19,5 +19,7 @@ forge script script/2b_upgradeSenderOnL2.s.sol:UpgradeSenderOnL2Script \
 #     --rpc-url basesepolia \
 #     --etherscan-api-key $BASESCAN_API_KEY \
 #     --compiler-version v0.8.25 \
-#     0xFb615DcC9f7AA88657A13055D87bE260446bd89A \
+#     --libraries src/utils/FunctionSelectorDecoder.sol:FunctionSelectorDecoder:0x186af032108ADD15e87b8098ab764376C824f4D5 \
+#     0x6D851679b611d5ACE7E3AF9F914507a5B107Af2C \
 #     ./src/SenderCCIP.sol:SenderCCIP
+

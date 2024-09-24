@@ -58,10 +58,10 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         vm.startBroadcast(deployerKey);
         if (isTest) {
             vm.deal(staker, 1 ether);
-            staker.call{value: 0.5 ether}("");
+            (bool success, ) = staker.call{value: 0.5 ether}("");
         } else {
             if (address(staker).balance < 0.04 ether) {
-                staker.call{value: 0.03 ether}("");
+                (bool success, ) = staker.call{value: 0.03 ether}("");
             }
         }
         IERC20_CCIPBnM(address(tokenL2)).drip(staker);
