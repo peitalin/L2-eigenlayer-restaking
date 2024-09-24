@@ -278,11 +278,13 @@ contract RestakingConnector is
             bytes memory signature
         ) = decodeQueueWithdrawalsMsg(messageWithSignature);
 
+        // withdrawers are identical for every element in qwpArray[] because Eigenlayer requires:
+        // msg.sender == withdrawer == staker for withdrawals (EigenAgent is all three)
         address withdrawer = qwpArray[0].withdrawer;
+        IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawer));
+
         uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(withdrawer);
         _withdrawalBlock[withdrawer][withdrawalNonce] = block.number;
-        /// msg.sender == withdrawer == staker (EigenAgent is all three)
-        IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawer));
 
         eigenAgent.executeWithSignature(
             address(delegationManager),
@@ -300,7 +302,7 @@ contract RestakingConnector is
      * If receiveAsTokens is true, tokens are returned then the bridge will bridge the withdrawal
      * from L2 back to L1 to the EigenAgent's owner.
      * @param withdrawalAmount is the amount withdrawn from Eigenlayer
-     * @param withdrawalToken is the token withdrawn from Eigenlayer
+     * @param withdrawalToken is the token withdrawn from Eigenlayer. Must be bridgeable or reverts.
      * @param messageForL2 encodes a "transferToAgentOwner" message to L2 to transfer the withdrawn
      * funds back to the EigenAgent's owner.
      * @param withdrawalTransferRoot refers to the withdrawalTransferRoot commitment set in L2 contract
@@ -334,7 +336,6 @@ contract RestakingConnector is
 
             // eigenAgent == withdrawer == staker == msg.sender (in Eigenlayer)
             IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawal.withdrawer));
-
             // (1) EigenAgent receives tokens from Eigenlayer
             // then (2) approves RestakingConnector to (3) transfer tokens to ReceiverCCIP
             eigenAgent.executeWithSignature(
@@ -350,41 +351,57 @@ contract RestakingConnector is
                 signature
             );
 
-            // Return variables to return to L2
-            receiveAsTokens = _receiveAsTokens;
-            withdrawalToken = address(tokensToWithdraw[0]);
-            withdrawalAmount = withdrawal.shares[0];
-            withdrawalTransferRoot = EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(
-                delegationManager.calculateWithdrawalRoot(withdrawal), // withdrawalRoot
-                withdrawalAmount,
-                signer
-            );
-            messageForL2 = string(EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(
-                withdrawalTransferRoot
-            ));
+            for (uint256 i = 0; i < tokensToWithdraw.length; ++i) {
 
-            if (_receiveAsTokens) {
-                // (2) EigenAgent approves RestakingConnector to transfer tokens to ReceiverCCIP
+                // (1) EigenAgent approves RestakingConnector to transfer tokens to ReceiverCCIP
                 eigenAgent.approveByWhitelistedContract(
                     address(this), // restakingConnector
-                    withdrawalToken,
-                    withdrawalAmount
+                    address(tokensToWithdraw[i]),
+                    withdrawal.shares[i]
                 );
-                // (3) RestakingConnector transfers tokens to ReceiverCCIP, to bridge tokens to Router (bridge)
-                IERC20(withdrawalToken).transferFrom(
-                    address(eigenAgent),
-                    _receiverCCIP,
-                    withdrawalAmount
-                );
+
+                if (address(tokensToWithdraw[i]) != EthSepolia.BridgeToken) {
+                    // (2) If the token is L1 native and cannot bridge to L2, transfer to AgentOwner on L1.
+                    // Should not reach this state, unless user manually uses EigenAgent on L1 to deposit arbitrary tokens.
+                    IERC20(tokensToWithdraw[i]).transferFrom(
+                        address(eigenAgent),
+                        signer, // AgentOwner
+                        withdrawal.shares[i]
+                    );
+
+                } else {
+                    // (3) RestakingConnector transfers tokens to ReceiverCCIP to bridge tokens.
+                    // Set return variables defined in the function signature.
+                    receiveAsTokens = _receiveAsTokens;
+                    withdrawalToken = address(tokensToWithdraw[i]);
+                    withdrawalAmount = withdrawal.shares[i];
+                    withdrawalTransferRoot = EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(
+                        delegationManager.calculateWithdrawalRoot(withdrawal), // withdrawalRoot
+                        withdrawalAmount,
+                        signer
+                    );
+                    messageForL2 = string(EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(
+                        withdrawalTransferRoot
+                    ));
+
+                    if (_receiveAsTokens) {
+                        // (3) RestakingConnector transfers tokens to ReceiverCCIP, to bridge tokens to Router (bridge)
+                        IERC20(withdrawalToken).transferFrom(
+                            address(eigenAgent),
+                            _receiverCCIP,
+                            withdrawalAmount
+                        );
+                    }
+                }
             }
         }
-        //// Named return variables are defined in the function signature.
+        // return variables defined in the function signature.
         // return (
         //     receiveAsTokens,
-        //     withdrawalAmount,
-        //     withdrawalToken,
         //     messageForL2,
-        //     withdrawalTransferRoot
+        //     withdrawalTransferRoot,
+        //     withdrawalToken,
+        //     withdrawalAmount
         // );
     }
 
@@ -505,7 +522,7 @@ contract RestakingConnector is
                 );
 
             } else {
-                // (2) RestakingConnector transfers tokens to ReceiverCCIP, to bridge tokens to Router (bridge)
+                // (2) RestakingConnector transfers tokens to ReceiverCCIP to bridge tokens
                 IERC20(_rewardsToken).transferFrom(
                     address(eigenAgent),
                     _receiverCCIP,

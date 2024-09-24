@@ -9,6 +9,7 @@ import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
+import {IStrategyFactory} from "@eigenlayer-contracts/interfaces/IStrategyFactory.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 
 import {IReceiverCCIPMock} from "./mocks/ReceiverCCIPMock.sol";
@@ -44,6 +45,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
     IStrategy public strategy;
+    IStrategyFactory public strategyFactory;
     IRewardsCoordinator public rewardsCoordinator;
     IERC20 public tokenL1;
     IERC20 public tokenL2;
@@ -114,7 +116,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         (
             strategy,
             strategyManager,
-            , // IStrategyFactory
+            strategyFactory,
             , // pauserRegistry
             delegationManager,
             rewardsCoordinator,
@@ -218,7 +220,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         (
             strategy,
             strategyManager,
-            , // IStrategyFactory
+            strategyFactory,
             , // pauserRegistry
             delegationManager,
             rewardsCoordinator,

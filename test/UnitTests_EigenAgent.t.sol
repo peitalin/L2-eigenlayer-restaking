@@ -445,7 +445,6 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         vm.stopBroadcast();
     }
 
-
     function test_EigenAgent_DepositTransferThenWithdraw() public {
 
         //////////////////////////////////////////////////////
@@ -588,6 +587,37 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
             vm.stopBroadcast();
         }
+    }
+
+    function test_EigenAgent_HoldsOnlyOneAgentAtATime() public {
+
+        // Mint Bob and EigenAgent
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgent1 = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
+        // Try Mint Bob another EigenAgent (total: 2) but fail
+        vm.prank(deployer);
+        vm.expectRevert("User already has an EigenAgent");
+        agentFactory.spawnEigenAgentOnlyOwner(bob);
+
+        // Bob transfers EigenAgent to Alice
+        (,, uint256 tokenId1) = eigenAgent1.token();
+        vm.prank(bob);
+        eigenAgentOwner721.transferFrom(bob, alice, tokenId1);
+
+        // Mint Bob another EigenAgent
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgent2 = agentFactory.spawnEigenAgentOnlyOwner(bob);
+        (,, uint256 tokenId2) = eigenAgent2.token();
+
+        // Reverts when Bob trys giving Alice another EigenAgent (total: 2)
+        vm.expectRevert("Cannot own more than one EigenAgentOwner721 at a time.");
+        vm.prank(bob);
+        eigenAgentOwner721.safeTransferFrom(bob, alice, tokenId2 , "");
+
+        // they should have one EigenAgent each
+        vm.assertEq(eigenAgentOwner721.balanceOf(alice), 1);
+        vm.assertEq(eigenAgentOwner721.balanceOf(bob), 1);
     }
 
     function createEigenAgentQueueWithdrawalsSignature(

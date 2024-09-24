@@ -419,7 +419,6 @@ contract DeployMockEigenlayerContractsScript is Script {
 
         strategiesToWhitelist[0] = _strategy;
         thirdPartyTransfersForbiddenValues[0] = false;
-        // allow third parties to deposit on behalf of a user (with their signature)
 
         vm.startBroadcast(deployer);
         _strategyFactory.whitelistStrategies(strategiesToWhitelist, thirdPartyTransfersForbiddenValues);

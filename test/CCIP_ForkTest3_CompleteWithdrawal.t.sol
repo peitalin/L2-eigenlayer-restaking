@@ -6,10 +6,14 @@ import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import {DelegationManager} from "@eigenlayer-contracts/core/DelegationManager.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 
+import {ERC20Minter} from "../test/mocks/ERC20Minter.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
@@ -212,10 +216,10 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         /////////////////////////////////////////////////////////////////
         vm.selectFork(ethForkId);
 
+        uint32 startBlock = uint32(block.number);
         uint256 execNonce2 = eigenAgent.execNonce();
         IDelegationManager.Withdrawal memory withdrawal;
         {
-            uint32 startBlock = uint32(block.number);
             uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(bob);
 
             IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
@@ -439,6 +443,269 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
 
         // withdrawalTransferRoot should be spent now
         vm.assertEq(senderHooks.isTransferRootSpent(withdrawalTransferRoot), true);
+    }
+
+    /*
+     *
+     *
+     *             Tests Multiple Token Withdrawals
+     *
+     *
+     */
+
+    function test_CompleteWithdrawals_MultipleTokensOnL1() public {
+
+        vm.selectFork(ethForkId);
+
+        ///////////////////////////////////////////////////////
+        // Deploy new token3
+        ///////////////////////////////////////////////////////
+        IERC20 token3;
+        IStrategy strategy3;
+        {
+            ProxyAdmin proxyAdmin = new ProxyAdmin();
+
+            token3 = IERC20(address(
+                new TransparentUpgradeableProxy(
+                    address(new ERC20Minter()),
+                    address(proxyAdmin),
+                    abi.encodeWithSelector(
+                        ERC20Minter.initialize.selector,
+                        "token3",
+                        "TKN3"
+                    )
+                )
+            ));
+
+            ERC20Minter(address(token3)).mint(bob, 1 ether);
+            ERC20Minter(address(token3)).mint(address(receiverContract), 1 ether);
+        }
+
+        ///////////////////////////////////////////////////////
+        /// Deploy new Eigenlayer strategy for token3 and configure strategy
+        ///////////////////////////////////////////////////////
+        {
+            // deploy new strategy for token3
+            strategy3 = strategyFactory.deployNewStrategy(token3);
+            // setStrategyWithdrawalDelayBlocks
+            IStrategy[] memory strategies3 = new IStrategy[](1);
+            strategies3[0] = strategy3;
+            uint256[] memory withdrawalDelayBlocks = new uint256[](1);
+            withdrawalDelayBlocks[0] = 1;
+
+            vm.prank(deployer);
+            DelegationManager(address(delegationManager)).setStrategyWithdrawalDelayBlocks(strategies3, withdrawalDelayBlocks);
+
+            IStrategy[] memory strategiesToWhitelist = new IStrategy[](1);
+            bool[] memory thirdPartyTransfersForbiddenValues = new bool[](1);
+
+            strategiesToWhitelist[0] = strategy3;
+            thirdPartyTransfersForbiddenValues[0] = false;
+
+            vm.prank(deployer);
+            strategyFactory.whitelistStrategies(strategiesToWhitelist, thirdPartyTransfersForbiddenValues);
+        }
+
+        vm.prank(deployer);
+        eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
+        ///////////////////////////////////
+        // Deposit Token 1
+        ///////////////////////////////////
+        uint256 amount = 0.1 ether;
+        bytes32 messageId1 = bytes32(abi.encode(0x123333444555));
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1),
+            amount: amount
+        });
+
+        {
+            uint256 execNonce0 = 0;
+            receiverContract.mockCCIPReceive(
+                Client.Any2EVMMessage({
+                    messageId: messageId1,
+                    sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
+                    sender: abi.encode(deployer),
+                    destTokenAmounts: destTokenAmounts,
+                    data: abi.encode(string(
+                        signMessageForEigenAgentExecution(
+                            bobKey,
+                            block.chainid,
+                            address(strategyManager),
+                            encodeDepositIntoStrategyMsg(
+                                address(strategy),
+                                address(tokenL1),
+                                amount
+                            ),
+                            execNonce0,
+                            expiry
+                        )
+                    ))
+                })
+            );
+        }
+
+        ///////////////////////////////////
+        // Deposit Token 3
+        ///////////////////////////////////
+        {
+            uint256 execNonce1 = 1;
+            destTokenAmounts[0] = Client.EVMTokenAmount({
+                token: address(token3),
+                amount: amount
+            });
+
+            receiverContract.mockCCIPReceive(
+                Client.Any2EVMMessage({
+                    messageId: messageId1,
+                    sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
+                    sender: abi.encode(deployer),
+                    destTokenAmounts: destTokenAmounts,
+                    data: abi.encode(string(
+                        signMessageForEigenAgentExecution(
+                            bobKey,
+                            block.chainid,
+                            address(strategyManager),
+                            encodeDepositIntoStrategyMsg(
+                                address(strategy3),
+                                address(token3),
+                                amount
+                            ),
+                            execNonce1,
+                            expiry
+                        )
+                    ))
+                })
+            );
+        }
+
+        /////////////////////////////////////
+        //// Queue Withdrawal - Multiple Tokens
+        /////////////////////////////////////
+
+        uint256 execNonce2 = eigenAgent.execNonce();
+        uint32 startBlock = uint32(block.number);
+
+        bytes memory messageWithSignature_QW;
+        {
+            IStrategy[] memory strategiesToWithdraw = new IStrategy[](2);
+            uint256[] memory sharesToWithdraw = new uint256[](2);
+            strategiesToWithdraw[0] = strategy;
+            strategiesToWithdraw[1] = strategy3;
+            sharesToWithdraw[0] = amount;
+            sharesToWithdraw[1] = amount;
+
+            IDelegationManager.QueuedWithdrawalParams[] memory QWPArray;
+            QWPArray = new IDelegationManager.QueuedWithdrawalParams[](1);
+            QWPArray[0] = IDelegationManager.QueuedWithdrawalParams({
+                strategies: strategiesToWithdraw,
+                shares: sharesToWithdraw,
+                withdrawer: address(eigenAgent)
+            });
+
+            messageWithSignature_QW = signMessageForEigenAgentExecution(
+                bobKey,
+                block.chainid,
+                address(delegationManager),
+                encodeQueueWithdrawalsMsg(QWPArray),
+                execNonce2,
+                expiry
+            );
+        }
+
+        receiverContract.mockCCIPReceive(
+            Client.Any2EVMMessage({
+                messageId: bytes32(uint256(9999)),
+                sourceChainSelector: BaseSepolia.ChainSelector,
+                sender: abi.encode(address(deployer)),
+                destTokenAmounts: new Client.EVMTokenAmount[](0), // not bridging coins
+                data: abi.encode(string(
+                    messageWithSignature_QW
+                ))
+            })
+        );
+
+        vm.warp(block.timestamp + 3600);
+        vm.roll((block.timestamp + 3600)/12);
+
+        /////////////////////////////////////
+        //// Complete Withdrawal - Multiple Tokens
+        /////////////////////////////////////
+        IDelegationManager.Withdrawal memory withdrawal;
+        {
+            uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(bob);
+
+            IStrategy[] memory strategiesToWithdraw = new IStrategy[](2);
+            uint256[] memory sharesToWithdraw = new uint256[](2);
+            strategiesToWithdraw[0] = strategy;
+            strategiesToWithdraw[1] = strategy3;
+            sharesToWithdraw[0] = amount;
+            sharesToWithdraw[1] = amount;
+
+            withdrawal = IDelegationManager.Withdrawal({
+                staker: address(eigenAgent),
+                delegatedTo: delegationManager.delegatedTo(address(eigenAgent)),
+                withdrawer: address(eigenAgent),
+                nonce: withdrawalNonce,
+                startBlock: startBlock,
+                strategies: strategiesToWithdraw,
+                shares: sharesToWithdraw
+            });
+        }
+
+        uint256 execNonce3 = eigenAgent.execNonce();
+        bytes memory messageWithSignature_CW;
+        {
+            IERC20[] memory tokensToWithdraw = new IERC20[](2);
+            tokensToWithdraw[0] = tokenL1;
+            tokensToWithdraw[1] = token3;
+
+            // sign the message for EigenAgent to execute Eigenlayer command
+            messageWithSignature_CW = signMessageForEigenAgentExecution(
+                bobKey,
+                block.chainid, // destination chainid where EigenAgent lives
+                address(delegationManager),
+                encodeCompleteWithdrawalMsg(
+                    withdrawal,
+                    tokensToWithdraw,
+                    0, //middlewareTimesIndex,
+                    true // receiveAsTokens
+                ),
+                execNonce3,
+                expiry
+            );
+        }
+
+        uint256 bobBalanceBefore = token3.balanceOf(bob);
+
+        vm.expectEmit(false, true, true, false);
+        emit ReceiverCCIP.BridgingWithdrawalToL2(
+            calculateWithdrawalTransferRoot(
+                delegationManager.calculateWithdrawalRoot(withdrawal),
+                withdrawal.shares[0], // shares of tokenL1, not token3
+                bob
+            ),
+            address(tokenL1),
+            amount
+        );
+        receiverContract.mockCCIPReceive(
+            Client.Any2EVMMessage({
+                messageId: bytes32(uint256(9999)),
+                sourceChainSelector: BaseSepolia.ChainSelector,
+                sender: abi.encode(deployer),
+                data: abi.encode(string(
+                    messageWithSignature_CW
+                )),
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
+            })
+        );
+
+        require(
+            token3.balanceOf(bob) == bobBalanceBefore + amount,
+            "Bob should have received some token3 on L1"
+        );
     }
 
 }
