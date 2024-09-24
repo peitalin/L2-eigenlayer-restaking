@@ -344,6 +344,42 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         );
     }
 
+    function test_ClientEncoder_encodeCompleteWithdrawals_ArrayMsg() public view {
+
+        IDelegationManager.Withdrawal[] memory withdrawals = new IDelegationManager.Withdrawal[](1);
+        withdrawals[0] = makeMockWithdrawal();
+
+        IERC20[][] memory tokensToWithdraw = new IERC20[][](1);
+        IERC20[] memory tokens1 = new IERC20[](1);
+        tokens1[0] = IERC20(address(1));
+        tokensToWithdraw[0] = tokens1;
+
+        uint256[] memory middlewareTimesIndexes = new uint256[](1) ;
+        bool[] memory receiveAsTokens = new bool[](1);
+
+        middlewareTimesIndexes[0] = 0;
+        receiveAsTokens[0] = false;
+
+        vm.assertEq(
+            keccak256(abi.encode(
+                clientEncodersTest.encodeCompleteWithdrawalsMsg(
+                    withdrawals,
+                    tokensToWithdraw,
+                    middlewareTimesIndexes,
+                    receiveAsTokens
+                )
+            )),
+            keccak256(abi.encode(
+                EigenlayerMsgEncoders.encodeCompleteWithdrawalsMsg(
+                    withdrawals,
+                    tokensToWithdraw,
+                    middlewareTimesIndexes,
+                    receiveAsTokens
+                )
+            ))
+        );
+    }
+
     function test_ClientEncoder_calculateWithdrawalTransferRoot() public view {
 
         IDelegationManager.Withdrawal memory withdrawal = makeMockWithdrawal();

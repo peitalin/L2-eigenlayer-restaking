@@ -23,6 +23,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
     uint256 withdrawalNonce = 0;
 
     error AddressZero(string msg);
+    error OnlySendFundsForDeposits(string msg);
 
     function setUp() public {
         setUpLocalEnvironment();
@@ -115,6 +116,15 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             bob
         );
 
+        // called by senderContract
+        vm.expectRevert(abi.encodeWithSelector(
+            OnlySendFundsForDeposits.selector, "Only send funds for deposit messages"));
+        senderHooks.beforeSendCCIPMessage(
+            abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
+            BaseSepolia.BridgeToken,
+            amount
+        );
+
         vm.expectEmit(true, true, true, false);
         emit SenderHooks.WithdrawalTransferRootCommitted(
             withdrawalAgentOwnerRoot,
@@ -125,7 +135,8 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         // called by senderContract
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-            BaseSepolia.BridgeToken
+            BaseSepolia.BridgeToken,
+            0
         );
 
         vm.stopBroadcast();
@@ -148,7 +159,8 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             vm.expectRevert("not called by SenderCCIP");
             senderHooks.beforeSendCCIPMessage(
                 abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-                BaseSepolia.BridgeToken
+                BaseSepolia.BridgeToken,
+                amount
             );
         }
         vm.stopBroadcast();
@@ -168,7 +180,8 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         vm.expectRevert("SenderHooks._commitWithdrawalTransferRootInfo: cannot commit tokenL2 as address(0)");
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-            address(0) // tokenL2
+            address(0), // tokenL2
+            amount
         );
 
         vm.stopBroadcast();
@@ -188,7 +201,8 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         vm.expectRevert("SenderHooks._commitRewardsTransferRootInfo: cannot commit tokenL2 as address(0)");
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_PC)), // CCIP string encodes when messaging
-            address(0) // tokenL2
+            address(0), // tokenL2
+            amount
         );
 
         vm.stopBroadcast();

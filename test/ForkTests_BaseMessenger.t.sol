@@ -247,7 +247,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         vm.selectFork(l2ForkId);
 
         uint64 randomChainSelector = 125;
-        uint256 _amount = 0.1 ether;
+        uint256 _amount = 0 ether;
         uint256 _gasLimit = 800_000;
 
         vm.startBroadcast(deployerKey);
@@ -290,7 +290,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
         vm.selectFork(l2ForkId);
 
-        uint256 _amount = 0.1 ether;
+        uint256 _amount = 0 ether;
         uint256 _gasLimit = 800_000;
 
         vm.startBroadcast(deployerKey);

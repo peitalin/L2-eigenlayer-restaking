@@ -10,9 +10,10 @@ import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoor
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {
-    EigenlayerMsgDecoders,
-    DelegationDecoders,
     AgentOwnerSignature,
+    EigenlayerMsgDecoders,
+    CompleteWithdrawalsArrayDecoder,
+    DelegationDecoders,
     TransferToAgentOwnerMsg
 } from "../src/utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
@@ -192,20 +193,24 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
     function test_Decode_Array_QueueWithdrawals() public view {
 
         IStrategy[] memory strategiesToWithdraw0 = new IStrategy[](1);
-        IStrategy[] memory strategiesToWithdraw1 = new IStrategy[](1);
-        IStrategy[] memory strategiesToWithdraw2 = new IStrategy[](1);
+        strategiesToWithdraw0[0] = IStrategy(0xb111111AD20E9d85d5152aE68f45f40A11111111);
+        IStrategy[] memory strategiesToWithdraw1 = new IStrategy[](2);
+        strategiesToWithdraw1[0] = IStrategy(0xb222222AD20e9D85d5152ae68F45f40a22222222);
+        strategiesToWithdraw1[1] = IStrategy(0xc666666bb11e9D85D5152AE68f45f40a66666666);
+        IStrategy[] memory strategiesToWithdraw2 = new IStrategy[](3);
+        strategiesToWithdraw2[0] = IStrategy(0xb333333AD20e9D85D5152aE68f45F40A33333333);
+        strategiesToWithdraw2[1] = IStrategy(0xC444444Ad20E9d85d5152ae68F45F40a44444444);
+        strategiesToWithdraw2[2] = IStrategy(0xd555555AD20E9d85D5152aE68F45F40a55555555);
 
         uint256[] memory sharesToWithdraw0 = new uint256[](1);
-        uint256[] memory sharesToWithdraw1 = new uint256[](1);
-        uint256[] memory sharesToWithdraw2 = new uint256[](1);
-
-        strategiesToWithdraw0[0] = IStrategy(0xb111111AD20E9d85d5152aE68f45f40A11111111);
-        strategiesToWithdraw1[0] = IStrategy(0xb222222AD20e9D85d5152ae68F45f40a22222222);
-        strategiesToWithdraw2[0] = IStrategy(0xb333333AD20e9D85D5152aE68f45F40A33333333);
-
         sharesToWithdraw0[0] = 0.010101 ether;
+        uint256[] memory sharesToWithdraw1 = new uint256[](2);
         sharesToWithdraw1[0] = 0.020202 ether;
+        sharesToWithdraw1[1] = 0.060606 ether;
+        uint256[] memory sharesToWithdraw2 = new uint256[](3);
         sharesToWithdraw2[0] = 0.030303 ether;
+        sharesToWithdraw2[1] = 0.040404 ether;
+        sharesToWithdraw2[2] = 0.050505 ether;
 
         IDelegationManager.QueuedWithdrawalParams[] memory QWPArray =
             new IDelegationManager.QueuedWithdrawalParams[](3);
@@ -271,10 +276,19 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         vm.assertEq(signer, deployer);
         vm.assertEq(expiry, expiry2);
         // strategies
+        vm.assertEq(address(decodedQW[0].strategies[0]), address(strategiesToWithdraw0[0]));
+        vm.assertEq(address(decodedQW[1].strategies[0]), address(strategiesToWithdraw1[0]));
+        vm.assertEq(address(decodedQW[1].strategies[1]), address(strategiesToWithdraw1[1]));
         vm.assertEq(address(decodedQW[2].strategies[0]), address(strategiesToWithdraw2[0]));
+        vm.assertEq(address(decodedQW[2].strategies[1]), address(strategiesToWithdraw2[1]));
+        vm.assertEq(address(decodedQW[2].strategies[2]), address(strategiesToWithdraw2[2]));
         // shares
         vm.assertEq(decodedQW[0].shares[0], sharesToWithdraw0[0]);
         vm.assertEq(decodedQW[1].shares[0], sharesToWithdraw1[0]);
+        vm.assertEq(decodedQW[1].shares[1], sharesToWithdraw1[1]);
+        vm.assertEq(decodedQW[2].shares[0], sharesToWithdraw2[0]);
+        vm.assertEq(decodedQW[2].shares[1], sharesToWithdraw2[1]);
+        vm.assertEq(decodedQW[2].shares[2], sharesToWithdraw2[2]);
         // withdrawers
         vm.assertEq(decodedQW[0].withdrawer, QWPArray[0].withdrawer);
         vm.assertEq(decodedQW[1].withdrawer, QWPArray[1].withdrawer);
@@ -321,7 +335,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
      *
     */
 
-    function test_Decode_CompleteQueuedWithdrawal() public view {
+    function test_Decode_CompleteQueuedWithdrawal_Single() public view {
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         uint256[] memory sharesToWithdraw = new uint256[](1);
@@ -396,6 +410,120 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         bytes4 fselector2 = bytes4(keccak256("completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)"));
         // bytes4 fselector3 = 0x60d7faed;
         vm.assertEq(fselector1, fselector2);
+    }
+
+    function test_Decode_CompleteQueuedWithdrawals_Array() public view {
+
+        IDelegationManager.Withdrawal[] memory withdrawals = new IDelegationManager.Withdrawal[](2);
+        {
+            IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
+            uint256[] memory sharesToWithdraw = new uint256[](1);
+
+            strategiesToWithdraw[0] = strategy;
+            sharesToWithdraw[0] = 0.00321 ether;
+
+            withdrawals[0] = IDelegationManager.Withdrawal({
+                staker: deployer,
+                delegatedTo: address(0x0),
+                withdrawer: deployer,
+                nonce: 0,
+                startBlock: uint32(block.number),
+                strategies: strategiesToWithdraw,
+                shares: sharesToWithdraw
+            });
+            withdrawals[1] = IDelegationManager.Withdrawal({
+                staker: bob,
+                delegatedTo: address(0x0),
+                withdrawer: bob,
+                nonce: 1,
+                startBlock: uint32(block.number),
+                strategies: strategiesToWithdraw,
+                shares: sharesToWithdraw
+            });
+        }
+
+        IERC20[][] memory tokensToWithdraw = new IERC20[][](2);
+        {
+            IERC20[] memory tokens1 = new IERC20[](2);
+            tokens1[0] = IERC20(address(6));
+            tokens1[1] = IERC20(address(7));
+            IERC20[] memory tokens2 = new IERC20[](3);
+            tokens2[0] = IERC20(address(8));
+            tokens2[1] = IERC20(address(9));
+            tokens2[2] = IERC20(address(5));
+            tokensToWithdraw[0] = tokens1;
+            tokensToWithdraw[1] = tokens2;
+        }
+
+        uint256[] memory middlewareTimesIndexes = new uint256[](2);
+        bool[] memory receiveAsTokens = new bool[](2);
+
+        middlewareTimesIndexes[0] = 0;
+        middlewareTimesIndexes[1] = 1;
+        receiveAsTokens[0] = true;
+        receiveAsTokens[1] = false;
+
+        bytes memory messageWithSignature_CW_Array;
+        {
+            messageWithSignature_CW_Array = signMessageForEigenAgentExecution(
+                deployerKey,
+                block.chainid, // destination chainid where EigenAgent lives
+                address(123123), // StrategyManager to approve + deposit
+                encodeCompleteWithdrawalsMsg(
+                    withdrawals,
+                    tokensToWithdraw,
+                    middlewareTimesIndexes,
+                    receiveAsTokens
+                ),
+                execNonce,
+                expiry
+            );
+        }
+
+        (
+            IDelegationManager.Withdrawal[] memory _withdrawals,
+            IERC20[][] memory _tokensToWithdraw,
+            uint256[] memory _middlewareTimesIndexes,
+            bool[] memory _receiveAsTokens,
+            address _signer,
+            uint256 _expiry,
+            bytes memory _signature
+        ) = CompleteWithdrawalsArrayDecoder.decodeCompleteWithdrawalsMsg(
+            abi.encode(string(
+                messageWithSignature_CW_Array
+            ))
+        );
+
+        vm.assertEq(_signature.length, 65);
+        vm.assertEq(_signer, deployer);
+        vm.assertEq(_expiry, expiry);
+
+        vm.assertEq(_withdrawals[0].staker, withdrawals[0].staker);
+        vm.assertEq(_withdrawals[0].withdrawer, withdrawals[0].withdrawer);
+        vm.assertEq(_withdrawals[0].nonce, withdrawals[0].nonce);
+        vm.assertEq(_withdrawals[0].startBlock, withdrawals[0].startBlock);
+        vm.assertEq(address(_withdrawals[0].strategies[0]), address(withdrawals[0].strategies[0]));
+        vm.assertEq(_withdrawals[0].shares[0], withdrawals[0].shares[0]);
+
+        vm.assertEq(_withdrawals[1].staker, withdrawals[1].staker);
+        vm.assertEq(_withdrawals[1].withdrawer, withdrawals[1].withdrawer);
+        vm.assertEq(_withdrawals[1].nonce, withdrawals[1].nonce);
+        vm.assertEq(_withdrawals[1].startBlock, withdrawals[1].startBlock);
+        vm.assertEq(address(_withdrawals[1].strategies[0]), address(withdrawals[1].strategies[0]));
+        vm.assertEq(_withdrawals[1].shares[0], withdrawals[1].shares[0]);
+
+        vm.assertEq(address(_tokensToWithdraw[0][0]), address(tokensToWithdraw[0][0]));
+        vm.assertEq(address(_tokensToWithdraw[0][1]), address(tokensToWithdraw[0][1]));
+
+        vm.assertEq(address(_tokensToWithdraw[1][0]), address(tokensToWithdraw[1][0]));
+        vm.assertEq(address(_tokensToWithdraw[1][1]), address(tokensToWithdraw[1][1]));
+        vm.assertEq(address(_tokensToWithdraw[1][2]), address(tokensToWithdraw[1][2]));
+
+        vm.assertEq(_middlewareTimesIndexes[0], middlewareTimesIndexes[0]);
+        vm.assertEq(_middlewareTimesIndexes[1], middlewareTimesIndexes[1]);
+
+        vm.assertEq(_receiveAsTokens[0], receiveAsTokens[0]);
+        vm.assertEq(_receiveAsTokens[1], receiveAsTokens[1]);
     }
 
     function test_Decode_WithdrawalTransferToAgentOwnerMsg() public view {

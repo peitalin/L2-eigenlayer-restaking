@@ -87,6 +87,42 @@ library EigenlayerMsgEncoders {
         );
     }
 
+    /// Array-ified version of completeWithdralw
+    function encodeCompleteWithdrawalsMsg(
+        IDelegationManager.Withdrawal[] calldata withdrawals,
+        IERC20[][] calldata tokens,
+        uint256[] calldata middlewareTimesIndexes,
+        bool[] calldata receiveAsTokens
+    ) public pure returns (bytes memory) {
+
+        // Function Signature:
+        //     completeQueuedWithdrawals(
+        //         Withdrawal[] withdrawals,
+        //         IERC20[][] tokens,
+        //         uint256[] middlewareTimesIndexes,
+        //         bool[] receiveAsTokens
+        //     )
+        // Where:
+        //     struct Withdrawal {
+        //         address staker;
+        //         address delegatedTo;
+        //         address withdrawer;
+        //         uint256 nonce;
+        //         uint32 startBlock;
+        //         IStrategy[] strategies;
+        //         uint256[] shares;
+        //     }
+
+        return abi.encodeWithSelector(
+            // cast sig "completeQueuedWithdrawals((address,address,address,uint256,uint32,address[],uint256[])[],address[][],uint256[],bool[])" == 0x33404396
+            IDelegationManager.completeQueuedWithdrawals.selector,
+            withdrawals,
+            tokens,
+            middlewareTimesIndexes,
+            receiveAsTokens
+        );
+    }
+
     /**
      * @dev Encodes params for a delegateTo() call to Eigenlayer's DelegationManager.sol
      * @param operator entity to delegate to
