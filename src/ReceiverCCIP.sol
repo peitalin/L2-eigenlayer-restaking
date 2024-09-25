@@ -15,12 +15,14 @@ import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 
 
-/// @title ETH L1 Messenger Contract: receives Eigenlayer messages from L2 and processes them
+/// @title ETH L1 Messenger Contract: receives messages from L2 and processes them
 contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
     IRestakingConnector public restakingConnector;
     address public senderContractL2;
+
     mapping(bytes32 messageId => uint256) public amountRefundedToMessageIds;
+    mapping(bytes32 messageId => uint256) public unhandledFundsMessageIds;
 
     event BridgingWithdrawalToL2(
         bytes32 indexed withdrawalTransferRoot,
@@ -47,7 +49,6 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     );
 
     error AddressZero(string msg);
-    error AgentCallError(string errorMsg, bytes customErr);
 
     /// @param _router address of the router contract.
     /// @param _link address of the link contract.
@@ -96,16 +97,20 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         restakingConnector = _restakingConnector;
     }
 
-    /// @dev Gets the amount refunded to prevent triggering a refund if admin manually refunds user.
-    /// @param messageId is the CCIP messageId
-    /// @return amount refunded
+    /**
+     * @dev Gets the amount refunded to prevent triggering a refund if admin manually refunds user.
+     * @param messageId is the CCIP messageId
+     * @return amount refunded
+     */
     function amountRefunded(bytes32 messageId) external view returns (uint256) {
         return amountRefundedToMessageIds[messageId];
     }
 
-    /// @dev This function sets amount refunded in case owner wants to refund a user manually.
-    /// @param messageId is the CCIP messageId
-    /// @param amountAfter is the amount refunded
+    /**
+     * @dev This function sets amount refunded in case owner wants to refund a user manually.
+     * @param messageId is the CCIP messageId
+     * @param amountAfter is the amount refunded
+     */
     function setAmountRefundedToMessageId(bytes32 messageId, uint256 amountAfter) external onlyOwner {
         uint256 amountBefore = amountRefundedToMessageIds[messageId];
         amountRefundedToMessageIds[messageId] = amountAfter;
@@ -138,16 +143,12 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             tokenAmount = 0;
         }
 
-        try this.dispatchMessageToEigenAgent(
-            any2EvmMessage,
-            tokenAddress,
-            tokenAmount
-        ) {
+        try this.dispatchMessageToEigenAgent(any2EvmMessage, tokenAddress, tokenAmount) {
             // EigenAgent executes message successfully.
             emit MessageReceived(
                 any2EvmMessage.messageId,
-                any2EvmMessage.sourceChainSelector, // fetch the source chain identifier (aka selector)
-                abi.decode(any2EvmMessage.sender, (address)), // abi-decoding of the sender address,
+                any2EvmMessage.sourceChainSelector,
+                abi.decode(any2EvmMessage.sender, (address)), // sender contract on L2
                 tokenAddress,
                 tokenAmount
             );
@@ -158,8 +159,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             // Decode and try catch the EigenAgentExecutionError
 
             if (errorSelector == IRestakingConnector.EigenAgentExecutionError.selector) {
-                // If there were bridged tokens (e.g. DepositIntoStrategy call)...
-                // and the deposit has not been manually refunded by an admin...
+                // If there were bridged tokens, and the deposit has not been refunded yet...
                 if (
                     tokenAmount > 0 &&
                     tokenAddress != address(0) &&
@@ -167,7 +167,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 ) {
                     // ...mark messageId as refunded
                     amountRefundedToMessageIds[any2EvmMessage.messageId] = tokenAmount;
-                    // ...then initiate a refund back to L2
+                    // ...then initiate a refund back to the signer on L2
                     return _refundToSignerAfterExpiry(customError, tokenAddress, tokenAmount);
 
                 } else {
@@ -188,10 +188,10 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     }
 
     /**
-     * @dev This function is called only by this contract (marked external for try/catch feature).
-     * @notice This function matches the on function selector, then forwards CCIP messages for
-     * Eigenlayer to the RestakingConnector which will deserialize the rest of the message and
-     * forward it to the user's EigenAgent for execution.
+     * @dev This function only called by internally (but is marked external for try/catch feature).
+     * @notice This function matches a function selector, then forwards CCIP Eigenlayer messages
+     * to the RestakingConnector which deserializes the rest of the message and
+     * forwards it to the user's EigenAgent for execution.
      */
     function dispatchMessageToEigenAgent(
         Client.Any2EVMMessage memory any2EvmMessage,
@@ -204,29 +204,22 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         bytes memory message = any2EvmMessage.data;
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
-        /// Deposit Into Strategy
         if (functionSelector == IStrategyManager.depositIntoStrategy.selector) {
-            // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
+            /// depositIntoStrategy - 0xe7a050aa
             IERC20(token).approve(address(restakingConnector), amount);
             // approve RestakingConnector to transfer tokens to EigenAgent
             restakingConnector.depositWithEigenAgent(message);
-        }
 
-        /// Mint EigenAgent
-        if (functionSelector == IRestakingConnector.mintEigenAgent.selector) {
-            // cast sig "mintEigenAgent(bytes)" == 0xcc15a557
+        } else if (functionSelector == IRestakingConnector.mintEigenAgent.selector) {
+            /// mintEigenAgent - 0xcc15a557
             restakingConnector.mintEigenAgent(message);
-        }
 
-        /// Queue Withdrawals
-        if (functionSelector == IDelegationManager.queueWithdrawals.selector) {
-            // cast sig "queueWithdrawals((address[],uint256[],address)[])" == 0x0dd8dd02
+        } else if (functionSelector == IDelegationManager.queueWithdrawals.selector) {
+            /// queueWithdrawals - 0x0dd8dd02
             restakingConnector.queueWithdrawalsWithEigenAgent(message);
-        }
 
-        /// Complete Withdrawal
-        if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
-            // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
+        } else if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
+            /// completeWithdrawal - 0x60d7faed
             (
                 bool receiveAsTokens,
                 string memory messageForL2,
@@ -236,11 +229,11 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             ) = restakingConnector.completeWithdrawalWithEigenAgent(message);
 
             if (receiveAsTokens) {
-                /// if `receiveAsTokens == true`, ReceiverCCIP should have received tokens
-                /// back from EigenAgent after completeWithdrawal.
-                ///
-                /// Send handleTransferToAgentOwner message to bridge tokens back to L2.
-                /// L2 SenderCCIP transfers tokens to AgentOwner.
+                // if receiveAsTokens == true, ReceiverCCIP should have received tokens
+                // back from EigenAgent after completeWithdrawal.
+                //
+                // Send handleTransferToAgentOwner message to bridge tokens back to L2.
+                // L2 SenderCCIP transfers tokens to AgentOwner.
                 this.sendMessagePayNative(
                     BaseSepolia.ChainSelector, // destination chain
                     senderContractL2,
@@ -250,31 +243,24 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                     0 // use default gasLimit
                 );
 
-                emit BridgingWithdrawalToL2(
-                    withdrawalTransferRoot,
-                    withdrawalToken,
-                    withdrawalAmount
-                );
+                emit BridgingWithdrawalToL2(withdrawalTransferRoot, withdrawalToken, withdrawalAmount);
 
             } else {
-                /// Otherwise if `receiveAsTokens == false`, withdrawal is redeposited in Eigenlayer
-                /// as shares, re-delegated to a new Operator as part of the `undelegate` flow.
-                /// We do not need to do anything in this case.
+                // Otherwise if `receiveAsTokens == false`, withdrawal is redeposited in Eigenlayer
+                // as shares, re-delegated to a new Operator as part of the `undelegate` flow.
+                // We do not need to do anything in this case.
             }
-        }
 
-        /// Delegate To
-        if (functionSelector == IDelegationManager.delegateTo.selector) {
+        } else if (functionSelector == IDelegationManager.delegateTo.selector) {
+            /// delegateTo - 0xeea9064b
             restakingConnector.delegateToWithEigenAgent(message);
-        }
 
-        /// Undelegate
-        if (functionSelector == IDelegationManager.undelegate.selector) {
+        } else if (functionSelector == IDelegationManager.undelegate.selector) {
+            /// undelegate - 0xda8be864
             restakingConnector.undelegateWithEigenAgent(message);
-        }
 
-        /// Process Claim (Rewards)
-        if (functionSelector == IRewardsCoordinator.processClaim.selector) {
+        } else if (functionSelector == IRewardsCoordinator.processClaim.selector) {
+            /// processClaim (Rewards) - 0x3ccc861d
             (
                 string memory messageForL2,
                 bytes32 rewardsTransferRoot,
@@ -293,13 +279,10 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                     0 // use default gasLimit
                 );
 
-                emit BridgingRewardsToL2(
-                    rewardsTransferRoot,
-                    rewardsToken,
-                    rewardsAmount
-                );
+                emit BridgingRewardsToL2(rewardsTransferRoot, rewardsToken, rewardsAmount);
             }
         }
+        // Should not reach this state with bridged funds, as SenderCCIP only sends funds for deposits.
     }
 
     /**

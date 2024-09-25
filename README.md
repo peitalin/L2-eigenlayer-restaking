@@ -40,6 +40,10 @@ There are `2b` and `3b` upgrade scripts which need to be run when changes made t
 
 
 
+Bridging times depend on the finality times of source and destination chains.
+It currently takes +20 minutes to bridge a message [Base and ZkSync has finality times of 20min, ETH is 15min](https://docs.chain.link/ccip/concepts/ccip-execution-latency#finality)
+
+
 
 ## Live Sepolia L2 Restaking Example
 
@@ -57,23 +61,63 @@ Assuming 10 GWEI on mainnet: 0.00724 ETH
 Assuming 30 GWEI on mainnet: 0.0217 ETH
 ```
 
+
 See [Tenderly transaction for an execution trace](https://dashboard.tenderly.co/tx/sepolia/0xc13273ab04e87f91b30eeac7d2ed23979904aec02cb1e090f1a85596e2fbb497).
 
+![Deposit Flow](./images/1_deposit.jpg)
 
-#### 2a. DelegateTo an Operator
+
+
+#### 2. Queue withdrawal via EigenAgent with user signature
+
+Users can send their EigenAgent a [QueueWithdrawal message](https://ccip.chain.link/msg/0x10a92b6dd245be98abc86ffa9e1192b201533c828763ecb94bffd3d2213ec165) to withdraw, producing [WithdrawalQueued events on L1](https://sepolia.etherscan.io/tx/0x41a6ba16229e2bd0e9db2f9bd632139a9db4c0d6952dadb2812420a55e0bd215#eventlog).
+
+After waiting for the unstaking period (7 days), users can complete withdrawals.
+- Queued withdrawals information are stored in `script/withdrawals-queued/<user_address>/`
+- Completed withdrawals information are stored in `script/withdrawals-completed/<user_address>/`.
+
+![Queue Withdrawals Flow](./images/2_queueWithdrawals.jpg)
+
+
+#### 3. Complete withdrawal and bridge back to EigenAgent owner on L2
+
+Sending a [CompleteWithdrawal message from L2](https://ccip.chain.link/msg/0x6d8674ca7afaf314f69c17faffe178ac897d822f897d5aeea101c1c9ee97afca) executes on L1 with the following Eigenlayer [WithdrawalCompleted events](https://sepolia.etherscan.io/tx/0xcadc91261a481bf82759face86821e77f6422c86ae01bf9cc4663dca73760f3a).
+
+The L2 Bridge contract will automatically bridge the withdrawal back to L2 to the EigenAgent's owner. You can see the `messageId` here in `topic[1]` of the [MessageSent event](https://sepolia.etherscan.io/tx/0xcadc91261a481bf82759face86821e77f6422c86ae01bf9cc4663dca73760f3a#eventlog#115) which we can track in the CCIP explorer to see the [withdrawal bridging back from L1 to L2](https://ccip.chain.link/msg/0xf7f7b36465f640cad874fa7379757ff2ca42f513186db0a5218b5526f0ca5bec).
+
+When the funds arrive on L2, the original `0.0619` tokens are [transferred to the EigenAgent owner's address](https://sepolia.basescan.org/tx/0xa6d2a4f2166c32b9d1f37a4b87d222b436405f546277c13525b02ea35f03b881).
+
+
+Note: As EigenAgentOwner NFTs are transferrable, a user may try call `completeWithdrawal` then attempt to sell the NFT while the withdrawal is in flight. If users are trading these NFTs they need to be careful about this.
+
+![Complete Withdrawals Flow](./images/3_completeWithdrawals.jpg)
+
+
+
+#### 4. Reward Claims from L2
+
+You can also claim staking rewards by [sending a processClaim message from L2](https://ccip.chain.link/msg/0xf4b4e2ca7753f29f363c2566011d090ab39259890ef965e6ab163b83469053b5). The rewards are [bridged back to L2 to the EigenAgent owner](https://ccip.chain.link/msg/0x1eb6bbbc8080f30b516d5a0194e25a2c3fdbe6bff9fba207179e84b4aa20feee). Only the bridge token will be bridged back to L2. Other ERC20 reward tokens will be sent to the EigenAgent owner's wallet on L1.
+
+
+![Claim Rewards Flow](./images/4_processClaimRewards.jpg)
+
+#### 5a. DelegateTo an Operator
 
 You can delegate to Operators, by sending a [delegateTo message](https://ccip.chain.link/msg/0x952b6d0e36dd9121ab7e0142f916d562c933fb3a5b2268ec7f87d355a709c482), resulting in the following [delegation events](https://sepolia.etherscan.io/tx/0xe9d1e9a6c5571e147858beb60909a74ee5b9463ae7601ce76093341b28a77686#eventlog).
 
 
-#### 2b. Undelegate from an Operator
+![DelegateTo Flow](./images/5a_delegateTo.jpg)
+
+#### 5b. Undelegate from an Operator
 
 If a user wants to switch Operators to delegate to, they can send a [undelegate message](https://ccip.chain.link/msg/0xd88d55c9b01de1eaa64fedc123358191cd863de08e7784701d7268120249c25d) which results in the following [undelegate events](https://sepolia.etherscan.io/tx/0x0220fa337ca1fc33de0048bb7f0b15dd5ca3ae56efe7a45cab336d72745df5f1).
 
 Undelegating queues the staker for withdrawal and produces `withdrawalRoots`.
 Front-end clients should keep track of the withdrawal information and `withdrawalRoots` as they will be needed to re-deposit later.
 
+![Undelegate Flow](./images/5b_undelegate.jpg)
 
-#### 2c. Re-delegate to an Operator (re-depositing)
+#### 5c. Re-delegate to an Operator (re-depositing)
 
 After undelegating, users wait 7 days then delegate to another Operator.
 Then can re-deposit back into Eigenlayer with a [redeposit Message](https://ccip.chain.link/msg/0x539643e769b7e975ac3c7109fbac5350e73974d5e8f7c9dd2161be7d119fa4f0), which results in the following [re-deposit (WithdrawalCompleted) events](https://sepolia.etherscan.io/tx/0x52b5b3dda3975771524072c4d2762a768550faec69c6f6f8067a23af79f47a7c).
@@ -85,31 +129,7 @@ The `receiveAsTokens` flag in `completeWithdrawals` call determines whether user
 
 There is no way to directly re-delegate to another operator, a staker must undelegate + withdraw, wait 7 days, then restake and re-delegate to a new operator.
 
-
-#### 3. Queue withdrawal via EigenAgent with user signature
-
-Users can send their EigenAgent a [QueueWithdrawal message](https://ccip.chain.link/msg/0x10a92b6dd245be98abc86ffa9e1192b201533c828763ecb94bffd3d2213ec165) to withdraw, producing [WithdrawalQueued events on L1](https://sepolia.etherscan.io/tx/0x41a6ba16229e2bd0e9db2f9bd632139a9db4c0d6952dadb2812420a55e0bd215#eventlog).
-
-After waiting for the unstaking period (7 days), users can complete withdrawals.
-- Queued withdrawals information are stored in `script/withdrawals-queued/<user_address>/`
-- Completed withdrawals information are stored in `script/withdrawals-completed/<user_address>/`.
-
-
-#### 4. Complete withdrawal and bridge back to EigenAgent owner on L2
-
-Sending a [CompleteWithdrawal message from L2](https://ccip.chain.link/msg/0x6d8674ca7afaf314f69c17faffe178ac897d822f897d5aeea101c1c9ee97afca) executes on L1 with the following Eigenlayer [WithdrawalCompleted events](https://sepolia.etherscan.io/tx/0xcadc91261a481bf82759face86821e77f6422c86ae01bf9cc4663dca73760f3a).
-
-The L2 Bridge contract will automatically bridge the withdrawal back to L2 to the EigenAgent's owner. You can see the `messageId` here in `topic[1]` of the [MessageSent event](https://sepolia.etherscan.io/tx/0xcadc91261a481bf82759face86821e77f6422c86ae01bf9cc4663dca73760f3a#eventlog#115) which we can track in the CCIP explorer to see the [withdrawal bridging back from L1 to L2](https://ccip.chain.link/msg/0xf7f7b36465f640cad874fa7379757ff2ca42f513186db0a5218b5526f0ca5bec).
-
-When the funds arrive on L2, the original `0.0619` tokens are [transferred to the EigenAgent owner's address](https://sepolia.basescan.org/tx/0xa6d2a4f2166c32b9d1f37a4b87d222b436405f546277c13525b02ea35f03b881).
-
-
-Note: As EigenAgentOwner NFTs are transferrable, a user may try call `completeWithdrawal` then attempt to sell the NFT while the withdrawal is in flight. If users are trading these NFTs they need to be careful about this.
-
-
-#### 5. Reward Claims from L2
-
-You can also claim staking rewards by [sending a processClaim message from L2](https://ccip.chain.link/msg/0xf4b4e2ca7753f29f363c2566011d090ab39259890ef965e6ab163b83469053b5). The rewards are [bridged back to L2 to the EigenAgent owner](https://ccip.chain.link/msg/0x1eb6bbbc8080f30b516d5a0194e25a2c3fdbe6bff9fba207179e84b4aa20feee). Only the bridge token will be bridged back to L2. Other ERC20 reward tokens will be sent to the EigenAgent owner's wallet on L1.
+![Redelegate Flow](./images/5c_redelegate.jpg)
 
 
 ### ERC-6551 EigenAgents
@@ -134,29 +154,28 @@ Note: at the moment you cannot have more than 1 cross-chain message in-flight at
 
 
 
-### TODO:
-- [x] Deploy mock Eigenlayer contracts on Sepolia (Eigenlayer uses Holesky, but Chainlink are on Sepolia)
-- [x] Test cross-chain messages for EigenAgent execution:
+### Features:
+- [x] Cross-chain messages for EigenAgent to execute Eigenlayer actions:
     - [x] `depositIntoStrategy`
-        - [x] Catch deposit reverts, and allow manual re-execution to trigger refund after expiry (in case target Operator goes offline while deposits are in-flight from L2).
+        - [x] Catches deposit reverts, and allow manual re-execution to trigger refund after expiry (in case target Operator goes offline while deposits are in-flight from L2).
     - [x] `queueWithdrawals`
     - [x] `completeQueuedWithdrawals`
-        - [x] Transfer withdrawn tokens from L1 back to L2.
+        - [x] Transfer withdrawn tokens back to L2.
+        - [x] Transfer L1 tokens to AgentOwner address on L1.
     - [x] `delegateTo`
     - [x] `undelegate`
-    - [x] `re-deposit` after undelegating, users re-delegate and re-deposit into Eigenlayer.
+    - [x] `re-deposit` into Eigenlayer (and re-delegate).
     - [x] `processClaim` staking rewards, and bridge rewards back to owner on L2.
+        - [x] Transfer bridgeable rewards tokens back to L2.
+        - [x] Transfer L1 rewards tokens to AgentOwner address on L1.
 
 - Gas optimization
     - [x] Estimate gas limit for each of the previous operations
-    - [ ] Reduce gas costs associated with 6551 accounts creation + delegate calls (ongoing)
-        - Remove proxies if we don't need upgradeability.
+    - [x] Reduce gas costs associated with 6551 accounts creation + delegate calls
+        - [ ] Remove proxies if we don't need upgradeability.
 
 - [ ] Chainlink to setup a "lane" for CCIP bridges to our L2:
-    - Chainlink CCIP only supports their own CCIP-BnM token in Sepolia testnet.
-    - [ ] Can Chainlink deploy lanes on Holesky? Or can Eigenlayer deploy on Sepolia?
-    - [ ] Adapt differences in burn/mint model with CCIP-BnM and MAGIC's bridging model (Lock-and-mint?).
+    - [ ] Setup Chainlink lanes on Holesky and L2.
+    - [ ] Adapt differences in bridging model (mint/burn vs lock/mint) for target chain.
 
-- [ ] Adapt the repo to ZkSync
-    - Luckily ERC-6551 EigenAgents operate on L1, not L2 (`CREATE2` compatibility issues).
 
