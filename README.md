@@ -22,6 +22,7 @@ This also keeps custody of funds with the user (who owns the 6551 NFT) and gives
 
 
 <a name="running-tests-and-restaking-scripts"/>
+
 ### Running Tests and Restaking Scripts
 
 Tests bridge from L2 to L1, then deposit in Eigenlayer, queueWithdrawal, completeWithdrawal, then bridge back to the original user on L2.
@@ -60,9 +61,11 @@ It currently takes +20 minutes to bridge a message [Base and ZkSync has finality
 
 
 <a name="sepolia-L2-restaking-example"/>
+
 ## Sepolia L2 Restaking Example
 
 <a name="deposit-with-eigenagent"/>
+
 ### 1. Deposit with EigenAgent
 
 We first bridge `0.0619` tokens from L2 to L1 with a message to mint an ERC-6551 EigenAgent and forward a  `DepositIntoStrategy` [message to Eigenlayer](https://ccip.chain.link/msg/0x5e37d8f0b80d3c489fb8fcc5bd00d761b47eeee214e3b06cb564484a9841914d), resulting in `Deposit` and 6551 EigenAgent [minting events](https://sepolia.etherscan.io/tx/0xc13273ab04e87f91b30eeac7d2ed23979904aec02cb1e090f1a85596e2fbb497).
@@ -85,7 +88,8 @@ See [Tenderly transaction for an execution trace](https://dashboard.tenderly.co/
 
 
 <a name="queue-withdrawals-with-eigenagent"/>
-#### 2. Queue withdrawals with EigenAgent
+
+### 2. Queue withdrawals with EigenAgent
 
 Users can send their EigenAgent a [QueueWithdrawal message](https://ccip.chain.link/msg/0x10a92b6dd245be98abc86ffa9e1192b201533c828763ecb94bffd3d2213ec165) to withdraw, producing [WithdrawalQueued events on L1](https://sepolia.etherscan.io/tx/0x41a6ba16229e2bd0e9db2f9bd632139a9db4c0d6952dadb2812420a55e0bd215#eventlog).
 
@@ -97,7 +101,8 @@ After waiting for the unstaking period (7 days), users can complete withdrawals.
 
 
 <a name="complete-withdrawal-with-eigenagent"/>
-#### 3. Complete withdrawal and bridge back to owner on L2
+
+### 3. Complete withdrawal and bridge back to owner on L2
 
 Sending a [CompleteWithdrawal message from L2](https://ccip.chain.link/msg/0x6d8674ca7afaf314f69c17faffe178ac897d822f897d5aeea101c1c9ee97afca) executes on L1 with the following Eigenlayer [WithdrawalCompleted events](https://sepolia.etherscan.io/tx/0xcadc91261a481bf82759face86821e77f6422c86ae01bf9cc4663dca73760f3a).
 
@@ -112,7 +117,8 @@ Note: As EigenAgentOwner NFTs are transferrable, a user may try call `completeWi
 
 
 <a name="claim-rewards-with-eigenagent"/>
-#### 4. Claimi Rewards from L2
+
+### 4. Claim Rewards from L2
 
 You can also claim staking rewards by [sending a processClaim message from L2](https://ccip.chain.link/msg/0xf4b4e2ca7753f29f363c2566011d090ab39259890ef965e6ab163b83469053b5). The rewards are [bridged back to L2 to the EigenAgent owner](https://ccip.chain.link/msg/0x1eb6bbbc8080f30b516d5a0194e25a2c3fdbe6bff9fba207179e84b4aa20feee). Only the bridge token will be bridged back to L2. Other ERC20 reward tokens will be sent to the EigenAgent owner's wallet on L1.
 
@@ -120,7 +126,8 @@ You can also claim staking rewards by [sending a processClaim message from L2](h
 ![Claim Rewards Flow](./images/4_processClaimRewards.jpg)
 
 <a name="delegateTo-with-eigenagent"/>
-#### 5a. Delegate to an Operator
+
+### 5a. Delegate to an Operator
 
 You can delegate to Operators, by sending a [delegateTo message](https://ccip.chain.link/msg/0x952b6d0e36dd9121ab7e0142f916d562c933fb3a5b2268ec7f87d355a709c482), resulting in the following [delegation events](https://sepolia.etherscan.io/tx/0xe9d1e9a6c5571e147858beb60909a74ee5b9463ae7601ce76093341b28a77686#eventlog).
 
@@ -129,7 +136,8 @@ You can delegate to Operators, by sending a [delegateTo message](https://ccip.ch
 
 
 <a name="undelegate-with-eigenagent"/>
-#### 5b. Undelegate from an Operator
+
+### 5b. Undelegate from an Operator
 
 If a user wants to switch Operators to delegate to, they can send a [undelegate message](https://ccip.chain.link/msg/0xd88d55c9b01de1eaa64fedc123358191cd863de08e7784701d7268120249c25d) which results in the following [undelegate events](https://sepolia.etherscan.io/tx/0x0220fa337ca1fc33de0048bb7f0b15dd5ca3ae56efe7a45cab336d72745df5f1).
 
@@ -139,7 +147,8 @@ Front-end clients should keep track of the withdrawal information and `withdrawa
 ![Undelegate Flow](./images/5b_undelegate.jpg)
 
 <a name="redelegate-with-eigenagent"/>
-#### 5c. Re-delegate to an Operator (re-depositing)
+
+### 5c. Re-delegate to an Operator (re-depositing)
 
 After undelegating, users wait 7 days then delegate to another Operator.
 Then can re-deposit back into Eigenlayer with a [redeposit Message](https://ccip.chain.link/msg/0x539643e769b7e975ac3c7109fbac5350e73974d5e8f7c9dd2161be7d119fa4f0), which results in the following [re-deposit (WithdrawalCompleted) events](https://sepolia.etherscan.io/tx/0x52b5b3dda3975771524072c4d2762a768550faec69c6f6f8067a23af79f47a7c).
@@ -155,7 +164,8 @@ There is no way to directly re-delegate to another operator, a staker must undel
 
 
 <a name="ERC-6551-eigenagents"/>
-### ERC-6551 EigenAgents
+
+## ERC-6551 EigenAgents
 
 EigenAgent accounts will only execute calls if the signature came from the user who owns the associated EigenAgentOwner 721 NFT.
 See: [https://eips.ethereum.org/EIPS/eip-6551](https://eips.ethereum.org/EIPS/eip-6551)
@@ -178,7 +188,7 @@ Note: at the moment you cannot have more than 1 cross-chain message in-flight at
 
 <a name="todo-features"/>
 
-### Todo Features
+## Todo Features
 
 - [x] Cross-chain messages for EigenAgent to execute Eigenlayer actions:
     - [x] `depositIntoStrategy`
