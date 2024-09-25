@@ -177,7 +177,9 @@ Note: at the moment you cannot have more than 1 cross-chain message in-flight at
 
 
 <a name="todo-features"/>
+
 ### Todo Features
+
 - [x] Cross-chain messages for EigenAgent to execute Eigenlayer actions:
     - [x] `depositIntoStrategy`
         - [x] Catches deposit reverts, and allow manual re-execution to trigger refund after expiry (in case target Operator goes offline while deposits are in-flight from L2).
@@ -192,7 +194,7 @@ Note: at the moment you cannot have more than 1 cross-chain message in-flight at
         - [x] Transfer bridgeable rewards tokens back to L2.
         - [x] Transfer L1 rewards tokens to AgentOwner address on L1.
 
-- Gas optimization
+- [ ] Gas optimization
     - [x] Estimate gas limit for each of the previous operations
     - [x] Reduce gas costs associated with 6551 accounts creation + delegate calls
         - [ ] Remove proxies if we don't need upgradeability.
