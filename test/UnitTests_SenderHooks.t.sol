@@ -85,7 +85,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         );
 
         // Return default gasLimit of 400_000 for undefined function selectors
-        vm.assertEq(senderHooks.getGasLimitForFunctionSelector(0xffeeaabb), 400_000);
+        vm.assertEq(senderHooks.getGasLimitForFunctionSelector(0xffeeaabb), 200_000);
 
         // gas limits should be set
         vm.assertEq(senderHooks.getGasLimitForFunctionSelector(functionSelectors[0]), 1_000_000);
@@ -160,7 +160,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             senderHooks.beforeSendCCIPMessage(
                 abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
                 BaseSepolia.BridgeToken,
-                amount
+                0 ether
             );
         }
         vm.stopBroadcast();
@@ -181,7 +181,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
             address(0), // tokenL2
-            amount
+            0 ether
         );
 
         vm.stopBroadcast();

@@ -2,14 +2,15 @@
 pragma solidity 0.8.25;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
-import {Adminable} from "./utils/Adminable.sol";
 
 import {ISenderHooks} from "./interfaces/ISenderHooks.sol";
 import {EigenlayerMsgDecoders, TransferToAgentOwnerMsg} from "./utils/EigenlayerMsgDecoders.sol";
 import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
+import {Adminable} from "./utils/Adminable.sol";
 import {EthSepolia} from "../script/Addresses.sol";
 
 
@@ -78,7 +79,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * - delegateTo(address,(bytes,uint256),bytes32) == 0xeea9064b
      * - undelegate(address) == 0xda8be864
      * @param functionSelector bytes4 functionSelector to get estimated gasLimits for.
-     * @return gasLimit a default gasLimit of 400_000 functionSelector parameter finds no matches.
+     * @return gasLimit a default gasLimit of 200_000 functionSelector parameter finds no matches.
      */
     function getGasLimitForFunctionSelector(bytes4 functionSelector)
         public
@@ -86,7 +87,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         returns (uint256)
     {
         uint256 gasLimit = _gasLimitsForFunctionSelectors[functionSelector];
-        return (gasLimit > 0) ? gasLimit : 400_000;
+        return (gasLimit > 0) ? gasLimit : 200_000;
     }
 
     /**
@@ -210,23 +211,17 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
 
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
+        if (functionSelector != IStrategyManager.depositIntoStrategy.selector) {
+            // check tokens are only bridged for deposit calls
+            if (amount > 0) revert OnlySendFundsForDeposits("Only send funds for deposit messages");
+        }
+
         if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
             // 0x60d7faed
             _commitWithdrawalTransferRootInfo(message, tokenL2);
-
         } else if (functionSelector == IRewardsCoordinator.processClaim.selector) {
             // 0x3ccc861d
             _commitRewardsTransferRootInfo(message, tokenL2);
-        }
-
-        // check tokens are only bridged for deposit calls
-        if (
-            amount > 0 &&
-            functionSelector != bytes4(0) &&
-            functionSelector != IStrategyManager.depositIntoStrategy.selector
-            // matched a function selector that is not a deposit message
-        ) {
-            revert OnlySendFundsForDeposits("Only send funds for deposit messages");
         }
 
         return getGasLimitForFunctionSelector(functionSelector);
@@ -241,7 +236,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
 
         (
             IDelegationManager.Withdrawal memory withdrawal,
-            , // tokensToWithdraw,
+            IERC20[] memory tokensToWithdraw,
             , // middlewareTimesIndex
             bool receiveAsTokens, // receiveAsTokens
             address signer, // signer
@@ -249,37 +244,42 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             // signature
         ) = decodeCompleteWithdrawalMsg(message);
 
-        // only when withdrawing tokens back to L2, not for re-deposits from re-delegations
-        if (receiveAsTokens) {
+        for (uint256 i = 0; i < tokensToWithdraw.length; ++i) {
 
-            // Calculate withdrawalTransferRoot: hash(withdrawalRoot, signer)
-            // and commit to it on L2, so that when the withdrawalTransferRoot message is
-            // returned from L1 we can lookup and verify which AgentOwner to transfer funds to.
-            bytes32 withdrawalTransferRoot = calculateWithdrawalTransferRoot(
-                _calculateWithdrawalRoot(withdrawal),
-                withdrawal.shares[0], // amount
-                signer // agentOwner
-            );
-            // This prevents griefing attacks where other users put in withdrawalRoot entries
-            // with the wrong agentOwner address, preventing completeWithdrawals
+            // @param receiveAsTokens is an Eigenlayer parameter that determines whether a user is withdraws
+            // tokens (receiveAsTokens = true), or re-deposits tokens as part of redelegating to an Operator.
+            // This state is only reached when withdrawing BridgeTokens back to L2, not for re-deposits.
+            if (receiveAsTokens && address(tokensToWithdraw[i]) == EthSepolia.BridgeToken) {
 
-            require(
-                transferRootsSpent[withdrawalTransferRoot] == false,
-                "SenderHooks._commitWithdrawalTransferRootInfo: TransferRoot already used"
-            );
+                // Calculate withdrawalTransferRoot: hash(withdrawalRoot, amount, signer)
+                // and commit to it on L2, so that when the withdrawalTransferRoot message is
+                // returned from L1 we can lookup and verify which AgentOwner to transfer funds to.
+                bytes32 withdrawalTransferRoot = calculateWithdrawalTransferRoot(
+                    _calculateWithdrawalRoot(withdrawal),
+                    withdrawal.shares[0], // amount
+                    signer // agentOwner
+                );
+                // This prevents griefing attacks where other users put in withdrawalRoot entries
+                // with the wrong agentOwner address, preventing completeWithdrawals
 
-            // Commit to WithdrawalTransfer(withdrawer, amount, token, owner) before sending completeWithdrawal message,
-            transferCommitments[withdrawalTransferRoot] = ISenderHooks.FundsTransfer({
-                amount: withdrawal.shares[0],
-                agentOwner: signer // signer is owner of EigenAgent, used in handleTransferToAgentOwner
-            });
+                require(
+                    transferRootsSpent[withdrawalTransferRoot] == false,
+                    "SenderHooks._commitWithdrawalTransferRootInfo: TransferRoot already used"
+                );
 
-            emit WithdrawalTransferRootCommitted(
-                withdrawalTransferRoot,
-                withdrawal.withdrawer, // eigenAgent
-                withdrawal.shares[0], // amount
-                signer // agentOwner
-            );
+                // Commit to WithdrawalTransfer(withdrawer, amount, token, owner) before sending completeWithdrawal message,
+                transferCommitments[withdrawalTransferRoot] = ISenderHooks.FundsTransfer({
+                    amount: withdrawal.shares[0],
+                    agentOwner: signer // signer is owner of EigenAgent, used in handleTransferToAgentOwner
+                });
+
+                emit WithdrawalTransferRootCommitted(
+                    withdrawalTransferRoot,
+                    withdrawal.withdrawer, // eigenAgent
+                    withdrawal.shares[0], // amount
+                    signer // agentOwner
+                );
+            }
         }
     }
 
@@ -303,10 +303,8 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
 
             uint256 rewardAmount = claim.tokenLeaves[i].cumulativeEarnings;
             address rewardToken = address(claim.tokenLeaves[i].token);
-            // TODO: validate token is the correct EthSepolia.BridgeToken
 
             if (rewardToken == EthSepolia.BridgeToken) {
-
                 // Calculate rewardsTransferRoot and commit to it on L2, so that when the
                 // rewardsTransferRoot message is returned from L1 we can lookup and verify
                 // which AgentOwner to transfer rewards to.
@@ -324,7 +322,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
                     "SenderHooks._commitRewardsTransferRootInfo: TransferRoot already used"
                 );
 
-                // Commit to RewardsTransfer(amount, agentOwner) before sending processClaim message,
+                // Commit to RewardsTransfer (amount, agentOwner) before sending processClaim message,
                 transferCommitments[rewardsTransferRoot] = ISenderHooks.FundsTransfer({
                     amount: rewardAmount,
                     agentOwner: signer // signer is owner of recipient (EigenAgent)
@@ -337,8 +335,9 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
                     signer // signer
                 );
             } else {
-                // Briding will continue however only BridgeToken can be claimed back to L2.
-                // Other L1 tokens will be claimed and transferred to AgentOwner on L1.
+                // Only the BridgeToken will be bridged back to L2.
+                // Other L1 tokens will be claimed and transferred to AgentOwner on L1
+                // and do not need a TransferRoot commitment.
             }
 
         }
