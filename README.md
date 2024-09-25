@@ -25,34 +25,40 @@ This also keeps custody of funds with the user (who owns the 6551 NFT) and gives
 
 ### Running Tests and Restaking Scripts
 
-Tests bridge from L2 to L1, then deposit in Eigenlayer, queueWithdrawal, completeWithdrawal, then bridge back to the original user on L2.
-
-The scripts run on Base Sepolia, and Eth Sepolia and bridges CCIP's BnM ERC20 token (swap for MAGIC).
-
-Test deposit and withdrawal:
+The following test will bridge from L2 to L1, deposit in Eigenlayer, queueWithdrawals, completeWithdrawal, then bridge back to the original user on L2.
 ```
 forge test --match-test test_FullFlow_CompleteWithdrawal -vvvv
 ```
 
-Test delegating, undelegating, and re-depositing:
+The following test will teset delegating, undelegating, and re-depositing:
 ```
 forge test --match-test test_FullFlow_Undelegate_Delegate_Redeposit -vvvv
 ```
 
-Test coverage:
+See test coverage (there is an `lcov.info` file for coverage as well):
 ```
 forge coverage
 ```
 
+Frontend clients will make contract calls similar to the the scripts in the `scripts` folder. These scripts run on Base Sepolia and dispatches CCIP calls to Eth Sepolia, bridging `CCIP-BnM` ERC20 tokens and interacting with mock Eigenlayer Strategy Vaults setup for the `CCIP-BnM` token.
 
 To run the Scripts see the `scripts` folder:
-- `5_depositAndMintEigenAgent.sh`: makes a cross-chain deposit into Eigenlayer from L2.
+- `5_depositAndMintEigenAgent.sh`: makes a cross-chain deposit into Eigenlayer from L2, minting an EigenAgent if the use does not yet have one.
 - `7_queueWithdrawal.sh`: queues a withdrawal from L2.
 - `8_completeWithdrawal.sh`: completes the withdrawal and bridges the deposit back from L1 into the original staker's wallet on L2.
+- `9_submitRewards.sh`: sets up token emission rewards for the week, however can only be down once per epoch (weekly)
+- `9b_processClaimRewards.sh`: claims token emissions rewards for the user and bridges tokens back to L2 user.
+
 
 Scripts `2_deploySenderOnL2.s.sol`, `3_deployReceiverOnL1.s.sol` and `4_whitelistCCIPContracts.sh` deploy the CCIP bridge contracts, and 6551 and Eigenlayer Restaking handler contracts.
 
 There are `2b` and `3b` upgrade scripts which need to be run when changes made to either the `SenderCCIP`, `ReceiverCCIP`,`RestakingConnector`, `SenderUtils`, `AgentFactory` or `EigenAgentOwner721` contracts.
+
+The following scripts will test delegation:
+- `6_delegateTo.sh` delegates to an Operator
+- `6b_undelegate.sh` undelegates from an Operator and begins a cooldown period (7 days on mainnet)
+- `6c_redeposit.sh` re-deposits shares into Eigenlayer and allows the user to re-delegate to another Operator.
+Everytime a user undelegates, there is a cooldown timer.
 
 
 Bridging times depend on the finality times of source and destination chains.
