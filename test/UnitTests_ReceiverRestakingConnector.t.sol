@@ -77,7 +77,11 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
      function test_Initialize_Receiver() public {
 
-        ReceiverCCIP receiverImpl = new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link);
+        ReceiverCCIP receiverImpl = new ReceiverCCIP(
+            EthSepolia.Router,
+            EthSepolia.BridgeToken,
+            BaseSepolia.BridgeToken
+        );
         ProxyAdmin pa = new ProxyAdmin();
 
         vm.expectRevert(

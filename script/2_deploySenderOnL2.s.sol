@@ -56,9 +56,17 @@ contract DeploySenderOnL2Script is Script, FileReader {
         // deploy sender
         SenderCCIP senderImpl;
         if (isMockRun) {
-            senderImpl = new SenderCCIPMock(BaseSepolia.Router, BaseSepolia.Link);
+            senderImpl = new SenderCCIPMock(
+                BaseSepolia.Router,
+                EthSepolia.BridgeToken,
+                BaseSepolia.BridgeToken
+            );
         } else {
-            senderImpl = new SenderCCIP(BaseSepolia.Router, BaseSepolia.Link);
+            senderImpl = new SenderCCIP(
+                BaseSepolia.Router,
+                EthSepolia.BridgeToken,
+                BaseSepolia.BridgeToken
+            );
         }
 
         SenderCCIP senderProxy = SenderCCIP(

@@ -8,10 +8,10 @@ import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManage
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 
 import {ISenderHooks} from "./interfaces/ISenderHooks.sol";
+import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {EigenlayerMsgDecoders, TransferToAgentOwnerMsg} from "./utils/EigenlayerMsgDecoders.sol";
 import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 import {Adminable} from "./utils/Adminable.sol";
-import {EthSepolia} from "../script/Addresses.sol";
 
 
 /// @title Sender Hooks: processes SenderCCIP messages and stores state
@@ -244,19 +244,23 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             // signature
         ) = decodeCompleteWithdrawalMsg(message);
 
-        for (uint256 i = 0; i < tokensToWithdraw.length; ++i) {
+        address bridgeTokenL1 = ISenderCCIP(_senderCCIP).bridgeTokenL1();
 
-            // @param receiveAsTokens is an Eigenlayer parameter that determines whether a user is withdraws
-            // tokens (receiveAsTokens = true), or re-deposits tokens as part of redelegating to an Operator.
-            // This state is only reached when withdrawing BridgeTokens back to L2, not for re-deposits.
-            if (receiveAsTokens && address(tokensToWithdraw[i]) == EthSepolia.BridgeToken) {
+        for (uint256 i = 0; i < tokensToWithdraw.length; ++i) {
+            // Assume only one token (BridgeToken) is bridgeable:
+            // Otherwise we need to track L1 and L2 addresses of all bridgeable tokens
+            if (receiveAsTokens && address(tokensToWithdraw[i]) == bridgeTokenL1) {
+
+                // @param receiveAsTokens is an Eigenlayer parameter that determines whether a user is withdraws
+                // tokens (receiveAsTokens = true), or re-deposits tokens as part of redelegating to an Operator.
+                // This state is only reached when withdrawing BridgeTokens back to L2, not for re-deposits.
 
                 // Calculate withdrawalTransferRoot: hash(withdrawalRoot, amount, signer)
                 // and commit to it on L2, so that when the withdrawalTransferRoot message is
                 // returned from L1 we can lookup and verify which AgentOwner to transfer funds to.
                 bytes32 withdrawalTransferRoot = calculateWithdrawalTransferRoot(
                     _calculateWithdrawalRoot(withdrawal),
-                    withdrawal.shares[0], // amount
+                    withdrawal.shares[i], // amount
                     signer // agentOwner
                 );
                 // This prevents griefing attacks where other users put in withdrawalRoot entries
@@ -269,14 +273,14 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
 
                 // Commit to WithdrawalTransfer(withdrawer, amount, token, owner) before sending completeWithdrawal message,
                 transferCommitments[withdrawalTransferRoot] = ISenderHooks.FundsTransfer({
-                    amount: withdrawal.shares[0],
+                    amount: withdrawal.shares[i],
                     agentOwner: signer // signer is owner of EigenAgent, used in handleTransferToAgentOwner
                 });
 
                 emit WithdrawalTransferRootCommitted(
                     withdrawalTransferRoot,
                     withdrawal.withdrawer, // eigenAgent
-                    withdrawal.shares[0], // amount
+                    withdrawal.shares[i], // amount
                     signer // agentOwner
                 );
             }
@@ -299,12 +303,16 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             // signature
         ) = decodeProcessClaimMsg(message);
 
+        address bridgeTokenL1 = ISenderCCIP(_senderCCIP).bridgeTokenL1();
+
         for (uint32 i = 0; i < claim.tokenLeaves.length; ++i) {
 
             uint256 rewardAmount = claim.tokenLeaves[i].cumulativeEarnings;
             address rewardToken = address(claim.tokenLeaves[i].token);
 
-            if (rewardToken == EthSepolia.BridgeToken) {
+            // Assume only one reward token is bridgeable (BridgeToken)
+            // Otherwise we need to track L1 and L2 addresses of all bridgeable tokens
+            if (rewardToken == bridgeTokenL1) {
                 // Calculate rewardsTransferRoot and commit to it on L2, so that when the
                 // rewardsTransferRoot message is returned from L1 we can lookup and verify
                 // which AgentOwner to transfer rewards to.

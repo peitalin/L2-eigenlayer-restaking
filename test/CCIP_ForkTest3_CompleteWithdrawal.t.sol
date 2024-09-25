@@ -680,7 +680,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
 
         uint256 bobBalanceBefore = token3.balanceOf(bob);
 
-        vm.expectEmit(false, true, true, false);
+        vm.expectEmit(true, true, true, false);
         emit ReceiverCCIP.BridgingWithdrawalToL2(
             calculateWithdrawalTransferRoot(
                 delegationManager.calculateWithdrawalRoot(withdrawal),

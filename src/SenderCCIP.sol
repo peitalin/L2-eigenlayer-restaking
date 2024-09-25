@@ -17,11 +17,14 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
     event MatchedReceivedFunctionSelector(bytes4 indexed);
 
-    /**
-     * @param _router address of the router contract.
-     * @param _link address of the link contract.
-     */
-    constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {
+    /// @param _router address of the router contract.
+    /// @param _bridgeTokenL1 address of the bridging token's L1 contract.
+    /// @param _bridgeTokenL2 address of the bridging token's L2 contract.
+    constructor(
+        address _router,
+        address _bridgeTokenL1,
+        address _bridgeTokenL2
+    ) BaseMessengerCCIP(_router, _bridgeTokenL1, _bridgeTokenL2) {
         _disableInitializers();
     }
 

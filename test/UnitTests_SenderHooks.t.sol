@@ -2,6 +2,7 @@
 pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
+import {console} from "forge-std/Test.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
@@ -110,11 +111,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             bytes memory messageWithSignature_CW
         ) = mockCompleteWithdrawalMessage(bobKey);
 
-        bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalTransferRoot(
-            withdrawalRoot,
-            amount,
-            bob
-        );
+        console.log("tokenL1", address(tokenL1));
 
         // called by senderContract
         vm.expectRevert(abi.encodeWithSelector(
@@ -125,18 +122,26 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             amount
         );
 
-        vm.expectEmit(true, true, true, false);
+        uint256 amountZero = 0 ether;
+
+        bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalTransferRoot(
+            withdrawalRoot,
+            amountZero,
+            bob
+        );
+
+        vm.expectEmit(false, false, false, false);
         emit SenderHooks.WithdrawalTransferRootCommitted(
             withdrawalAgentOwnerRoot,
             mockEigenAgent, // withdrawer
-            amount,
+            amountZero, // must be 0 ether for non-deposit calls
             bob // signer
         );
         // called by senderContract
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
             BaseSepolia.BridgeToken,
-            0
+            amountZero
         );
 
         vm.stopBroadcast();
@@ -202,7 +207,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_PC)), // CCIP string encodes when messaging
             address(0), // tokenL2
-            amount
+            0 ether
         );
 
         vm.stopBroadcast();

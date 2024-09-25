@@ -8,6 +8,7 @@ import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
+import {NonPayableContract} from "./mocks/NonPayableContract.sol";
 
 
 contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
@@ -89,6 +90,29 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
         require(alice.balance == 1.1 ether, "alice should have received 1 ETH");
         require(address(senderContract).balance == 0, "sender should have sent entire ETH balance");
+    }
+
+    function test_BaseMessenger_withdrawFailure() public {
+
+        vm.selectFork(l2ForkId);
+
+        vm.deal(address(senderContract), 1.1 ether);
+
+        NonPayableContract nonPayableContract = new NonPayableContract();
+
+        vm.prank(deployer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                FailedToWithdrawEth.selector,
+                deployer, // owner
+                address(nonPayableContract), // target
+                1.1 ether // uint256 value
+            )
+        );
+        senderContract.withdraw(address(nonPayableContract));
+
+        vm.assertEq(address(nonPayableContract).balance, 0);
+        vm.assertEq(address(senderContract).balance, 1.1 ether);
     }
 
     function test_BaseMessenger_L1_onlyAllowlistedSender() public {
@@ -440,7 +464,6 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             800_000
         );
     }
-
 
     function test_Sender_L2_sendMessagePayNative_Deposit() public {
 

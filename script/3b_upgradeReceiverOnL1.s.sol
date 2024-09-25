@@ -18,7 +18,7 @@ import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
-import {EthSepolia} from "./Addresses.sol";
+import {EthSepolia, BaseSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
 
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
@@ -113,7 +113,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
         // Upgrade ReceiverCCIP proxy to new implementation
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(receiverProxy))),
-            address(new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link))
+            address(new ReceiverCCIP(EthSepolia.Router, EthSepolia.BridgeToken, BaseSepolia.BridgeToken))
         );
         vm.stopBroadcast();
 

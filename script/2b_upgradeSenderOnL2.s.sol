@@ -48,7 +48,7 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
 
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(senderProxy))),
-            address(new SenderCCIP(BaseSepolia.Router, BaseSepolia.Link))
+            address(new SenderCCIP(BaseSepolia.Router, EthSepolia.BridgeToken, BaseSepolia.BridgeToken))
         );
 
         proxyAdmin.upgrade(

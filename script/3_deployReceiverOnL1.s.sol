@@ -151,9 +151,17 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         // deploy real receiver implementation and upgradeAndCall initializer
         ReceiverCCIP receiverImpl;
         if (isMockRun) {
-            receiverImpl = new ReceiverCCIPMock(EthSepolia.Router, EthSepolia.Link);
+            receiverImpl = new ReceiverCCIPMock(
+                EthSepolia.Router,
+                EthSepolia.BridgeToken,
+                BaseSepolia.BridgeToken
+            );
         } else {
-            receiverImpl = new ReceiverCCIP(EthSepolia.Router, EthSepolia.Link);
+            receiverImpl = new ReceiverCCIP(
+                EthSepolia.Router,
+                EthSepolia.BridgeToken,
+                BaseSepolia.BridgeToken
+            );
         }
         receiverProxy = ReceiverCCIP(
             payable(address(
