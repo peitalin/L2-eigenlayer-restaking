@@ -7,7 +7,7 @@ Eigenlayer does not allow ThirdParty withdrawals, users must use their wallets t
 This also keeps custody of funds with the user (who owns the 6551 NFT) and gives them an escape option to withdraw funds on L1.
 
 
-##### Table of Contents
+### Table of Contents
 - [Running Tests and Restaking Scripts](#running-tests-and-restaking-scripts)
 - [Sepolia L2 Restaking Example](#sepolia-L2-restaking-example)
     - [1. Deposit with EigenAgent](#deposit-with-eigenagent)
