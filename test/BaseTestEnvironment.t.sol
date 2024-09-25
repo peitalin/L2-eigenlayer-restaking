@@ -4,7 +4,6 @@ pragma solidity 0.8.25;
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
-import {IERC20Minter} from "../src/interfaces/IERC20Minter.sol";
 
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
@@ -12,6 +11,7 @@ import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IStrategyFactory} from "@eigenlayer-contracts/interfaces/IStrategyFactory.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 
+import {IERC20Minter} from "./mocks/IERC20Minter.sol";
 import {IReceiverCCIPMock} from "./mocks/ReceiverCCIPMock.sol";
 import {ISenderCCIPMock} from "./mocks/SenderCCIPMock.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
