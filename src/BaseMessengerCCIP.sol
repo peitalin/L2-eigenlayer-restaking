@@ -17,7 +17,9 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     mapping(uint64 => bool) public allowlistedSourceChains;
     mapping(address => bool) public allowlistedSenders;
 
-    IERC20 internal s_linkToken;
+    /// @notice set token addresses so contract knows which tokens are bridgeable
+    address public bridgeTokenL1;
+    address public bridgeTokenL2;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -25,7 +27,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
 
-    uint256[46] private __gap;
+    uint256[45] private __gap;
 
     event MessageSent(
         bytes32 indexed messageId,
@@ -56,9 +58,13 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
     constructor(
         address _router,
-        address _link
+        address _bridgeTokenL1,
+        address _bridgeTokenL2
     ) CCIPReceiver(_router) {
-        s_linkToken = IERC20(_link);
+        require(_bridgeTokenL1 != address(0), "_bridgeTokenL1 cannot be address(0)");
+        require(_bridgeTokenL2 != address(0), "_bridgeTokenL2 cannot be address(0)");
+        bridgeTokenL1 = _bridgeTokenL1;
+        bridgeTokenL2 = _bridgeTokenL2;
     }
 
     function __BaseMessengerCCIP_init() internal {
@@ -109,6 +115,13 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     /// @param allowed allowlist status to be set for the sender.
     function allowlistSender(address _sender, bool allowed) external onlyOwner {
         allowlistedSenders[_sender] = allowed;
+    }
+
+    function setBridgeTokens(address _bridgeTokenL1, address _bridgeTokenL2) external onlyOwner {
+        require(_bridgeTokenL1 != address(0), "_bridgeTokenL1 cannot be address(0)");
+        require(_bridgeTokenL2 != address(0), "_bridgeTokenL2 cannot be address(0)");
+        bridgeTokenL1 = _bridgeTokenL1;
+        bridgeTokenL2 = _bridgeTokenL2;
     }
 
     /// @notice Sends data and transfer tokens to receiver on the destination chain.

@@ -27,5 +27,11 @@ interface IBaseMessengerCCIP {
     function withdraw(address _beneficiary) external;
 
     function withdrawToken(address _beneficiary, address _token) external;
+
+    function bridgeTokenL1() external returns (address);
+
+    function bridgeTokenL2() external returns (address);
+
+    function setBridgeTokens(address _bridgeTokenL1, address _bridgeTokenL2) external;
 }
 

@@ -12,7 +12,7 @@ import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
-import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
+import {BaseSepolia} from "../script/Addresses.sol";
 
 
 /// @title ETH L1 Messenger Contract: receives messages from L2 and processes them
@@ -51,8 +51,13 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     error AddressZero(string msg);
 
     /// @param _router address of the router contract.
-    /// @param _link address of the link contract.
-    constructor(address _router, address _link) BaseMessengerCCIP(_router, _link) {
+    /// @param _bridgeTokenL1 address of the bridging token's L1 contract.
+    /// @param _bridgeTokenL2 address of the bridging token's L2 contract.
+    constructor(
+        address _router,
+        address _bridgeTokenL1,
+        address _bridgeTokenL2
+    ) BaseMessengerCCIP(_router, _bridgeTokenL1, _bridgeTokenL2) {
         _disableInitializers();
     }
 
@@ -228,7 +233,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 uint256 withdrawalAmount
             ) = restakingConnector.completeWithdrawalWithEigenAgent(message);
 
-            if (receiveAsTokens) {
+            if (receiveAsTokens && withdrawalToken == bridgeTokenL1) {
                 // if receiveAsTokens == true, ReceiverCCIP should have received tokens
                 // back from EigenAgent after completeWithdrawal.
                 //
@@ -268,7 +273,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 uint256 rewardsAmount
             ) = restakingConnector.processClaimWithEigenAgent(message);
 
-            if (rewardsToken == EthSepolia.BridgeToken) {
+            if (rewardsToken == bridgeTokenL1) {
 
                 this.sendMessagePayNative(
                     BaseSepolia.ChainSelector, // destination chain
