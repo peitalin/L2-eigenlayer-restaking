@@ -4,6 +4,8 @@ pragma solidity 0.8.25;
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {console} from "forge-std/Test.sol";
 
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
@@ -53,6 +55,74 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         vm.assertEq(senderHooks.getSenderCCIP(), address(senderContract));
     }
 
+    function test_SenderHooks_SetBridgeTokens() public {
+
+        ProxyAdmin proxyAdmin = new ProxyAdmin();
+
+        address _bridgeTokenL1 = vm.addr(1001);
+        address _bridgeTokenL2 = vm.addr(2002);
+
+        SenderHooks senderImpl = new SenderHooks();
+
+        vm.expectRevert(abi.encodeWithSelector(AddressZero.selector, "_bridgeTokenL1 cannot be address(0)"));
+        new TransparentUpgradeableProxy(
+            address(senderImpl),
+            address(proxyAdmin),
+            abi.encodeWithSelector(
+                SenderHooks.initialize.selector,
+                address(0),
+                _bridgeTokenL2
+            )
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(AddressZero.selector, "_bridgeTokenL2 cannot be address(0)"));
+        new TransparentUpgradeableProxy(
+            address(senderImpl),
+            address(proxyAdmin),
+            abi.encodeWithSelector(
+                SenderHooks.initialize.selector,
+                _bridgeTokenL1,
+                address(0)
+            )
+        );
+
+        vm.prank(deployer);
+        SenderHooks senderHooks = SenderHooks(address(
+            new TransparentUpgradeableProxy(
+                address(senderImpl),
+                address(proxyAdmin),
+                abi.encodeWithSelector(
+                    SenderHooks.initialize.selector,
+                    _bridgeTokenL1,
+                    _bridgeTokenL2
+                )
+            )
+        ));
+
+        vm.startBroadcast(bob);
+        {
+            vm.expectRevert("Ownable: caller is not the owner");
+            senderHooks.setBridgeTokens(_bridgeTokenL1, _bridgeTokenL2);
+        }
+        vm.stopBroadcast();
+
+        vm.startBroadcast(deployer);
+        {
+            vm.expectRevert(abi.encodeWithSelector(AddressZero.selector, "_bridgeTokenL1 cannot be address(0)"));
+            senderHooks.setBridgeTokens(address(0), _bridgeTokenL2);
+
+            vm.expectRevert(abi.encodeWithSelector(AddressZero.selector, "_bridgeTokenL2 cannot be address(0)"));
+            senderHooks.setBridgeTokens(_bridgeTokenL1, address(0));
+
+            senderHooks.setBridgeTokens(_bridgeTokenL1, _bridgeTokenL2);
+            vm.assertEq(senderHooks.bridgeTokensL1toL2(_bridgeTokenL1), _bridgeTokenL2);
+
+            senderHooks.clearBridgeTokens(_bridgeTokenL1);
+            vm.assertEq(senderHooks.bridgeTokensL1toL2(_bridgeTokenL1), address(0));
+        }
+        vm.stopBroadcast();
+    }
+
     function test_SetAndGet_GasLimits_SenderHooks() public {
 
         uint256[] memory gasLimits = new uint256[](2);
@@ -99,7 +169,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         SenderHooks sHooks = new SenderHooks();
         // _disableInitializers on contract implementations
         vm.expectRevert("Initializable: contract is already initialized");
-        sHooks.initialize();
+        sHooks.initialize(address(1), address(2));
     }
 
     function test_BeforeSend_Commits_WithdrawalTransferRoot() public {
@@ -109,7 +179,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         (
             bytes32 withdrawalRoot,
             bytes memory messageWithSignature_CW
-        ) = mockCompleteWithdrawalMessage(bobKey);
+        ) = mockCompleteWithdrawalMessage(bobKey, amount);
 
         console.log("tokenL1", address(tokenL1));
 
@@ -118,7 +188,6 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             OnlySendFundsForDeposits.selector, "Only send funds for deposit messages"));
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-            BaseSepolia.BridgeToken,
             amount
         );
 
@@ -126,21 +195,17 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
 
         bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalTransferRoot(
             withdrawalRoot,
-            amountZero,
             bob
         );
 
         vm.expectEmit(false, false, false, false);
         emit SenderHooks.WithdrawalTransferRootCommitted(
             withdrawalAgentOwnerRoot,
-            mockEigenAgent, // withdrawer
-            amountZero, // must be 0 ether for non-deposit calls
-            bob // signer
+            bob
         );
         // called by senderContract
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-            BaseSepolia.BridgeToken,
             amountZero
         );
 
@@ -158,37 +223,15 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             (
                 , // bytes32 withdrawalRoot,
                 bytes memory messageWithSignature_CW
-            ) = mockCompleteWithdrawalMessage(bobKey);
+            ) = mockCompleteWithdrawalMessage(bobKey, amount);
 
             // Should revert if called by anyone other than senderContract
             vm.expectRevert("not called by SenderCCIP");
             senderHooks.beforeSendCCIPMessage(
                 abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-                BaseSepolia.BridgeToken,
                 0 ether
             );
         }
-        vm.stopBroadcast();
-    }
-
-    function test_BeforeSendCCIPMessage_WithdrawalTransferRoot_TokenCannotBeNull() public {
-
-        vm.startBroadcast(address(senderContract));
-
-        (
-            bytes32 withdrawalRoot,
-            bytes memory messageWithSignature_CW
-        ) = mockCompleteWithdrawalMessage(bobKey);
-
-        require(withdrawalRoot != bytes32(abi.encode(0)), "withdrawalRoot cannot be 0x0");
-
-        vm.expectRevert("SenderHooks._commitWithdrawalTransferRootInfo: cannot commit tokenL2 as address(0)");
-        senderHooks.beforeSendCCIPMessage(
-            abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-            address(0), // tokenL2
-            0 ether
-        );
-
         vm.stopBroadcast();
     }
 
@@ -203,10 +246,9 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
 
         require(rewardsRoot != bytes32(abi.encode(0)), "rewardsRoot cannot be 0x0");
 
-        vm.expectRevert("SenderHooks._commitRewardsTransferRootInfo: cannot commit tokenL2 as address(0)");
+        // vm.expectRevert("SenderHooks._commitRewardsTransferRootInfo: cannot commit tokenL2 as address(0)");
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_PC)), // CCIP string encodes when messaging
-            address(0), // tokenL2
             0 ether
         );
 
@@ -261,7 +303,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         rewardsRoot = calculateRewardsRoot(claim);
     }
 
-    function mockCompleteWithdrawalMessage(uint256 signerKey) public view
+    function mockCompleteWithdrawalMessage(uint256 signerKey, uint256 _amount) public view
         returns (
             bytes32 withdrawalRoot,
             bytes memory messageWithSignature_CW
@@ -271,7 +313,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         uint256[] memory sharesToWithdraw = new uint256[](1);
         strategiesToWithdraw[0] = strategy;
-        sharesToWithdraw[0] = amount;
+        sharesToWithdraw[0] = _amount;
 
         IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
             staker: mockEigenAgent,

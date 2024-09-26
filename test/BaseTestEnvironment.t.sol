@@ -134,7 +134,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
 
         // only for tests
         vm.prank(deployer);
-        receiverContract.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
+        restakingConnector.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
 
         vm.deal(address(receiverContract), 1 ether);
     }
@@ -260,7 +260,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             IERC20Minter(address(tokenL1)).mint(deployer, 1 ether);
 
             // for mock testing only
-            receiverContract.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
+            restakingConnector.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
         }
         vm.stopBroadcast();
 
@@ -284,7 +284,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             senderContract.allowlistSender(deployer, true);
 
             // for mock testing only
-            senderContract.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
+            senderHooks.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
         }
         vm.stopBroadcast();
     }

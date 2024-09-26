@@ -50,6 +50,7 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         ) = getEigenAgentAndExecNonce(staker);
 
         require(address(eigenAgent) == address(0), "User already has an EigenAgent");
+        // User already has an EigenAgent, use script 5b_depositIntoStrategy for lower cost.
 
         //////////////////////////////////////////////////////
         /// L2: Fund staker account

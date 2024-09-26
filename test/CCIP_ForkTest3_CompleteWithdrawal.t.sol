@@ -20,6 +20,7 @@ import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 
+import {console} from "forge-std/Test.sol";
 
 contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFees {
 
@@ -29,10 +30,8 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
 
     // SenderHooks.WithdrawalTransferRootCommitted
     event WithdrawalTransferRootCommitted(
-        bytes32 indexed, // withdrawalTransferRoot
-        address indexed, //  withdrawer (eigenAgent)
-        uint256, // amount
-        address  // signer (agentOwner)
+        bytes32 indexed withdrawalTransferRoot,
+        address signer
     );
 
     function setUp() public {
@@ -274,7 +273,6 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
 
         bytes32 withdrawalTransferRoot = calculateWithdrawalTransferRoot(
             withdrawalRoot,
-            withdrawal.shares[0],
             bob
         );
 
@@ -284,8 +282,6 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         vm.expectEmit(true, false, true, false);
         emit WithdrawalTransferRootCommitted(
             withdrawalTransferRoot,
-            withdrawal.withdrawer, // withdrawer
-            withdrawal.shares[0],
             bob // signer
         );
         senderContract.sendMessagePayNative{
@@ -364,11 +360,12 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         vm.selectFork(l2ForkId);
 
         // fundsTransfer info should be available
-        ISenderHooks.FundsTransfer memory fundsTransfer = senderHooks.getFundsTransferCommitment(
+        ISenderHooks.FundsTransfer[] memory fundsTransfer = senderHooks.getFundsTransferCommitment(
             withdrawalTransferRoot
         );
-        vm.assertEq(fundsTransfer.amount, amount);
-        vm.assertEq(fundsTransfer.agentOwner, bob);
+        vm.assertEq(fundsTransfer[0].amount, amount);
+        vm.assertEq(fundsTransfer[0].tokenL2, address(BaseSepolia.BridgeToken));
+        vm.assertEq(fundsTransfer[0].agentOwner, bob);
 
         // Mock SenderContract on L2 receiving the tokens and TransferToAgentOwner CCIP message from L1
         Client.EVMTokenAmount[] memory destTokenAmountsL2 = new Client.EVMTokenAmount[](1);
@@ -419,7 +416,6 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         bytes memory messageWithdrawalReuse = encodeTransferToAgentOwnerMsg(
             calculateWithdrawalTransferRoot(
                 withdrawalRoot,
-                amount,
                 bob
             )
         );
@@ -438,8 +434,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
 
         // fundsTransfer should be deleted after withdrawal completes
         fundsTransfer = senderHooks.getFundsTransferCommitment(withdrawalTransferRoot);
-        vm.assertEq(fundsTransfer.amount, 0);
-        vm.assertEq(fundsTransfer.agentOwner, address(0));
+        vm.assertEq(fundsTransfer.length, 0);
 
         // withdrawalTransferRoot should be spent now
         vm.assertEq(senderHooks.isTransferRootSpent(withdrawalTransferRoot), true);
@@ -455,6 +450,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
 
     function test_CompleteWithdrawals_MultipleTokensOnL1() public {
 
+        //// Bridge 1 token back to L2, and one to user on L1
         vm.selectFork(ethForkId);
 
         ///////////////////////////////////////////////////////
@@ -684,7 +680,6 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         emit ReceiverCCIP.BridgingWithdrawalToL2(
             calculateWithdrawalTransferRoot(
                 delegationManager.calculateWithdrawalRoot(withdrawal),
-                withdrawal.shares[0], // shares of tokenL1, not token3
                 bob
             ),
             address(tokenL1),

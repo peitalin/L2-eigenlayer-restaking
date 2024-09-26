@@ -48,7 +48,7 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
 
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(senderProxy))),
-            address(new SenderCCIP(BaseSepolia.Router, EthSepolia.BridgeToken, BaseSepolia.BridgeToken))
+            address(new SenderCCIP(BaseSepolia.Router))
         );
 
         proxyAdmin.upgrade(
@@ -60,9 +60,13 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         senderProxy.allowlistSender(address(receiverProxy), true);
-
         senderProxy.setSenderHooks(senderHooksProxy);
+
         senderHooksProxy.setSenderCCIP(address(senderProxy));
+        senderHooksProxy.setBridgeTokens(
+            EthSepolia.BridgeToken,
+            BaseSepolia.BridgeToken
+        );
 
         require(
             address(senderProxy.getSenderHooks()) != address(0),

@@ -2,11 +2,9 @@
 pragma solidity 0.8.25;
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
-import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 
 import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
@@ -22,7 +20,6 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     address public senderContractL2;
 
     mapping(bytes32 messageId => uint256) public amountRefundedToMessageIds;
-    mapping(bytes32 messageId => uint256) public unhandledFundsMessageIds;
 
     event BridgingWithdrawalToL2(
         bytes32 indexed withdrawalTransferRoot,
@@ -51,13 +48,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     error AddressZero(string msg);
 
     /// @param _router address of the router contract.
-    /// @param _bridgeTokenL1 address of the bridging token's L1 contract.
-    /// @param _bridgeTokenL2 address of the bridging token's L2 contract.
-    constructor(
-        address _router,
-        address _bridgeTokenL1,
-        address _bridgeTokenL2
-    ) BaseMessengerCCIP(_router, _bridgeTokenL1, _bridgeTokenL2) {
+    constructor(address _router) BaseMessengerCCIP(_router) {
         _disableInitializers();
     }
 
@@ -143,20 +134,51 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         if (any2EvmMessage.destTokenAmounts.length > 0) {
             tokenAddress = any2EvmMessage.destTokenAmounts[0].token;
             tokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
+            _approveRestakingConnectorForDeposits(
+                FunctionSelectorDecoder.decodeFunctionSelector(any2EvmMessage.data),
+                tokenAddress,
+                tokenAmount
+            );
         } else {
             tokenAddress = address(0);
             tokenAmount = 0;
         }
 
-        try this.dispatchMessageToEigenAgent(any2EvmMessage, tokenAddress, tokenAmount) {
-            // EigenAgent executes message successfully.
-            emit MessageReceived(
-                any2EvmMessage.messageId,
-                any2EvmMessage.sourceChainSelector,
-                abi.decode(any2EvmMessage.sender, (address)), // sender contract on L2
-                tokenAddress,
-                tokenAmount
-            );
+        try restakingConnector.dispatchMessageToEigenAgent(any2EvmMessage)
+            returns (IRestakingConnector.TransferTokensInfo[] memory transferTokensArray) {
+
+            for (uint32 i = 0; i < transferTokensArray.length; ++i) {
+
+                IRestakingConnector.TransferTokensInfo memory t = transferTokensArray[i];
+
+                if (t.transferRoot != bytes32(0)) {
+                    // If transferRoot is returned bridge to L2, then SenderCCIP transfers tokens to AgentOwner.
+                    this.sendMessagePayNative(
+                        BaseSepolia.ChainSelector, // destination chain
+                        senderContractL2,
+                        t.transferToAgentOwnerMessage,
+                        t.transferToken, // L1 token to burn/lock
+                        t.transferAmount,
+                        0 // use default gasLimit
+                    );
+
+                    if (t.transferType == IRestakingConnector.TransferType.Withdrawal) {
+                        emit BridgingWithdrawalToL2(t.transferRoot, t.transferToken, t.transferAmount);
+
+                    } else if (t.transferType == IRestakingConnector.TransferType.RewardsClaim) {
+                        emit BridgingRewardsToL2(t.transferRoot, t.transferToken, t.transferAmount);
+
+                    }
+                }
+                // EigenAgent executes message successfully.
+                emit MessageReceived(
+                    any2EvmMessage.messageId,
+                    any2EvmMessage.sourceChainSelector,
+                    abi.decode(any2EvmMessage.sender, (address)), // sender contract on L2
+                    tokenAddress,
+                    tokenAmount
+                );
+            }
 
         } catch (bytes memory customError) {
 
@@ -192,102 +214,15 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         }
     }
 
-    /**
-     * @dev This function only called by internally (but is marked external for try/catch feature).
-     * @notice This function matches a function selector, then forwards CCIP Eigenlayer messages
-     * to the RestakingConnector which deserializes the rest of the message and
-     * forwards it to the user's EigenAgent for execution.
-     */
-    function dispatchMessageToEigenAgent(
-        Client.Any2EVMMessage memory any2EvmMessage,
-        address token,
-        uint256 amount
-    ) external {
-
-        require(msg.sender == address(this), "Function not called internally");
-
-        bytes memory message = any2EvmMessage.data;
-        bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
-
+    /// @dev approves RestakingConnector to transfer tokens from ReceiverCCIP to EigenAgent
+    function _approveRestakingConnectorForDeposits(
+        bytes4 functionSelector,
+        address tokenAddress,
+        uint256 tokenAmount
+    ) private {
         if (functionSelector == IStrategyManager.depositIntoStrategy.selector) {
-            /// depositIntoStrategy - 0xe7a050aa
-            IERC20(token).approve(address(restakingConnector), amount);
-            // approve RestakingConnector to transfer tokens to EigenAgent
-            restakingConnector.depositWithEigenAgent(message);
-
-        } else if (functionSelector == IRestakingConnector.mintEigenAgent.selector) {
-            /// mintEigenAgent - 0xcc15a557
-            restakingConnector.mintEigenAgent(message);
-
-        } else if (functionSelector == IDelegationManager.queueWithdrawals.selector) {
-            /// queueWithdrawals - 0x0dd8dd02
-            restakingConnector.queueWithdrawalsWithEigenAgent(message);
-
-        } else if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
-            /// completeWithdrawal - 0x60d7faed
-            (
-                bool receiveAsTokens,
-                string memory messageForL2,
-                bytes32 withdrawalTransferRoot,
-                address withdrawalToken,
-                uint256 withdrawalAmount
-            ) = restakingConnector.completeWithdrawalWithEigenAgent(message);
-
-            if (receiveAsTokens && withdrawalToken == bridgeTokenL1) {
-                // if receiveAsTokens == true, ReceiverCCIP should have received tokens
-                // back from EigenAgent after completeWithdrawal.
-                //
-                // Send handleTransferToAgentOwner message to bridge tokens back to L2.
-                // L2 SenderCCIP transfers tokens to AgentOwner.
-                this.sendMessagePayNative(
-                    BaseSepolia.ChainSelector, // destination chain
-                    senderContractL2,
-                    messageForL2,
-                    withdrawalToken, // L1 token to burn/lock
-                    withdrawalAmount,
-                    0 // use default gasLimit
-                );
-
-                emit BridgingWithdrawalToL2(withdrawalTransferRoot, withdrawalToken, withdrawalAmount);
-
-            } else {
-                // Otherwise if `receiveAsTokens == false`, withdrawal is redeposited in Eigenlayer
-                // as shares, re-delegated to a new Operator as part of the `undelegate` flow.
-                // We do not need to do anything in this case.
-            }
-
-        } else if (functionSelector == IDelegationManager.delegateTo.selector) {
-            /// delegateTo - 0xeea9064b
-            restakingConnector.delegateToWithEigenAgent(message);
-
-        } else if (functionSelector == IDelegationManager.undelegate.selector) {
-            /// undelegate - 0xda8be864
-            restakingConnector.undelegateWithEigenAgent(message);
-
-        } else if (functionSelector == IRewardsCoordinator.processClaim.selector) {
-            /// processClaim (Rewards) - 0x3ccc861d
-            (
-                string memory messageForL2,
-                bytes32 rewardsTransferRoot,
-                address rewardsToken,
-                uint256 rewardsAmount
-            ) = restakingConnector.processClaimWithEigenAgent(message);
-
-            if (rewardsToken == bridgeTokenL1) {
-
-                this.sendMessagePayNative(
-                    BaseSepolia.ChainSelector, // destination chain
-                    senderContractL2,
-                    messageForL2,
-                    rewardsToken, // L1 token to burn/lock
-                    rewardsAmount,
-                    0 // use default gasLimit
-                );
-
-                emit BridgingRewardsToL2(rewardsTransferRoot, rewardsToken, rewardsAmount);
-            }
+            IERC20(tokenAddress).approve(address(restakingConnector), tokenAmount);
         }
-        // Should not reach this state with bridged funds, as SenderCCIP only sends funds for deposits.
     }
 
     /**

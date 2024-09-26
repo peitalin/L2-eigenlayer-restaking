@@ -17,17 +17,13 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     mapping(uint64 => bool) public allowlistedSourceChains;
     mapping(address => bool) public allowlistedSenders;
 
-    /// @notice set token addresses so contract knows which tokens are bridgeable
-    address public bridgeTokenL1;
-    address public bridgeTokenL2;
-
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
 
-    uint256[45] private __gap;
+    uint256[47] private __gap;
 
     event MessageSent(
         bytes32 indexed messageId,
@@ -56,16 +52,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     error InvalidReceiverAddress();
     error NotEnoughEthGasFees(uint256 setGasFees, uint256 requiredGasFees);
 
-    constructor(
-        address _router,
-        address _bridgeTokenL1,
-        address _bridgeTokenL2
-    ) CCIPReceiver(_router) {
-        require(_bridgeTokenL1 != address(0), "_bridgeTokenL1 cannot be address(0)");
-        require(_bridgeTokenL2 != address(0), "_bridgeTokenL2 cannot be address(0)");
-        bridgeTokenL1 = _bridgeTokenL1;
-        bridgeTokenL2 = _bridgeTokenL2;
-    }
+    constructor(address _router) CCIPReceiver(_router) { }
 
     function __BaseMessengerCCIP_init() internal {
         OwnableUpgradeable.__Ownable_init();
@@ -115,13 +102,6 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     /// @param allowed allowlist status to be set for the sender.
     function allowlistSender(address _sender, bool allowed) external onlyOwner {
         allowlistedSenders[_sender] = allowed;
-    }
-
-    function setBridgeTokens(address _bridgeTokenL1, address _bridgeTokenL2) external onlyOwner {
-        require(_bridgeTokenL1 != address(0), "_bridgeTokenL1 cannot be address(0)");
-        require(_bridgeTokenL2 != address(0), "_bridgeTokenL2 cannot be address(0)");
-        bridgeTokenL1 = _bridgeTokenL1;
-        bridgeTokenL2 = _bridgeTokenL2;
     }
 
     /// @notice Sends data and transfer tokens to receiver on the destination chain.

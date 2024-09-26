@@ -59,41 +59,6 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
         vm.stopBroadcast();
     }
 
-    function test_BaseMessenger_SetBridgeTokens() public {
-
-        address _bridgeTokenL1 = vm.addr(1001);
-        address _bridgeTokenL2 = vm.addr(2002);
-
-        vm.expectRevert("_bridgeTokenL1 cannot be address(0)");
-        new SenderCCIP(BaseSepolia.Router, address(0), _bridgeTokenL2);
-
-        vm.expectRevert("_bridgeTokenL2 cannot be address(0)");
-        new SenderCCIP(BaseSepolia.Router, _bridgeTokenL1, address(0));
-
-        IBaseMessengerCCIP baseMessenger = IBaseMessengerCCIP(address(senderContract));
-
-        vm.startBroadcast(bob);
-        {
-            vm.expectRevert("Ownable: caller is not the owner");
-            baseMessenger.setBridgeTokens(_bridgeTokenL1, _bridgeTokenL2);
-        }
-        vm.stopBroadcast();
-
-        vm.startBroadcast(deployer);
-        {
-            vm.expectRevert("_bridgeTokenL1 cannot be address(0)");
-            baseMessenger.setBridgeTokens(address(0), _bridgeTokenL2);
-
-            vm.expectRevert("_bridgeTokenL2 cannot be address(0)");
-            baseMessenger.setBridgeTokens(_bridgeTokenL1, address(0));
-
-            baseMessenger.setBridgeTokens(_bridgeTokenL1, _bridgeTokenL2);
-            vm.assertEq(senderContract.bridgeTokenL1(), _bridgeTokenL1);
-            vm.assertEq(senderContract.bridgeTokenL2(), _bridgeTokenL2);
-        }
-        vm.stopBroadcast();
-    }
-
     function test_MockReceive_RandomMessage_WithTokens() public {
 
         vm.startBroadcast(address(senderContract));

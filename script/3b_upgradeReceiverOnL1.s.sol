@@ -113,7 +113,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
         // Upgrade ReceiverCCIP proxy to new implementation
         proxyAdmin.upgrade(
             TransparentUpgradeableProxy(payable(address(receiverProxy))),
-            address(new ReceiverCCIP(EthSepolia.Router, EthSepolia.BridgeToken, BaseSepolia.BridgeToken))
+            address(new ReceiverCCIP(EthSepolia.Router))
         );
         vm.stopBroadcast();
 
@@ -128,6 +128,10 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
 
         restakingConnectorProxy.setAgentFactory(address(agentFactoryProxy));
         restakingConnectorProxy.setReceiverCCIP(address(receiverProxy));
+        restakingConnectorProxy.setBridgeTokens(
+            EthSepolia.BridgeToken,
+            BaseSepolia.BridgeToken
+        );
 
         eigenAgentOwner721Proxy.setAgentFactory(agentFactoryProxy);
 

@@ -531,14 +531,16 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         bytes32 withdrawalRoot = 0x8c20d3a37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7d8ec77;
 
         address bob = vm.addr(8881);
-        bytes32 withdrawalTransferRoot = keccak256(abi.encode(withdrawalRoot, amount, bob));
+        bytes32 withdrawalTransferRoot = keccak256(abi.encode(
+            withdrawalRoot,
+            bob
+        ));
 
         TransferToAgentOwnerMsg memory tta_msg = eigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(
             abi.encode(string(
                 encodeTransferToAgentOwnerMsg(
                     calculateWithdrawalTransferRoot(
                         withdrawalRoot,
-                        amount,
                         bob
                     )
                 )
@@ -559,8 +561,6 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
         bytes32 rewardsTransferRoot = EigenlayerMsgEncoders.calculateRewardsTransferRoot(
             mockRewardsRoot,
-            rewardAmount,
-            rewardToken,
             agentOwner
         );
 
@@ -569,8 +569,6 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
                 encodeTransferToAgentOwnerMsg(
                     calculateRewardsTransferRoot(
                         mockRewardsRoot,
-                        rewardAmount,
-                        rewardToken,
                         agentOwner
                     )
                 )

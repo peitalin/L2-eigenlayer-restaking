@@ -189,16 +189,14 @@ library EigenlayerMsgEncoders {
      * on L2 when first sending a completeWithdrawal() message so that when the withdrawan
      * funds return from L2 later, the bridge can lookup the user to transfer funds to.
      * @param withdrawalRoot is calculate by Eigenlayer during queueWithdrawals, needed to completeWithdrawal
-     * @param amount is the amount withdrawan
      * @param agentOwner is the owner of the EigenAgent who deposits and withdraws from Eigenlayer
      */
     function calculateWithdrawalTransferRoot(
         bytes32 withdrawalRoot,
-        uint256 amount,
         address agentOwner // signer
     ) public pure returns (bytes32) {
         // encode signer into withdrawalTransferRoot
-        return keccak256(abi.encode(withdrawalRoot, amount, agentOwner));
+        return keccak256(abi.encode(withdrawalRoot, agentOwner));
     }
 
     /**
@@ -216,17 +214,13 @@ library EigenlayerMsgEncoders {
     /**
      * @dev Returns the same rewardsTransferRoot calculated in RestakingConnector.
      * @param rewardsRoot keccak256(abi.encode(claim.rootIndex, claim.earnerIndex))
-     * @param rewardAmount amount of rewards
-     * @param rewardToken token address of reward token
      * @param agentOwner owner of the EigenAgent executing completeWithdrawals
      */
     function calculateRewardsTransferRoot(
         bytes32 rewardsRoot,
-        uint256 rewardAmount,
-        address rewardToken,
         address agentOwner
     ) public pure returns (bytes32) {
-        return keccak256(abi.encode(rewardsRoot, rewardAmount, rewardToken, agentOwner));
+        return keccak256(abi.encode(rewardsRoot, agentOwner));
     }
 
     /**

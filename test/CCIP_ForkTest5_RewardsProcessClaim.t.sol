@@ -24,8 +24,6 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
     // SenderHooks.RewardsTransferRootCommitted
     event RewardsTransferRootCommitted(
         bytes32 indexed rewardsTransferRoot,
-        address indexed recipient,
-        uint256 amount,
         address signer
     );
 
@@ -320,8 +318,6 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         rewardsToken = address(tokenL1);
         rewardsTransferRoot = calculateRewardsTransferRoot(
             rewardsRoot,
-            rewardsAmount,
-            rewardsToken,
             deployer // agentOwner
         );
 
@@ -342,8 +338,6 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         vm.expectEmit(true, true, true, true);
         emit RewardsTransferRootCommitted(
             rewardsTransferRoot,
-            address(eigenAgent), // rewards recipient (eigenAgent)
-            rewardsAmount,
             deployer // signer (agentOwner)
         );
         senderContract.sendMessagePayNative{value: routerFees}(

@@ -87,7 +87,6 @@ contract CompleteWithdrawalScript is BaseScript {
             // verify which user (AgentOwner) to transfer withdrawals to
             bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalTransferRoot(
                 withdrawalRoot,
-                withdrawal.shares[0],
                 deployer
             );
 

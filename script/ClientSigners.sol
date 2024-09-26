@@ -171,8 +171,8 @@ contract ClientSigners is Script {
                 signatureEigenAgent
             );
 
-            _logClientEigenAgentExecutionMessage(chainid, targetContractAddr, messageToEigenlayer, execNonceEigenAgent, expiry);
-            _logClientSignature(signer, digestHash, signatureEigenAgent);
+            // _logClientEigenAgentExecutionMessage(chainid, targetContractAddr, messageToEigenlayer, execNonceEigenAgent, expiry);
+            // _logClientSignature(signer, digestHash, signatureEigenAgent);
             checkSignature_EIP1271(signer, digestHash, signatureEigenAgent);
         }
 
