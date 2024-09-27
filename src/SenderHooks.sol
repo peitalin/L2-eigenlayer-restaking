@@ -151,99 +151,12 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
     */
 
     /**
-     * @dev Gets FundsTransfer structs (amount, tokenl2, agentOwner) associated with a transferRoot
-     * @param transferRoot is calculated when dispatching a completeWithdrawal message.
-     * A transferRoot may be either a rewardsTransferRoot or withdrawalsTransferRoot depending on
-     * whether we are sending a completeWithdrawal message, or a rewards claimProcess message.
-     * @return transferTokensArray is an array of FundsTransfer(amount, tokenL2, agentOwner) structs
-     */
-    function getFundsTransferCommitment(bytes32 transferRoot)
-        public
-        view
-        returns (ISenderHooks.FundsTransfer[] memory transferTokensArray)
-    {
-        uint256[] memory amounts = transferCommitmentsAmount[transferRoot];
-        address[] memory tokensL2 = transferCommitmentsTokenL2[transferRoot];
-        address agentOwner = transferCommitmentsAgentOwner[transferRoot];
-
-        // instantiate array size. amounts.length == tokensL2.length by construction
-        transferTokensArray = new ISenderHooks.FundsTransfer[](amounts.length);
-
-        for (uint256 i = 0; i < amounts.length; ++i) {
-            transferTokensArray[i] = ISenderHooks.FundsTransfer({
-                amount: amounts[i],
-                tokenL2: tokensL2[i],
-                agentOwner: agentOwner
-            });
-        }
-    }
-
-    /**
-     * @dev Sets FundsTransfer structs (amount, tokenl2, agentOwner) associated with a transferRoot
-     * only bridgeable tokens are saved. Non bridgeable tokens will not be stored.
-     * @param transferRoot is calculated when dispatching a completeWithdrawal message.
-     * A transferRoot may be either a rewardsTransferRoot or withdrawalsTransferRoot depending on
-     * whether we are sending a completeWithdrawal message, or a rewards claimProcess message.
-     * @param transferTokensArray is an array of FundsTransfer(amount, tokenL2, agentOwner) structs
-     * @param numBridgeableTokens is the number of bridgeable tokens, to set correct array lengths
-     * when storing amounts[] and tokensL2[] as transferTokensArray.length includes non-bridgeable tokens
-     */
-    function _setFundsTransferCommitment(
-        bytes32 transferRoot,
-        ISenderHooks.FundsTransfer[] memory transferTokensArray,
-        uint256 numBridgeableTokens
-    ) private {
-
-        if (numBridgeableTokens > 0 && transferTokensArray.length > 0) {
-
-            uint256[] memory amounts = new uint256[](numBridgeableTokens);
-            address[] memory tokensL2 = new address[](numBridgeableTokens);
-            address agentOwner = transferTokensArray[0].agentOwner;
-
-            for (uint32 i = 0; i < transferTokensArray.length; ++i) {
-                if (transferTokensArray[i].tokenL2 != address(0)) {
-                    amounts[i] = transferTokensArray[i].amount;
-                    tokensL2[i] = transferTokensArray[i].tokenL2;
-                }
-            }
-
-            transferCommitmentsAmount[transferRoot] = amounts;
-            transferCommitmentsTokenL2[transferRoot] = tokensL2;
-            transferCommitmentsAgentOwner[transferRoot] = agentOwner;
-        }
-    }
-
-    /**
      * @param transferRoot is calculated when dispatching a completeWithdrawal message.
      * A transferRoot may be either a rewardsTransferRoot or withdrawalsTransferRoot depending on
      * whether we are sending a completeWithdrawal message, or a rewards claimProcess message.
      */
     function isTransferRootSpent(bytes32 transferRoot) external view returns (bool) {
         return transferRootsSpent[transferRoot];
-    }
-
-    /**
-     * @dev Returns the same withdrawalTransferRoot calculated in RestakingConnector.
-     * @param withdrawalRoot withdrawalRoot calculated by Eigenlayer to verify withdrawals.
-     * @param agentOwner owner of the EigenAgent executing completeWithdrawals
-     */
-    function calculateWithdrawalTransferRoot(
-        bytes32 withdrawalRoot,
-        address agentOwner
-    ) public pure returns (bytes32) {
-        return keccak256(abi.encode(withdrawalRoot, agentOwner));
-    }
-
-    /**
-     * @dev Returns the same rewardsTransferRoot calculated in RestakingConnector.
-     * @param rewardsRoot keccak256(abi.encode(claim.rootIndex, claim.earnerIndex))
-     * @param agentOwner owner of the EigenAgent executing completeWithdrawals
-     */
-    function calculateRewardsTransferRoot(
-        bytes32 rewardsRoot,
-        address agentOwner
-    ) public pure returns (bytes32) {
-        return keccak256(abi.encode(rewardsRoot, agentOwner));
     }
 
     /**
@@ -308,6 +221,66 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         return getGasLimitForFunctionSelector(functionSelector);
     }
 
+    /**
+     * @dev Gets FundsTransfer structs (amount, tokenl2, agentOwner) associated with a transferRoot
+     * @param transferRoot is calculated when dispatching a completeWithdrawal message.
+     * A transferRoot may be either a rewardsTransferRoot or withdrawalsTransferRoot depending on
+     * whether we are sending a completeWithdrawal message, or a rewards claimProcess message.
+     * @return transferTokensArray is an array of FundsTransfer(amount, tokenL2, agentOwner) structs
+     */
+    function getFundsTransferCommitment(bytes32 transferRoot)
+        public
+        view
+        returns (ISenderHooks.FundsTransfer[] memory transferTokensArray)
+    {
+        uint256[] memory amounts = transferCommitmentsAmount[transferRoot];
+        address[] memory tokensL2 = transferCommitmentsTokenL2[transferRoot];
+        address agentOwner = transferCommitmentsAgentOwner[transferRoot];
+
+        // instantiate array size. amounts.length == tokensL2.length by construction
+        transferTokensArray = new ISenderHooks.FundsTransfer[](amounts.length);
+
+        for (uint256 i = 0; i < amounts.length; ++i) {
+            transferTokensArray[i] = ISenderHooks.FundsTransfer({
+                amount: amounts[i],
+                tokenL2: tokensL2[i],
+                agentOwner: agentOwner
+            });
+        }
+    }
+
+    /**
+     * @dev Returns the same withdrawalTransferRoot calculated in RestakingConnector.
+     * @param withdrawalRoot withdrawalRoot calculated by Eigenlayer to verify withdrawals.
+     * @param agentOwner owner of the EigenAgent executing completeWithdrawals
+     */
+    function calculateWithdrawalTransferRoot(
+        bytes32 withdrawalRoot,
+        address agentOwner
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encode(withdrawalRoot, agentOwner));
+    }
+
+    /**
+     * @dev Returns the same rewardsTransferRoot calculated in RestakingConnector.
+     * @param rewardsRoot keccak256(abi.encode(claim.rootIndex, claim.earnerIndex))
+     * @param agentOwner owner of the EigenAgent executing completeWithdrawals
+     */
+    function calculateRewardsTransferRoot(
+        bytes32 rewardsRoot,
+        address agentOwner
+    ) public pure returns (bytes32) {
+        return keccak256(abi.encode(rewardsRoot, agentOwner));
+    }
+
+    /**
+     *
+     *
+     *                 Private Functions
+     *
+     *
+     */
+
     function _commitWithdrawalTransferRootInfo(bytes memory message) private {
 
         (
@@ -326,16 +299,14 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         if (receiveAsTokens) {
 
             uint256 n; // track bridgeable tokens index
-            uint256 lenBridgeable = _numBridgeableTokens(tokensToWithdraw);
 
             ISenderHooks.FundsTransfer[] memory fundsTransfersArray =
-                new ISenderHooks.FundsTransfer[](lenBridgeable);
+                new ISenderHooks.FundsTransfer[](_numBridgeableTokens(tokensToWithdraw));
 
             for (uint256 i = 0; i < tokensToWithdraw.length; ++i) {
 
                 uint256 amount = withdrawal.shares[i];
                 address tokenL2 = bridgeTokensL1toL2[address(tokensToWithdraw[i])];
-
                 // Check whether tokenToWithdraw is bridgeable:
                 if (tokenL2 != address(0)) {
 
@@ -365,7 +336,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             );
 
             // Commit to (amount, tokenL2, agentOwner) before sending completeWithdrawal message,
-            _setFundsTransferCommitment(withdrawalTransferRoot, fundsTransfersArray, lenBridgeable);
+            _setFundsTransferCommitment(withdrawalTransferRoot, fundsTransfersArray);
 
             emit WithdrawalTransferRootCommitted(withdrawalTransferRoot, signer);
         }
@@ -382,10 +353,9 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         ) = decodeProcessClaimMsg(message);
 
         uint256 n = 0; // index to keep track of bridgeable tokens
-        uint256 lenBridgeable = _numBridgeableTokenLeaves(claim.tokenLeaves);
 
         ISenderHooks.FundsTransfer[] memory fundsTransfersArray =
-            new ISenderHooks.FundsTransfer[](lenBridgeable);
+            new ISenderHooks.FundsTransfer[](_numBridgeableTokenLeaves(claim.tokenLeaves));
 
         for (uint32 j = 0; j < claim.tokenLeaves.length; ++j) {
             // Only bridgeable tokens will be bridged back to L2.
@@ -394,7 +364,6 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             uint256 rewardAmount = claim.tokenLeaves[j].cumulativeEarnings;
             address rewardToken = address(claim.tokenLeaves[j].token);
             address tokenL2 = bridgeTokensL1toL2[rewardToken];
-
             // Check whether tokenToWithdraw is bridgeable:
             if (tokenL2 != address(0)) {
 
@@ -424,9 +393,40 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         );
 
         // Commit rewardsTransferRoot to fundsTransferArray before sending processClaim message,
-        _setFundsTransferCommitment(rewardsTransferRoot, fundsTransfersArray, lenBridgeable);
+        _setFundsTransferCommitment(rewardsTransferRoot, fundsTransfersArray);
 
         emit RewardsTransferRootCommitted(rewardsTransferRoot, signer);
+    }
+
+    /**
+     * @dev Sets FundsTransfer structs (amount, tokenl2, agentOwner) associated with a transferRoot
+     * only bridgeable tokens are saved. Non bridgeable tokens will not be stored.
+     * @param transferRoot is calculated when dispatching a completeWithdrawal message.
+     * A transferRoot may be either a rewardsTransferRoot or withdrawalsTransferRoot depending on
+     * whether we are sending a completeWithdrawal message, or a rewards claimProcess message.
+     * @param transferTokensArray is an array of FundsTransfer(amount, tokenL2, agentOwner) structs
+     * Assumes all elements have non-zero fields for: amount, tokenl2, agentOwner
+     */
+    function _setFundsTransferCommitment(
+        bytes32 transferRoot,
+        ISenderHooks.FundsTransfer[] memory transferTokensArray
+    ) private {
+
+        if (transferTokensArray.length > 0) {
+
+            uint256[] memory amounts = new uint256[](transferTokensArray.length);
+            address[] memory tokensL2 = new address[](transferTokensArray.length);
+            address agentOwner = transferTokensArray[0].agentOwner;
+
+            for (uint32 i = 0; i < transferTokensArray.length; ++i) {
+                amounts[i] = transferTokensArray[i].amount;
+                tokensL2[i] = transferTokensArray[i].tokenL2;
+            }
+
+            transferCommitmentsAmount[transferRoot] = amounts;
+            transferCommitmentsTokenL2[transferRoot] = tokensL2;
+            transferCommitmentsAgentOwner[transferRoot] = agentOwner;
+        }
     }
 
     /**
@@ -461,9 +461,11 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * @dev Returns the same withdrawalRoot calculated in Eigenlayer's DelegationManager during withdrawal
      * @param withdrawal is the Withdrawal struct used to completeWithdralwas in Eigenlayer.
      */
-    function _calculateWithdrawalRoot(
-        IDelegationManager.Withdrawal memory withdrawal
-    ) private pure returns (bytes32) {
+    function _calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
+        private
+        pure
+        returns (bytes32)
+    {
         return keccak256(abi.encode(withdrawal));
     }
 
@@ -471,9 +473,11 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * @dev Returns the same rewardsRoot calculated in in RestakingConnector during processClaims on L1
      * @param claim is the RewardsMerkleClaim struct used to processClaim in Eigenlayer.
      */
-    function _calculateRewardsRoot(
-        IRewardsCoordinator.RewardsMerkleClaim memory claim
-    ) private pure returns (bytes32) {
+    function _calculateRewardsRoot(IRewardsCoordinator.RewardsMerkleClaim memory claim)
+        private
+        pure
+        returns (bytes32)
+    {
         return keccak256(abi.encode(claim));
     }
 }

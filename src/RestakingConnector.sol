@@ -40,13 +40,6 @@ contract RestakingConnector is
         __RestakingConnectorStorage_init(_agentFactory, _bridgeTokenL1, _bridgeTokenL2);
     }
 
-    /*
-     *
-     *                 Functions
-     *
-     *
-     */
-
     /**
      * @dev Retrieves the block.number where queueWithdrawal occured. Needed as the time when
      * queueWithdrawal message is dispatched differs from the time the message executes on L1.
@@ -141,6 +134,14 @@ contract RestakingConnector is
         address recipient = decodeMintEigenAgent(message);
         agentFactory.tryGetEigenAgentOrSpawn(recipient);
     }
+
+    /**
+     *
+     *
+     *                 Private Functions
+     *
+     *
+     */
 
     /**
      * @dev Mints an EigenAgent before depositing into Eigenlayer if a user
@@ -287,7 +288,6 @@ contract RestakingConnector is
             );
 
             uint256 n; // tracks index of transferTokensArray (bridgeableTokens only)
-
             // instantiate array size
             transferTokensArray = new IRestakingConnector.TransferTokensInfo[](
                 _numBridgeableTokens(tokensToWithdraw)
@@ -485,25 +485,13 @@ contract RestakingConnector is
             // Only transfer bridgeable tokens back to L2. Transfer remaining L1 tokens to AgentOwner.
             if (tokenL2 == address(0)) {
                 // (2) If the token cannot be bridged to L2, transfer to AgentOwner on L1.
-                IERC20(rewardsToken).transferFrom(
-                    address(eigenAgent),
-                    signer, // AgentOwner
-                    rewardsAmount
-                );
-
-                emit SendingRewardsToAgentOwnerOnL1(
-                    rewardsToken,
-                    signer, // AgentOwner
-                    rewardsAmount
-                );
+                IERC20(rewardsToken).transferFrom(address(eigenAgent), signer, rewardsAmount);
+                // signer is AgentOwner
+                emit SendingRewardsToAgentOwnerOnL1(rewardsToken, signer, rewardsAmount);
 
             } else {
                 // (2) RestakingConnector transfers tokens to ReceiverCCIP to bridge tokens
-                IERC20(rewardsToken).transferFrom(
-                    address(eigenAgent),
-                    _receiverCCIP,
-                    rewardsAmount
-                );
+                IERC20(rewardsToken).transferFrom(address(eigenAgent), _receiverCCIP, rewardsAmount);
 
                 bytes32 rewardsTransferRoot = EigenlayerMsgEncoders.calculateRewardsTransferRoot(
                     rewardsRoot,
