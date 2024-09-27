@@ -31,7 +31,6 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
 
     mapping(bytes4 => uint256) internal _gasLimitsForFunctionSelectors;
 
-    event SendingRewardsToAgentOwnerOnL1(address indexed, address indexed, uint256 indexed);
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
 
     error AddressZero(string msg);

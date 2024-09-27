@@ -26,6 +26,7 @@ contract RestakingConnector is
     RestakingConnectorStorage
 {
 
+    event SendingRewardsToAgentOwnerOnL1(address indexed, address indexed, uint256 indexed);
     event SetQueueWithdrawalBlock(address indexed, uint256 indexed, uint256 indexed);
 
     constructor() {
