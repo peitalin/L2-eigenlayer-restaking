@@ -126,10 +126,9 @@ contract ClientEncoders {
 
     function calculateWithdrawalTransferRoot(
         bytes32 withdrawalRoot,
-        uint256 amount,
         address agentOwner
     ) public pure returns (bytes32) {
-        return keccak256(abi.encode(withdrawalRoot, amount, agentOwner));
+        return keccak256(abi.encode(withdrawalRoot, agentOwner));
     }
 
     function calculateRewardsRoot(IRewardsCoordinator.RewardsMerkleClaim memory claim)
@@ -140,13 +139,12 @@ contract ClientEncoders {
         return keccak256(abi.encode(claim));
     }
 
+
     function calculateRewardsTransferRoot(
         bytes32 rewardsRoot,
-        uint256 rewardAmount,
-        address rewardToken,
         address agentOwner
     ) public pure returns (bytes32) {
-        return keccak256(abi.encode(rewardsRoot, rewardAmount, rewardToken, agentOwner));
+        return keccak256(abi.encode(rewardsRoot, agentOwner));
     }
 
     function encodeTransferToAgentOwnerMsg(

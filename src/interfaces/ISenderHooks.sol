@@ -9,6 +9,7 @@ interface ISenderHooks {
 
     struct FundsTransfer {
         uint256 amount;
+        address tokenL2;
         address agentOwner;
     }
 
@@ -23,9 +24,15 @@ interface ISenderHooks {
         uint256[] memory gasLimits
     ) external;
 
+    function bridgeTokensL1toL2(address _bridgeTokenL1) external returns (address);
+
+    function setBridgeTokens(address _bridgeTokenL1, address _bridgeTokenL2) external;
+
+    function clearBridgeTokens(address _bridgeTokenL1) external;
+
     function getFundsTransferCommitment(bytes32 transferRoot)
         external
-        returns (ISenderHooks.FundsTransfer memory);
+        returns (ISenderHooks.FundsTransfer[] memory);
 
     function isTransferRootSpent(bytes32 transferRoot) external returns (bool);
 
@@ -36,7 +43,6 @@ interface ISenderHooks {
 
     function calculateWithdrawalTransferRoot(
         bytes32 withdrawalRoot,
-        uint256 amount,
         address agentOwner
     ) external pure returns (bytes32);
 
@@ -47,20 +53,17 @@ interface ISenderHooks {
 
     function calculateRewardsTransferRoot(
         bytes32 rewardsRoot,
-        uint256 rewardAmount,
-        address rewardToken,
         address agentOwner
     ) external pure returns (bytes32);
 
     function beforeSendCCIPMessage(
         bytes memory message,
-        address tokenL2,
         uint256 amount
     ) external returns (uint256 gasLimit);
 
     function handleTransferToAgentOwner(bytes memory message)
         external
-        returns (address agentOwner, uint256 amount);
+        returns (ISenderHooks.FundsTransfer[] memory);
 
 }
 

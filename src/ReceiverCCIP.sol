@@ -2,11 +2,9 @@
 pragma solidity 0.8.25;
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
-import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 
 import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
@@ -21,8 +19,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     IRestakingConnector public restakingConnector;
     address public senderContractL2;
 
-    mapping(bytes32 messageId => uint256) public amountRefundedToMessageIds;
-    mapping(bytes32 messageId => uint256) public unhandledFundsMessageIds;
+    mapping(bytes32 messageId => mapping(address token => uint256 amount)) public amountRefundedToMessageIds;
 
     event BridgingWithdrawalToL2(
         bytes32 indexed withdrawalTransferRoot,
@@ -44,20 +41,15 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
     event UpdatedAmountRefunded(
         bytes32 indexed messageId,
-        uint256 indexed beforeAmount,
+        address indexed token,
+        uint256 beforeAmount,
         uint256 indexed afterAmount
     );
 
     error AddressZero(string msg);
 
     /// @param _router address of the router contract.
-    /// @param _bridgeTokenL1 address of the bridging token's L1 contract.
-    /// @param _bridgeTokenL2 address of the bridging token's L2 contract.
-    constructor(
-        address _router,
-        address _bridgeTokenL1,
-        address _bridgeTokenL2
-    ) BaseMessengerCCIP(_router, _bridgeTokenL1, _bridgeTokenL2) {
+    constructor(address _router) BaseMessengerCCIP(_router) {
         _disableInitializers();
     }
 
@@ -107,8 +99,8 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
      * @param messageId is the CCIP messageId
      * @return amount refunded
      */
-    function amountRefunded(bytes32 messageId) external view returns (uint256) {
-        return amountRefundedToMessageIds[messageId];
+    function amountRefunded(bytes32 messageId, address token) external view returns (uint256) {
+        return amountRefundedToMessageIds[messageId][token];
     }
 
     /**
@@ -116,10 +108,14 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
      * @param messageId is the CCIP messageId
      * @param amountAfter is the amount refunded
      */
-    function setAmountRefundedToMessageId(bytes32 messageId, uint256 amountAfter) external onlyOwner {
-        uint256 amountBefore = amountRefundedToMessageIds[messageId];
-        amountRefundedToMessageIds[messageId] = amountAfter;
-        emit UpdatedAmountRefunded(messageId, amountBefore, amountAfter);
+    function setAmountRefundedToMessageId(
+        bytes32 messageId,
+        address token,
+        uint256 amountAfter
+    ) external onlyOwner {
+        uint256 amountBefore = amountRefundedToMessageIds[messageId][token];
+        amountRefundedToMessageIds[messageId][token] = amountAfter;
+        emit UpdatedAmountRefunded(messageId, token, amountBefore, amountAfter);
     }
 
     /*
@@ -137,26 +133,53 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             abi.decode(any2EvmMessage.sender, (address))
         )
     {
-        address tokenAddress;
-        uint256 tokenAmount;
 
-        if (any2EvmMessage.destTokenAmounts.length > 0) {
-            tokenAddress = any2EvmMessage.destTokenAmounts[0].token;
-            tokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
-        } else {
-            tokenAddress = address(0);
-            tokenAmount = 0;
+        bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(any2EvmMessage.data);
+        // For depositIntoStrategy: approve RestakingConnector to transfer tokens to EigenAgent
+        if (functionSelector == IStrategyManager.depositIntoStrategy.selector) {
+            for (uint32 i = 0; i < any2EvmMessage.destTokenAmounts.length; ++i) {
+                IERC20(any2EvmMessage.destTokenAmounts[i].token).approve(
+                    address(restakingConnector),
+                    any2EvmMessage.destTokenAmounts[i].amount
+                );
+            }
         }
 
-        try this.dispatchMessageToEigenAgent(any2EvmMessage, tokenAddress, tokenAmount) {
-            // EigenAgent executes message successfully.
-            emit MessageReceived(
-                any2EvmMessage.messageId,
-                any2EvmMessage.sourceChainSelector,
-                abi.decode(any2EvmMessage.sender, (address)), // sender contract on L2
-                tokenAddress,
-                tokenAmount
-            );
+        try restakingConnector.dispatchMessageToEigenAgent(any2EvmMessage)
+            returns (IRestakingConnector.TransferTokensInfo[] memory transferTokensArray)
+        {
+            for (uint32 i = 0; i < transferTokensArray.length; ++i) {
+
+                IRestakingConnector.TransferTokensInfo memory t = transferTokensArray[i];
+
+                if (t.transferRoot != bytes32(0)) {
+                    // If transferRoot is returned bridge to L2, then SenderCCIP transfers tokens to AgentOwner.
+                    this.sendMessagePayNative(
+                        BaseSepolia.ChainSelector, // destination chain
+                        senderContractL2,
+                        t.transferToAgentOwnerMessage,
+                        t.transferToken, // L1 token to burn/lock
+                        t.transferAmount,
+                        0 // use default gasLimit
+                    );
+
+                    if (t.transferType == IRestakingConnector.TransferType.Withdrawal) {
+                        emit BridgingWithdrawalToL2(t.transferRoot, t.transferToken, t.transferAmount);
+
+                    } else if (t.transferType == IRestakingConnector.TransferType.RewardsClaim) {
+                        emit BridgingRewardsToL2(t.transferRoot, t.transferToken, t.transferAmount);
+
+                    }
+                }
+                // EigenAgent executes message successfully.
+                emit MessageReceived(
+                    any2EvmMessage.messageId,
+                    any2EvmMessage.sourceChainSelector,
+                    abi.decode(any2EvmMessage.sender, (address)), // sender contract on L2
+                    t.transferToken,
+                    t.transferAmount
+                );
+            }
 
         } catch (bytes memory customError) {
 
@@ -164,130 +187,40 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             // Decode and try catch the EigenAgentExecutionError
 
             if (errorSelector == IRestakingConnector.EigenAgentExecutionError.selector) {
-                // If there were bridged tokens, and the deposit has not been refunded yet...
-                if (
-                    tokenAmount > 0 &&
-                    tokenAddress != address(0) &&
-                    amountRefundedToMessageIds[any2EvmMessage.messageId] <= 0
-                ) {
-                    // ...mark messageId as refunded
-                    amountRefundedToMessageIds[any2EvmMessage.messageId] = tokenAmount;
-                    // ...then initiate a refund back to the signer on L2
-                    return _refundToSignerAfterExpiry(customError, tokenAddress, tokenAmount);
+                // If there were bridged tokens and the deposit has not been refunded yet...
+                // (there should only be 1 token for deposits, but handle input destTokenAmounts[] as an array)
+                for (uint32 i = 0; i < any2EvmMessage.destTokenAmounts.length; ++i) {
 
-                } else {
-                    // Parse EigenAgentExecutionError message and continue allowing manual re-execution tries.
-                    (
-                        address signer,
-                        uint256 expiry,
-                        string memory errStr
-                    ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
+                    address tokenAddress = any2EvmMessage.destTokenAmounts[i].token;
+                    uint256 tokenAmount = any2EvmMessage.destTokenAmounts[i].amount;
 
-                    revert IRestakingConnector.EigenAgentExecutionErrorStr(signer, expiry, errStr);
+                    if (
+                        tokenAmount > 0 &&
+                        tokenAddress != address(0) &&
+                        amountRefundedToMessageIds[any2EvmMessage.messageId][tokenAddress] <= 0
+                    ) {
+                        // ...mark messageId as refunded
+                        amountRefundedToMessageIds[any2EvmMessage.messageId][tokenAddress] = tokenAmount;
+                        // ...then initiate a refund back to the signer on L2
+                        return _refundToSignerAfterExpiry(customError, tokenAddress, tokenAmount);
+
+                    } else {
+                        // Parse EigenAgentExecutionError message and continue allowing manual re-execution tries.
+                        (
+                            address signer,
+                            uint256 expiry,
+                            string memory errStr
+                        ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
+
+                        revert IRestakingConnector.EigenAgentExecutionErrorStr(signer, expiry, errStr);
+                    }
                 }
+
             } else {
                 // For other errors revert and try parse error message
                 revert(string(customError));
             }
         }
-    }
-
-    /**
-     * @dev This function only called by internally (but is marked external for try/catch feature).
-     * @notice This function matches a function selector, then forwards CCIP Eigenlayer messages
-     * to the RestakingConnector which deserializes the rest of the message and
-     * forwards it to the user's EigenAgent for execution.
-     */
-    function dispatchMessageToEigenAgent(
-        Client.Any2EVMMessage memory any2EvmMessage,
-        address token,
-        uint256 amount
-    ) external {
-
-        require(msg.sender == address(this), "Function not called internally");
-
-        bytes memory message = any2EvmMessage.data;
-        bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
-
-        if (functionSelector == IStrategyManager.depositIntoStrategy.selector) {
-            /// depositIntoStrategy - 0xe7a050aa
-            IERC20(token).approve(address(restakingConnector), amount);
-            // approve RestakingConnector to transfer tokens to EigenAgent
-            restakingConnector.depositWithEigenAgent(message);
-
-        } else if (functionSelector == IRestakingConnector.mintEigenAgent.selector) {
-            /// mintEigenAgent - 0xcc15a557
-            restakingConnector.mintEigenAgent(message);
-
-        } else if (functionSelector == IDelegationManager.queueWithdrawals.selector) {
-            /// queueWithdrawals - 0x0dd8dd02
-            restakingConnector.queueWithdrawalsWithEigenAgent(message);
-
-        } else if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
-            /// completeWithdrawal - 0x60d7faed
-            (
-                bool receiveAsTokens,
-                string memory messageForL2,
-                bytes32 withdrawalTransferRoot,
-                address withdrawalToken,
-                uint256 withdrawalAmount
-            ) = restakingConnector.completeWithdrawalWithEigenAgent(message);
-
-            if (receiveAsTokens && withdrawalToken == bridgeTokenL1) {
-                // if receiveAsTokens == true, ReceiverCCIP should have received tokens
-                // back from EigenAgent after completeWithdrawal.
-                //
-                // Send handleTransferToAgentOwner message to bridge tokens back to L2.
-                // L2 SenderCCIP transfers tokens to AgentOwner.
-                this.sendMessagePayNative(
-                    BaseSepolia.ChainSelector, // destination chain
-                    senderContractL2,
-                    messageForL2,
-                    withdrawalToken, // L1 token to burn/lock
-                    withdrawalAmount,
-                    0 // use default gasLimit
-                );
-
-                emit BridgingWithdrawalToL2(withdrawalTransferRoot, withdrawalToken, withdrawalAmount);
-
-            } else {
-                // Otherwise if `receiveAsTokens == false`, withdrawal is redeposited in Eigenlayer
-                // as shares, re-delegated to a new Operator as part of the `undelegate` flow.
-                // We do not need to do anything in this case.
-            }
-
-        } else if (functionSelector == IDelegationManager.delegateTo.selector) {
-            /// delegateTo - 0xeea9064b
-            restakingConnector.delegateToWithEigenAgent(message);
-
-        } else if (functionSelector == IDelegationManager.undelegate.selector) {
-            /// undelegate - 0xda8be864
-            restakingConnector.undelegateWithEigenAgent(message);
-
-        } else if (functionSelector == IRewardsCoordinator.processClaim.selector) {
-            /// processClaim (Rewards) - 0x3ccc861d
-            (
-                string memory messageForL2,
-                bytes32 rewardsTransferRoot,
-                address rewardsToken,
-                uint256 rewardsAmount
-            ) = restakingConnector.processClaimWithEigenAgent(message);
-
-            if (rewardsToken == bridgeTokenL1) {
-
-                this.sendMessagePayNative(
-                    BaseSepolia.ChainSelector, // destination chain
-                    senderContractL2,
-                    messageForL2,
-                    rewardsToken, // L1 token to burn/lock
-                    rewardsAmount,
-                    0 // use default gasLimit
-                );
-
-                emit BridgingRewardsToL2(rewardsTransferRoot, rewardsToken, rewardsAmount);
-            }
-        }
-        // Should not reach this state with bridged funds, as SenderCCIP only sends funds for deposits.
     }
 
     /**

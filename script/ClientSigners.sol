@@ -139,7 +139,6 @@ contract ClientSigners is Script {
         uint256 expiry
     ) public view returns (bytes memory) {
 
-        require(chainid != 0, "ClientSigner: chainid cannot be 0");
         require(targetContractAddr != address(0x0), "ClientSigner: targetContract cannot be 0x0");
 
         bytes memory messageWithSignature;

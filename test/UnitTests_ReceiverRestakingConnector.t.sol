@@ -6,6 +6,7 @@ import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
@@ -77,11 +78,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
      function test_Initialize_Receiver() public {
 
-        ReceiverCCIP receiverImpl = new ReceiverCCIP(
-            EthSepolia.Router,
-            EthSepolia.BridgeToken,
-            BaseSepolia.BridgeToken
-        );
+        ReceiverCCIP receiverImpl = new ReceiverCCIP(EthSepolia.Router);
         ProxyAdmin pa = new ProxyAdmin();
 
         vm.expectRevert(
@@ -124,7 +121,9 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             address(pa),
             abi.encodeWithSelector(
                 RestakingConnector.initialize.selector,
-                address(0)
+                address(0),
+                address(1),
+                address(2)
             )
         );
     }
@@ -175,7 +174,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         receiverContract.mockCCIPReceive(any2EvmMessage);
 
         vm.prank(deployer);
-        receiverContract.setAmountRefundedToMessageId(messageId1, 1 ether);
+        receiverContract.setAmountRefundedToMessageId(messageId1, address(tokenL1), 1 ether);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -255,7 +254,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
+            token: address(tokenL1),
             amount: amount
         });
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
@@ -279,41 +278,60 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 
-    function test_OnlyReceiverCanCall_RestakingConnector() public {
+    function test_ReceiverL1_HandleCustomDepositError_DepositOnlyOneToken() public {
 
-        bytes memory mintEigenAgentMessage = encodeMintEigenAgentMsg(bob);
+        uint256 execNonce = 0;
+        // should revert with EigenAgentExecutionError(signer, expiry)
+        address invalidEigenlayerStrategy = vm.addr(4444);
+        // make expiryShort to test refund on expiry feature
+        uint256 expiryShort = block.timestamp + 60 seconds;
+        uint256 amount = 0.1 ether;
 
-        bytes memory ccipMessage = abi.encode(string(mintEigenAgentMessage));
-
-        vm.expectRevert("not called by ReceiverCCIP");
-        restakingConnector.mintEigenAgent(
-            ccipMessage
+        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
+            bobKey,
+            block.chainid, // destination chainid where EigenAgent lives
+            address(strategyManager), // StrategyManager to approve + deposit
+            encodeDepositIntoStrategyMsg(
+                invalidEigenlayerStrategy,
+                address(tokenL1),
+                amount
+            ),
+            execNonce,
+            expiryShort
         );
 
-        vm.expectRevert("not called by ReceiverCCIP");
-        restakingConnector.depositWithEigenAgent(
-            ccipMessage
-        );
+        ERC20 token2 = new ERC20("token2", "TKN2");
 
-        vm.expectRevert("not called by ReceiverCCIP");
-        restakingConnector.queueWithdrawalsWithEigenAgent(
-            ccipMessage
-        );
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](2);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1),
+            amount: amount
+        });
+        // mock a second token to trigger error
+        destTokenAmounts[1] = Client.EVMTokenAmount({
+            token: address(token2),
+            amount: amount
+        });
 
-        vm.expectRevert("not called by ReceiverCCIP");
-        restakingConnector.completeWithdrawalWithEigenAgent(
-            ccipMessage
-        );
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0x0),
+            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
+            sender: abi.encode(deployer),
+            destTokenAmounts: destTokenAmounts,
+            data: abi.encode(string(
+                messageWithSignature
+            ))
+        });
 
-        vm.expectRevert("not called by ReceiverCCIP");
-        restakingConnector.delegateToWithEigenAgent(
-            ccipMessage
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
+                "DepositIntoStrategy only handles one token at a time",
+                "Manually execute to refund after timestamp:",
+                expiryShort
+            )
         );
-
-        vm.expectRevert("not called by ReceiverCCIP");
-        restakingConnector.undelegateWithEigenAgent(
-            ccipMessage
-        );
+        receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 
     function test_ReceiverL1_MintEigenAgent() public {
@@ -522,8 +540,8 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         vm.prank(user);
 
-        vm.expectRevert("Function not called internally");
-        receiverContract.dispatchMessageToEigenAgent(
+        vm.expectRevert("not called by ReceiverCCIP");
+        restakingConnector.dispatchMessageToEigenAgent(
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
                 sourceChainSelector: BaseSepolia.ChainSelector,
@@ -532,9 +550,20 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
                     encodeMintEigenAgentMsg(deployer)
                 )),
                 destTokenAmounts: new Client.EVMTokenAmount[](0)
-            }),
-            address(tokenL1),
-            1 ether
+            })
+        );
+
+        vm.prank(address(receiverContract));
+        restakingConnector.dispatchMessageToEigenAgent(
+            Client.Any2EVMMessage({
+                messageId: bytes32(0x0),
+                sourceChainSelector: BaseSepolia.ChainSelector,
+                sender: abi.encode(deployer),
+                data: abi.encode(string(
+                    encodeMintEigenAgentMsg(deployer)
+                )),
+                destTokenAmounts: new Client.EVMTokenAmount[](0)
+            })
         );
     }
 
@@ -544,14 +573,86 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         vm.prank(bob);
         vm.expectRevert("Ownable: caller is not the owner");
-        receiverContract.setAmountRefundedToMessageId(messageId , 1 ether);
+        receiverContract.setAmountRefundedToMessageId(messageId, address(tokenL1), 1 ether);
 
         vm.prank(deployer);
-        receiverContract.setAmountRefundedToMessageId(messageId , 1.3 ether);
+        receiverContract.setAmountRefundedToMessageId(messageId, address(tokenL1), 1.3 ether);
 
         vm.assertEq(
-            receiverContract.amountRefunded(messageId ),
+            receiverContract.amountRefunded(messageId, address(tokenL1)),
             1.3 ether
         );
     }
+
+    function test_RestakingConnector_SetBridgeTokens() public {
+
+        ProxyAdmin proxyAdmin = new ProxyAdmin();
+
+        address _bridgeTokenL1 = vm.addr(1001);
+        address _bridgeTokenL2 = vm.addr(2002);
+
+        RestakingConnector rcImpl = new RestakingConnector();
+
+        vm.expectRevert(abi.encodeWithSelector(AddressZero.selector, "_bridgeTokenL1 cannot be address(0)"));
+        new TransparentUpgradeableProxy(
+            address(rcImpl ),
+            address(proxyAdmin),
+            abi.encodeWithSelector(
+                RestakingConnector.initialize.selector,
+                agentFactory,
+                address(0),
+                _bridgeTokenL2
+            )
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(AddressZero.selector, "_bridgeTokenL2 cannot be address(0)"));
+        new TransparentUpgradeableProxy(
+            address(rcImpl ),
+            address(proxyAdmin),
+            abi.encodeWithSelector(
+                RestakingConnector.initialize.selector,
+                agentFactory,
+                _bridgeTokenL1,
+                address(0)
+            )
+        );
+
+        vm.prank(deployer);
+        RestakingConnector rc = RestakingConnector(address(
+            new TransparentUpgradeableProxy(
+                address(rcImpl ),
+                address(proxyAdmin),
+                abi.encodeWithSelector(
+                    RestakingConnector.initialize.selector,
+                    agentFactory,
+                    _bridgeTokenL1,
+                    _bridgeTokenL2
+                )
+            )
+        ));
+
+        vm.startBroadcast(bob);
+        {
+            vm.expectRevert("Ownable: caller is not the owner");
+            rc.setBridgeTokens(_bridgeTokenL1, _bridgeTokenL2);
+        }
+        vm.stopBroadcast();
+
+        vm.startBroadcast(deployer);
+        {
+            vm.expectRevert(abi.encodeWithSelector(AddressZero.selector, "_bridgeTokenL1 cannot be address(0)"));
+            rc.setBridgeTokens(address(0), _bridgeTokenL2);
+
+            vm.expectRevert(abi.encodeWithSelector(AddressZero.selector, "_bridgeTokenL2 cannot be address(0)"));
+            rc.setBridgeTokens(_bridgeTokenL1, address(0));
+
+            rc.setBridgeTokens(_bridgeTokenL1, _bridgeTokenL2);
+            vm.assertEq(rc.bridgeTokensL1toL2(_bridgeTokenL1), _bridgeTokenL2);
+
+            rc.clearBridgeTokens(_bridgeTokenL1);
+            vm.assertEq(rc.bridgeTokensL1toL2(_bridgeTokenL1), address(0));
+        }
+        vm.stopBroadcast();
+    }
+
 }

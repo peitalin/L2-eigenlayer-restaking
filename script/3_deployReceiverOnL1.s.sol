@@ -137,7 +137,9 @@ contract DeployReceiverOnL1Script is Script, FileReader {
                     address(proxyAdmin),
                     abi.encodeWithSelector(
                         RestakingConnector.initialize.selector,
-                        agentFactoryProxy
+                        agentFactoryProxy,
+                        EthSepolia.BridgeToken,
+                        BaseSepolia.BridgeToken
                     )
                 )
             ))
@@ -151,17 +153,9 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         // deploy real receiver implementation and upgradeAndCall initializer
         ReceiverCCIP receiverImpl;
         if (isMockRun) {
-            receiverImpl = new ReceiverCCIPMock(
-                EthSepolia.Router,
-                EthSepolia.BridgeToken,
-                BaseSepolia.BridgeToken
-            );
+            receiverImpl = new ReceiverCCIPMock(EthSepolia.Router);
         } else {
-            receiverImpl = new ReceiverCCIP(
-                EthSepolia.Router,
-                EthSepolia.BridgeToken,
-                BaseSepolia.BridgeToken
-            );
+            receiverImpl = new ReceiverCCIP(EthSepolia.Router);
         }
         receiverProxy = ReceiverCCIP(
             payable(address(

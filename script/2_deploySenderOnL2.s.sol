@@ -48,7 +48,11 @@ contract DeploySenderOnL2Script is Script, FileReader {
                 new TransparentUpgradeableProxy(
                     address(new SenderHooks()),
                     address(proxyAdmin),
-                    abi.encodeWithSelector(SenderHooks.initialize.selector)
+                    abi.encodeWithSelector(
+                        SenderHooks.initialize.selector,
+                        EthSepolia.BridgeToken,
+                        BaseSepolia.BridgeToken
+                    )
                 )
             ))
         );
@@ -56,17 +60,9 @@ contract DeploySenderOnL2Script is Script, FileReader {
         // deploy sender
         SenderCCIP senderImpl;
         if (isMockRun) {
-            senderImpl = new SenderCCIPMock(
-                BaseSepolia.Router,
-                EthSepolia.BridgeToken,
-                BaseSepolia.BridgeToken
-            );
+            senderImpl = new SenderCCIPMock(BaseSepolia.Router);
         } else {
-            senderImpl = new SenderCCIP(
-                BaseSepolia.Router,
-                EthSepolia.BridgeToken,
-                BaseSepolia.BridgeToken
-            );
+            senderImpl = new SenderCCIP(BaseSepolia.Router);
         }
 
         SenderCCIP senderProxy = SenderCCIP(

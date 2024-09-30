@@ -16,15 +16,10 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
     ISenderHooks public senderHooks;
 
     event MatchedReceivedFunctionSelector(bytes4 indexed);
+    event SendingFundsToAgentOwner(address indexed, uint256 indexed);
 
     /// @param _router address of the router contract.
-    /// @param _bridgeTokenL1 address of the bridging token's L1 contract.
-    /// @param _bridgeTokenL2 address of the bridging token's L2 contract.
-    constructor(
-        address _router,
-        address _bridgeTokenL1,
-        address _bridgeTokenL2
-    ) BaseMessengerCCIP(_router, _bridgeTokenL1, _bridgeTokenL2) {
+    constructor(address _router) BaseMessengerCCIP(_router) {
         _disableInitializers();
     }
 
@@ -63,26 +58,27 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
             abi.decode(any2EvmMessage.sender, (address))
         )
     {
-        address tokenAddress;
-        uint256 tokenAmount;
-
-        if (any2EvmMessage.destTokenAmounts.length > 0) {
-            tokenAddress = any2EvmMessage.destTokenAmounts[0].token;
-            tokenAmount = any2EvmMessage.destTokenAmounts[0].amount;
+        if (any2EvmMessage.destTokenAmounts.length == 0) {
+            emit MessageReceived(
+                any2EvmMessage.messageId,
+                any2EvmMessage.sourceChainSelector,
+                abi.decode(any2EvmMessage.sender, (address)),
+                address(0),
+                0
+            );
         } else {
-            tokenAddress = address(0);
-            tokenAmount = 0;
+            for (uint32 i = 0; i < any2EvmMessage.destTokenAmounts.length; ++i) {
+                emit MessageReceived(
+                    any2EvmMessage.messageId,
+                    any2EvmMessage.sourceChainSelector,
+                    abi.decode(any2EvmMessage.sender, (address)),
+                    any2EvmMessage.destTokenAmounts[i].token,
+                    any2EvmMessage.destTokenAmounts[i].amount
+                );
+            }
         }
 
         _afterCCIPReceiveMessage(any2EvmMessage);
-
-        emit MessageReceived(
-            any2EvmMessage.messageId,
-            any2EvmMessage.sourceChainSelector,
-            abi.decode(any2EvmMessage.sender, (address)),
-            tokenAddress,
-            tokenAmount
-        );
     }
 
     /**
@@ -98,13 +94,25 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
         if (functionSelector == ISenderHooks.handleTransferToAgentOwner.selector) {
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
-            (
-                address agentOwner, // agentOwner (completeWithdrawals) or recipient (processClaim)
-                uint256 amount
-            ) = senderHooks.handleTransferToAgentOwner(message);
 
-            // agentOwner is the signer, first committed when sending completeWithdrawal
-            IERC20(any2EvmMessage.destTokenAmounts[0].token).transfer(agentOwner, amount);
+            ISenderHooks.FundsTransfer[] memory fundsTransfersArray =
+                senderHooks.handleTransferToAgentOwner(message);
+
+            for (uint k = 0; k < fundsTransfersArray.length; ++k) {
+                if (fundsTransfersArray[k].agentOwner != address(0)) {
+
+                    emit SendingFundsToAgentOwner(
+                        fundsTransfersArray[k].agentOwner,
+                        fundsTransfersArray[k].amount
+                    );
+
+                    // agentOwner is the signer, first committed when sending completeWithdrawal
+                    IERC20(fundsTransfersArray[k].tokenL2).transfer(
+                        fundsTransfersArray[k].agentOwner,
+                        fundsTransfersArray[k].amount
+                    );
+                }
+            }
 
         } else {
             emit MatchedReceivedFunctionSelector(functionSelector);
@@ -151,7 +159,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
         bytes memory message = abi.encode(_text);
 
-        uint256 gasLimit = senderHooks.beforeSendCCIPMessage(message, _token, _amount);
+        uint256 gasLimit = senderHooks.beforeSendCCIPMessage(message, _amount);
 
         if (_overrideGasLimit > 0) {
             gasLimit = _overrideGasLimit;

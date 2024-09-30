@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
@@ -48,6 +49,12 @@ interface IRestakingConnector {
 
     function setQueueWithdrawalBlock(address staker, uint256 nonce, uint256 blockNumber) external;
 
+    function bridgeTokensL1toL2(address _bridgeTokenL1) external returns (address);
+
+    function setBridgeTokens(address _bridgeTokenL1, address _bridgeTokenL2) external;
+
+    function clearBridgeTokens(address _bridgeTokenL1) external;
+
     /*
      *
      *           EigenAgent -> Eigenlayer Handlers
@@ -55,29 +62,22 @@ interface IRestakingConnector {
      *
     */
 
-    function depositWithEigenAgent(bytes memory message) external;
+    enum TransferType {
+        Withdrawal,
+        RewardsClaim
+    }
+
+    struct TransferTokensInfo {
+        TransferType transferType;
+        string transferToAgentOwnerMessage;
+        bytes32 transferRoot;
+        address transferToken;
+        uint256 transferAmount;
+    }
+
+    function dispatchMessageToEigenAgent(Client.Any2EVMMessage memory any2EvmMessage)
+        external
+        returns (TransferTokensInfo[] memory);
 
     function mintEigenAgent(bytes memory message) external;
-
-    function queueWithdrawalsWithEigenAgent(bytes memory message) external;
-
-    function completeWithdrawalWithEigenAgent(bytes memory message) external returns (
-        bool receiveAsTokens,
-        string memory messageForL2, // CCIP message: transferToAgentOwner on L2
-        bytes32 withdrawalTransferRoot,
-        address withdrawalToken,
-        uint256 withdrawalAmount
-    );
-
-    function delegateToWithEigenAgent(bytes memory message) external;
-
-    function undelegateWithEigenAgent(bytes memory message) external;
-
-    function processClaimWithEigenAgent(bytes memory message) external returns (
-        string memory messageForL2,
-        bytes32 rewardsTransferRoot,
-        address rewardsToken,
-        uint256 rewardsAmount
-    );
-
 }
