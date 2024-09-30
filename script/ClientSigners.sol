@@ -139,7 +139,6 @@ contract ClientSigners is Script {
         uint256 expiry
     ) public view returns (bytes memory) {
 
-        require(chainid != 0, "ClientSigner: chainid cannot be 0");
         require(targetContractAddr != address(0x0), "ClientSigner: targetContract cannot be 0x0");
 
         bytes memory messageWithSignature;
@@ -171,8 +170,8 @@ contract ClientSigners is Script {
                 signatureEigenAgent
             );
 
-            // _logClientEigenAgentExecutionMessage(chainid, targetContractAddr, messageToEigenlayer, execNonceEigenAgent, expiry);
-            // _logClientSignature(signer, digestHash, signatureEigenAgent);
+            _logClientEigenAgentExecutionMessage(chainid, targetContractAddr, messageToEigenlayer, execNonceEigenAgent, expiry);
+            _logClientSignature(signer, digestHash, signatureEigenAgent);
             checkSignature_EIP1271(signer, digestHash, signatureEigenAgent);
         }
 
