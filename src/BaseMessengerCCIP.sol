@@ -220,6 +220,5 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         IERC20(_token).safeTransfer(_beneficiary, amount);
     }
 
-
 }
 

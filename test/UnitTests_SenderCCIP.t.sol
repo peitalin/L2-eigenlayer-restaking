@@ -7,7 +7,6 @@ import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
-import {IBaseMessengerCCIP} from "../src/interfaces/IBaseMessengerCCIP.sol";
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 
@@ -79,9 +78,13 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
                 destTokenAmounts: destTokenAmounts
             });
 
-            vm.expectEmit(true, true, true, true);
-            emit SenderCCIP.MatchedReceivedFunctionSelector(randomFunctionSelector);
-
+            // event MessageReceived(
+            //     bytes32 indexed messageId,
+            //     uint64 indexed sourceChainSelector,
+            //     address sender,
+            //     address token,
+            //     uint256 tokenAmount
+            // );
             vm.expectEmit(true, true, true, true);
             emit BaseMessengerCCIP.MessageReceived(
                 ccipMessage.messageId,
@@ -90,13 +93,9 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
                 destTokenAmounts[0].token,
                 destTokenAmounts[0].amount
             );
-            // event MessageReceived(
-            //     bytes32 indexed messageId,
-            //     uint64 indexed sourceChainSelector,
-            //     address sender,
-            //     address token,
-            //     uint256 tokenAmount
-            // );
+            vm.expectEmit(true, true, true, true);
+            emit SenderCCIP.MatchedReceivedFunctionSelector(randomFunctionSelector);
+            // events must be emitted in the right order
             senderContract.mockCCIPReceive(
                 ccipMessage
         );
@@ -121,9 +120,13 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
                 destTokenAmounts: destTokenAmounts
             });
 
-            vm.expectEmit(true, true, true, true);
-            emit SenderCCIP.MatchedReceivedFunctionSelector(randomFunctionSelector);
-
+            // event MessageReceived(
+            //     bytes32 indexed messageId,
+            //     uint64 indexed sourceChainSelector,
+            //     address sender,
+            //     address token,
+            //     uint256 tokenAmount
+            // );
             vm.expectEmit(true, true, true, true);
             emit BaseMessengerCCIP.MessageReceived(
                 ccipMessage.messageId,
@@ -132,13 +135,9 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
                 address(0),
                 0
             );
-            // event MessageReceived(
-            //     bytes32 indexed messageId,
-            //     uint64 indexed sourceChainSelector,
-            //     address sender,
-            //     address token,
-            //     uint256 tokenAmount
-            // );
+            vm.expectEmit(true, true, true, true);
+            emit SenderCCIP.MatchedReceivedFunctionSelector(randomFunctionSelector);
+            // events must be emitted in the right order
             senderContract.mockCCIPReceive(
                 ccipMessage
             );

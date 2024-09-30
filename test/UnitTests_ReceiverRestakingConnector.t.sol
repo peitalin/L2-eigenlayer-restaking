@@ -6,6 +6,7 @@ import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
@@ -173,7 +174,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         receiverContract.mockCCIPReceive(any2EvmMessage);
 
         vm.prank(deployer);
-        receiverContract.setAmountRefundedToMessageId(messageId1, 1 ether);
+        receiverContract.setAmountRefundedToMessageId(messageId1, address(tokenL1), 1 ether);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -253,7 +254,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
+            token: address(tokenL1),
             amount: amount
         });
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
@@ -270,6 +271,62 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             abi.encodeWithSelector(
                 IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
                 "StrategyManager.onlyStrategiesWhitelistedForDeposit: strategy not whitelisted",
+                "Manually execute to refund after timestamp:",
+                expiryShort
+            )
+        );
+        receiverContract.mockCCIPReceive(any2EvmMessage);
+    }
+
+    function test_ReceiverL1_HandleCustomDepositError_DepositOnlyOneToken() public {
+
+        uint256 execNonce = 0;
+        // should revert with EigenAgentExecutionError(signer, expiry)
+        address invalidEigenlayerStrategy = vm.addr(4444);
+        // make expiryShort to test refund on expiry feature
+        uint256 expiryShort = block.timestamp + 60 seconds;
+        uint256 amount = 0.1 ether;
+
+        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
+            bobKey,
+            block.chainid, // destination chainid where EigenAgent lives
+            address(strategyManager), // StrategyManager to approve + deposit
+            encodeDepositIntoStrategyMsg(
+                invalidEigenlayerStrategy,
+                address(tokenL1),
+                amount
+            ),
+            execNonce,
+            expiryShort
+        );
+
+        ERC20 token2 = new ERC20("token2", "TKN2");
+
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](2);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1),
+            amount: amount
+        });
+        // mock a second token to trigger error
+        destTokenAmounts[1] = Client.EVMTokenAmount({
+            token: address(token2),
+            amount: amount
+        });
+
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0x0),
+            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
+            sender: abi.encode(deployer),
+            destTokenAmounts: destTokenAmounts,
+            data: abi.encode(string(
+                messageWithSignature
+            ))
+        });
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
+                "DepositIntoStrategy only handles one token at a time",
                 "Manually execute to refund after timestamp:",
                 expiryShort
             )
@@ -516,13 +573,13 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         vm.prank(bob);
         vm.expectRevert("Ownable: caller is not the owner");
-        receiverContract.setAmountRefundedToMessageId(messageId , 1 ether);
+        receiverContract.setAmountRefundedToMessageId(messageId, address(tokenL1), 1 ether);
 
         vm.prank(deployer);
-        receiverContract.setAmountRefundedToMessageId(messageId , 1.3 ether);
+        receiverContract.setAmountRefundedToMessageId(messageId, address(tokenL1), 1.3 ether);
 
         vm.assertEq(
-            receiverContract.amountRefunded(messageId ),
+            receiverContract.amountRefunded(messageId, address(tokenL1)),
             1.3 ether
         );
     }

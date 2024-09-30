@@ -97,7 +97,7 @@ contract RestakingConnector is
 
         if (functionSelector == IStrategyManager.depositIntoStrategy.selector) {
             /// depositIntoStrategy - 0xe7a050aa
-            _depositWithEigenAgent(message);
+            _depositWithEigenAgent(message, any2EvmMessage.destTokenAmounts);
 
         } else if (functionSelector == IRestakingConnector.mintEigenAgent.selector) {
             /// mintEigenAgent - 0xcc15a557
@@ -156,7 +156,10 @@ contract RestakingConnector is
      * @param messageWithSignature is the depositIntoSignature message with
      * appended signature for EigenAgent execution.
      */
-    function _depositWithEigenAgent(bytes memory messageWithSignature) private {
+    function _depositWithEigenAgent(
+        bytes memory messageWithSignature,
+        Client.EVMTokenAmount[] memory destTokenAmounts
+    ) private {
 
         (
             // original message
@@ -168,6 +171,21 @@ contract RestakingConnector is
             uint256 expiry,
             bytes memory signature // signature from original_staker
         ) = decodeDepositIntoStrategyMsg(messageWithSignature);
+
+        if (destTokenAmounts.length > 1) {
+            // Eigenlayer DepositIntoStrategy deposits one token at a time, and SenderCCIP on L2
+            // only sends one token at a time.
+            // However it is possible to send multiple tokens with CCIP in other Sender implementations,
+            // so revert with EigenAgentExecutionError to refund in case this happens.
+            revert IRestakingConnector.EigenAgentExecutionError(
+                signer,
+                expiry,
+                abi.encodeWithSelector(
+                    TooManyTokensToDeposit.selector,
+                    "DepositIntoStrategy only handles one token at a time"
+                )
+            );
+        }
 
         // Get original_staker's EigenAgent, or spawn one.
         try agentFactory.tryGetEigenAgentOrSpawn(signer) returns (IEigenAgent6551 eigenAgent) {
@@ -185,7 +203,7 @@ contract RestakingConnector is
                 _receiverCCIP,
                 address(eigenAgent),
                 amount
-                );
+            );
 
             try eigenAgent.executeWithSignature(
                 address(strategyManager), // strategyManager

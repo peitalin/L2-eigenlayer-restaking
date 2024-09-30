@@ -15,8 +15,8 @@ interface IReceiverCCIP is IBaseMessengerCCIP {
 
     function setRestakingConnector(IRestakingConnector _restakingConnector) external;
 
-    function amountRefunded(bytes32 messageId) external view returns (uint256);
+    function amountRefunded(bytes32 messageId, address token) external view returns (uint256);
 
-    function setAmountRefundedToMessageId(bytes32 messageId, uint256 amountAfter) external;
+    function setAmountRefundedToMessageId(bytes32 messageId, address token, uint256 amountAfter) external;
 }
 

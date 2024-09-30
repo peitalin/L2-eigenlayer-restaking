@@ -33,7 +33,8 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
 
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
 
-    error AddressZero(string msg);
+    error AddressZero(string reason);
+    error TooManyTokensToDeposit(string reason);
 
     /*
      *

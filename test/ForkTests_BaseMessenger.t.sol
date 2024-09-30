@@ -274,6 +274,8 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         uint256 _amount = 0 ether;
         uint256 _gasLimit = 800_000;
 
+        vm.deal(deployer, 1 ether);
+
         vm.startBroadcast(deployerKey);
         {
             uint256 fees = getRouterFeesL2(
@@ -487,6 +489,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             expiry
         );
 
+        vm.deal(deployer, 1 ether);
         vm.startBroadcast(deployer);
         {
             tokenL2.approve(address(senderContract), 0.1 ether);

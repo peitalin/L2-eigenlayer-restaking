@@ -90,6 +90,7 @@ library FunctionSelectorDecoder {
                 innerErrorSelector == 0x08c379a0    // Error(string)
                 || innerErrorSelector == 0xc2a21d1d // CallerNotWhitelisted(string)
                 || innerErrorSelector == 0xad62b3ea // InvalidSignature(string)
+                || innerErrorSelector == 0x3fc42773 // TooManyTokensToDeposit(string)
             ) {
                 uint32 innerErrorLength;
                 uint32 innerErrorOffset = 200;
