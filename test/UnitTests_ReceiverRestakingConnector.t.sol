@@ -379,7 +379,26 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         );
     }
 
-    function test_SetAndGet_QueueWithdrawalBlock() public {
+    function test_ReceiverL1_MintEigenAgent_OnlyCallableByReceiver() public {
+
+        bytes memory mintEigenAgentMessageBob = encodeMintEigenAgentMsg(bob);
+        bytes memory messageCCIP = abi.encode(string(mintEigenAgentMessageBob));
+
+        vm.expectRevert("not called by ReceiverCCIP");
+        restakingConnector.mintEigenAgent(messageCCIP);
+
+        vm.prank(address(receiverContract));
+        restakingConnector.mintEigenAgent(messageCCIP);
+    }
+
+    function test_ReceiverContractL1_CanReceiveEther() public {
+        vm.deal(deployer, 0.1 ether);
+        vm.prank(deployer);
+        (bool success, ) = address(senderContract).call{value: 0.1 ether}("");
+        vm.assertTrue(success);
+    }
+
+    function test_ReceiverContractL1_SetAndGet_QueueWithdrawalBlock() public {
 
         vm.expectRevert("Not admin or owner");
         restakingConnector.setQueueWithdrawalBlock(deployer, 22, 9999);
@@ -392,7 +411,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
     }
 
 
-    function test_SetAndGet_AgentFactory() public {
+    function test_RestakingConnector_SetAndGet_AgentFactory() public {
 
         vm.expectRevert("Ownable: caller is not the owner");
         restakingConnector.setAgentFactory(
@@ -416,7 +435,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         vm.assertEq(af, address(agentFactory));
     }
 
-    function test_SetAndGet_EigenlayerContracts() public {
+    function test_RestakingConnector_SetAndGet_EigenlayerContracts() public {
 
         vm.expectRevert("Ownable: caller is not the owner");
         restakingConnector.setEigenlayerContracts(
@@ -491,7 +510,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         vm.stopBroadcast();
     }
 
-    function test_SetAndGet_GasLimits_RestakingConnector() public {
+    function test_RestakingConnector_SetAndGet_GasLimits() public {
 
         uint256[] memory gasLimits = new uint256[](2);
         gasLimits[0] = 1_000_000;
@@ -567,7 +586,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         );
     }
 
-    function test_SetandGet_AmountRefunded() public {
+    function test_ReceiverContractL1_SetandGet_AmountRefunded() public {
 
         bytes32 messageId = bytes32(abi.encode(1,2,3));
 
