@@ -164,9 +164,11 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * withdrawn funds, and the L1 bridge has bridged them back to L2.
      * It receives a transferRoot and matches it with the committed transferRoot
      * to verify which user to transfer the withdrawn funds (or rewards claims) to.
+     * Only callable from SenderCCIP.
      */
     function handleTransferToAgentOwner(bytes memory message)
         external
+        onlySenderCCIP
         returns (ISenderHooks.FundsTransfer[] memory)
     {
 

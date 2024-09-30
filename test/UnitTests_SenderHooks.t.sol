@@ -2,7 +2,6 @@
 pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
-import {console} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
@@ -11,6 +10,7 @@ import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationMa
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 
@@ -172,7 +172,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         sHooks.initialize(address(1), address(2));
     }
 
-    function test_BeforeSend_Commits_WithdrawalTransferRoot() public {
+    function test_beforeSend_Commits_WithdrawalTransferRoot() public {
 
         vm.startBroadcast(address(senderContract));
 
@@ -180,18 +180,6 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             bytes32 withdrawalRoot,
             bytes memory messageWithSignature_CW
         ) = mockCompleteWithdrawalMessage(bobKey, amount);
-
-        console.log("tokenL1", address(tokenL1));
-
-        // called by senderContract
-        vm.expectRevert(abi.encodeWithSelector(
-            OnlySendFundsForDeposits.selector, "Only send funds for deposit messages"));
-        senderHooks.beforeSendCCIPMessage(
-            abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-            amount
-        );
-
-        uint256 amountZero = 0 ether;
 
         bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalTransferRoot(
             withdrawalRoot,
@@ -206,13 +194,49 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         // called by senderContract
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-            amountZero
+            0 ether // not bridging tokens
         );
 
         vm.stopBroadcast();
     }
 
-    function test_BeforeSendCCIPMessage_OnlySenderCCIP(uint256 signerKey) public {
+    function test_CommitsAndGets_WithdrawalTransferRoot() public {
+
+        vm.startBroadcast(address(senderContract));
+
+        (
+            bytes32 withdrawalRoot,
+            bytes memory messageWithSignature_CW
+        ) = mockCompleteWithdrawalMessage(bobKey, amount);
+
+        bytes32 withdrawalTransferRoot = calculateWithdrawalTransferRoot(
+            withdrawalRoot,
+            bob
+        );
+
+        vm.expectEmit(false, false, false, false);
+        emit SenderHooks.WithdrawalTransferRootCommitted(
+            withdrawalTransferRoot,
+            bob
+        );
+        // called by senderContract
+        senderHooks.beforeSendCCIPMessage(
+            abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
+            0 ether // not bridging tokens
+        );
+
+        vm.stopBroadcast();
+
+        // fundsTransfer info should be available
+        ISenderHooks.FundsTransfer[] memory fundsTransfer = senderHooks.getFundsTransferCommitment(
+            withdrawalTransferRoot
+        );
+        vm.assertEq(fundsTransfer[0].amount, amount);
+        vm.assertEq(fundsTransfer[0].tokenL2, address(BaseSepolia.BridgeToken));
+        vm.assertEq(fundsTransfer[0].agentOwner, bob);
+    }
+
+    function test_beforeSendCCIPMessage_OnlyCalledBySenderCCIP(uint256 signerKey) public {
 
         vm.assume(signerKey < type(uint256).max / 2); // EIP-2: secp256k1 curve order / 2
         vm.assume(signerKey > 1);
@@ -235,7 +259,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         vm.stopBroadcast();
     }
 
-    function test_BeforeSendCCIPMessage_RewardsTransferRoot_TokenCannotBeNull() public {
+    function test_beforeSendCCIPMessage_OnlySendFundsForDeposits() public {
 
         vm.startBroadcast(address(senderContract));
 
@@ -246,13 +270,42 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
 
         require(rewardsRoot != bytes32(abi.encode(0)), "rewardsRoot cannot be 0x0");
 
-        // vm.expectRevert("SenderHooks._commitRewardsTransferRootInfo: cannot commit tokenL2 as address(0)");
+        vm.expectRevert(abi.encodeWithSelector(
+            OnlySendFundsForDeposits.selector, "Only send funds for deposit messages"));
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_PC)), // CCIP string encodes when messaging
-            0 ether
+            amount
         );
 
         vm.stopBroadcast();
+    }
+
+    function test_handleTransferToAgentOwner_OnlyCallableBySenderCCIP(address mock_address) public {
+
+        vm.assume(mock_address != address(senderContract));
+
+        (
+            bytes32 rewardsRoot,
+            bytes memory messageWithSignature_PC
+        ) = mockRewardsClaimMessage(bobKey);
+
+        require(rewardsRoot != bytes32(abi.encode(0)), "rewardsRoot cannot be 0x0");
+
+        bytes memory message = abi.encode(string(messageWithSignature_PC));
+
+        vm.prank(mock_address);
+        vm.expectRevert("not called by SenderCCIP");
+        senderHooks.handleTransferToAgentOwner(message);
+
+        vm.prank(address(senderContract));
+        senderHooks.handleTransferToAgentOwner(message);
+    }
+
+    function test_SenderContract_CanReceiveEther() public {
+        vm.deal(deployer, 0.1 ether);
+        vm.prank(deployer);
+        (bool success, ) = address(senderContract).call{value: 0.1 ether}("");
+        vm.assertTrue(success);
     }
 
     function mockRewardsClaimMessage(uint256 signerKey) public view returns (
