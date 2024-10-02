@@ -27,6 +27,8 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
     error AddressZero(string msg);
     error CallerNotWhitelisted(string reason);
     error SignatureInvalid(string reason);
+    error AlreadyRefunded(uint256 amount);
+    error WithdrawalExceedsBalance(uint256 amount, uint256 currentBalance);
 
     uint256 expiry;
     uint256 execNonce0;
@@ -128,7 +130,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         );
     }
 
-    function test_HandleCustomError_InvalidTargetContract() public {
+    function test_HandleCustomErrorForDeposits_InvalidTargetContract() public {
 
         uint256 execNonce = 0;
         uint256 expiryShort = block.timestamp + 60 seconds;
@@ -174,16 +176,12 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         receiverContract.mockCCIPReceive(any2EvmMessage);
 
         vm.prank(deployer);
-        receiverContract.setAmountRefundedToMessageId(messageId1, address(tokenL1), 1 ether);
+        receiverContract.withdrawTokenForMessageId(messageId1, bob, address(tokenL1), 0.1 ether);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IRestakingConnector.EigenAgentExecutionErrorStr.selector,
-                bob,
-                expiryShort,
-                "Invalid signer, or incorrect digestHash parameters."
-            )
-        );
+        vm.assertEq(tokenL1.balanceOf(bob), 0.1 ether);
+
+        // after refund, show original error message instead
+        vm.expectRevert("Invalid signer, or incorrect digestHash parameters.");
         receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 
@@ -586,20 +584,49 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         );
     }
 
-    function test_ReceiverContractL1_SetandGet_AmountRefunded() public {
+    function test_ReceiverContractL1_WithdrawTokenForMessageId_BalanceMatches() public {
 
         bytes32 messageId = bytes32(abi.encode(1,2,3));
 
         vm.prank(bob);
         vm.expectRevert("Ownable: caller is not the owner");
-        receiverContract.setAmountRefundedToMessageId(messageId, address(tokenL1), 1 ether);
+        receiverContract.withdrawTokenForMessageId(messageId, bob, address(tokenL1), 1 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(WithdrawalExceedsBalance.selector, 2 ether, 1 ether));
+        vm.prank(deployer);
+        receiverContract.withdrawTokenForMessageId(messageId, bob, address(tokenL1), 2 ether);
 
         vm.prank(deployer);
-        receiverContract.setAmountRefundedToMessageId(messageId, address(tokenL1), 1.3 ether);
+        receiverContract.withdrawTokenForMessageId(messageId, bob, address(tokenL1), 0.3 ether);
 
         vm.assertEq(
             receiverContract.amountRefunded(messageId, address(tokenL1)),
-            1.3 ether
+            0.3 ether
+        );
+        vm.assertEq(tokenL1.balanceOf(bob), 0.3 ether);
+
+    }
+
+    function test_ReceiverContractL1_WithdrawTokenForMessageId_AlreadyRefunded() public {
+
+        bytes32 messageId = bytes32(abi.encode(1,2,3));
+        uint256 refundAmount = 0.2 ether;
+
+        // refund
+        vm.prank(deployer);
+        receiverContract.withdrawTokenForMessageId(messageId, bob, address(tokenL1), refundAmount);
+
+        vm.assertEq(receiverContract.amountRefunded(messageId, address(tokenL1)), refundAmount);
+        vm.assertEq(tokenL1.balanceOf(bob), refundAmount);
+
+        // revert when trying to refund again
+        vm.prank(deployer);
+        vm.expectRevert(abi.encodeWithSelector(AlreadyRefunded.selector, refundAmount));
+        receiverContract.withdrawTokenForMessageId(
+            messageId,
+            bob,
+            address(tokenL1),
+            0.1 ether
         );
     }
 

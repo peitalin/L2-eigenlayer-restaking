@@ -44,7 +44,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     );
 
     error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees);
-    error NothingToWithdraw();
+    error WithdrawalExceedsBalance(uint256 amount, uint256 currentBalance);
     error FailedToWithdrawEth(address owner, address target, uint256 value);
     error DestinationChainNotAllowed(uint64 destinationChainSelector);
     error SourceChainNotAllowed(uint64 sourceChainSelector);
@@ -200,24 +200,26 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
     fallback() external payable {}
 
-    /// @notice Allows the contract owner to withdraw the entire balance of Ether from the contract.
+    /// @notice Allows the contract owner to withdraw Ether from the contract.
     /// @param _beneficiary The address to which the Ether should be sent.
-    function withdraw(address _beneficiary) external onlyOwner {
-        uint256 amount = address(this).balance;
-        if (amount == 0) revert NothingToWithdraw();
-        (bool sent, ) = _beneficiary.call{value: amount}("");
-        if (!sent) revert FailedToWithdrawEth(msg.sender, _beneficiary, amount);
+    /// @param _amount The amount to withdraw
+    function withdraw(address _beneficiary, uint256 _amount) external onlyOwner {
+        if (_amount > address(this).balance) revert WithdrawalExceedsBalance(_amount, address(this).balance);
+        (bool sent, ) = _beneficiary.call{value: _amount}("");
+        if (!sent) revert FailedToWithdrawEth(msg.sender, _beneficiary, _amount);
     }
 
     /// @param _beneficiary address to which the tokens will be sent.
     /// @param _token contract address of the ERC20 token to be withdrawn.
+    /// @param _amount The amount to withdraw
     function withdrawToken(
         address _beneficiary,
-        address _token
-    ) external onlyOwner {
-        uint256 amount = IERC20(_token).balanceOf(address(this));
-        if (amount == 0) revert NothingToWithdraw();
-        IERC20(_token).safeTransfer(_beneficiary, amount);
+        address _token,
+        uint256 _amount
+    ) external virtual onlyOwner {
+        uint256 tokenBalance = IERC20(_token).balanceOf(address(this));
+        if (_amount > tokenBalance) revert WithdrawalExceedsBalance(_amount, tokenBalance);
+        IERC20(_token).safeTransfer(_beneficiary, _amount);
     }
 
 }

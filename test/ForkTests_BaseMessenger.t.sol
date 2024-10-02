@@ -14,7 +14,7 @@ import {NonPayableContract} from "./mocks/NonPayableContract.sol";
 contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
     error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees);
-    error NothingToWithdraw();
+    error WithdrawalExceedsBalance(uint256 amount, uint256 currentBalance);
     error FailedToWithdrawEth(address owner, address target, uint256 value);
 
     error DestinationChainNotAllowed(uint64 destinationChainSelector);
@@ -46,80 +46,91 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
     */
 
     function test_BaseMessenger_withdrawToken() public {
-        /////////////////////////
+
         // L1 Receiver
-        /////////////////////////
         vm.selectFork(ethForkId);
 
         IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
-        uint256 total = tokenL1.balanceOf(address(receiverContract));
+        uint256 totalWithdraw = tokenL1.balanceOf(address(receiverContract));
+        uint256 halfWithdraw = totalWithdraw / 2;
 
         vm.prank(bob);
         vm.expectRevert("Ownable: caller is not the owner");
-        receiverContract.withdrawToken(bob, address(tokenL1));
+        receiverContract.withdrawToken(bob, address(tokenL1), totalWithdraw);
 
+        // withdraw half, twice (all tokens)
         vm.prank(deployer);
-        receiverContract.withdrawToken(alice, address(tokenL1));
-
+        receiverContract.withdrawToken(alice, address(tokenL1), halfWithdraw);
         vm.prank(deployer);
-        vm.expectRevert(abi.encodeWithSelector(NothingToWithdraw.selector));
-        receiverContract.withdrawToken(deployer, address(tokenL1));
+        receiverContract.withdrawToken(alice, address(tokenL1), halfWithdraw);
 
-        require(tokenL1.balanceOf(alice) == total, "alice should have received all tokens");
+        require(tokenL1.balanceOf(alice) == totalWithdraw, "alice should have received all tokens");
         require(tokenL1.balanceOf(address(receiverContract)) == 0, "Sender should have sent all tokens");
+
+        vm.expectRevert(abi.encodeWithSelector(
+            WithdrawalExceedsBalance.selector,
+            totalWithdraw  * 2,
+            tokenL1.balanceOf(address(receiverContract))
+        ));
+        vm.prank(deployer);
+        receiverContract.withdrawToken(deployer, address(tokenL1), totalWithdraw * 2);
     }
 
     function test_BaseMessenger_withdraw() public {
-        /////////////////////////
+
         // L2 Sender
-        /////////////////////////
         vm.selectFork(l2ForkId);
 
         vm.deal(address(senderContract), 1.1 ether);
 
         vm.prank(bob);
         vm.expectRevert("Ownable: caller is not the owner");
-        senderContract.withdraw(bob);
+        senderContract.withdraw(bob, address(bob).balance);
 
         vm.prank(deployer);
-        senderContract.withdraw(alice);
+        senderContract.withdraw(alice, address(senderContract).balance);
 
-        vm.prank(deployer);
-        vm.expectRevert(abi.encodeWithSelector(NothingToWithdraw.selector));
-        senderContract.withdraw(deployer);
-
-        require(alice.balance == 1.1 ether, "alice should have received 1 ETH");
+        require(alice.balance == 1.1 ether, "alice should have received 1.1 ETH");
         require(address(senderContract).balance == 0, "sender should have sent entire ETH balance");
+
+        vm.expectRevert(abi.encodeWithSelector(
+            WithdrawalExceedsBalance.selector,
+            address(senderContract).balance + 0.1 ether,
+            address(senderContract).balance
+        ));
+        vm.prank(deployer);
+        senderContract.withdraw(deployer, address(senderContract).balance + 0.1 ether);
     }
 
     function test_BaseMessenger_withdrawFailure() public {
 
+        // L2 Sender
         vm.selectFork(l2ForkId);
 
         vm.deal(address(senderContract), 1.1 ether);
 
         NonPayableContract nonPayableContract = new NonPayableContract();
 
-        vm.prank(deployer);
+        uint256 withdrawAmount = 1.1 ether;
+
         vm.expectRevert(
             abi.encodeWithSelector(
                 FailedToWithdrawEth.selector,
                 deployer, // owner
                 address(nonPayableContract), // target
-                1.1 ether // uint256 value
+                withdrawAmount
             )
         );
-        senderContract.withdraw(address(nonPayableContract));
+        vm.prank(deployer);
+        senderContract.withdraw(address(nonPayableContract), withdrawAmount);
 
         vm.assertEq(address(nonPayableContract).balance, 0);
-        vm.assertEq(address(senderContract).balance, 1.1 ether);
+        vm.assertEq(address(senderContract).balance, withdrawAmount);
     }
 
     function test_BaseMessenger_L1_onlyAllowlistedSender() public {
 
-        /////////////////////////
         // L1 Receiver
-        /////////////////////////
         vm.selectFork(ethForkId);
 
         // these users will revert
@@ -170,9 +181,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
     function test_BaseMessenger_L2_onlyAllowlistedSender() public {
 
-        /////////////////////////
         // L2 Sender
-        /////////////////////////
         vm.selectFork(l2ForkId);
 
         // these users will revert
@@ -223,6 +232,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
     function test_BaseMessenger_L1_onlyAllowlistedDestinationChain() public {
 
+        // L1 Receiver
         vm.selectFork(ethForkId);
 
         uint64 randomChainSelector = 125;
@@ -268,6 +278,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
     function test_BaseMessenger_L2_onlyAllowlistedDestinationChain() public {
 
+        // L2 Sender
         vm.selectFork(l2ForkId);
 
         uint64 randomChainSelector = 125;
@@ -314,6 +325,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
     function test_BaseMessenger_L2_NotEnoughGasFees() public {
 
+        // L2 Sender
         vm.selectFork(l2ForkId);
 
         uint256 _amount = 0 ether;
@@ -350,6 +362,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
     function test_BaseMessenger_L1_onlyAllowlistedSourceChain() public {
 
+        // L1 Receiver
         vm.selectFork(ethForkId);
 
         uint64 randomChainSelector = 333;
@@ -385,6 +398,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
     function test_BaseMessenger_L2_onlyAllowlistedSourceChain() public {
 
+        // L2 Sender
         vm.selectFork(l2ForkId);
 
         uint64 randomChainSelector = 333;
@@ -420,6 +434,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
     function test_BaseMessenger_L1_ValidateReceiver() public {
 
+        // L1 Receiver
         vm.selectFork(ethForkId);
 
         vm.expectRevert(InvalidReceiverAddress.selector);
@@ -450,10 +465,11 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
     function testFail_BaseMessenger_L2_NotEnoughBalance() public {
 
+        // L2 Sender
         vm.selectFork(l2ForkId);
 
         vm.prank(deployer);
-        senderContract.withdraw(deployer);
+        senderContract.withdraw(deployer, address(deployer).balance);
 
         // cheatcode not released yet.
         // vm.expectPartialRevert(NotEnoughBalance.selector);
@@ -469,9 +485,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
     function test_Sender_L2_sendMessagePayNative_Deposit() public {
 
-        ///////////////////////////////////////////////////
-        //// Setup Sender contracts on L2 fork
-        ///////////////////////////////////////////////////
+        // Setup L2 Sender contracts on L2 fork
         vm.selectFork(l2ForkId);
 
         uint256 execNonce = 0;
@@ -526,9 +540,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
     function test_Receiver_L2_sendMessagePayNative_TransferToAgentOwner() public {
 
-        ///////////////////////////////////////////////////
-        //// Receiver contracts on L1 fork
-        ///////////////////////////////////////////////////
+        // Receiver contracts on L1 fork
         vm.selectFork(ethForkId);
 
         bytes memory messageWithSignature;
@@ -582,6 +594,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
     function test_Receiver_L2_sendMessagePayNative_OutOfGas() public {
 
+        // L1 fork
         vm.selectFork(ethForkId);
 
         bytes memory messageWithSignature;
