@@ -4,6 +4,7 @@ pragma solidity 0.8.25;
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 
 import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
@@ -15,6 +16,7 @@ import {BaseSepolia} from "../script/Addresses.sol";
 
 /// @title ETH L1 Messenger Contract: receives messages from L2 and processes them
 contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
+    using SafeERC20 for IERC20;
 
     IRestakingConnector public restakingConnector;
     address public senderContractL2;
@@ -47,6 +49,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     );
 
     error AddressZero(string msg);
+    error AlreadyRefunded(uint256 amount);
 
     /// @param _router address of the router contract.
     constructor(address _router) BaseMessengerCCIP(_router) {
@@ -95,27 +98,38 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     }
 
     /**
-     * @dev Gets the amount refunded to prevent triggering a refund if admin manually refunds user.
-     * @param messageId is the CCIP messageId
-     * @return amount refunded
+     * @dev Looks up the amount refunded for a messageId.
+     * @param messageId is the CCIP messageId.
+     * @return amount is the amount refunded.
      */
     function amountRefunded(bytes32 messageId, address token) external view returns (uint256) {
         return amountRefundedToMessageIds[messageId][token];
     }
 
     /**
-     * @dev This function sets amount refunded in case owner wants to refund a user manually.
-     * @param messageId is the CCIP messageId
-     * @param amountAfter is the amount refunded
+     * @notice Lets admin withdraw tokens and mark that messageId as refunded, preventing further refunds.
+     * @param messageId is the CCIP messageId.
+     * @param beneficiary address to which the tokens will be sent.
+     * @param token contract address of the ERC20 token to be withdrawn.
+     * @param amount The amount to withdraw.
      */
-    function setAmountRefundedToMessageId(
+    function withdrawTokenForMessageId(
         bytes32 messageId,
+        address beneficiary,
         address token,
-        uint256 amountAfter
+        uint256 amount
     ) external onlyOwner {
+
         uint256 amountBefore = amountRefundedToMessageIds[messageId][token];
-        amountRefundedToMessageIds[messageId][token] = amountAfter;
-        emit UpdatedAmountRefunded(messageId, token, amountBefore, amountAfter);
+        uint256 tokenBalance = IERC20(token).balanceOf(address(this));
+
+        if (amountBefore > 0) revert AlreadyRefunded(amountBefore);
+        if (amount > tokenBalance) revert WithdrawalExceedsBalance(amount, tokenBalance);
+
+        amountRefundedToMessageIds[messageId][token] = amount;
+        emit UpdatedAmountRefunded(messageId, token, amountBefore, amount);
+
+        IERC20(token).safeTransfer(beneficiary, amount);
     }
 
     /*
@@ -205,14 +219,14 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                         return _refundToSignerAfterExpiry(customError, tokenAddress, tokenAmount);
 
                     } else {
-                        // Parse EigenAgentExecutionError message and continue allowing manual re-execution tries.
+                        // Transaction not refundable (or already refunded). Display original error instead
                         (
-                            address signer,
-                            uint256 expiry,
+                            , // address signer
+                            , // uint256 expiry
                             string memory errStr
                         ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
 
-                        revert IRestakingConnector.EigenAgentExecutionErrorStr(signer, expiry, errStr);
+                        revert(errStr);
                     }
                 }
 
@@ -231,7 +245,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
      * trigger a refund to the original sender back on L2. This may happen for instance if an
      * Operator goes offline when attempting to deposit.
      *
-     * No other Eigenlayer function call bridges tokens, this is the main UX edgecase to cover.
+     * No other Eigenlayer call bridges tokens, this is the only edgecase to cover.
      */
     function _refundToSignerAfterExpiry(
         bytes memory customError,
@@ -326,6 +340,5 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                 )
             });
     }
-
 }
 

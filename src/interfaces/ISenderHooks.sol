@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
-import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
-
 
 interface ISenderHooks {
 
@@ -36,20 +33,10 @@ interface ISenderHooks {
 
     function isTransferRootSpent(bytes32 transferRoot) external returns (bool);
 
-    // function calculateWithdrawalRoot(IDelegationManager.Withdrawal memory withdrawal)
-    //     external
-    //     pure
-    //     returns (bytes32);
-
     function calculateWithdrawalTransferRoot(
         bytes32 withdrawalRoot,
         address agentOwner
     ) external pure returns (bytes32);
-
-    // function calculateRewardsRoot(IRewardsCoordinator.RewardsMerkleClaim memory claim)
-    //     external
-    //     pure
-    //     returns (bytes32);
 
     function calculateRewardsTransferRoot(
         bytes32 rewardsRoot,
