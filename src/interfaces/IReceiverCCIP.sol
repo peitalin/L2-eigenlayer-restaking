@@ -7,9 +7,9 @@ import {IBaseMessengerCCIP} from "./IBaseMessengerCCIP.sol";
 
 interface IReceiverCCIP is IBaseMessengerCCIP {
 
-    function getSenderContractL2Addr() external view returns (address);
+    function getSenderContractL2() external view returns (address);
 
-    function setSenderContractL2Addr(address _senderContract) external;
+    function setSenderContractL2(address _senderContract) external;
 
     function getRestakingConnector() external view returns (IRestakingConnector);
 

@@ -37,17 +37,11 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
         senderHooks = _senderHooks;
     }
 
-    /*
-     *
-     *                Receiving Messages
-     *
-     *
-    */
-
     /**
      * @dev _ccipReceiver is called when a CCIP bridge contract receives a CCIP message.
      * This contract allows us to define custom logic to handle outboound Eigenlayer messages
      * for instance, committing a withdrawalTransferRoot on outbound completeWithdrawal messages.
+     * @param any2EvmMessage contains CCIP message info such as data (message) and bridged token amounts
      */
     function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage)
         internal
@@ -119,14 +113,8 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
         }
     }
 
-    /*
-     *
-     *                Sending Messages
-     *
-     *
-    */
-
     /**
+     * @dev This function is called when sending a message.
      * @param _receiver The address of the receiver.
      * @param _text The string data to be sent.
      * @param _token The token to be transferred.

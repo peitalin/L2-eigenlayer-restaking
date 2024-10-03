@@ -57,12 +57,12 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         receiverContract.setRestakingConnector(IRestakingConnector(address(0)));
 
         vm.expectRevert("Ownable: caller is not the owner");
-        receiverContract.setSenderContractL2Addr(address(senderContract));
+        receiverContract.setSenderContractL2(address(senderContract));
 
         vm.prank(deployer);
         vm.expectRevert(abi.encodeWithSelector(AddressZero.selector,
             "SenderContract on L2 cannot be address(0)"));
-        receiverContract.setSenderContractL2Addr(address(0));
+        receiverContract.setSenderContractL2(address(0));
 
         vm.expectRevert(abi.encodeWithSelector(AddressZero.selector,
             "RestakingConnector cannot be address(0)"));

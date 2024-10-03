@@ -178,7 +178,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         receiverProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
 
         receiverProxy.allowlistSender(address(senderContract), true);
-        receiverProxy.setSenderContractL2Addr(address(senderContract));
+        receiverProxy.setSenderContractL2(address(senderContract));
 
         eigenAgentOwner721.addAdmin(deployer);
         eigenAgentOwner721.addAdmin(address(restakingProxy));
