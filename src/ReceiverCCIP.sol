@@ -75,11 +75,11 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         BaseMessengerCCIP.__BaseMessengerCCIP_init();
     }
 
-    function getSenderContractL2Addr() external view returns (address) {
+    function getSenderContractL2() external view returns (address) {
         return senderContractL2;
     }
 
-    function setSenderContractL2Addr(address _senderContractL2) external onlyOwner {
+    function setSenderContractL2(address _senderContractL2) external onlyOwner {
         if (address(_senderContractL2) == address(0))
             revert AddressZero("SenderContract on L2 cannot be address(0)");
 
@@ -132,13 +132,10 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         IERC20(token).safeTransfer(beneficiary, amount);
     }
 
-    /*
-     *
-     *                Receiving
-     *
-     *
+    /**
+     * @dev This function is called when receiving an inbound message.
+     * @param any2EvmMessage contains CCIP message info such as data (message) and bridged token amounts
     */
-
     function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage)
         internal
         override
@@ -238,65 +235,15 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     }
 
     /**
-     * @dev Allows users to manually execute EigenAgent execution messages until expiry
-     * if the message fails because of gas spikes, or other temporary issues.
-     *
-     * After message expiry, manual executions that result in a EigenAgentExecutionError will
-     * trigger a refund to the original sender back on L2. This may happen for instance if an
-     * Operator goes offline when attempting to deposit.
-     *
-     * No other Eigenlayer call bridges tokens, this is the only edgecase to cover.
-     */
-    function _refundToSignerAfterExpiry(
-        bytes memory customError,
-        address tokenAddress,
-        uint256 tokenAmount
-    ) private {
-
-        (
-            address signer,
-            uint256 expiry,
-            string memory errStr
-        ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
-
-        if (block.timestamp > expiry) {
-            // If message has expired, trigger CCIP call to bridge funds back to L2 signer
-            this.sendMessagePayNative(
-                BaseSepolia.ChainSelector, // destination chain
-                signer, // receiver on L2
-                string.concat(errStr, ": refunding to L2 signer"),
-                tokenAddress, // L1 token to burn/lock
-                tokenAmount,
-                0 // use default gasLimit for this call
-            );
-
-            emit RefundingDeposit(signer, tokenAddress, tokenAmount);
-
-        } else {
-            // otherwise if message hasn't expired, allow manual execution retries
-            revert IRestakingConnector.ExecutionErrorRefundAfterExpiry(
-                errStr,
-                "Manually execute to refund after timestamp:",
-                expiry
-            );
-        }
-    }
-
-    /*
-     *
-     *                Sending
-     *
-     *
-    */
-
-    /**
+     * @dev This function is called when sending an outbound message.
      * @param _receiver The address of the receiver.
      * @param _text The string data to be sent.
      * @param _token The token to be transferred.
      * @param _amount The amount of the token to be transferred.
-     * @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
+     * @param _feeTokenAddress Address of the token used for fees. Set address(0) for native gas.
      * @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
-     * @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
+     * @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information
+     * for sending a CCIP message.
      */
     function _buildCCIPMessage(
         address _receiver,
@@ -339,6 +286,49 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                     Client.EVMExtraArgsV1({ gasLimit: gasLimit })
                 )
             });
+    }
+
+    /**
+     * @dev Allows users to manually retry EigenAgent execution messages until expiry
+     * if the message fails due to out-of-gas errors, or other temporary issues.
+     * After message expiry, manual executions that still revert with an EigenAgentExecutionError
+     * will trigger a refund to the original sender back on L2. This may happen for instance if
+     * an Operator goes offline when attempting to deposit.
+     * No other Eigenlayer call bridges tokens, this is the only edgecase to cover.
+     */
+    function _refundToSignerAfterExpiry(
+        bytes memory customError,
+        address tokenAddress,
+        uint256 tokenAmount
+    ) private {
+
+        (
+            address signer,
+            uint256 expiry,
+            string memory errStr
+        ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
+
+        if (block.timestamp > expiry) {
+            // If message has expired, trigger CCIP call to bridge funds back to L2 signer
+            this.sendMessagePayNative(
+                BaseSepolia.ChainSelector, // destination chain
+                signer, // receiver on L2
+                string.concat(errStr, ": refunding to L2 signer"),
+                tokenAddress, // L1 token to burn/lock
+                tokenAmount,
+                0 // use default gasLimit
+            );
+
+            emit RefundingDeposit(signer, tokenAddress, tokenAmount);
+
+        } else {
+            // Otherwise if message hasn't expired, allow manual execution retries
+            revert IRestakingConnector.ExecutionErrorRefundAfterExpiry(
+                errStr,
+                "Manually execute to refund after timestamp:",
+                expiry
+            );
+        }
     }
 }
 

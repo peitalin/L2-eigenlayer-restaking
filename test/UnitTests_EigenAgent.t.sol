@@ -118,8 +118,8 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         vm.startBroadcast(bobKey);
 
         uint256 execNonce0 = eigenAgent.execNonce();
-        // encode a simple getSenderContractL2Addr call
-        bytes memory data = abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector);
+        // encode a simple getSenderContractL2 call
+        bytes memory data = abi.encodeWithSelector(receiverContract.getSenderContractL2.selector);
 
         bytes32 digestHash = eigenAgent.createEigenAgentCallDigestHash(
             address(receiverContract),
@@ -153,7 +153,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         );
 
         // msg.sender = ReceiverContract's address
-        address senderTargetAddr = receiverContract.getSenderContractL2Addr();
+        address senderTargetAddr = receiverContract.getSenderContractL2();
         address sender1 = abi.decode(result, (address));
 
         require(sender1 == senderTargetAddr, "call did not return the same address");
@@ -165,7 +165,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         EigenAgent6551(payable(address(eigenAgent))).execute(
             address(receiverContract),
             0 ether,
-            abi.encodeWithSelector(receiverContract.getSenderContractL2Addr.selector),
+            abi.encodeWithSelector(receiverContract.getSenderContractL2.selector),
             0
         );
 

@@ -42,7 +42,7 @@ contract RestakingConnector is
     }
 
     /**
-     * @dev Retrieves the block.number where queueWithdrawal occured. Needed as the time when
+     * @dev Retrieves the block.number where queueWithdrawal occurred. Needed as the time when
      * queueWithdrawal message is dispatched differs from the time the message executes on L1.
      * @param staker is the EigenAgent staking into Eigenlayer
      * @param nonce is the withdrawal nonce Eigenlayer keeps track of in DelegationManager.sol
@@ -78,7 +78,7 @@ contract RestakingConnector is
     */
 
    /**
-     * @dev This function only called by ReceiverCCIP (but is marked external for try/catch feature).
+     * @dev This function only called by ReceiverCCIP.
      * @notice This function matches a function selector, then forwards CCIP Eigenlayer messages
      * to the RestakingConnector which deserializes the rest of the message and
      * forwards it to the user's EigenAgent for execution.
@@ -313,7 +313,7 @@ contract RestakingConnector is
             );
 
             /// receiveAsTokens determines whether Eigenlayer returns tokens to the EigenAgent or
-            /// re-deposits them into Eigenlayer strategy vault as part of a re-delegate and re-deposit flow.
+            /// re-deposits them into Eigenlayer strategy as part of a re-delegate and re-deposit flow.
             if (receiveAsTokens) {
                 // if receiveAsTokens == true, distribute tokens to user address on L1 and L2.
                 // Otherwise if receiveAsTokens == false, withdrawal is redeposited in Eigenlayer
@@ -332,7 +332,7 @@ contract RestakingConnector is
 
                     if (tokenL2 == address(0)) {
                         // (2) If the token cannot bridge to L2, transfer to AgentOwner on L1.
-                        // Should not reach this state, unless user manually uses EigenAgent on L1 to deposit arbitrary tokens.
+                        // Shouldn't reach this state, unless user deposits L1 tokens via EigenAgent on L1.
                         IERC20(tokensToWithdraw[i]).transferFrom(
                             address(eigenAgent),
                             signer, // AgentOwner
@@ -438,10 +438,10 @@ contract RestakingConnector is
      * @param messageWithSignature is the Eigenlayer processClaim message with
      * appended signature for EigenAgent to execute the message.
      * @return transferTokensArray is an array of objects that include information such as:
-     * - transferTokensArray.transferToAgentOwnerMessage encodes a "transferToAgentOwner" message to L2 to transfer
-     * rewards back to the EigenAgent's owner on L2.
-     * - transferTokensArray.transferRoot refers to the rewardsTransferRoot commitment set in L2 contract
-     * when a processClaim message was initially sent on L2. This ensures that the rewards
+     * - transferTokensArray.transferToAgentOwnerMessage encodes a "transferToAgentOwner" message
+     * to L2 to transfer rewards back to the EigenAgent's owner on L2.
+     * - transferTokensArray.transferRoot refers to the rewardsTransferRoot commitment set in L2
+     * contract when a processClaim message was initially sent on L2. This ensures that the rewards
      * bridged to L2 will be transferred to the EigenAgent's owner and cannot be tampered with.
      * - transferTokensArray.transferToken is the token reward claimed from Eigenlayer.
      * - transferTokensArray.transferAmount is the amount of token rewards claimed from Eigenlayer.
@@ -534,7 +534,7 @@ contract RestakingConnector is
 
     /**
      * @dev gets number of bridgeable tokens from an array that contains both bridgeable
-     * and non-bridgeable tokens for withdrawals
+     * and non-bridgeable tokens for withdrawals.
      */
     function _numBridgeableTokens(IERC20[] memory tokens) private view returns (uint256 num) {
         for (uint256 i = 0; i < tokens.length; ++i) {
