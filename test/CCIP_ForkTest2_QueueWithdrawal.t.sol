@@ -14,6 +14,7 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
 
     uint256 expiry;
     uint256 amount;
+    event SetQueueWithdrawalBlock(address indexed, uint256 indexed, uint256 indexed);
 
     function setUp() public {
         // setup forked environments for L2 and L1 contracts
@@ -105,9 +106,10 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
     function test_ReceiverL1_MockReceive_QueueWithdrawal() public {
 
         setupL1State_Deposit();
+        uint256 bobBalanceBefore = tokenL1.balanceOf(bob);
 
         /////////////////////////////////////
-        //// Mock message to L2 Receiver
+        //// Mock message to L1 Receiver
         /////////////////////////////////////
 
         uint256 execNonce1 = eigenAgent.execNonce();
@@ -152,18 +154,31 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
             ))
         });
 
-        // mock message to L2 receiver -> EigenAgent -> Eigenlayer
+        uint256 expectedBlock = block.number; // expected block withdrawal was queued
+        uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(address(eigenAgent));
+
+        vm.expectEmit(true, true, true, false);
+        emit SetQueueWithdrawalBlock(address(eigenAgent), withdrawalNonce, expectedBlock);
+        // Dispatch message to L2 receiver -> EigenAgent -> Eigenlayer
         receiverContract.mockCCIPReceive(any2EvmMessageQueueWithdrawal);
+
+        uint256 bobBalanceAfter = tokenL1.balanceOf(bob);
+        vm.assertEq(bobBalanceAfter, bobBalanceBefore, "Bob's balance should have stayed the same on L1");
+
+        uint256 withdrawalBlock = restakingConnector.getQueueWithdrawalBlock(address(eigenAgent), withdrawalNonce);
+        vm.assertEq(withdrawalBlock, expectedBlock, "QueueWithdrawalBlock should be saved");
+
+        // there should be 1 queued withdrawal for Bob's EigenAgent
+        vm.assertEq(1, delegationManager.cumulativeWithdrawalsQueued(address(eigenAgent)));
     }
 
     function test_ReceiverL1_CatchError_NullArrayQueueWithdrawal() public {
 
         setupL1State_Deposit();
-
-        // Catch error, but do nothing as no tokens are bridge in queueWithdrawal calls.
+        /// Test error handling, but do nothing as no tokens are bridged in queueWithdrawal calls.
 
         /////////////////////////////////////
-        //// Mock message to L2 Receiver
+        //// Mock message to L1 Receiver
         /////////////////////////////////////
 
         uint256 execNonce1 = eigenAgent.execNonce();
@@ -172,7 +187,7 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
 
         bytes memory messageWithSignature1;
         {
-            // Eigenlayer reverts with zero-length arrays:
+            // Eigenlayer reverts with zero-length arrays
             IDelegationManager.QueuedWithdrawalParams[] memory QWPArray;
             QWPArray = new IDelegationManager.QueuedWithdrawalParams[](0);
 
@@ -180,7 +195,6 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
             bytes memory withdrawalMessage = encodeQueueWithdrawalsMsg(
                 QWPArray
             );
-
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature1 = signMessageForEigenAgentExecution(
                 bobKey,
