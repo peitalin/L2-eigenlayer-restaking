@@ -28,6 +28,7 @@ contract RestakingConnector is
 
     event SendingRewardsToAgentOwnerOnL1(address indexed, address indexed, uint256 indexed);
     event SetQueueWithdrawalBlock(address indexed, uint256 indexed, uint256 indexed);
+    event SetUndelegateBlock(address indexed, uint256 indexed, uint256 indexed);
 
     constructor() {
         _disableInitializers();
@@ -246,6 +247,7 @@ contract RestakingConnector is
 
         uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(withdrawer);
         _withdrawalBlock[withdrawer][withdrawalNonce] = block.number;
+        emit SetQueueWithdrawalBlock(withdrawer, withdrawalNonce, block.number);
 
         eigenAgent.executeWithSignature(
             address(delegationManager),
@@ -421,8 +423,8 @@ contract RestakingConnector is
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(eigenAgentAddr));
 
         uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(eigenAgentAddr);
-
         _withdrawalBlock[eigenAgentAddr][withdrawalNonce] = block.number;
+        emit SetUndelegateBlock(eigenAgentAddr, withdrawalNonce, block.number);
 
         eigenAgent.executeWithSignature(
             address(delegationManager),
