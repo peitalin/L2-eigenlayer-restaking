@@ -30,7 +30,7 @@ The following test will bridge from L2 to L1, deposit in Eigenlayer, queueWithdr
 forge test --match-test test_FullFlow_CompleteWithdrawal -vvvv
 ```
 
-The following test will teset delegating, undelegating, and re-depositing:
+The following test will test delegating, undelegating, and re-depositing:
 ```
 forge test --match-test test_FullFlow_Undelegate_Delegate_Redeposit -vvvv
 ```
