@@ -43,10 +43,10 @@ forge coverage
 Frontend clients will make contract calls similar to the scripts in the `scripts` folder. These scripts run on Base Sepolia and dispatches CCIP calls to Eth Sepolia, bridging `CCIP-BnM` ERC20 tokens and interacting with mock Eigenlayer Strategy Vaults setup for the `CCIP-BnM` token.
 
 To run the Scripts see the `scripts` folder:
-- `5_depositAndMintEigenAgent.sh`: makes a cross-chain deposit into Eigenlayer from L2, minting an EigenAgent if the use does not yet have one.
+- `5_depositAndMintEigenAgent.sh`: makes a cross-chain deposit into Eigenlayer from L2, minting an EigenAgent if the user does not yet have one.
 - `7_queueWithdrawal.sh`: queues a withdrawal from L2.
 - `8_completeWithdrawal.sh`: completes the withdrawal and bridges the deposit back from L1 into the original staker's wallet on L2.
-- `9_submitRewards.sh`: sets up token emission rewards for the week, however can only be down once per epoch (weekly)
+- `9_submitRewards.sh`: sets up token emission rewards for the week, however can only be done once per epoch (weekly)
 - `9b_processClaimRewards.sh`: claims token emissions rewards for the user and bridges tokens back to L2 user.
 
 
