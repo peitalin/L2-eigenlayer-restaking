@@ -79,7 +79,7 @@ contract RestakingConnector is
     */
 
    /**
-     * @dev This function only called by ReceiverCCIP.
+     * @dev This function is only called by ReceiverCCIP.
      * @notice This function matches a function selector, then forwards CCIP Eigenlayer messages
      * to the RestakingConnector which deserializes the rest of the message and
      * forwards it to the user's EigenAgent for execution.
