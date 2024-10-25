@@ -96,6 +96,8 @@ contract ScriptsTests_Delegation_Rewards is Test, TestErrorHandlers {
 
             if (catchErrorStr(errStr, "RewardsCoordinator.submitRoot: new root must be for newer calculated period")) {
                 console.log("Rewards root already submitted for this week.");
+            } else if (catchErrorStr(errStr, "RewardsCoordinator: caller is not the rewardsUpdater")) {
+                console.log("only RewardsCoordinator deplyer can update rewards");
             } else {
                 revert(errStr);
             }
@@ -114,6 +116,9 @@ contract ScriptsTests_Delegation_Rewards is Test, TestErrorHandlers {
 
             } else if (catchErrorStr(errStr, "RewardsCoordinator._verifyEarnerClaimProof: invalid earner claim proof")) {
                 console.log("Either an invalid claim, or run script 9 and submit a root first.");
+
+            } else if (catchErrorStr(errStr, "User must have an EigenAgent")) {
+                console.log("User must have an EigenAgent, run /script/5_depositAndMintEigenAgent.sh first.");
 
             } else {
                 revert(errStr);
