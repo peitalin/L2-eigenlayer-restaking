@@ -44,7 +44,7 @@ contract EigenAgent6551 is ERC6551 {
     /**
      * @dev This function is used by RestakingConnector.sol to approve Eigenlayer StrategyManager
      * to transfer and EigenAgent's tokens into Eigenlayer strategy vaults. This avoids needing
-     * to extra transfers and signed messages to complete L2 restaking deposits.
+     * extra transfers and signed messages to complete L2 restaking deposits.
      * @param targetContract to approve transfer for, expected to be the Eigenlayer StrategyManager contract
      * @param token the token used in the Eigenlayer Strategy vault.
      * @param amount of tokens user is depositing into the strategy vault.
