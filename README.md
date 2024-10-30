@@ -198,7 +198,7 @@ Every message sent from L2 to L1 abi.encodes the message to send to Eigenlayer, 
 Please see the `signMessageForEigenAgentExecution` function [here](https://github.com/peitalin/L2-eigenlayer-restaking/blob/f1bd5c91b2c47ec6dad50cf518102f13355f521c/script/ClientSigners.sol#L166).
 
 An example of an Eigenlayer message would be the deposit message:
-```
+```solidity
 function encodeDepositIntoStrategyMsg(
     address strategy,
     address token,
