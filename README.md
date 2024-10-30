@@ -191,6 +191,50 @@ Note: at the moment you cannot have more than 1 cross-chain message in-flight at
 - CCIP bridging takes ~20min (Ethereum finality takes ~12.8 min)
 - A solution is to track in-flight txs and increment nonces on the client-side for subsequent messages (at least until the messages successfully execute on L1). Note this assumes CCIP messages land on L1 in the correct order.
 
+## Eigenlayer Message Encoding and Decoding
+
+Every message sent from L2 to L1 abi.encodes the message to send to Eigenlayer, then appends a user signature that signs the message digest of that Eigenlayer message to the end of it.
+
+Please see the `signMessageForEigenAgentExecution` function (here)[https://github.com/peitalin/L2-eigenlayer-restaking/blob/f1bd5c91b2c47ec6dad50cf518102f13355f521c/script/ClientSigners.sol#L166].
+
+An example of an Eigenlayer message would be the deposit message:
+```
+function encodeDepositIntoStrategyMsg(
+    address strategy,
+    address token,
+    uint256 amount
+) public pure returns (bytes memory) {
+    return abi.encodeWithSelector(
+        IStrategyManager.depositIntoStrategy.selector,
+        strategy,
+        token,
+        amount
+    );
+}
+```
+See it being [used in a script here](https://github.com/peitalin/L2-eigenlayer-restaking/blob/f1bd5c91b2c47ec6dad50cf518102f13355f521c/script/5b_depositIntoStrategy.s.sol#L59).
+
+These `messageWithSignatures` arrive on L1 and are decoded in the `RestakingConnector.sol` contract.
+In general, they follow the following format:
+```
+0000000000000000000000000000000000000000000000000000000000000020 [32]  string offset CCIP
+00000000000000000000000000000000000000000000000000000000000005a5 [64]  string length CCIP
+3ccc861d                                                         [96]  Eigenlayer function selector
+0000000000000000000000000000000000000000000000000000000000000000 [100] Eigenlayer calldata
+0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] ...
+0000000000000000000000000000000000000000000000000000000000000054 [164] ...
+0000000000000000000000000000000000000000000000000000000000010252 [196] ...
+0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [-124] signer
+0000000000000000000000000000000000000000000000000000000000015195 [-92]  expiry
+03814b471f1beef18326b0d63c4a0f4431fdb72be167ee8aeb6212c8bd14d8e5 [-60]  signature r
+74fa9f4f34373bef152fdcba912a10b0a5c77be53c00d04c4c6c77ae407136e7 [-28]  signature s
+1b000000000000000000000000000000000000000000000000000000         [-0]   signature v
+```
+The signature starts 124 bytes from the end of the message.
+
+The decoding functions can be found in `src/utils/EigenlayerMsgDecoders.sol` with correspoding tests in
+`test/UnitTests_MsgEncodingDecoding.t.sol`.
+
 
 <a name="todo-features"/>
 
