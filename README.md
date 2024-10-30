@@ -212,7 +212,7 @@ function encodeDepositIntoStrategyMsg(
     );
 }
 ```
-See it being (used in a script here)[https://github.com/peitalin/L2-eigenlayer-restaking/blob/f1bd5c91b2c47ec6dad50cf518102f13355f521c/script/5b_depositIntoStrategy.s.sol#L59].
+See it being [used in a script here](https://github.com/peitalin/L2-eigenlayer-restaking/blob/f1bd5c91b2c47ec6dad50cf518102f13355f521c/script/5b_depositIntoStrategy.s.sol#L59).
 
 These `messageWithSignatures` arrive on L1 and are decoded in the `RestakingConnector.sol` contract.
 In general, they follow the following format:
