@@ -195,7 +195,7 @@ Note: at the moment you cannot have more than 1 cross-chain message in-flight at
 
 Every message sent from L2 to L1 abi.encodes the message to send to Eigenlayer, then appends a user signature that signs the message digest of that Eigenlayer message to the end of it.
 
-Please see the `signMessageForEigenAgentExecution` function (here)[https://github.com/peitalin/L2-eigenlayer-restaking/blob/f1bd5c91b2c47ec6dad50cf518102f13355f521c/script/ClientSigners.sol#L166].
+Please see the `signMessageForEigenAgentExecution` function [here](https://github.com/peitalin/L2-eigenlayer-restaking/blob/f1bd5c91b2c47ec6dad50cf518102f13355f521c/script/ClientSigners.sol#L166).
 
 An example of an Eigenlayer message would be the deposit message:
 ```
@@ -212,7 +212,7 @@ function encodeDepositIntoStrategyMsg(
     );
 }
 ```
-See it being [used in a script here](https://github.com/peitalin/L2-eigenlayer-restaking/blob/f1bd5c91b2c47ec6dad50cf518102f13355f521c/script/5b_depositIntoStrategy.s.sol#L59).
+See it being (used in a script here)[https://github.com/peitalin/L2-eigenlayer-restaking/blob/f1bd5c91b2c47ec6dad50cf518102f13355f521c/script/5b_depositIntoStrategy.s.sol#L59].
 
 These `messageWithSignatures` arrive on L1 and are decoded in the `RestakingConnector.sol` contract.
 In general, they follow the following format:
