@@ -191,6 +191,19 @@ Note: at the moment you cannot have more than 1 cross-chain message in-flight at
 - CCIP bridging takes ~20min (Ethereum finality takes ~12.8 min)
 - A solution is to track in-flight txs and increment nonces on the client-side for subsequent messages (at least until the messages successfully execute on L1). Note this assumes CCIP messages land on L1 in the correct order.
 
+## Messaging and Bridging Behaviour
+
+When sending a TX to SenderCCIP bridge, if the CCIP message:
+
+| Contains Message | Sends Funds  | Outcome  |
+| ------- | --- | --- |
+| yes | yes | The TX reverts early on L2 if the Message is not a `depositIntoStrategy` function call to that it is harder for frontend clients to make mistakes. We don't want frontend clients accidentally sending funds to L1 for a `queueWithdrawal` call for instance. |
+| yes | no | Tries to match an Eigenlayer function selector and execute that function (queueWithdrawal, claim rewards, delegate, etc). If no function selectors match, nothing happens.
+| no | yes | Simply bridges funds |
+
+These choices are made because this repo is intended just for Eigenlayer function calls, not general purpose function calls.
+
+
 ## Eigenlayer Message Encoding and Decoding
 
 Every message sent from L2 to L1 abi.encodes the message to send to Eigenlayer, then appends a user signature that signs the message digest of that Eigenlayer message to the end of it.
