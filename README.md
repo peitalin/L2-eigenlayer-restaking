@@ -18,6 +18,8 @@ This also keeps custody of funds with the user (who owns the 6551 NFT) and gives
     - [6. Undelegate with EigenAgent](#undelegate-with-eigenagent)
     - [7. Redeposit with EigenAgent (re-delegate)](#redeposit-with-eigenagent)
 - [ERC-6551 EigenAgents](#ERC-6551-eigenagents)
+- [Messaging and Bridging Behavior](#messaging-and-bridging-behavior)
+- [Message Encoding and Decoder](#message-encoding-and-decoding)
 - [Todo Features](#todo-features)
 
 
@@ -191,7 +193,9 @@ Note: at the moment you cannot have more than 1 cross-chain message in-flight at
 - CCIP bridging takes ~20min (Ethereum finality takes ~12.8 min)
 - A solution is to track in-flight txs and increment nonces on the client-side for subsequent messages (at least until the messages successfully execute on L1). Note this assumes CCIP messages land on L1 in the correct order.
 
-## Messaging and Bridging Behaviour
+<a name="messaging-and-bridging-behavior"/>
+
+## Messaging and Bridging Behavior
 
 When sending a TX to SenderCCIP bridge, if the CCIP message:
 
@@ -204,7 +208,9 @@ When sending a TX to SenderCCIP bridge, if the CCIP message:
 These choices are made because this repo is intended just for Eigenlayer function calls, not general purpose function calls.
 
 
-## Eigenlayer Message Encoding and Decoding
+<a name="message-encoding-and-decoding"/>
+
+## Message Encoding and Decoding
 
 Every message sent from L2 to L1 abi.encodes the message to send to Eigenlayer, then appends a user signature that signs the message digest of that Eigenlayer message to the end of it.
 
