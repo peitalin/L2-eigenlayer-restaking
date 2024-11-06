@@ -4,6 +4,7 @@ pragma solidity 0.8.25;
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {ISignatureUtils} from "@eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
+import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -24,12 +25,14 @@ library EigenlayerMsgEncoders {
         address token,
         uint256 amount
     ) public pure returns (bytes memory) {
-        return abi.encodeWithSelector(
+        return abi.encodeCall(
             // cast sig "depositIntoStrategy(address,address,uint256)" == 0xe7a050aa
-            IStrategyManager.depositIntoStrategy.selector,
-            strategy,
-            token,
-            amount
+            IStrategyManager.depositIntoStrategy,
+            (
+                IStrategy(strategy),
+                IERC20(token),
+                amount
+            )
         );
     }
 
@@ -38,10 +41,10 @@ library EigenlayerMsgEncoders {
     function encodeQueueWithdrawalsMsg(
         IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
     ) public pure returns (bytes memory) {
-        return abi.encodeWithSelector(
+        return abi.encodeCall(
             // cast sig "queueWithdrawals((address[],uint256[],address)[])"
-            IDelegationManager.queueWithdrawals.selector,
-            queuedWithdrawalParams
+            IDelegationManager.queueWithdrawals,
+            (queuedWithdrawalParams)
         );
     }
 
@@ -77,13 +80,15 @@ library EigenlayerMsgEncoders {
         //         uint256[] shares;
         //     }
 
-        return abi.encodeWithSelector(
+        return abi.encodeCall(
             // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
-            IDelegationManager.completeQueuedWithdrawal.selector,
-            withdrawal,
-            tokensToWithdraw,
-            middlewareTimesIndex,
-            receiveAsTokens
+            IDelegationManager.completeQueuedWithdrawal,
+            (
+                withdrawal,
+                tokensToWithdraw,
+                middlewareTimesIndex,
+                receiveAsTokens
+            )
         );
     }
 
@@ -113,13 +118,15 @@ library EigenlayerMsgEncoders {
         //         uint256[] shares;
         //     }
 
-        return abi.encodeWithSelector(
+        return abi.encodeCall(
             // cast sig "completeQueuedWithdrawals((address,address,address,uint256,uint32,address[],uint256[])[],address[][],uint256[],bool[])" == 0x33404396
-            IDelegationManager.completeQueuedWithdrawals.selector,
-            withdrawals,
-            tokens,
-            middlewareTimesIndexes,
-            receiveAsTokens
+            IDelegationManager.completeQueuedWithdrawals,
+            (
+                withdrawals,
+                tokens,
+                middlewareTimesIndexes,
+                receiveAsTokens
+            )
         );
     }
 
@@ -147,12 +154,14 @@ library EigenlayerMsgEncoders {
         //         uint256 expiry;
         //     }
 
-        return abi.encodeWithSelector(
+        return abi.encodeCall(
             // cast sig "delegateTo(address,(bytes,uint256),bytes32)" == 0xeea9064b
-            IDelegationManager.delegateTo.selector,
-            operator,
-            approverSignatureAndExpiry,
-            approverSalt
+            IDelegationManager.delegateTo,
+            (
+                operator,
+                approverSignatureAndExpiry,
+                approverSalt
+            )
         );
     }
 
@@ -170,6 +179,7 @@ library EigenlayerMsgEncoders {
     /// @dev Encodes params to mint an EigenAgent from the AgentFactory.sol contract. Can be called by anyone.
     /// @param recipient address to mint an EigenAgent to.
     function encodeMintEigenAgentMsg(address recipient) public pure returns (bytes memory) {
+        // Note: use encodeWithSelector here as function selector differs from payload
         return abi.encodeWithSelector(
             // cast sig "mintEigenAgent(bytes)" == 0xcc15a557
             IRestakingConnector.mintEigenAgent.selector,
@@ -232,6 +242,7 @@ library EigenlayerMsgEncoders {
     function encodeTransferToAgentOwnerMsg(
         bytes32 transferRoot
     ) public pure returns (bytes memory) {
+        // Note: use encodeWithSelector here as function selector differs from payload
         return abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderHooks.handleTransferToAgentOwner.selector,
@@ -281,11 +292,13 @@ library EigenlayerMsgEncoders {
         //     uint256 cumulativeEarnings;
         // }
 
-        return abi.encodeWithSelector(
+        return abi.encodeCall(
             // cast sig "processClaim((uint32,uint32,bytes,(address,bytes32),uint32[],bytes[],(address,uint256)[]), address)" == 0x3ccc861d
-            IRewardsCoordinator.processClaim.selector,
-            claim,
-            recipient
+            IRewardsCoordinator.processClaim,
+            (
+                claim,
+                recipient
+            )
         );
     }
 
