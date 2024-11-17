@@ -7,7 +7,7 @@ import {ISignatureUtils} from "@eigenlayer-contracts/interfaces/ISignatureUtils.
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 
 import {
     AgentOwnerSignature,

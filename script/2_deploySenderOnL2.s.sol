@@ -40,7 +40,7 @@ contract DeploySenderOnL2Script is Script, FileReader {
 
         vm.startBroadcast(deployerKey);
 
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
+        ProxyAdmin proxyAdmin = new ProxyAdmin(deployer);
 
         // deploy sender utils proxy
         SenderHooks senderHooksProxy = SenderHooks(

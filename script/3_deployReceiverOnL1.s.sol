@@ -95,7 +95,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
 
         vm.startBroadcast(deployerKey);
 
-        proxyAdmin = new ProxyAdmin();
+        proxyAdmin = new ProxyAdmin(address(this));
         // deploy 6551 Registry
         registry6551 = IERC6551Registry(address(new ERC6551Registry()));
         // deploy 6551 EigenAgentOwner NFT
