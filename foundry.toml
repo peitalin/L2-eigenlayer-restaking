@@ -23,6 +23,8 @@ remappings = [
   "@openzeppelin-v5/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
   "@openzeppelin-v5/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
   # Note: Eigenlayer uses OpenZeppelin v4
+  # Note II: context aware remappings are needed if we want to use OZ v5
+  # https://github.com/foundry-rs/foundry/issues/1855
   "@openzeppelin/contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/",
   "@openzeppelin/contracts-upgradeable/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable/contracts/"
 ]
