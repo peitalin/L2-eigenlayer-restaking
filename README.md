@@ -37,9 +37,13 @@ The following test will test delegating, undelegating, and re-depositing:
 forge test --match-test test_FullFlow_Undelegate_Delegate_Redeposit -vvvv
 ```
 
-See test coverage (there is an `lcov.info` file for coverage as well):
+See test coverage
 ```
 forge coverage
+```
+You can generate a `lcov.info` file to see line-by-line test coverage in code editors, run this with:
+```
+forge coverage --report lcov
 ```
 
 Frontend clients will make contract calls similar to the scripts in the `scripts` folder. These scripts run on Base Sepolia and dispatches CCIP calls to Eth Sepolia, bridging `CCIP-BnM` ERC20 tokens and interacting with mock Eigenlayer Strategy Vaults setup for the `CCIP-BnM` token.
