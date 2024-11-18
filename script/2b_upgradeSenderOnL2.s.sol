@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 
 import {Script} from "forge-std/Script.sol";
@@ -46,14 +46,16 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
         /////////////////////////////
         vm.startBroadcast(deployerKey);
 
-        proxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(senderProxy))),
-            address(new SenderCCIP(BaseSepolia.Router))
+        proxyAdmin.upgradeAndCall(
+            ITransparentUpgradeableProxy(payable(address(senderProxy))),
+            address(new SenderCCIP(BaseSepolia.Router)),
+            ""
         );
 
-        proxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(senderHooksProxy))),
-            address(new SenderHooks())
+        proxyAdmin.upgradeAndCall(
+            ITransparentUpgradeableProxy(payable(address(senderHooksProxy))),
+            address(new SenderHooks()),
+            ""
         );
 
         /// whitelist destination chain

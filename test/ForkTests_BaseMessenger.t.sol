@@ -3,6 +3,7 @@ pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
+import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
@@ -55,7 +56,10 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         uint256 halfWithdraw = totalWithdraw / 2;
 
         vm.prank(bob);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(
+            OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+            bob
+        ));
         receiverContract.withdrawToken(bob, address(tokenL1), totalWithdraw);
 
         // withdraw half, twice (all tokens)
@@ -84,7 +88,10 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         vm.deal(address(senderContract), 1.1 ether);
 
         vm.prank(bob);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(
+            OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+            bob
+        ));
         senderContract.withdraw(bob, address(bob).balance);
 
         vm.prank(deployer);

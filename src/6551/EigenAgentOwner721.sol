@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {ERC721URIStorageUpgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {ERC721URIStorageUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
+import {Initializable} from "@openzeppelin-v5-contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Strings} from "@openzeppelin-v5-contracts/utils/Strings.sol";
 
 import {Adminable} from "../utils/Adminable.sol";
 import {IAgentFactory} from "./IAgentFactory.sol";
 
 
 contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Adminable {
+    error AlreadyHasAgent(address owner);
 
     uint256 private _tokenIdCounter;
     IAgentFactory public agentFactory;
@@ -75,17 +76,16 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
         _setTokenURI(tokenId, string(abi.encodePacked("eigen-agent/", Strings.toString(tokenId), ".json")));
         return tokenId;
     }
-
+        
     /**
-     * @dev Hook to update EigenAgentOwner721 NFT owner whenever a NFT transfer occurs.
+     * @dev Update EigenAgentOwner721 NFT owner whenever a NFT transfer occurs.
      * This updates AgentFactory and keeps users matched with tokenIds (and associated ERC-6551 EigenAgents).
      */
-    function _afterTokenTransfer(
-        address from,
-        address to,
-        uint256 tokenId
-    ) internal override virtual {
+    function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
+        address from = super._update(to, tokenId, auth);
         require(balanceOf(to) <= 1, "Cannot own more than one EigenAgentOwner721 at a time.");
         agentFactory.updateEigenAgentOwnerTokenId(from, to, tokenId);
+        return from;
     }
+
 }

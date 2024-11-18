@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
+import {Clones} from "@openzeppelin-v5-contracts/proxy/Clones.sol";
+import {IERC721} from "@openzeppelin-v5-contracts/token/ERC721/IERC721.sol";
 import {ERC6551Account} from "@6551/examples/simple/ERC6551Account.sol";
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
@@ -18,7 +18,7 @@ contract UnitTests_Compare6551Costs is BaseTestEnvironment {
     function setUp() public {
 
         setUpLocalEnvironment();
-        proxyAdmin = new ProxyAdmin();
+        proxyAdmin = new ProxyAdmin(address(this));
     }
 
     /*

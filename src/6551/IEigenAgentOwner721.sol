@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC721} from "@openzeppelin-v5-contracts/token/ERC721/IERC721.sol";
 import {IAdminable} from "../utils/Adminable.sol";
 import {IAgentFactory} from "../6551/IAgentFactory.sol";
 
