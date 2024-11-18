@@ -67,7 +67,7 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
             string[] memory mkdir_filepath = new string[](3);
             mkdir_filepath[0] = "mkdir";
             mkdir_filepath[1] = "-p";
-            mkdir_filepath[2] = "/test/temp-files";
+            mkdir_filepath[2] = "./test/temp-files";
             vm.ffi(mkdir_filepath);
         }
         fileReaderTest.saveReceiverBridgeContracts(
