@@ -176,9 +176,7 @@ contract FileReader is Script {
         // chains[17000] = "holesky";
         // chains[84532] = "basesepolia";
         // chains[11155111] = "ethsepolia";
-        string memory finalOutputPath1 = string(abi.encodePacked(
-            filePath
-        ));
+        string memory finalOutputPath1 = string(abi.encodePacked(filePath));
         vm.writeJson(finalJson1, finalOutputPath1);
     }
 
