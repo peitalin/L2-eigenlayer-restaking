@@ -63,6 +63,14 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
         fileReaderTest.readProxyAdminL2();
         fileReaderTest.readSenderContract();
         fileReaderTest.readSenderHooks();
+        {
+            // mkdir temp-files folder if need be
+            string[] memory mkdir_filepath = new string[](3);
+            mkdir_filepath[0] = "mkdir";
+            mkdir_filepath[1] = "-p";
+            mkdir_filepath[2] = "./test/temp-files";
+            vm.ffi(mkdir_filepath);
+        }
         fileReaderTest.saveReceiverBridgeContracts(
             vm.addr(1),
             vm.addr(2),
