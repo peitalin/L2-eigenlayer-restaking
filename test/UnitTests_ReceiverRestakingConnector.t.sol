@@ -12,7 +12,7 @@ import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManage
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 
-import {TestERC20} from "./TestERC20.sol";
+import {TestERC20} from "./mocks/TestERC20.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
