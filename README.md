@@ -205,9 +205,9 @@ When sending a TX to SenderCCIP bridge, if the CCIP message:
 
 | Contains Message | Sends Funds  | Outcome  |
 | ------- | --- | --- |
-| true | false | The TX reverts early on L2 if the Message is not a `depositIntoStrategy` function call. This makes it harder for frontend clients to make mistakes, e.g. frontend clients accidentally sending funds to L1 for a `queueWithdrawal` call. |
+| true | true | The TX reverts early on L2 if the Message is not a `depositIntoStrategy` function call. This makes it harder for frontend clients to make mistakes, e.g. frontend clients accidentally sending funds to L1 for a `queueWithdrawal` call. |
 | true | false | Tries to match an Eigenlayer function selector and execute that function (queueWithdrawal, claim rewards, delegate, etc). If no function selectors match, nothing happens.
-| true | false | Simply bridges funds |
+| false | true | Simply bridges funds |
 
 These choices are made because this repo is intended just for Eigenlayer function calls, not general purpose function calls.
 
