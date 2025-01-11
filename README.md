@@ -19,8 +19,8 @@ This also keeps custody of funds with the user (who owns the 6551 NFT) and gives
     - [7. Redeposit with EigenAgent (re-delegate)](#redeposit-with-eigenagent)
 - [ERC-6551 EigenAgents](#ERC-6551-eigenagents)
 - [Bridging Behavior Defaults](#bridging-behavior-defaults)
-    - [1. Refunds Behaviour](#refunds-behaviour)
-    - [2. Rewards Claiming Behaviour](#rewards-claiming-behaviour)
+    - [1. Refunds Behavior](#refunds-behavior)
+    - [2. Rewards Claiming Behavior](#rewards-claiming-behavior)
 - [Message Encoding and Decoding](#message-encoding-and-decoding)
 - [Supported Features](#supported-features)
 
