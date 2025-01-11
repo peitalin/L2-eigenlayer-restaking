@@ -208,9 +208,9 @@ These choices are made because this repo is intended just for Eigenlayer functio
 
 ### Refund behaviour for failed deposits
 If a deposit reverts on L1 (e.g Operator goes offline while CCIP message is in flight), the protocol does *not* automatically refund the user their deposit. Users must manually trigger the refund after waiting (a configurable expiry parameter in the message, e.g. 30min).
-    - Having the refund trigger automatically without delay may be confusing for users, manually triggering refunds makes this action explicit.
-    - This also gives Operators a window of opportunity to fix deposit issues, and allow users to re-try deposits.
-    - Admins may also trigger the refunds for the user if the user does not have gas on L1, or if the expiry is too long. It will mark the messageId as refunded in this case.
+- Having the refund trigger automatically without delay may be confusing for users, manually triggering refunds makes this action explicit.
+- This also gives Operators a window of opportunity to fix deposit issues, and allow users to re-try deposits.
+- Admins may also trigger the refunds for the user if the user does not have gas on L1, or if the expiry is too long. It will mark the messageId as refunded in this case.
 
 Auditors might note that this expiry paramater in the signature (in the CCIP message) does not do anything except for this refund mechanic. See [here for details](https://github.com/TreasureProject/L2-eigenlayer-restaking/blob/b1d2827415ca600dfbafe83fa4575bfbcb910f7b/src/6551/EigenAgent6551.sol#L86).
 
@@ -219,12 +219,12 @@ Auditors might note that this expiry paramater in the signature (in the CCIP mes
 ### Rewards claiming behaviour
 Eigenlayer allows users to claim multiple token rewards at a time (MAGIC, ETH, other ERC20s).
 The protocol claims multiple tokens and bridges just the MAGIC rewards back to the user's address on L2, while sending all other tokens and ETH rewards to the user's (the owner of the ERC-6551 NFT) address on L1.
-    - The protocol checks which tokens are marked as bridgeable (the mapping `bridgeTokensL1toL2` on `RestakingConnectorStorage.sol` and `SenderHooks.sol`) then bridges only those reward tokens.
-    - Cross-chain claiming of multiple reward tokens is somewhat new in web3, so we will have to let users know where their tokens are going on the frontend (either L1 or L2). 
-    - Alternatively we can just claim MAGIC and let users manually claim their other tokens and ETH rewards on L1 (but this is arguable worse UX).
+- The protocol checks which tokens are marked as bridgeable (the mapping `bridgeTokensL1toL2` on `RestakingConnectorStorage.sol` and `SenderHooks.sol`) then bridges only those reward tokens.
+- Cross-chain claiming of multiple reward tokens is somewhat new in web3, so we will have to let users know where their tokens are going on the frontend (either L1 or L2). 
+- Alternatively we can just claim MAGIC and let users manually claim their other tokens and ETH rewards on L1 (but this is arguable worse UX).
 
 There's a configurable list of reward tokens (the mapping `bridgeTokensL1toL2`) that the protocol will try bridge back to L2. This list needs to mirror the tokens that the CCIP can actually bridge (which is just MAGIC at the moment). If we want to bridge other reward tokens back to L2, CCIP needs to be setup properly for those tokens as well (or rewards claiming will revert). Thus it is up to us to make sure `bridgeTokensL1toL2` and CCIP bridgeable tokens match.
-    - [ ] We should write tests to ensure that CCIP bridge tokens matches once CCIP deploys on Treasure chain.
+- [ ] We should write tests to ensure that CCIP bridge tokens matches once CCIP deploys on Treasure chain.
 
 
 <a name="message-encoding-and-decoding"/>
