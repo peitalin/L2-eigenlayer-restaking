@@ -194,7 +194,7 @@ Note: at the moment you cannot have more than 1 cross-chain message in-flight at
 
 ## Bridging Behavior Defaults
 
-When sending a TX to SenderCCIP bridge, if the CCIP message:
+When sending a transaction to the SenderCCIP bridge, if the CCIP message:
 
 | Contains Message | Sends Funds  | Outcome  |
 | ------- | --- | --- |
@@ -223,8 +223,8 @@ The protocol claims multiple tokens and bridges just the MAGIC rewards back to t
 - Cross-chain claiming of multiple reward tokens is somewhat new in web3, so we will have to let users know where their tokens are going on the frontend (either L1 or L2). 
 - Alternatively we can just claim MAGIC and let users manually claim their other tokens and ETH rewards on L1 (but this is arguable worse UX).
 
-There's a configurable list of reward tokens (the mapping `bridgeTokensL1toL2`) that the protocol will try bridge back to L2. This list needs to mirror the tokens that the CCIP can actually bridge (which is just MAGIC at the moment). If we want to bridge other reward tokens back to L2, CCIP needs to be setup properly for those tokens as well (or rewards claiming will revert). Thus it is up to us to make sure `bridgeTokensL1toL2` and CCIP bridgeable tokens match.
-- [ ] We should write tests to ensure that CCIP bridge tokens matches once CCIP deploys on Treasure chain.
+There's a configurable list of reward tokens (the mapping `bridgeTokensL1toL2`) that the protocol will try bridge back to the user's address on L2. This list needs to mirror the tokens that have a CCIP lane setup. If we want to bridge other reward tokens back to L2, CCIP lanes needs to be setup for those tokens as well, and we need to make sure `bridgeTokensL1toL2` and tokens with CCIP lanes match (or rewards claiming attempts will revert).
+- [ ] We should write tests to ensure that CCIP lanes the list of tokens in `bridgeTokensL1toL2` once CCIP deploys on Treasure chain.
 
 
 <a name="message-encoding-and-decoding"/>
@@ -304,7 +304,7 @@ Upgradeability
 - [ ] Remove proxies for specific contracts if we don't need upgradeability.
 
 CCIP
-- [ ] Chainlink to setup a "lane" for CCIP bridges:
+- [ ] Chainlink to setup a "lane" for CCIP token bridges:
     - [ ] Setup Chainlink lanes on Holesky and target L2.
     - [ ] Adapt differences in bridging model (mint/burn vs lock/mint) for target chain.
 
