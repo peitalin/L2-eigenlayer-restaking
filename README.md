@@ -298,15 +298,15 @@ The decoding functions can be found in `src/utils/EigenlayerMsgDecoders.sol` wit
 
 ### Todo Checklist
 
-- Upgradeability
+- [x] Upgradeability
     - [ ] Remove proxies for specific contracts if we don't need upgradeability.
-- CCIP
+- [x] CCIP
     - [ ] Chainlink to setup a "lane" for CCIP token bridges:
         - [ ] Setup Chainlink lanes on Holesky and target L2.
         - [ ] Adapt differences in bridging model (mint/burn vs lock/mint) for target chain.
-- Frontend Helper Functions
+- [ ] Frontend Helper Functions
     - [ ] Frontend message signing helper functions (to append signatures for the 6551 EigenAgent account to the CCIP messages).
-- Extra Tests
+- [ ] Extra Tests
     - [ ] Write tests to ensure that the tokens with CCIP lanes matches the list of bridgeable tokens (the mapping `bridgeTokensL1toL2` on `RestakingConnectorStorage.sol` and `SenderHooks.sol`) once CCIP deploys on Treasure chain.
 - [x] Gas optimization
     - [x] Estimate gas limit for each of the previous operations
