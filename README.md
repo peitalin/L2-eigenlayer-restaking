@@ -72,6 +72,8 @@ Everytime a user undelegates, there is a cooldown timer.
 Bridging times depend on the finality times of source and destination chains.
 It currently takes +20 minutes to bridge a message [Base and ZkSync has finality times of 20min, ETH is 15min](https://docs.chain.link/ccip/concepts/ccip-execution-latency#finality)
 
+Tests dependencies note: We deploy Eigenlayer contracts as part of our tests, and Eigenlayer depends on Open Zepplin v4.7, however our protocol uses Open Zeppelin v5. 
+So we use [context aware remappings](https://github.com/foundry-rs/foundry/issues/1855) to use v5 along with v4.7.
 
 
 <a name="sepolia-L2-restaking-example"/>
@@ -293,12 +295,8 @@ The decoding functions can be found in `src/utils/EigenlayerMsgDecoders.sol` wit
         - [x] Transfer bridgeable rewards tokens back to L2.
         - [x] Transfer L1 rewards tokens to AgentOwner address on L1.
 
-- [x] Gas optimization
-    - [x] Estimate gas limit for each of the previous operations
-    - [x] Reduce gas costs associated with 6551 accounts creation + delegate calls
 
-
-## Todo Checklist
+### Todo Checklist
 
 Upgradeability
 - [ ] Remove proxies for specific contracts if we don't need upgradeability.
@@ -311,6 +309,9 @@ CCIP
 Frontend Helper Functions
 - [ ] Frontend message signing helper functions (to append signatures for the 6551 EigenAgent account to the CCIP messages).
 
-Tests
+Extra Tests
 - [ ] Write tests to ensure that the tokens with CCIP lanes matches the list of bridgeable tokens (the mapping `bridgeTokensL1toL2` on `RestakingConnectorStorage.sol` and `SenderHooks.sol`) once CCIP deploys on Treasure chain.
 
+- [x] Gas optimization
+    - [x] Estimate gas limit for each of the previous operations
+    - [x] Reduce gas costs associated with 6551 accounts creation + delegate calls
