@@ -3,8 +3,8 @@ pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IERC1271} from "@openzeppelin-v5-contracts/interfaces/IERC1271.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
@@ -94,7 +94,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
         bytes32 digest1 = clientSignersTest.createEigenlayerDepositDigest(
             strategy,
-            tokenL1,
+            address(tokenL1),
             amount,
             staker,
             execNonce,

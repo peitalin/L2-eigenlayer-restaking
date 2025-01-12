@@ -3,6 +3,7 @@ pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
+import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
@@ -40,7 +41,10 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
 
         vm.startBroadcast(bob);
         {
-            vm.expectRevert("Ownable: caller is not the owner");
+            vm.expectRevert(abi.encodeWithSelector(
+                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+                bob
+            ));
             senderContract.setSenderHooks(ISenderHooks(newSenderHooks));
         }
         vm.stopBroadcast();

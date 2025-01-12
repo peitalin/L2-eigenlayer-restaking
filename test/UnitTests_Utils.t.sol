@@ -4,8 +4,9 @@ pragma solidity 0.8.25;
 import {Test} from "forge-std/Test.sol";
 import {TestErrorHandlers} from "./TestErrorHandlers.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
 import {IStrategy} from "eigenlayer-contracts/src/contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "eigenlayer-contracts/src/contracts/interfaces/IDelegationManager.sol";
 
@@ -37,7 +38,7 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
             erc20Minter = ERC20Minter(address(
                 new TransparentUpgradeableProxy(
                     address(new ERC20Minter()),
-                    address(new ProxyAdmin()),
+                    address(new ProxyAdmin(deployer)),
                     abi.encodeWithSelector(ERC20Minter.initialize.selector, "test", "TST")
                 )
             ));
@@ -63,7 +64,7 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
         fileReaderTest.readSenderContract();
         fileReaderTest.readSenderHooks();
         {
-            // mkdir file if need be
+            // mkdir temp-files folder if need be
             string[] memory mkdir_filepath = new string[](3);
             mkdir_filepath[0] = "mkdir";
             mkdir_filepath[1] = "-p";
@@ -127,7 +128,10 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
         vm.expectRevert("Not admin or owner");
         erc20Minter.mint(deployer, 1 ether);
 
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(
+            OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+            address(this)
+        ));
         erc20Minter.burn(deployer, 1 ether);
 
         vm.prank(deployer);
@@ -153,7 +157,10 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
         require(adminableMock.mockIsOwner() == false, "bob is not owner");
 
         vm.prank(bob);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(
+            OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+            bob
+        ));
         adminableMock.addAdmin(bob);
 
         vm.prank(deployer);
@@ -165,7 +172,10 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
         require(adminableMock.mockOnlyAdmin(), "should pass onlyAdmin modifier");
 
         vm.prank(bob);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(
+            OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+            bob
+        ));
         adminableMock.removeAdmin(bob);
 
         vm.prank(deployer);

@@ -3,9 +3,11 @@ pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Initializable} from "@openzeppelin-v5-contracts-upgradeable/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
@@ -42,7 +44,10 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
 
     function test_SetAndGet_SenderCCIP() public {
 
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(
+            OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+            address(this)
+        ));
         senderHooks.setSenderCCIP(address(senderContract));
 
         vm.expectRevert(abi.encodeWithSelector(AddressZero.selector, "SenderCCIP cannot be address(0)"));
@@ -57,7 +62,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
 
     function test_SenderHooks_SetBridgeTokens() public {
 
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
+        ProxyAdmin proxyAdmin = new ProxyAdmin(address(this));
 
         address _bridgeTokenL1 = vm.addr(1001);
         address _bridgeTokenL2 = vm.addr(2002);
@@ -101,7 +106,10 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
 
         vm.startBroadcast(bob);
         {
-            vm.expectRevert("Ownable: caller is not the owner");
+            vm.expectRevert(abi.encodeWithSelector(
+                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+                bob
+            ));
             senderHooks.setBridgeTokens(_bridgeTokenL1, _bridgeTokenL2);
         }
         vm.stopBroadcast();
@@ -168,7 +176,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
     function test_DisableInitializers_SenderHooks() public {
         SenderHooks sHooks = new SenderHooks();
         // _disableInitializers on contract implementations
-        vm.expectRevert("Initializable: contract is already initialized");
+        vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
         sHooks.initialize(address(1), address(2));
     }
 

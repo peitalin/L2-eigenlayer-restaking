@@ -19,14 +19,16 @@ remappings = [
   "@chainlink/ccip-vendor/=lib/ccip/contracts/src/v0.8/vendor/",
   "forge-std/=lib/forge-std/src/",
   "@6551/=lib/reference/src/",
-  "@eigenlayer-contracts/=lib/eigenlayer-contracts/src/contracts/",
-  "@openzeppelin-v5/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
-  "@openzeppelin-v5/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
-  # Note: Eigenlayer uses OpenZeppelin v4
-  # Note II: context aware remappings are needed if we want to use OZ v5
-  # https://github.com/foundry-rs/foundry/issues/1855
-  "@openzeppelin/contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/",
-  "@openzeppelin/contracts-upgradeable/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable/contracts/"
+  "@openzeppelin-v5-contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts",
+  "@openzeppelin-v5-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts",
+  "@eigenlayer-contracts=lib/eigenlayer-contracts/src/contracts",
+    # Note: We use OpenZeppelin v4.7 to deploy EigenLayer contracts (as EigenLayer does)
+  "@openzeppelin-v47-contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/",
+    # Context dependent remappings to avoid conflicts
+  "lib/openzeppelin-contracts-upgradeable:@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts",
+  "lib/openzeppelin-contracts-upgradeable:@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts",
+  "lib/eigenlayer-contracts:@openzeppelin/contracts-upgradeable/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable",
+  "lib/eigenlayer-contracts:@openzeppelin/contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts"
 ]
 
 [rpc_endpoints]
