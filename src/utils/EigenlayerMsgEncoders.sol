@@ -92,7 +92,7 @@ library EigenlayerMsgEncoders {
         );
     }
 
-    /// Array-ified version of completeWithdralw
+    /// Array-ified version of completeWithdrawal
     function encodeCompleteWithdrawalsMsg(
         IDelegationManager.Withdrawal[] calldata withdrawals,
         IERC20[][] calldata tokens,
