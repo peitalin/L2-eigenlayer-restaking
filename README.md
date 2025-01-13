@@ -229,6 +229,13 @@ There's a configurable list of reward tokens (the mapping `bridgeTokensL1toL2`) 
 - [ ] We should write tests to ensure that CCIP lanes the list of tokens in `bridgeTokensL1toL2` once CCIP deploys on Treasure chain.
 
 
+### WithdrawalTransferRoot and RewardsTransferRoot
+In [`Sender.sol`](https://github.com/TreasureProject/L2-eigenlayer-restaking/blob/b6a8d052ba62cb2330ed254af99402568718614e/src/SenderHooks.sol#L19) you will see code relating to withdrawal TransferRoots and rewards claiming TransferRoots. 
+- These commitment roots are in place in case a CCIP node tries to tamper with withdrawal and rewards claiming messages (e.g. swap destination address). 
+- CCIP checks for this as part of their protocol (see their [Risk Management Network](https://docs.chain.link/ccip/concepts#onchain-risk-management-contract)), so it these TransferRoots may be redundant. They are an extra security check.
+
+
+
 <a name="message-encoding-and-decoding"/>
 
 ## Message Encoding and Decoding
