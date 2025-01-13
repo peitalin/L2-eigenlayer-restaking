@@ -196,7 +196,7 @@ library EigenlayerMsgEncoders {
 
     /**
      * @dev withdrawalTransferRoot commits to a Eigenlayer withdrawalRoot, amount and agentOwner
-     * on L2 when first sending a completeWithdrawal() message so that when the withdrawan
+     * on L2 when first sending a completeWithdrawal() message so that when the withdrawn
      * funds return from L2 later, the bridge can lookup the user to transfer funds to.
      * @param withdrawalRoot is calculate by Eigenlayer during queueWithdrawals, needed to completeWithdrawal
      * @param agentOwner is the owner of the EigenAgent who deposits and withdraws from Eigenlayer
@@ -210,7 +210,7 @@ library EigenlayerMsgEncoders {
     }
 
     /**
-     * @dev Returns the same rewardsRoot calculated in in RestakingConnector during processClaims on L1
+     * @dev Returns the same rewardsRoot calculated in RestakingConnector during processClaims on L1
      * @param claim is the RewardsMerkleClaim struct used to processClaim in Eigenlayer.
      */
     function calculateRewardsRoot(IRewardsCoordinator.RewardsMerkleClaim memory claim)
