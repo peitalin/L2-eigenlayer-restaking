@@ -33,8 +33,11 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
 
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
 
+    // When adding custom errors, update decodeEigenAgentExecutionError
+    // to decode the new error selector and display error messages properly.
     error AddressZero(string reason);
     error TooManyTokensToDeposit(string reason);
+    error TokenAmountMismatch(string reason);
 
     /*
      *

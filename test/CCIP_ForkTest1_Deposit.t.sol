@@ -346,4 +346,124 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
 
         require(fees2 > 0, "RouterFees on L2 did not esimate bridging fees");
     }
+
+   /**
+     * @notice Test that verifies the token/amount mismatch validation works correctly
+     * @dev This test creates a deposit message with a token/amount that doesn't match
+     * what's actually being sent in the CCIP message's destTokenAmounts
+     */
+    function test_ReceiverL1_AmountMismatch_Validation() public {
+        vm.selectFork(ethForkId);
+
+        uint256 execNonce = 0;
+        uint256 mismatchAmount = amount + 0.001 ether; // Different amount than what's sent
+
+        bytes memory messageWithSignature;
+        {
+            // Create message with a different amount than what's in destTokenAmounts
+            bytes memory depositMessage = encodeDepositIntoStrategyMsg(
+                address(strategy),
+                address(tokenL1),
+                mismatchAmount // Mismatch amount
+            );
+
+            // Sign the message for EigenAgent execution
+            messageWithSignature = signMessageForEigenAgentExecution(
+                bobKey,
+                block.chainid,
+                address(strategyManager),
+                depositMessage,
+                execNonce,
+                expiry
+            );
+        }
+
+        // Set up CCIP message with a different amount than in the signed message
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1),
+            amount: amount // Different from mismatchAmount in the message
+        });
+
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0x0),
+            sourceChainSelector: BaseSepolia.ChainSelector,
+            sender: abi.encode(deployer),
+            destTokenAmounts: destTokenAmounts,
+            data: abi.encode(string(messageWithSignature))
+        });
+
+        // Expect it to revert with TokenAmountMismatch
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
+                "Token or amount in message does not match received tokens",
+                "Manually execute to refund after timestamp:",
+                expiry
+            )
+        );
+
+        // Attempt to receive the message with mismatched amounts
+        receiverContract.mockCCIPReceive(any2EvmMessage);
+    }
+
+    /**
+     * @notice Test that verifies token mismatch validation works correctly
+     * @dev This test creates a deposit message with a different token than what's sent
+     */
+    function test_ReceiverL1_TokenMismatch_Validation() public {
+        vm.selectFork(ethForkId);
+
+        // Deploy a different token for mismatch testing
+        address differentToken = address(0xDEADBEEF);
+
+        uint256 execNonce = 0;
+        bytes memory messageWithSignature;
+        {
+            // Create message with a different token than what's in destTokenAmounts
+            bytes memory depositMessage = encodeDepositIntoStrategyMsg(
+                address(strategy),
+                differentToken, // Different token address
+                amount
+            );
+
+            // Sign the message for EigenAgent execution
+            messageWithSignature = signMessageForEigenAgentExecution(
+                bobKey,
+                block.chainid,
+                address(strategyManager),
+                depositMessage,
+                execNonce,
+                expiry
+            );
+        }
+
+        // Set up CCIP message with a different token than in the signed message
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1), // Different from differentToken in the message
+            amount: amount
+        });
+
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0x0),
+            sourceChainSelector: BaseSepolia.ChainSelector,
+            sender: abi.encode(deployer),
+            destTokenAmounts: destTokenAmounts,
+            data: abi.encode(string(messageWithSignature))
+        });
+
+        // Expect it to revert with TokenAmountMismatch
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
+                "Token or amount in message does not match received tokens",
+                "Manually execute to refund after timestamp:",
+                expiry
+            )
+        );
+
+        // Attempt to receive the message with mismatched token
+        receiverContract.mockCCIPReceive(any2EvmMessage);
+    }
 }

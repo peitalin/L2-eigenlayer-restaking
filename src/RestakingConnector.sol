@@ -173,7 +173,7 @@ contract RestakingConnector is
             bytes memory signature // signature from original_staker
         ) = decodeDepositIntoStrategyMsg(messageWithSignature);
 
-        if (destTokenAmounts.length > 1) {
+        if (destTokenAmounts.length != 1) {
             // Eigenlayer DepositIntoStrategy deposits one token at a time, and SenderCCIP on L2
             // only sends one token at a time.
             // However it is possible to send multiple tokens with CCIP in other Sender implementations,
@@ -184,6 +184,18 @@ contract RestakingConnector is
                 abi.encodeWithSelector(
                     TooManyTokensToDeposit.selector,
                     "DepositIntoStrategy only handles one token at a time"
+                )
+            );
+        }
+
+        // Validate token and amount in the CCIP message match the actual tokens received
+        if (token != destTokenAmounts[0].token || amount != destTokenAmounts[0].amount) {
+            revert IRestakingConnector.EigenAgentExecutionError(
+                signer,
+                expiry,
+                abi.encodeWithSelector(
+                    TokenAmountMismatch.selector,
+                    "Token or amount in message does not match received tokens"
                 )
             );
         }
