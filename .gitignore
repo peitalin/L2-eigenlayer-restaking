@@ -19,3 +19,7 @@ docs/
 /test/withdrawals-redeposited/*
 /test/withdrawals-undelegated/*
 /test/temp-files/*
+
+/.vscode
+.DS_Store
+**/.DS_Store

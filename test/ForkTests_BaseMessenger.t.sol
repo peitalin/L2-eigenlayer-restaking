@@ -463,7 +463,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         );
     }
 
-    function testFail_BaseMessenger_L2_NotEnoughBalance() public {
+    function test_RevertWhen_BaseMessenger_L2_NotEnoughBalance() public {
 
         // L2 Sender
         vm.selectFork(l2ForkId);
@@ -473,6 +473,9 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
         // cheatcode not released yet.
         // vm.expectPartialRevert(NotEnoughBalance.selector);
+        // can't use expectRevert with abi.encodeWithSelector because fees is not known
+        // vm.expectRevert(abi.encodeWithSelector(NotEnoughEthGasFees.selector, 0, 6716943154164788));
+        vm.expectRevert();
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // _destinationChainSelector,
             address(receiverContract), // _receiver,

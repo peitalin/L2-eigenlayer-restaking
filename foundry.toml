@@ -14,6 +14,10 @@ evm_version = "Cancun"
 # https://github.com/foundry-rs/foundry/issues/3971
 # memory_limit = 335544320
 
+# Allow internal expectRevert to be used in tests
+allow_internal_expect_revert = true
+
+
 remappings = [
   "@chainlink/ccip/=lib/ccip/contracts/src/v0.8/ccip/",
   "@chainlink/ccip-vendor/=lib/ccip/contracts/src/v0.8/vendor/",
