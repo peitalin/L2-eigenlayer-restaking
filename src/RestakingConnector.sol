@@ -247,7 +247,7 @@ contract RestakingConnector is
             // original message
             IDelegationManager.QueuedWithdrawalParams[] memory qwpArray,
             // message signature
-            , // address signer
+            , // address __signer
             uint256 expiry,
             bytes memory signature
         ) = decodeQueueWithdrawalsMsg(messageWithSignature);
@@ -297,7 +297,7 @@ contract RestakingConnector is
                 uint256 middlewareTimesIndex,
                 bool receiveAsTokens,
                 // message signature
-                address signer,
+                , // address __signer, // unused variable, use eigenAgent.owner() instead
                 uint256 expiry,
                 bytes memory signature
             ) = decodeCompleteWithdrawalMsg(messageWithSignature);
@@ -319,6 +319,8 @@ contract RestakingConnector is
                 expiry,
                 signature
             );
+
+            address agentOwner = eigenAgent.owner();
 
             uint256 n; // tracks index of transferTokensArray (bridgeableTokens only)
             // instantiate array size
@@ -349,7 +351,7 @@ contract RestakingConnector is
                         // Shouldn't reach this state, unless user deposits L1 tokens via EigenAgent on L1.
                         IERC20(tokensToWithdraw[i]).transferFrom(
                             address(eigenAgent),
-                            signer, // AgentOwner
+                            agentOwner, // AgentOwner
                             withdrawal.shares[i]
                         );
 
@@ -358,7 +360,7 @@ contract RestakingConnector is
                         // (3) If bridgeable, prepare a transferToAgentOwner message with transferRoots
                         bytes32 withdrawalTransferRoot = EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(
                             delegationManager.calculateWithdrawalRoot(withdrawal), // withdrawalRoot
-                            signer
+                            agentOwner // AgentOwner
                         );
 
                         transferTokensArray[n] = IRestakingConnector.TransferTokensInfo({
@@ -427,7 +429,7 @@ contract RestakingConnector is
             // original message
             address eigenAgentAddr, // staker in Eigenlayer delegating
             // message signature
-            , // address signer
+            , // address __signer
             uint256 expiry,
             bytes memory signature
         ) = DelegationDecoders.decodeUndelegateMsg(messageWithSignature);
@@ -465,7 +467,7 @@ contract RestakingConnector is
         returns (IRestakingConnector.TransferTokensInfo[] memory transferTokensArray)
     {
         IRewardsCoordinator.RewardsMerkleClaim memory claim;
-        address signer;
+        address agentOwner;
         IEigenAgent6551 eigenAgent;
         // scope to reduce variable count
         {
@@ -474,7 +476,7 @@ contract RestakingConnector is
                 IRewardsCoordinator.RewardsMerkleClaim memory _claim,
                 address recipient, // eigenAgent
                 // message signature
-                address _signer,
+                , // address __signer
                 uint256 expiry,
                 bytes memory signature
             ) = decodeProcessClaimMsg(messageWithSignature);
@@ -483,8 +485,8 @@ contract RestakingConnector is
             IEigenAgent6551 _eigenAgent = IEigenAgent6551(payable(recipient));
 
             claim = _claim;
-            signer = _signer;
             eigenAgent = _eigenAgent;
+            agentOwner = eigenAgent.owner();
 
             eigenAgent.executeWithSignature(
                 address(rewardsCoordinator),
@@ -518,9 +520,9 @@ contract RestakingConnector is
             // Only transfer bridgeable tokens back to L2. Transfer remaining L1 tokens to AgentOwner.
             if (tokenL2 == address(0)) {
                 // (2) If the token cannot be bridged to L2, transfer to AgentOwner on L1.
-                IERC20(rewardsToken).transferFrom(address(eigenAgent), signer, rewardsAmount);
-                // signer is AgentOwner
-                emit SendingRewardsToAgentOwnerOnL1(rewardsToken, signer, rewardsAmount);
+                IERC20(rewardsToken).transferFrom(address(eigenAgent), agentOwner, rewardsAmount);
+                // AgentOwner is signer of the message
+                emit SendingRewardsToAgentOwnerOnL1(rewardsToken, agentOwner, rewardsAmount);
 
             } else {
                 // (2) RestakingConnector transfers tokens to ReceiverCCIP to bridge tokens
@@ -528,7 +530,7 @@ contract RestakingConnector is
 
                 bytes32 rewardsTransferRoot = EigenlayerMsgEncoders.calculateRewardsTransferRoot(
                     rewardsRoot,
-                    signer // AgentOwner
+                    agentOwner // AgentOwner
                 );
 
                 transferTokensArray[n] = IRestakingConnector.TransferTokensInfo({
