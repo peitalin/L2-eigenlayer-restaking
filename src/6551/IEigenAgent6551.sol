@@ -27,7 +27,7 @@ interface IEigenAgent6551 is IERC6551, IERC6551Executable {
         address targetContract,
         address token,
         uint256 amount
-    ) external returns (bool);
+    ) external;
 
     function executeWithSignature(
         address targetContract,

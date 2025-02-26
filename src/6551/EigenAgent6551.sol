@@ -5,11 +5,14 @@ import {IERC1271} from "@openzeppelin-v5-contracts/interfaces/IERC1271.sol";
 import {IERC20} from "@openzeppelin-v5-contracts/token/ERC20/IERC20.sol";
 import {SignatureChecker} from "@openzeppelin-v5-contracts/utils/cryptography/SignatureChecker.sol";
 import {ERC6551Account as ERC6551} from "@6551/examples/simple/ERC6551Account.sol";
+import {SafeERC20} from "@openzeppelin-v5-contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
 
 
 contract EigenAgent6551 is ERC6551 {
+
+    using SafeERC20 for IERC20;
 
     /// @notice The EIP-712 typehash for the deposit struct used by the contract
     bytes32 public constant EIGEN_AGENT_EXEC_TYPEHASH = keccak256(
@@ -45,16 +48,18 @@ contract EigenAgent6551 is ERC6551 {
      * @dev This function is used by RestakingConnector.sol to approve Eigenlayer StrategyManager
      * to transfer and EigenAgent's tokens into Eigenlayer strategy vaults. This avoids needing
      * extra transfers and signed messages to complete L2 restaking deposits.
-     * @param targetContract to approve transfer for, expected to be the Eigenlayer StrategyManager contract
+     * @param spenderContract to approve transfer for, expected to be the Eigenlayer StrategyManager contract
      * @param token the token used in the Eigenlayer Strategy vault.
      * @param amount of tokens user is depositing into the strategy vault.
      */
     function approveByWhitelistedContract(
-        address targetContract,
+        address spenderContract,
         address token,
         uint256 amount
-    ) external onlyWhitelistedCallers returns (bool) {
-        return IERC20(token).approve(targetContract, amount);
+    ) external onlyWhitelistedCallers {
+        // forceApprove handles the two-step approval process internally
+        // for tokens like USDT that require setting to 0 first
+        IERC20(token).forceApprove(spenderContract, amount);
     }
 
     /**
