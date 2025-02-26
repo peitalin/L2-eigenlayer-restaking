@@ -230,7 +230,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         vm.prank(deployer);
         eigenAgentOwner721.removeFromWhitelistedCallers(address(restakingConnector));
 
-        vm.expectRevert(abi.encodeWithSelector(CallerNotWhitelisted.selector, "EigenAgent: caller not allowed"));
+        vm.expectRevert(abi.encodeWithSelector(CallerNotWhitelisted.selector, "EigenAgent6551: caller not allowed"));
         receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 

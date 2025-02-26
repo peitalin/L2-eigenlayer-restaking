@@ -141,7 +141,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         //////////////////////////////////////////////////////
         /// Receiver Broadcasts TX
         //////////////////////////////////////////////////////
-        vm.startBroadcast(address(receiverContract));
+        vm.startBroadcast(address(restakingConnector));
 
         // msg.sender = EigenAgent's address
         bytes memory result = eigenAgent.executeWithSignature(
@@ -160,7 +160,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         vm.stopBroadcast();
 
         // should fail if anyone else tries to call with Bob's EigenAgent without Bob's signature
-        vm.startBroadcast(address(receiverContract));
+        vm.startBroadcast(address(restakingConnector));
         vm.expectRevert("Invalid signer");
         EigenAgent6551(payable(address(eigenAgent))).execute(
             address(receiverContract),
@@ -192,10 +192,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         );
 
         // alice attempts to execute using deployer's EigenAgent
-        vm.expectRevert(abi.encodeWithSelector(
-            SignatureInvalid.selector,
-            "Invalid signer, or incorrect digestHash parameters."
-        ));
+        vm.expectRevert("Only RestakingConnector or owner can execute");
         eigenAgent.executeWithSignature(
             address(strategyManager), // strategyManager
             0,
@@ -410,7 +407,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
         vm.expectRevert(abi.encodeWithSelector(
             CallerNotWhitelisted.selector,
-            "EigenAgent: caller not allowed"
+            "EigenAgent6551: caller not allowed"
         ));
         eigenAgent.approveByWhitelistedContract(
             someSpenderContract,
@@ -434,7 +431,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             eigenAgentOwner721.removeFromWhitelistedCallers(deployer);
             vm.expectRevert(abi.encodeWithSelector(
                 CallerNotWhitelisted.selector,
-                "EigenAgent: caller not allowed"
+                "EigenAgent6551: caller not allowed"
             ));
             eigenAgent.approveByWhitelistedContract(
                 someSpenderContract,
@@ -455,12 +452,14 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
         vm.stopBroadcast();
 
+        vm.deal(address(restakingConnector), 1 ether);
+
         //////////////////////////////////////////////////////
         //// 1) EigenAgent approves StrategyManager to transfer tokens
         //////////////////////////////////////////////////////
         uint256 execNonce0 = eigenAgent.execNonce();
         {
-            vm.startBroadcast(address(receiverContract));
+            vm.startBroadcast(address(restakingConnector));
             (
                 bytes memory data0,
                 bytes32 digestHash0,
@@ -492,7 +491,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         //////////////////////////////////////////////////////
         uint256 execNonce1 = eigenAgent.execNonce();
         {
-            vm.startBroadcast(address(receiverContract));
+            vm.startBroadcast(address(restakingConnector));
             (
                 bytes memory data1,
                 bytes32 digestHash1,
@@ -539,7 +538,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         //// 4) Alice -> EigenAgent Queues Withdrawal from Eigenlayer
         //////////////////////////////////////////////////////
         {
-            vm.startBroadcast(address(receiverContract));
+            vm.startBroadcast(address(restakingConnector));
 
             IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams;
 

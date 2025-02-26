@@ -181,6 +181,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
         uint256 tokenId = eigenAgentOwner721.mint(user);
         // userToEigenAgentTokenIds[user] = tokenId is set in EigenAgentOwner721._afterTokenTransfer
 
+        // Clone the baseEigenAgent
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(
             erc6551Registry.createAccount(
                 Clones.clone(baseEigenAgent), // ERC-1167 minimal viable proxy clone
@@ -190,6 +191,9 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
                 tokenId
             )
         ));
+
+        // set the RestakingConnector on the new EigenAgent
+        eigenAgent.setInitialRestakingConnector(_restakingConnector);
 
         tokenIdToEigenAgents[tokenId] = address(eigenAgent);
 

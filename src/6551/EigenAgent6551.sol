@@ -25,6 +25,9 @@ contract EigenAgent6551 is ERC6551 {
     /// @notice Nonce for signing executeWithSignature calls
     uint256 public execNonce;
 
+    /// @notice Only the RestakingConnector address can call executeWithSignature
+    address public restakingConnector;
+
     event ExecutedSignedCall(
         address indexed targetContract,
         bool indexed success,
@@ -39,9 +42,28 @@ contract EigenAgent6551 is ERC6551 {
         // get the 721 NFT associated with 6551 account and check if caller is whitelisted
         (uint256 chainId, address contractAddress, uint256 tokenId) = token();
         if (!IEigenAgentOwner721(contractAddress).isWhitelistedCaller(msg.sender)) {
-            revert CallerNotWhitelisted("EigenAgent: caller not allowed");
+            revert CallerNotWhitelisted("EigenAgent6551: caller not allowed");
         }
         _;
+    }
+
+    /**
+     * @dev Initializes the EigenAgent6551 with a RestakingConnector address
+     * @param _restakingConnector The address of the RestakingConnector contract
+     */
+    function setInitialRestakingConnector(address _restakingConnector) external {
+        // Only allow initialization if restakingConnector is not set yet
+        require(restakingConnector == address(0), "EigenAgent6551: already initialized");
+        require(_restakingConnector != address(0), "EigenAgent6551: invalid RestakingConnector");
+
+        restakingConnector = _restakingConnector;
+    }
+
+    // Add a function to set the RestakingConnector
+    function setRestakingConnector(address _restakingConnector) external {
+        // Only the owner of the EigenAgent should be able to set this
+        require(msg.sender == owner(), "Only owner can set RestakingConnector");
+        restakingConnector = _restakingConnector;
     }
 
     /**
@@ -87,6 +109,11 @@ contract EigenAgent6551 is ERC6551 {
         virtual
         returns (bytes memory result)
     {
+        // Only allow RestakingConnector or NFT owner to call this function
+        require(
+            msg.sender == restakingConnector || msg.sender == owner(),
+            "Only RestakingConnector or owner can execute"
+        );
 
         // require(expiry >= block.timestamp, "Signature for EigenAgent execution expired");
         /// Note: do not revert on expiry. CCIP may take hours to deliver messages if gas spikes.

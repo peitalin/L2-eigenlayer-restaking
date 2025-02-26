@@ -149,6 +149,8 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         restakingProxy.setEigenlayerContracts(delegationManager, strategyManager, strategy, rewardsCoordinator);
         agentFactoryProxy.addAdmin(deployer);
         agentFactoryProxy.setRestakingConnector(address(restakingProxy));
+        // doesn't strictly need to be set, as AgentFactory clones the baseEigenAgent, but good to have.
+        baseEigenAgent.setInitialRestakingConnector(address(restakingProxy));
 
         // deploy real receiver implementation and upgradeAndCall initializer
         ReceiverCCIP receiverImpl;

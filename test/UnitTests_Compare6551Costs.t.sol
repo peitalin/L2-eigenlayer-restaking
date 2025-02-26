@@ -57,8 +57,9 @@ contract UnitTests_Compare6551Costs is BaseTestEnvironment {
             0, // execNonce = 0
             expiry
         );
+        vm.startBroadcast(address(restakingConnector));
         agent1.executeWithSignature(targetContract, 0, testMessage, expiry, sig1);
-
+        vm.stopBroadcast();
         bytes memory sig2 = signMessage(
             aliceKey,
             targetContract,
@@ -66,7 +67,9 @@ contract UnitTests_Compare6551Costs is BaseTestEnvironment {
             1, // execNonce = 1
             expiry
         );
+        vm.startBroadcast(address(restakingConnector));
         agent1.executeWithSignature(targetContract, 0, testMessage, expiry, sig2);
+        vm.stopBroadcast();
 
         bytes memory sig3 = signMessage(
             bobKey,
@@ -75,8 +78,9 @@ contract UnitTests_Compare6551Costs is BaseTestEnvironment {
             0, // execNonce = 0
             expiry
         );
+        vm.startBroadcast(address(restakingConnector));
         agent2.executeWithSignature(targetContract, 0, testMessage, expiry, sig3);
-
+        vm.stopBroadcast();
         vm.assertEq(agent1.execNonce(), 2);
         vm.assertEq(agent2.execNonce(), 1);
         vm.assertEq(defaultAgent.execNonce(), 0);

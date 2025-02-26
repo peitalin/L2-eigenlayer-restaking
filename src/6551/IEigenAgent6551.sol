@@ -57,4 +57,10 @@ interface IEigenAgent6551 is IERC6551, IERC6551Executable {
     ) external pure returns (bytes32);
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool);
+
+    function restakingConnector() external view returns (address);
+
+    function setRestakingConnector(address _restakingConnector) external;
+
+    function setInitialRestakingConnector(address _restakingConnector) external;
 }

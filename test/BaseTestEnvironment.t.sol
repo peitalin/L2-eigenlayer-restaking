@@ -138,6 +138,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         restakingConnector.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
 
         vm.deal(address(receiverContract), 1 ether);
+        vm.deal(address(restakingConnector), 1 ether);
     }
 
     function _setupL2ForkedEnvironment() private {
@@ -179,6 +180,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy, rewardsCoordinator);
 
             IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
+            IERC20_CCIPBnM(address(tokenL1)).drip(address(restakingConnector));
             IERC20_CCIPBnM(address(tokenL1)).drip(address(deployer));
         }
         vm.stopBroadcast();
@@ -245,6 +247,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         eigenAgentOwner721 = agentFactory.eigenAgentOwner721();
 
         vm.deal(address(receiverContract), 1 ether);
+        vm.deal(address(restakingConnector), 1 ether);
 
         vm.startBroadcast(deployerKey);
         {
@@ -258,6 +261,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy, rewardsCoordinator);
 
             IERC20Minter(address(tokenL1)).mint(address(receiverContract), 1 ether);
+            IERC20Minter(address(tokenL1)).mint(address(restakingConnector), 1 ether);
             IERC20Minter(address(tokenL1)).mint(deployer, 1 ether);
 
             // for mock testing only

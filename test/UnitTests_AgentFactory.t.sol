@@ -10,9 +10,10 @@ import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
+import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
-
-
+import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
 contract UnitTests_AgentFactory is BaseTestEnvironment {
 
@@ -187,5 +188,66 @@ contract UnitTests_AgentFactory is BaseTestEnvironment {
         uint256 tokenId3 = agentFactory.getEigenAgentOwnerTokenId(deployer);
 
         vm.assertEq(tokenId2, tokenId3);
+    }
+
+    function test_AgentFactory_RequiresMatchingRestakingConnectorValue() public {
+
+        vm.startPrank(deployer);
+        // Deploy a new AgentFactory with a fresh base EigenAgent
+        EigenAgent6551 newBaseEigenAgent = new EigenAgent6551();
+        IERC6551Registry newERC6551Registry = IERC6551Registry(address(new ERC6551Registry()));
+        address mockRestakingConnector = address(0x1234);
+        ProxyAdmin proxyAdmin = new ProxyAdmin(deployer);
+        // Create a new AgentFactory
+        // Initialize with the new base EigenAgent
+        IAgentFactory newAgentFactory = IAgentFactory(
+            payable(address(
+                new TransparentUpgradeableProxy(
+                    address(new AgentFactory()),
+                    address(proxyAdmin),
+                    abi.encodeWithSelector(
+                        AgentFactory.initialize.selector,
+                        newERC6551Registry,
+                        eigenAgentOwner721,
+                        newBaseEigenAgent
+                    )
+                )
+            ))
+        );
+
+        // Set the RestakingConnector on the AgentFactory
+        newAgentFactory.setRestakingConnector(mockRestakingConnector);
+        vm.stopPrank();
+
+        // Configure eigenAgentOwner721 to work with the new AgentFactory
+        vm.startPrank(deployer);
+        eigenAgentOwner721.setAgentFactory(IAgentFactory(address(newAgentFactory)));
+        eigenAgentOwner721.addToWhitelistedCallers(mockRestakingConnector);
+        vm.stopPrank();
+
+        // spawn an EigenAgent
+        address newUser = address(0xABCD);
+        vm.startPrank(deployer);
+
+        // valid restaking connector
+        IEigenAgent6551 newAgent = newAgentFactory.spawnEigenAgentOnlyOwner(newUser);
+        vm.stopPrank();
+
+        // Verify the RestakingConnector was correctly set in the newAgent
+        assertEq(
+            address(newAgent.restakingConnector()),
+            mockRestakingConnector,
+            "New agent should have correct RestakingConnector"
+        );
+
+        vm.startPrank(deployer);
+        vm.expectRevert("Only owner can set RestakingConnector");
+        newAgent.setRestakingConnector(address(0x8881223));
+        vm.stopPrank();
+
+        vm.startPrank(deployer);
+        vm.expectRevert("EigenAgent6551: already initialized");
+        newAgent.setInitialRestakingConnector(address(0x129381));
+        vm.stopPrank();
     }
 }
