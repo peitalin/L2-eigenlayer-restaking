@@ -3,10 +3,10 @@ pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {ERC20Minter} from "./mocks/ERC20Minter.sol";
 
@@ -85,7 +85,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         // Create a second memecoin ERC20 token for multi-token rewards claims
         memecoin = IERC20(address(new TransparentUpgradeableProxy(
             address(new ERC20Minter()),
-            address(new ProxyAdmin()),
+            address(new ProxyAdmin(address(this))),
             abi.encodeWithSelector(
                 ERC20Minter.initialize.selector,
                 "token2",

@@ -3,8 +3,8 @@ pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
 
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
@@ -69,7 +69,7 @@ contract UnitTests_AgentFactory is BaseTestEnvironment {
 
     function test_AgentFactory_Initialize() public {
 
-        ProxyAdmin pa = new ProxyAdmin();
+        ProxyAdmin pa = new ProxyAdmin(address(this));
         AgentFactory agentFactoryImpl = new AgentFactory();
         address mockBaseEigenAgent = vm.addr(4321);
         address mock6551Registry  = vm.addr(12341234);

@@ -5,9 +5,9 @@ import {IRouterClient} from "@chainlink/ccip/interfaces/IRouterClient.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {CCIPReceiver} from "@chainlink/ccip/applications/CCIPReceiver.sol";
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {IERC20} from "@openzeppelin-v5-contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin-v5-contracts/token/ERC20/utils/SafeERC20.sol";
+import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 
 abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
@@ -55,7 +55,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     constructor(address _router) CCIPReceiver(_router) { }
 
     function __BaseMessengerCCIP_init() internal {
-        OwnableUpgradeable.__Ownable_init();
+        OwnableUpgradeable.__Ownable_init(msg.sender);
     }
 
     /// @param _destinationChainSelector The selector of the destination chain.

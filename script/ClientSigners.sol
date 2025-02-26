@@ -2,8 +2,7 @@
 pragma solidity 0.8.25;
 
 import {Script, console} from "forge-std/Script.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SignatureChecker} from "@openzeppelin-v5/contracts/utils/cryptography/SignatureChecker.sol";
+import {SignatureChecker} from "@openzeppelin-v5-contracts/utils/cryptography/SignatureChecker.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 
 
@@ -42,7 +41,7 @@ contract ClientSigners is Script {
 
     function createEigenlayerDepositDigest(
         IStrategy strategy,
-        IERC20 token,
+        address token,
         uint256 amount,
         address staker,
         uint256 nonce,

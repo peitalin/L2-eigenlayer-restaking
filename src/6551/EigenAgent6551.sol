@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SignatureChecker} from "@openzeppelin-v5/contracts/utils/cryptography/SignatureChecker.sol";
+import {IERC1271} from "@openzeppelin-v5-contracts/interfaces/IERC1271.sol";
+import {IERC20} from "@openzeppelin-v5-contracts/token/ERC20/IERC20.sol";
+import {SignatureChecker} from "@openzeppelin-v5-contracts/utils/cryptography/SignatureChecker.sol";
 import {ERC6551Account as ERC6551} from "@6551/examples/simple/ERC6551Account.sol";
 
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";

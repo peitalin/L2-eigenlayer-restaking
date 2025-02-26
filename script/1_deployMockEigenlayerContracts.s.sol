@@ -2,10 +2,10 @@
 pragma solidity 0.8.25;
 
 import {Script, stdJson} from "forge-std/Script.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {IBeacon} from "@openzeppelin/contracts/proxy/beacon/IBeacon.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin-v47-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin-v47-contracts/proxy/transparent/ProxyAdmin.sol";
+import {IBeacon} from "@openzeppelin-v47-contracts/proxy/beacon/IBeacon.sol";
+import {UpgradeableBeacon} from "@openzeppelin-v47-contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 import {IETHPOSDeposit} from "@eigenlayer-contracts/interfaces/IETHPOSDeposit.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
@@ -28,7 +28,7 @@ import {StrategyFactory} from "@eigenlayer-contracts/strategies/StrategyFactory.
 import {StrategyBaseTVLLimits} from "@eigenlayer-contracts/strategies/StrategyBaseTVLLimits.sol";
 
 import {ERC20Minter} from "../test/mocks/ERC20Minter.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {EthSepolia} from "./Addresses.sol";
 
