@@ -189,7 +189,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
             eigenAgent.EIGEN_AGENT_EXEC_TYPEHASH(),
             _target,
             _value,
-            _data,
+            keccak256(_data),
             _nonce,
             _chainid,
             _expiry

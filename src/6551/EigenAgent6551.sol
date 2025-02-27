@@ -191,7 +191,7 @@ contract EigenAgent6551 is ERC6551 {
             EIGEN_AGENT_EXEC_TYPEHASH,
             target,
             value,
-            data,
+            keccak256(data),
             nonce,
             chainid,
             expiry
