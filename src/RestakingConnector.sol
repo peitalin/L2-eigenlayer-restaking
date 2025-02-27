@@ -270,6 +270,16 @@ contract RestakingConnector is
         );
     }
 
+    struct PackedCompleteWithdrawalVars {
+        IDelegationManager.Withdrawal withdrawal;
+        IERC20[] tokensToWithdraw;
+        uint256 middlewareTimesIndex;
+        bool receiveAsTokens;
+        address signer;
+        uint256 expiry;
+        bytes signature;
+    }
+
     /**
      * @dev Forwards a completeWithdrawal message to Eigenlayer to the user's EigenAgent to execute.
      * @param messageWithSignature is the Eigenlayer processClaim message with
@@ -288,22 +298,24 @@ contract RestakingConnector is
         private
         returns (IRestakingConnector.TransferTokensInfo[] memory transferTokensArray)
     {
-        // scope to reduce variable count
-        {
-            (
-                // original message
-                IDelegationManager.Withdrawal memory withdrawal,
-                IERC20[] memory tokensToWithdraw,
-                uint256 middlewareTimesIndex,
-                bool receiveAsTokens,
-                // message signature
-                , // address __signer, // unused variable, use eigenAgent.owner() instead
-                uint256 expiry,
-                bytes memory signature
-            ) = decodeCompleteWithdrawalMsg(messageWithSignature);
+        PackedCompleteWithdrawalVars memory vars = _decodeCompleteWithdrawalVarsPacked(messageWithSignature);
 
-            // eigenAgent == withdrawer == staker == msg.sender (in Eigenlayer)
-            IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawal.withdrawer));
+        // eigenAgent == withdrawer == staker == msg.sender (in Eigenlayer)
+        IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(vars.withdrawal.withdrawer));
+        uint256[] memory balanceDiffsAmountsToBridge = new uint256[](vars.tokensToWithdraw.length);
+        // resize array
+        transferTokensArray = new IRestakingConnector.TransferTokensInfo[](
+            _numBridgeableTokens(vars.tokensToWithdraw)
+        );
+
+        /// Vault shares != actual number of tokens received from Eigenlayer, so we need to
+        /// Calculate balance differences before and after withdrawal
+        /// to transfer from EigenAgent back to ReceiverCCIP after withdrawal.
+        {
+            uint256[] memory balancesBefore = _getEigenAgentBalancesWithdrawals(
+                eigenAgent,
+                vars.tokensToWithdraw
+            );
 
             // (1) EigenAgent receives tokens from Eigenlayer
             // then (2) approves RestakingConnector to (3) transfer tokens to ReceiverCCIP
@@ -311,80 +323,89 @@ contract RestakingConnector is
                 address(delegationManager),
                 0 ether,
                 EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
-                    withdrawal,
-                    tokensToWithdraw,
-                    middlewareTimesIndex,
-                    receiveAsTokens
+                    vars.withdrawal,
+                    vars.tokensToWithdraw,
+                    vars.middlewareTimesIndex,
+                    vars.receiveAsTokens
                 ),
-                expiry,
-                signature
+                vars.expiry,
+                vars.signature
             );
 
-            address agentOwner = eigenAgent.owner();
+            // Should received tokens from StrategyManager now.
+            // It converts shares to tokens and sends them to EigenAgent's balance
+            uint256[] memory balancesAfter = _getEigenAgentBalancesWithdrawals(
+                eigenAgent,
+                vars.tokensToWithdraw
+            );
 
+            for (uint256 i = 0; i < vars.tokensToWithdraw.length; ++i) {
+                balanceDiffsAmountsToBridge[i] = balancesAfter[i] - balancesBefore[i];
+            }
+        }
+
+        /// receiveAsTokens determines whether Eigenlayer returns tokens to the EigenAgent or
+        /// re-deposits them into Eigenlayer strategy as part of a re-delegate and re-deposit flow.
+        if (vars.receiveAsTokens) {
+
+            // if receiveAsTokens == true, distribute tokens to user address on L1 and L2.
+            // Otherwise if receiveAsTokens == false, withdrawal is redeposited in Eigenlayer
+            // as shares, re-delegated to a new Operator as part of the `undelegate` flow.
+            // We do not need to do anything in this case.
             uint256 n; // tracks index of transferTokensArray (bridgeableTokens only)
-            // instantiate array size
-            transferTokensArray = new IRestakingConnector.TransferTokensInfo[](
-                _numBridgeableTokens(tokensToWithdraw)
-            );
 
-            /// receiveAsTokens determines whether Eigenlayer returns tokens to the EigenAgent or
-            /// re-deposits them into Eigenlayer strategy as part of a re-delegate and re-deposit flow.
-            if (receiveAsTokens) {
-                // if receiveAsTokens == true, distribute tokens to user address on L1 and L2.
-                // Otherwise if receiveAsTokens == false, withdrawal is redeposited in Eigenlayer
-                // as shares, re-delegated to a new Operator as part of the `undelegate` flow.
-                // We do not need to do anything in this case.
-                for (uint256 i = 0; i < tokensToWithdraw.length; ++i) {
+            for (uint256 i = 0; i < vars.tokensToWithdraw.length; ++i) {
 
-                    // (1) EigenAgent approves RestakingConnector to transfer tokens
-                    eigenAgent.approveByWhitelistedContract(
-                        address(this), // restakingConnector
-                        address(tokensToWithdraw[i]),
-                        withdrawal.shares[i]
+                // (1) EigenAgent approves RestakingConnector to transfer tokens
+                eigenAgent.approveByWhitelistedContract(
+                    address(this), // restakingConnector
+                    address(vars.tokensToWithdraw[i]),
+                    balanceDiffsAmountsToBridge[i]
+                );
+
+                address tokenL2 = bridgeTokensL1toL2[address(vars.tokensToWithdraw[i])];
+
+                address agentOwner = eigenAgent.owner();
+
+                if (tokenL2 == address(0)) {
+                    // (2) If the token cannot bridge to L2, transfer to AgentOwner on L1.
+                    // Shouldn't reach this state, unless user deposits L1 tokens via EigenAgent on L1.
+                    IERC20(vars.tokensToWithdraw[i]).transferFrom(
+                        address(eigenAgent),
+                        agentOwner, // AgentOwner
+                        balanceDiffsAmountsToBridge[i]
                     );
 
-                    address tokenL2 = bridgeTokensL1toL2[address(tokensToWithdraw[i])];
+                } else {
 
-                    if (tokenL2 == address(0)) {
-                        // (2) If the token cannot bridge to L2, transfer to AgentOwner on L1.
-                        // Shouldn't reach this state, unless user deposits L1 tokens via EigenAgent on L1.
-                        IERC20(tokensToWithdraw[i]).transferFrom(
-                            address(eigenAgent),
-                            agentOwner, // AgentOwner
-                            withdrawal.shares[i]
-                        );
+                    // (3) If bridgeable, prepare a transferToAgentOwner message with transferRoots
+                    bytes32 withdrawalTransferRoot = EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(
+                        delegationManager.calculateWithdrawalRoot(vars.withdrawal), // withdrawalRoot
+                        agentOwner // AgentOwner
+                    );
 
-                    } else {
+                    transferTokensArray[n] = IRestakingConnector.TransferTokensInfo({
+                        transferType: IRestakingConnector.TransferType.Withdrawal,
+                        transferToAgentOwnerMessage: string(
+                            EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(withdrawalTransferRoot)
+                        ),
+                        transferRoot: withdrawalTransferRoot,
+                        transferAmount: balanceDiffsAmountsToBridge[i],
+                        transferToken: address(vars.tokensToWithdraw[i])
+                    });
 
-                        // (3) If bridgeable, prepare a transferToAgentOwner message with transferRoots
-                        bytes32 withdrawalTransferRoot = EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(
-                            delegationManager.calculateWithdrawalRoot(withdrawal), // withdrawalRoot
-                            agentOwner // AgentOwner
-                        );
+                    ++n; // increment transferTokens index after setting transferTokensArray
 
-                        transferTokensArray[n] = IRestakingConnector.TransferTokensInfo({
-                            transferType: IRestakingConnector.TransferType.Withdrawal,
-                            transferToAgentOwnerMessage: string(
-                                EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(withdrawalTransferRoot)
-                            ),
-                            transferRoot: withdrawalTransferRoot,
-                            transferAmount: withdrawal.shares[i],
-                            transferToken: address(tokensToWithdraw[i])
-                        });
-
-                        ++n; // increment transferTokens index after setting transferTokensArray
-
-                        // RestakingConnector transfers tokens to ReceiverCCIP to bridge
-                        IERC20(tokensToWithdraw[i]).transferFrom(
-                            address(eigenAgent),
-                            _receiverCCIP,
-                            withdrawal.shares[i] // withdrawalAmount
-                        );
-                    }
+                    // RestakingConnector transfers tokens to ReceiverCCIP to bridge
+                    IERC20(vars.tokensToWithdraw[i]).transferFrom(
+                        address(eigenAgent),
+                        _receiverCCIP,
+                        balanceDiffsAmountsToBridge[i]
+                    );
                 }
             }
         }
+
     }
 
     /**
@@ -449,6 +470,14 @@ contract RestakingConnector is
         );
     }
 
+    struct PackedRewardsClaimVars {
+        IRewardsCoordinator.RewardsMerkleClaim claim;
+        address recipient; // eigenAgent
+        address signer;
+        uint256 expiry;
+        bytes signature;
+    }
+
     /**
      * @dev Forwards a processClaim message to claim Eigenlayer rewards via EigenAgent.
      * @param messageWithSignature is the Eigenlayer processClaim message with
@@ -466,47 +495,53 @@ contract RestakingConnector is
         private
         returns (IRestakingConnector.TransferTokensInfo[] memory transferTokensArray)
     {
-        IRewardsCoordinator.RewardsMerkleClaim memory claim;
-        address agentOwner;
-        IEigenAgent6551 eigenAgent;
-        // scope to reduce variable count
+
+        PackedRewardsClaimVars memory vars = _decodeRewardsClaimVarsPacked(messageWithSignature);
+        uint256[] memory balanceDiffsAmountsToBridge = new uint256[](vars.claim.tokenLeaves.length);
+        // eigenAgent == recipient == msg.sender (in Eigenlayer)
+        IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(vars.recipient));
+        address agentOwner = eigenAgent.owner();
+
+        /// Vault shares != actual number of tokens received from Eigenlayer.
+        /// Calculate balances before and after claiming rewards and calculate differences
         {
-            (
-                // original message
-                IRewardsCoordinator.RewardsMerkleClaim memory _claim,
-                address recipient, // eigenAgent
-                // message signature
-                , // address __signer
-                uint256 expiry,
-                bytes memory signature
-            ) = decodeProcessClaimMsg(messageWithSignature);
+            uint256[] memory balancesBefore = _getEigenAgentBalancesRewards(
+                eigenAgent,
+                vars.claim
+            );
 
-            // eigenAgent == recipient == msg.sender (in Eigenlayer)
-            IEigenAgent6551 _eigenAgent = IEigenAgent6551(payable(recipient));
-
-            claim = _claim;
-            eigenAgent = _eigenAgent;
-            agentOwner = eigenAgent.owner();
-
+            // (1) EigenAgent receives tokens from Eigenlayer
+            // then (2) approves RestakingConnector to (3) transfer tokens to ReceiverCCIP
             eigenAgent.executeWithSignature(
                 address(rewardsCoordinator),
                 0 ether,
-                EigenlayerMsgEncoders.encodeProcessClaimMsg(claim, recipient),
-                expiry,
-                signature
+                EigenlayerMsgEncoders.encodeProcessClaimMsg(vars.claim, vars.recipient),
+                vars.expiry,
+                vars.signature
             );
+
+            // Should received tokens from StrategyManager now.
+            // It converts shares to tokens and sends them to EigenAgent's balance
+            uint256[] memory balancesAfter = _getEigenAgentBalancesRewards(
+                eigenAgent,
+                vars.claim
+            );
+
+            for (uint256 i = 0; i < vars.claim.tokenLeaves.length; ++i) {
+                balanceDiffsAmountsToBridge[i] = balancesAfter[i] - balancesBefore[i];
+            }
         }
 
         // The same rewardsRoot calculated on L2 in SenderHooks.sol
-        bytes32 rewardsRoot = EigenlayerMsgEncoders.calculateRewardsRoot(claim);
+        bytes32 rewardsRoot = EigenlayerMsgEncoders.calculateRewardsRoot(vars.claim);
         uint32 n; // tracks index of transferTokensArray (bridgeableTokens only)
 
-        transferTokensArray = new IRestakingConnector.TransferTokensInfo[](claim.tokenLeaves.length);
+        transferTokensArray = new IRestakingConnector.TransferTokensInfo[](vars.claim.tokenLeaves.length);
 
-        for (uint32 i = 0; i < claim.tokenLeaves.length; ++i) {
+        for (uint32 i = 0; i < vars.claim.tokenLeaves.length; ++i) {
 
-            uint256 rewardsAmount = claim.tokenLeaves[i].cumulativeEarnings;
-            address rewardsToken = address(claim.tokenLeaves[i].token); // tokenL1
+            uint256 rewardsAmount = balanceDiffsAmountsToBridge[i];
+            address rewardsToken = address(vars.claim.tokenLeaves[i].token); // tokenL1
 
             // (1) EigenAgent approves RestakingConnector to transfer tokens to ReceiverCCIP
             eigenAgent.approveByWhitelistedContract(
@@ -558,6 +593,90 @@ contract RestakingConnector is
                 ++num;
             }
         }
+    }
+
+    function _decodeCompleteWithdrawalVarsPacked(bytes memory messageWithSignature)
+        private
+        pure
+        returns (PackedCompleteWithdrawalVars memory vars)
+    {
+        (
+            // original message
+            IDelegationManager.Withdrawal memory withdrawal,
+            IERC20[] memory tokensToWithdraw,
+            uint256 middlewareTimesIndex,
+            bool receiveAsTokens,
+            // message signature
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        ) = decodeCompleteWithdrawalMsg(messageWithSignature);
+
+        return PackedCompleteWithdrawalVars({
+            withdrawal: withdrawal,
+            tokensToWithdraw: tokensToWithdraw,
+            middlewareTimesIndex: middlewareTimesIndex,
+            receiveAsTokens: receiveAsTokens,
+            signer: signer,
+            expiry: expiry,
+            signature: signature
+        });
+    }
+
+    function _decodeRewardsClaimVarsPacked(bytes memory messageWithSignature)
+        private
+        pure
+        returns (PackedRewardsClaimVars memory vars)
+    {
+        // struct RewardsMerkleClaim {
+        //     uint32 rootIndex;
+        //     uint32 earnerIndex;
+        //     bytes earnerTreeProof;
+        //     EarnerTreeMerkleLeaf earnerLeaf;
+        //     uint32[] tokenIndices;
+        //     bytes[] tokenTreeProofs;
+        //     TokenTreeMerkleLeaf[] tokenLeaves;
+        // }
+        (
+            IRewardsCoordinator.RewardsMerkleClaim memory claim,
+            address recipient, // eigenAgent
+            // message signature
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        ) = decodeProcessClaimMsg(messageWithSignature);
+
+        return PackedRewardsClaimVars({
+            claim: claim,
+            recipient: recipient,
+            signer: signer,
+            expiry: expiry,
+            signature: signature
+        });
+    }
+
+
+    function _getEigenAgentBalancesWithdrawals(IEigenAgent6551 eigenAgent, IERC20[] memory tokensToWithdraw)
+        private
+        view
+        returns (uint256[] memory)
+    {
+        uint256[] memory balances = new uint256[](tokensToWithdraw.length);
+        for (uint256 i = 0; i < tokensToWithdraw.length; ++i) {
+            balances[i] = tokensToWithdraw[i].balanceOf(address(eigenAgent));
+        }
+        return balances;
+    }
+
+    function _getEigenAgentBalancesRewards(
+        IEigenAgent6551 eigenAgent,
+        IRewardsCoordinator.RewardsMerkleClaim memory claim
+    ) private view returns (uint256[] memory) {
+        uint256[] memory balances = new uint256[](claim.tokenLeaves.length);
+        for (uint256 i = 0; i < claim.tokenLeaves.length; ++i) {
+            balances[i] = claim.tokenLeaves[i].token.balanceOf(address(eigenAgent));
+        }
+        return balances;
     }
 
 }

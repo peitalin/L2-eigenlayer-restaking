@@ -105,6 +105,8 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         allowlistedSenders[_sender] = allowed;
     }
 
+    /// TODO: do a multi-token version of sendMessagePayNative
+
     /// @notice Sends data and transfer tokens to receiver on the destination chain.
     /// @notice Pay for fees in native gas.
     /// @dev Assumes your contract has sufficient native gas like ETH on Ethereum or MATIC on Polygon.

@@ -360,13 +360,11 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
-        // fundsTransfer info should be available
-        ISenderHooks.FundsTransfer[] memory fundsTransfer = senderHooks.getFundsTransferCommitment(
+        // transferRoot agentOwner info should be available
+        address agentOwner = senderHooks.getTransferRootAgentOwner(
             withdrawalTransferRoot
         );
-        vm.assertEq(fundsTransfer[0].amount, amount);
-        vm.assertEq(fundsTransfer[0].tokenL2, address(BaseSepolia.BridgeToken));
-        vm.assertEq(fundsTransfer[0].agentOwner, bob);
+        vm.assertEq(agentOwner, bob);
 
         // Mock SenderContract on L2 receiving the tokens and TransferToAgentOwner CCIP message from L1
         Client.EVMTokenAmount[] memory destTokenAmountsL2 = new Client.EVMTokenAmount[](1);
@@ -432,10 +430,6 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
                 destTokenAmounts: new Client.EVMTokenAmount[](0)
             })
         );
-
-        // fundsTransfer should be deleted after withdrawal completes
-        fundsTransfer = senderHooks.getFundsTransferCommitment(withdrawalTransferRoot);
-        vm.assertEq(fundsTransfer.length, 0);
 
         // withdrawalTransferRoot should be spent now
         vm.assertEq(senderHooks.isTransferRootSpent(withdrawalTransferRoot), true);

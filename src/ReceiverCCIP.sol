@@ -234,6 +234,8 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         }
     }
 
+    /// TODO: do a multi-token version of _buildCCIPMessage
+
     /**
      * @dev This function is called when sending an outbound message.
      * @param _receiver The address of the receiver.

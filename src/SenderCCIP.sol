@@ -85,26 +85,24 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
     function _afterCCIPReceiveMessage(Client.Any2EVMMessage memory any2EvmMessage) internal {
 
         bytes memory message = any2EvmMessage.data;
+        Client.EVMTokenAmount[] memory destTokenAmounts = any2EvmMessage.destTokenAmounts;
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
+        // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
         if (functionSelector == ISenderHooks.handleTransferToAgentOwner.selector) {
-            // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
+            // Trust chainlink CCIP to not have modified the message
+            address agentOwner = senderHooks.handleTransferToAgentOwner(message);
 
-            ISenderHooks.FundsTransfer[] memory fundsTransfersArray =
-                senderHooks.handleTransferToAgentOwner(message);
-
-            for (uint k = 0; k < fundsTransfersArray.length; ++k) {
-                if (fundsTransfersArray[k].agentOwner != address(0)) {
-
+            for (uint k = 0; k < destTokenAmounts.length; ++k) {
+                if (destTokenAmounts[k].amount > 0) {
                     emit SendingFundsToAgentOwner(
-                        fundsTransfersArray[k].agentOwner,
-                        fundsTransfersArray[k].amount
+                        agentOwner,
+                        destTokenAmounts[k].amount
                     );
-
                     // agentOwner is the signer, first committed when sending completeWithdrawal
-                    IERC20(fundsTransfersArray[k].tokenL2).transfer(
-                        fundsTransfersArray[k].agentOwner,
-                        fundsTransfersArray[k].amount
+                    IERC20(destTokenAmounts[k].token).transfer(
+                        agentOwner,
+                        destTokenAmounts[k].amount
                     );
                 }
             }

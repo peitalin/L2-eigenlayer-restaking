@@ -233,15 +233,9 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             0 ether // not bridging tokens
         );
 
+        address agentOwner = senderHooks.getTransferRootAgentOwner(withdrawalTransferRoot);
         vm.stopBroadcast();
-
-        // fundsTransfer info should be available
-        ISenderHooks.FundsTransfer[] memory fundsTransfer = senderHooks.getFundsTransferCommitment(
-            withdrawalTransferRoot
-        );
-        vm.assertEq(fundsTransfer[0].amount, amount);
-        vm.assertEq(fundsTransfer[0].tokenL2, address(BaseSepolia.BridgeToken));
-        vm.assertEq(fundsTransfer[0].agentOwner, bob);
+        vm.assertEq(agentOwner, bob);
     }
 
     function test_beforeSendCCIPMessage_OnlyCalledBySenderCCIP(uint256 signerKey) public {
