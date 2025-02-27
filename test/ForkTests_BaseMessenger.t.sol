@@ -10,6 +10,8 @@ import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
 import {NonPayableContract} from "./mocks/NonPayableContract.sol";
+import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+import {SenderCCIP} from "../src/SenderCCIP.sol";
 
 
 contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
@@ -659,5 +661,47 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         );
 
         require(address(receiverContract).balance == 0, "receiverCCIP should not have any ETH");
+    }
+
+   function test_BaseMessenger_UnsupportedFunctionCall() public {
+
+        // L2 Sender
+        vm.selectFork(l2ForkId);
+
+        uint256 _amount = 0 ether;
+        uint256 _gasLimit = 800_000;
+
+        vm.deal(deployer, 1 ether);
+
+        bytes4 randomFunctionSelector = bytes4(keccak256("randomFunctionSelector()"));
+
+        bytes memory unsupportedMessage = abi.encodeWithSelector(
+            randomFunctionSelector
+        );
+
+        vm.startBroadcast(deployerKey);
+        {
+            uint256 fees = getRouterFeesL2(
+                address(receiverContract),
+                string(unsupportedMessage),
+                address(tokenL2),
+                _amount,
+                _gasLimit
+            );
+
+            tokenL2.approve(address(senderContract), _amount);
+
+            vm.expectRevert(abi.encodeWithSelector(
+                SenderCCIP.UnsupportedFunctionCall.selector
+            ));
+            senderContract.sendMessagePayNative{value: fees}(
+                EthSepolia.ChainSelector, // _destinationChainSelector,
+                address(receiverContract), // _receiver,
+                string(unsupportedMessage),
+                address(tokenL2),
+                _amount,
+                _gasLimit
+            );
+        }
     }
 }

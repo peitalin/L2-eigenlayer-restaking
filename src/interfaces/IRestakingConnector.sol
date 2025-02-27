@@ -36,7 +36,7 @@ interface IRestakingConnector {
         IRewardsCoordinator _rewardsCoordinator
     ) external;
 
-    function getGasLimitForFunctionSelector(bytes4 functionSelector) external returns (uint256);
+    function getGasLimitForFunctionSelectorL1(bytes4 functionSelector) external returns (uint256);
 
     function setGasLimitsForFunctionSelectors(
         bytes4[] memory functionSelectors,

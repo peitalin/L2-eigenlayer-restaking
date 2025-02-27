@@ -23,6 +23,7 @@ import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
 import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
 import {ClientSigners} from "../script/ClientSigners.sol";
 import {ClientEncoders} from "../script/ClientEncoders.sol";
+import {GasLimits} from "../script/GasLimits.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
@@ -31,8 +32,7 @@ import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 
 
-
-contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
+contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
 
     DeployReceiverOnL1Script public deployReceiverOnL1Script;
     DeploySenderOnL2Script public deploySenderOnL2Script;
@@ -160,6 +160,17 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         // only for tests
         vm.prank(deployer);
         senderContract.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
+
+        (
+            uint256[] memory gasLimits,
+            bytes4[] memory functionSelectors
+        ) = getGasLimits();
+
+        vm.prank(deployer);
+        senderHooks.setGasLimitsForFunctionSelectors(
+            functionSelectors,
+            gasLimits
+        );
     }
 
     function _whitelistContracts() private {
@@ -290,6 +301,17 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
 
             // for mock testing only
             senderHooks.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
+
+            (
+                uint256[] memory gasLimits,
+                bytes4[] memory functionSelectors
+            ) = getGasLimits();
+
+            senderHooks.setGasLimitsForFunctionSelectors(
+                functionSelectors,
+                gasLimits
+            );
+
         }
         vm.stopBroadcast();
     }

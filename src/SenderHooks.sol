@@ -91,7 +91,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * - delegateTo(address,(bytes,uint256),bytes32) == 0xeea9064b
      * - undelegate(address) == 0xda8be864
      * @param functionSelector bytes4 functionSelector to get estimated gasLimits for.
-     * @return gasLimit a default gasLimit of 200_000 functionSelector parameter finds no matches.
+     * @return gasLimit returns 199_998 default if functionSelector does not match any entries
      */
     function getGasLimitForFunctionSelector(bytes4 functionSelector)
         public
@@ -99,7 +99,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         returns (uint256)
     {
         uint256 gasLimit = _gasLimitsForFunctionSelectors[functionSelector];
-        return (gasLimit > 0) ? gasLimit : 200_000;
+        return (gasLimit > 0) ? gasLimit : 199_998;
     }
 
     /**

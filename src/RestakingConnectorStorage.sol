@@ -162,9 +162,10 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
      * @dev Retrieves estimated gasLimits for different L2 restaking functions, e.g:
      * "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
      * @param functionSelector bytes4 functionSelector to get estimated gasLimits for.
-     * @return gasLimit a default gasLimit of 200_000 functionSelector parameter finds no matches.
+     * @return gasLimit a default gasLimit of 200_000 functionSelector parame
+ter finds no matches.
      */
-    function getGasLimitForFunctionSelector(bytes4 functionSelector)
+    function getGasLimitForFunctionSelectorL1(bytes4 functionSelector)
         external
         view
         returns (uint256)

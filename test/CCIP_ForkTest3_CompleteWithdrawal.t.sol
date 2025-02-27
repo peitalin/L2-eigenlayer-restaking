@@ -277,7 +277,8 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         );
 
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
-            IDelegationManager.completeQueuedWithdrawal.selector);
+            IDelegationManager.completeQueuedWithdrawal.selector
+        );
 
         vm.expectEmit(true, false, true, false);
         emit WithdrawalTransferRootCommitted(
