@@ -17,6 +17,9 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
 
     mapping(address contracts => bool whitelisted) public whitelistedCallers;
 
+    /// Keeps track of user mintNonces for deterministic EigenAgent creation
+    mapping(address user => uint256 mintNonce) public userMintNonces;
+
     constructor() {
         _disableInitializers();
     }
@@ -72,11 +75,12 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
     function _mint(address user) internal returns (uint256) {
         uint256 tokenId = _tokenIdCounter;
         ++_tokenIdCounter;
+        ++userMintNonces[user];
         _safeMint(user, tokenId);
-        _setTokenURI(tokenId, string(abi.encodePacked("eigen-agent/", Strings.toString(tokenId), ".json")));
+        // _setTokenURI(tokenId, string(abi.encodePacked("eigen-agent/", Strings.toString(tokenId), ".json")));
         return tokenId;
     }
-        
+
     /**
      * @dev Update EigenAgentOwner721 NFT owner whenever a NFT transfer occurs.
      * This updates AgentFactory and keeps users matched with tokenIds (and associated ERC-6551 EigenAgents).

@@ -177,15 +177,15 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
         require(eigenAgentOwner721.balanceOf(user) == 0, "User already has an EigenAgent");
         // if the user transfers their AgentOwnerNft they can mint another one.
 
-        bytes32 salt = bytes32(abi.encode(user));
         uint256 tokenId = eigenAgentOwner721.mint(user);
+        bytes32 salt2 = bytes32(keccak256(abi.encode(user, tokenId)));
         // userToEigenAgentTokenIds[user] = tokenId is set in EigenAgentOwner721._afterTokenTransfer
 
         // Clone the baseEigenAgent
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(
             erc6551Registry.createAccount(
-                Clones.clone(baseEigenAgent), // ERC-1167 minimal viable proxy clone
-                salt,
+                Clones.cloneDeterministic(baseEigenAgent, salt2), // ERC-1167 minimal viable proxy clone
+                salt2,
                 block.chainid,
                 address(eigenAgentOwner721),
                 tokenId
@@ -200,5 +200,16 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
         emit AgentCreated(user, address(eigenAgent), tokenId);
 
         return eigenAgent;
+    }
+
+    function predictEigenAgentAddress(address user, uint256 tokenId) external view returns (address) {
+        bytes32 salt2 = bytes32(keccak256(abi.encode(user, tokenId)));
+        return erc6551Registry.account(
+            Clones.predictDeterministicAddress(baseEigenAgent, salt2, address(this)),
+            salt2,
+            block.chainid,
+            address(eigenAgentOwner721),
+            tokenId
+        );
     }
 }

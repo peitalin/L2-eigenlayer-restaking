@@ -9,6 +9,8 @@ import {SafeERC20} from "@openzeppelin-v5-contracts/token/ERC20/utils/SafeERC20.
 
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
 
+import {console} from "forge-std/Script.sol";
+
 
 contract EigenAgent6551 is ERC6551 {
 
@@ -185,13 +187,13 @@ contract EigenAgent6551 is ERC6551 {
         uint256 nonce,
         uint256 chainid,
         uint256 expiry
-    ) public pure returns (bytes32) {
+    ) public view returns (bytes32) {
         // EIP-712 struct hash
         bytes32 structHash = keccak256(abi.encode(
             EIGEN_AGENT_EXEC_TYPEHASH,
             target,
             value,
-            data,
+            keccak256(data),
             nonce,
             chainid,
             expiry
@@ -199,7 +201,7 @@ contract EigenAgent6551 is ERC6551 {
         // calculate the digest hash
         bytes32 digestHash = keccak256(abi.encodePacked(
             "\x19\x01",
-            domainSeparator(target, chainid),
+            domainSeparator(chainid),
             structHash
         ));
 
@@ -207,15 +209,18 @@ contract EigenAgent6551 is ERC6551 {
     }
 
     /**
-     * @param contractAddr is the address of the contract where the signature will be verified,
-     * either EigenAgent, Eigenlayer StrategyManager, or DelegationManager.
      * @param chainid is the chain Eigenlayer and EigenAgent are deployed on.
      */
     function domainSeparator(
-        address contractAddr, // strategyManagerAddr, or delegationManagerAddr
         uint256 chainid
-    ) public pure returns (bytes32) {
-        return keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes("EigenLayer")), chainid, contractAddr));
+    ) public view returns (bytes32) {
+        console.log(">>>>> address(this): ", address(this));
+        return keccak256(abi.encode(
+            DOMAIN_TYPEHASH,
+            keccak256(bytes("EigenLayer")),
+            chainid,
+            address(this)
+        ));
     }
 }
 

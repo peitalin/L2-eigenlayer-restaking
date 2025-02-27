@@ -14,12 +14,14 @@ import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoor
 
 import {TestERC20} from "./mocks/TestERC20.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
+import {console} from "forge-std/Script.sol";
 
 
 contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
@@ -39,6 +41,9 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         expiry = block.timestamp + 1 hours;
         execNonce0 = 0;
+
+        vm.prank(deployer);
+        eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
     }
 
     /*
@@ -144,6 +149,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             bobKey,
+            address(eigenAgent),
             block.chainid,
             address(123123), // invalid targetContract to cause revert
             encodeDepositIntoStrategyMsg(
@@ -199,6 +205,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             bobKey,
+            address(eigenAgent),
             block.chainid,
             address(strategyManager),
             encodeDepositIntoStrategyMsg(
@@ -243,8 +250,14 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         uint256 expiryShort = block.timestamp + 60 seconds;
         uint256 amount = 0.1 ether;
 
+        vm.startPrank(deployer);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+        vm.stopPrank();
+
+        console.log("111111 address(eigenAgentBob): ", address(eigenAgentBob));
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
-            bobKey,
+            bobKey, // sign with Bob's key
+            address(eigenAgentBob),
             block.chainid, // destination chainid where EigenAgent lives
             address(strategyManager), // StrategyManager to approve + deposit
             encodeDepositIntoStrategyMsg(
@@ -255,6 +268,9 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             execNonce,
             expiryShort
         );
+        bytes32 domainSeparator = eigenAgentBob.domainSeparator(block.chainid);
+        console.log("222222 domainSeparator: ");
+        console.logBytes32(domainSeparator);
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
@@ -293,6 +309,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             bobKey,
+            address(eigenAgent),
             block.chainid, // destination chainid where EigenAgent lives
             address(strategyManager), // StrategyManager to approve + deposit
             encodeDepositIntoStrategyMsg(
@@ -378,7 +395,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             "Bob should have minted a new EigenAgent for Alice"
         );
         require(
-            address(agentFactory.getEigenAgent(deployer)) == address(0),
+            address(agentFactory.getEigenAgent(deployer)) == address(eigenAgent),
             "Deployer should not have minted a new EigenAgent"
         );
     }

@@ -40,4 +40,8 @@ interface IAgentFactory is IAdminable {
 
     function getEigenAgent(address staker) external view returns (IEigenAgent6551);
 
+    function predictEigenAgentAddress(
+        address user,
+        uint256 tokenId
+    ) external view returns (address);
 }
