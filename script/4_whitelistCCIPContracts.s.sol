@@ -76,8 +76,8 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
 
         (
-            uint256[] memory gasLimits,
-            bytes4[] memory functionSelectors
+            bytes4[] memory functionSelectors,
+            uint256[] memory gasLimits
         ) = getGasLimits();
 
         senderHooksProxy.setGasLimitsForFunctionSelectors(

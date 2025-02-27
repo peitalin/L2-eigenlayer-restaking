@@ -156,25 +156,25 @@ contract QueueWithdrawalScript is BaseScript {
 
         vm.stopBroadcast();
 
-        string memory filePath = "script/withdrawals-queued/";
-        if (isTest) {
-           filePath = "test/withdrawals-queued/";
-        }
-        // NOTE: Tx will still be bridging after this script runs.
-        // startBlock is saved after bridging completes and calls queueWithdrawal on L1.
-        // Then we call getWithdrawalBlock for the correct startBlock to calculate withdrawalRoots
-        saveWithdrawalInfo(
-            staker,
-            delegatedTo,
-            withdrawer,
-            withdrawalNonce,
-            0, // startBlock is created later in Eigenlayer
-            strategiesToWithdraw,
-            sharesToWithdraw,
-            bytes32(0x0), // withdrawalRoot is created later when completeWithdrawal
-            bytes32(0x0), // withdrawalTransferRoot is created later
-            filePath
-        );
+        // string memory filePath = "script/withdrawals-queued/";
+        // if (isTest) {
+        //    filePath = "test/withdrawals-queued/";
+        // }
+        // // NOTE: Tx will still be bridging after this script runs.
+        // // startBlock is saved after bridging completes and calls queueWithdrawal on L1.
+        // // Then we call getWithdrawalBlock for the correct startBlock to calculate withdrawalRoots
+        // saveWithdrawalInfo(
+        //     staker,
+        //     delegatedTo,
+        //     withdrawer,
+        //     withdrawalNonce,
+        //     0, // startBlock is created later in Eigenlayer
+        //     strategiesToWithdraw,
+        //     sharesToWithdraw,
+        //     bytes32(0x0), // withdrawalRoot is created later when completeWithdrawal
+        //     bytes32(0x0), // withdrawalTransferRoot is created later
+        //     filePath
+        // );
     }
 
 }

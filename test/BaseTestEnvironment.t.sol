@@ -162,8 +162,8 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
         senderContract.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
 
         (
-            uint256[] memory gasLimits,
-            bytes4[] memory functionSelectors
+            bytes4[] memory functionSelectors,
+            uint256[] memory gasLimits
         ) = getGasLimits();
 
         vm.prank(deployer);
@@ -303,8 +303,8 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             senderHooks.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
 
             (
-                uint256[] memory gasLimits,
-                bytes4[] memory functionSelectors
+                bytes4[] memory functionSelectors,
+                uint256[] memory gasLimits
             ) = getGasLimits();
 
             senderHooks.setGasLimitsForFunctionSelectors(

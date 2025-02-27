@@ -15,6 +15,7 @@ import {ProcessClaimRewardsScript} from "../script/9b_processClaimRewards.s.sol"
 
 contract ScriptsTests_Delegation_Rewards is Test, TestErrorHandlers {
 
+    bool skip_scripts_tests = vm.envBool("SKIP_SCRIPTS_TESTS");
     function setUp() public {}
 
     /*
@@ -26,7 +27,7 @@ contract ScriptsTests_Delegation_Rewards is Test, TestErrorHandlers {
      */
 
     function test_step6_DelegateToScript() public {
-
+        vm.skip(skip_scripts_tests);
         DelegateToScript delegateToScript = new DelegateToScript();
 
         try delegateToScript.mockrun() {
@@ -37,7 +38,7 @@ contract ScriptsTests_Delegation_Rewards is Test, TestErrorHandlers {
     }
 
     function test_step6b_UndelegateScript() public {
-
+        vm.skip(skip_scripts_tests);
         UndelegateScript undelegateScript = new UndelegateScript();
 
         try undelegateScript.mockrun() {
@@ -67,7 +68,7 @@ contract ScriptsTests_Delegation_Rewards is Test, TestErrorHandlers {
     }
 
     function test_step6c_RedepositScript() public {
-
+        vm.skip(skip_scripts_tests);
         RedepositScript redepositScript = new RedepositScript();
 
         try redepositScript.mockrun() {
@@ -87,7 +88,7 @@ contract ScriptsTests_Delegation_Rewards is Test, TestErrorHandlers {
     }
 
     function test_step9_SubmitRewardsScript() public {
-
+        vm.skip(skip_scripts_tests);
         SubmitRewardsScript submitRewardsScript = new SubmitRewardsScript();
 
         try submitRewardsScript.mockrun() {
@@ -105,7 +106,7 @@ contract ScriptsTests_Delegation_Rewards is Test, TestErrorHandlers {
     }
 
     function test_step9b_ProcessClaimRewardsScript() public {
-
+        vm.skip(skip_scripts_tests);
         ProcessClaimRewardsScript processClaimRewardsScript = new ProcessClaimRewardsScript();
 
         try processClaimRewardsScript.mockrun() {

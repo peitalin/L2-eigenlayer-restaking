@@ -14,6 +14,7 @@ import {CompleteWithdrawalScript} from "../script/8_completeWithdrawal.s.sol";
 
 contract ScriptsTests_Deposits_Withdrawals is Test, TestErrorHandlers {
 
+    bool skip_scripts_tests = vm.envBool("SKIP_SCRIPTS_TESTS");
     function setUp() public {}
 
     /*
@@ -25,7 +26,7 @@ contract ScriptsTests_Deposits_Withdrawals is Test, TestErrorHandlers {
      */
 
     function test_step5_DepositAndMintEigenAgentScript() public {
-
+        vm.skip(skip_scripts_tests);
         DepositAndMintEigenAgentScript depositAndMintEigenAgentScript =
             new DepositAndMintEigenAgentScript();
 
@@ -41,7 +42,7 @@ contract ScriptsTests_Deposits_Withdrawals is Test, TestErrorHandlers {
     }
 
     function test_step5b_DepositIntoStrategyScript() public {
-
+        vm.skip(skip_scripts_tests);
         DepositIntoStrategyScript depositIntoStrategyScript = new DepositIntoStrategyScript();
 
         try depositIntoStrategyScript.mockrun() {
@@ -52,7 +53,7 @@ contract ScriptsTests_Deposits_Withdrawals is Test, TestErrorHandlers {
     }
 
     function test_step5c_MintEigenAgent() public {
-
+        vm.skip(skip_scripts_tests);
         MintEigenAgentScript mintEigenAgentScript = new MintEigenAgentScript();
         uint256 mockKey = (vm.randomUint() / 2) + 1;
         // vm.assume(mockKey < type(uint256).max / 2);
@@ -70,7 +71,7 @@ contract ScriptsTests_Deposits_Withdrawals is Test, TestErrorHandlers {
     }
 
     function test_step5d_CheckMintEigenAgentGasCosts() public {
-
+        vm.skip(skip_scripts_tests);
         CheckMintEigenAgentGasCostsScript checkMintEigenAgentGasCostsScript
             = new CheckMintEigenAgentGasCostsScript();
 
@@ -86,7 +87,7 @@ contract ScriptsTests_Deposits_Withdrawals is Test, TestErrorHandlers {
     }
 
     function test_step7_QueueWithdrawalScript() public {
-
+        vm.skip(skip_scripts_tests);
         QueueWithdrawalScript queueWithdrawalScript = new QueueWithdrawalScript();
         // Writes new json files: withdrawalRoots, so use mockrun()
         try queueWithdrawalScript.mockrun() {
@@ -106,7 +107,7 @@ contract ScriptsTests_Deposits_Withdrawals is Test, TestErrorHandlers {
     }
 
     function test_step8_CompleteWithdrawalScript() public {
-
+        vm.skip(skip_scripts_tests);
         CompleteWithdrawalScript completeWithdrawalScript = new CompleteWithdrawalScript();
         // Note: requires step7 to be run first so that:
         // script/withdrawals-queued/<eigen-agent-address>/run-latest.json exists

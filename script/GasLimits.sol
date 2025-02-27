@@ -3,8 +3,8 @@ pragma solidity 0.8.25;
 
 contract GasLimits {
     function getGasLimits() public pure returns (
-        uint256[] memory,
-        bytes4[] memory
+        bytes4[] memory,
+        uint256[] memory
     ) {
         // set GasLimits
         uint256[] memory gasLimits = new uint256[](7);
@@ -33,6 +33,6 @@ contract GasLimits {
         functionSelectors[6] = 0x3ccc861d;
         // cast sig "processClaim((uint32,uint32,bytes,(address,bytes32),uint32[],bytes[],(address,uint256)[]), address)" == 0x3ccc861d
 
-        return (gasLimits, functionSelectors);
+        return (functionSelectors, gasLimits);
     }
 }
