@@ -369,6 +369,45 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         }
     }
 
+    function test_BaseMessenger_L2_RefundsExcessGasFees() public {
+
+        // L2 Sender
+        vm.selectFork(l2ForkId);
+
+        uint256 _amount = 0 ether;
+        uint256 _gasLimit = 800_000;
+
+        vm.deal(deployer, 1 ether);
+        vm.startBroadcast(deployerKey);
+        {
+            uint256 balanceBefore = address(deployer).balance;
+            uint256 fees = 1 ether;
+            uint256 feesExpected = getRouterFeesL2(
+                address(receiverContract), // _receiver,
+                string(message),
+                address(tokenL2),
+                _amount,
+                _gasLimit
+            );
+            require(fees > feesExpected, "Fees should be greater than expected");
+
+            tokenL2.approve(address(senderContract), _amount);
+
+            senderContract.sendMessagePayNative{value: fees}(
+                EthSepolia.ChainSelector, // _destinationChainSelector,
+                address(receiverContract), // _receiver,
+                string(message),
+                address(tokenL2),
+                _amount,
+                _gasLimit
+            );
+
+            uint256 balanceAfter = address(deployer).balance;
+            uint256 expectedBalance = balanceBefore - feesExpected;
+            require(balanceAfter == expectedBalance, "Did not refund excess ETH");
+        }
+    }
+
     function test_BaseMessenger_L1_onlyAllowlistedSourceChain() public {
 
         // L1 Receiver
@@ -704,4 +743,5 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             );
         }
     }
+
 }

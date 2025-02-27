@@ -51,6 +51,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     error SenderNotAllowed(address sender);
     error InvalidReceiverAddress();
     error NotEnoughEthGasFees(uint256 setGasFees, uint256 requiredGasFees);
+    error FailedToRefundExcessEth(address sender, uint256 refundAmount);
 
     constructor(address _router) CCIPReceiver(_router) { }
 
@@ -144,8 +145,19 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
         if (msg.sender != address(this)) {
             // user sends ETH to the router
-            if (fees > msg.value)
+            if (fees > msg.value) {
+                // User sent too little gas, revert.
                 revert NotEnoughEthGasFees(msg.value, fees);
+            } else if (msg.value > fees) {
+                // User sent too much gas, refund the excess.
+                uint256 refundAmount = msg.value - fees;
+                (bool success, ) = msg.sender.call{value: refundAmount}("");
+                if (!success) {
+                    revert FailedToRefundExcessEth(msg.sender, refundAmount);
+                }
+            } else {
+                // Do nothing. User sent just the right amount of gas.
+            }
         } else {
             // when contract initiates refund, or transfers withdrawals back to L1
             if (fees > address(this).balance)

@@ -10,7 +10,7 @@ import {SenderHooks} from "../src/SenderHooks.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
-
+import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 
 contract UnitTests_SenderCCIP is BaseTestEnvironment {
