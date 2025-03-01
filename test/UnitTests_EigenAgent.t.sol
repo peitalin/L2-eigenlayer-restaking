@@ -701,7 +701,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
         address precalculated_eigenAgentAddress0 = agentFactory.predictEigenAgentAddress(
             bob,
-            tokenId2
+            0
         );
 
         assertEq(precalculated_eigenAgentAddress0 , address(eigenAgent));

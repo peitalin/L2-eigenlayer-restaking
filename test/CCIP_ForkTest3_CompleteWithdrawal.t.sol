@@ -84,7 +84,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         /// EigenAgentBob is spawned later and passed the deposit message
         address precalculated_eigenAgentBobAddress = agentFactory.predictEigenAgentAddress(
             bob,
-            1 // tokenId is non-deterministic when doing cross-chain tx
+            0 // userTokenIdNonce starts at 0
         );
 
         bytes memory messageWithSignature_D;
@@ -115,7 +115,8 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
 
         vm.selectFork(ethForkId);
         {
-            vm.expectEmit(true, false, true, false); // don't check topic[2] EigenAgent address
+
+            vm.expectEmit(true, true, false, false); // check topic[2] EigenAgent address
             emit AgentFactory.AgentCreated(bob, precalculated_eigenAgentBobAddress, 1);
             receiverContract.mockCCIPReceive(
                 Client.Any2EVMMessage({

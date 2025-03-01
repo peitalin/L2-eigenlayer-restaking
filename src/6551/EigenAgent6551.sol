@@ -9,7 +9,6 @@ import {SafeERC20} from "@openzeppelin-v5-contracts/token/ERC20/utils/SafeERC20.
 
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
 
-import {console} from "forge-std/Script.sol";
 
 
 contract EigenAgent6551 is ERC6551 {
@@ -214,7 +213,6 @@ contract EigenAgent6551 is ERC6551 {
     function domainSeparator(
         uint256 chainid
     ) public view returns (bytes32) {
-        console.log(">>>>> address(this): ", address(this));
         return keccak256(abi.encode(
             DOMAIN_TYPEHASH,
             keccak256(bytes("EigenLayer")),

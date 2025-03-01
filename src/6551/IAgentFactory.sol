@@ -42,6 +42,6 @@ interface IAgentFactory is IAdminable {
 
     function predictEigenAgentAddress(
         address user,
-        uint256 tokenId
+        uint256 userTokenIdNonce
     ) external view returns (address);
 }
