@@ -94,8 +94,7 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
                 ccipMessage.messageId,
                 ccipMessage.sourceChainSelector,
                 address(deployer),
-                destTokenAmounts[0].token,
-                destTokenAmounts[0].amount
+                destTokenAmounts
             );
             vm.expectEmit(true, true, true, true);
             emit SenderCCIP.MatchedReceivedFunctionSelector(randomFunctionSelector);
@@ -124,6 +123,7 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
                 destTokenAmounts: destTokenAmounts
             });
 
+            Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
             // event MessageReceived(
             //     bytes32 indexed messageId,
             //     uint64 indexed sourceChainSelector,
@@ -136,8 +136,7 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
                 ccipMessage.messageId,
                 ccipMessage.sourceChainSelector,
                 address(deployer),
-                address(0),
-                0
+                tokenAmounts
             );
             vm.expectEmit(true, true, true, true);
             emit SenderCCIP.MatchedReceivedFunctionSelector(randomFunctionSelector);
@@ -148,5 +147,7 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
         }
         vm.stopBroadcast();
     }
+
+
 
 }

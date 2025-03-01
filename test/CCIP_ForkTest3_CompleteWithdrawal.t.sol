@@ -280,6 +280,12 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             IDelegationManager.completeQueuedWithdrawal.selector
         );
 
+        Client.EVMTokenAmount[] memory tokenAmounts1 = new Client.EVMTokenAmount[](1);
+        tokenAmounts1[0] = Client.EVMTokenAmount({
+            token: address(tokenL2),
+            amount: 0 ether
+        });
+
         vm.expectEmit(true, false, true, false);
         emit WithdrawalTransferRootCommitted(
             withdrawalTransferRoot,
@@ -289,16 +295,14 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             value: getRouterFeesL2(
                 address(receiverContract),
                 string(messageWithSignature_CW),
-                address(tokenL2),
-                0 ether,
+                tokenAmounts1,
                 gasLimit
             )
         }(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_CW),
-            address(tokenL2), // destination token
-            0, // not sending tokens, just message
+            tokenAmounts1,
             0 // use default gasLimit for this function
         );
 
@@ -399,6 +403,11 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         /////////////////////////////////////////////////////////////////
         //// Test Attempts to re-use WithdrawalAgentOwnerRoots
         /////////////////////////////////////////////////////////////////
+        Client.EVMTokenAmount[] memory tokenAmounts2 = new Client.EVMTokenAmount[](1);
+        tokenAmounts2[0] = Client.EVMTokenAmount({
+            token: address(BaseSepolia.BridgeToken),
+            amount: 0 ether
+        });
 
         // attempting to commit a spent withdrawalTransferRoot should fail on L2
         vm.expectRevert("SenderHooks._commitWithdrawalTransferRootInfo: TransferRoot already used");
@@ -406,8 +415,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_CW),
-            address(BaseSepolia.BridgeToken), // destination token
-            0, // not sending tokens, just message
+            tokenAmounts2,
             0 // use default gasLimit for this function
         );
 

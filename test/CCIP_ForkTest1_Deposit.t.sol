@@ -172,14 +172,18 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         vm.warp(block.timestamp + 3666); // 1 hour, 1 min, 6 seconds
         vm.roll((block.timestamp + 3666) / 12); // 305 blocks on ETH
 
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1),
+            amount: amount
+        });
 
         vm.expectEmit(false, true, true, false);
         emit BaseMessengerCCIP.MessageSent(
             bytes32(0x0), // messageId
             BaseSepolia.ChainSelector, // destination chain
             bob, // receiver
-            address(tokenL1),
-            amount, // amount of tokens to send
+            tokenAmounts,
             address(0), // 0 for native gas
             0 // fees
         );
@@ -322,12 +326,16 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
 
         vm.selectFork(ethForkId);
         RouterFees routerFeesL1 = new RouterFees();
+        Client.EVMTokenAmount[] memory tokenAmountsL1 = new Client.EVMTokenAmount[](1);
+        tokenAmountsL1[0] = Client.EVMTokenAmount({
+            token: address(EthSepolia.BridgeToken),
+            amount: 0.1 ether
+        });
 
         uint256 fees1 = routerFeesL1.getRouterFeesL1(
             address(receiverContract), // receiver
             string("some random message"), // message
-            address(EthSepolia.BridgeToken), // tokenL1
-            0.1 ether, // amount
+            tokenAmountsL1,
             0 // gasLimit
         );
 
@@ -335,12 +343,16 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
 
         vm.selectFork(l2ForkId);
         RouterFees routerFeesL2 = new RouterFees();
+        Client.EVMTokenAmount[] memory tokenAmountsL2 = new Client.EVMTokenAmount[](1);
+        tokenAmountsL2[0] = Client.EVMTokenAmount({
+            token: address(BaseSepolia.BridgeToken),
+            amount: 0.1 ether
+        });
 
         uint256 fees2 = routerFeesL2.getRouterFeesL2(
             address(senderContract), // receiver
             string("some random message"), // message
-            address(BaseSepolia.BridgeToken), // tokenL1
-            0.1 ether, // amount
+            tokenAmountsL2,
             0 // gasLimit
         );
 

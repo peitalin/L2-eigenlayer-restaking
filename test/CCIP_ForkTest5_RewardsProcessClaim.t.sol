@@ -326,11 +326,16 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         ///////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL2),
+            amount: 0 ether
+        });
+
         routerFees = getRouterFeesL2(
             address(receiverContract),
             string(messageWithSignature_PC),
-            address(tokenL2),
-            0 ether,
+            tokenAmounts,
             senderHooks.getGasLimitForFunctionSelector(IRewardsCoordinator.processClaim.selector)
             // gasLimit
         );
@@ -344,8 +349,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_PC),
-            address(tokenL2), // destination token
-            0, // not sending tokens, just message
+            tokenAmounts,
             0 // use default gasLimit for this function
         );
 
@@ -450,8 +454,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         uint256 routerFees2 = getRouterFeesL2(
             address(receiverContract),
             string(messageWithSignature_PC),
-            address(tokenL2),
-            0 ether,
+            destTokenAmountsL2,
             senderHooks.getGasLimitForFunctionSelector(IRewardsCoordinator.processClaim.selector)
         );
         // attempting to re-commit a spent claim should fail on L2
@@ -460,8 +463,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_PC),
-            address(tokenL2), // destination token
-            0, // not sending tokens, just message
+            destTokenAmountsL2,
             0 // use default gasLimit for this function
         );
 

@@ -2,6 +2,7 @@
 pragma solidity 0.8.25;
 
 import {console} from "forge-std/Test.sol";
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 
@@ -93,11 +94,16 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         uint256 gasLimit = 730_000;
         // Note: must set gasLimit for deposit + mint EigenAgent: [gas: 724,221]
 
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL2),
+            amount: amount
+        });
+
         uint256 routerFees = getRouterFeesL2(
             address(receiverContract),
             string(messageWithSignature),
-            address(tokenL2),
-            amount,
+            tokenAmounts,
             gasLimit
         );
         console.log("Router fees:", routerFees);
@@ -110,8 +116,7 @@ contract DepositAndMintEigenAgentScript is BaseScript {
                 EthSepolia.ChainSelector, // destination chain
                 address(receiverContract),
                 string(messageWithSignature),
-                address(tokenL2),
-                amount,
+                tokenAmounts,
                 gasLimit // use default gasLimit if 0
             );
         }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 
@@ -110,14 +111,19 @@ contract RedepositScript is BaseScript {
                 sigExpiry
             );
 
+            Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+            tokenAmounts[0] = Client.EVMTokenAmount({
+                token: address(tokenL2),
+                amount: amount
+            });
+
             uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
                 IDelegationManager.completeQueuedWithdrawal.selector
             );
             uint256 routerFees = getRouterFeesL2(
                 address(receiverContract),
                 string(messageWithSignature),
-                address(tokenL2),
-                0, // not bridging, just sending message
+                tokenAmounts,
                 gasLimit
             );
 
@@ -127,8 +133,7 @@ contract RedepositScript is BaseScript {
                 EthSepolia.ChainSelector, // destination chain
                 address(receiverContract),
                 string(messageWithSignature),
-                address(tokenL2),
-                amount,
+                tokenAmounts,
                 0 // use default gasLimit for this function
             );
 

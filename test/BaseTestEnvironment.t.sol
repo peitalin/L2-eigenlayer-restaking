@@ -193,6 +193,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
             IERC20_CCIPBnM(address(tokenL1)).drip(address(restakingConnector));
             IERC20_CCIPBnM(address(tokenL1)).drip(address(deployer));
+            IERC20_CCIPBnM(address(tokenL1)).drip(address(deployer));
         }
         vm.stopBroadcast();
 
@@ -210,6 +211,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             senderContract.allowlistSender(deployer, true);
 
             IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(senderContract));
+            IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(deployer));
             IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(deployer));
         }
         vm.stopBroadcast();
