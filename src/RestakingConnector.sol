@@ -26,9 +26,11 @@ contract RestakingConnector is
     RestakingConnectorStorage
 {
 
-    event SendingRewardsToAgentOwnerOnL1(address indexed, address indexed, uint256 indexed);
     event SetQueueWithdrawalBlock(address indexed, uint256 indexed, uint256 indexed);
     event SetUndelegateBlock(address indexed, uint256 indexed, uint256 indexed);
+    event UnsupportedFunctionCall(bytes4 functionSelector indexed);
+    event SendingRewardsToAgentOwnerOnL1(address indexed, address indexed, uint256 indexed);
+    event SendingWithdrawalToAgentOwnerOnL1(address indexed, address indexed, uint256 indexed);
 
     constructor() {
         _disableInitializers();
@@ -123,8 +125,11 @@ contract RestakingConnector is
         } else if (functionSelector == IRewardsCoordinator.processClaim.selector) {
             /// processClaim (Rewards) - 0x3ccc861d
             transferTokensInfo = _processClaimWithEigenAgent(message);
+
+        } else {
+            revert IRestakingConnector.UnsupportedFunctionCall(functionSelector);
+            // Should not reach this state with bridged funds, as SenderCCIP only sends funds for deposits.
         }
-        // Should not reach this state with bridged funds, as SenderCCIP only sends funds for deposits.
     }
 
     /**
@@ -377,6 +382,11 @@ contract RestakingConnector is
                         agentOwner, // AgentOwner
                         balanceDiffsAmountsToBridge[i]
                     );
+                    emit SendingWithdrawalToAgentOwnerOnL1(
+                        vars.tokensToWithdraw[i],
+                        agentOwner,
+                        balanceDiffsAmountsToBridge[i]
+                    );
 
                 } else {
 
@@ -546,7 +556,6 @@ contract RestakingConnector is
             if (tokenL2 == address(0)) {
                 // (2) If the token cannot be bridged to L2, transfer to AgentOwner on L1.
                 IERC20(rewardsToken).transferFrom(address(eigenAgent), agentOwner, rewardsAmount);
-                // AgentOwner is signer of the message
                 emit SendingRewardsToAgentOwnerOnL1(rewardsToken, agentOwner, rewardsAmount);
 
             } else {

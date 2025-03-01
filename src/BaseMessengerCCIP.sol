@@ -41,6 +41,10 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         Client.EVMTokenAmount[] tokenAmounts
     );
 
+    event AllowlistDestinationChain(uint64 indexed destinationChainSelector, bool allowed);
+    event AllowlistSourceChain(uint64 indexed sourceChainSelector, bool allowed);
+    event AllowlistSender(address indexed sender, bool allowed);
+
     error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees);
     error WithdrawalExceedsBalance(uint256 amount, uint256 currentBalance);
     error FailedToWithdrawEth(address owner, address target, uint256 value);
@@ -119,6 +123,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         bool allowed
     ) external onlyOwner {
         allowlistedDestinationChains[_destinationChainSelector] = allowed;
+        emit AllowlistDestinationChain(_destinationChainSelector, allowed);
     }
 
     /// @param _sourceChainSelector The selector of the source chain to be updated.
@@ -128,12 +133,14 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         bool allowed
     ) external onlyOwner {
         allowlistedSourceChains[_sourceChainSelector] = allowed;
+        emit AllowlistSourceChain(_sourceChainSelector, allowed);
     }
 
     /// @param _sender address of the sender to be updated.
     /// @param allowed allowlist status to be set for the sender.
     function allowlistSender(address _sender, bool allowed) external onlyOwner {
         allowlistedSenders[_sender] = allowed;
+        emit AllowlistSender(_sender, allowed);
     }
 
     /// TODO: do a multi-token version of sendMessagePayNative

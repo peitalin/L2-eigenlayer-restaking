@@ -35,6 +35,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
     function setSenderHooks(ISenderHooks _senderHooks) external onlyOwner {
         require(address(_senderHooks) != address(0), "_senderHooks cannot be address(0)");
         senderHooks = _senderHooks;
+        emit SetSenderHooks(_senderHooks);
     }
 
     /**

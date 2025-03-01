@@ -44,6 +44,10 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         address signer
     );
 
+    event SetSenderCCIP(address indexed);
+    event SetBridgeTokens(address indexed, address indexed);
+    event ClearBridgeTokens(address indexed);
+
     error AddressZero(string msg);
     error OnlySendFundsForDeposits(bytes4 functionSelector, string msg);
     error OnlyDepositOneTokenAtATime(string msg);
@@ -83,6 +87,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             revert AddressZero("SenderCCIP cannot be address(0)");
 
         _senderCCIP = newSenderCCIP;
+        emit SetSenderCCIP(newSenderCCIP);
     }
 
     /**
@@ -136,6 +141,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             revert AddressZero("_bridgeTokenL2 cannot be address(0)");
 
         bridgeTokensL1toL2[_bridgeTokenL1] = _bridgeTokenL2;
+        emit SetBridgeTokens(_bridgeTokenL1, _bridgeTokenL2);
     }
 
     /**
@@ -144,6 +150,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      */
     function clearBridgeTokens(address _bridgeTokenL1) external onlyOwner {
         delete bridgeTokensL1toL2[_bridgeTokenL1];
+        emit ClearBridgeTokens(_bridgeTokenL1);
     }
 
     /*

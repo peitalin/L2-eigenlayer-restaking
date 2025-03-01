@@ -11,7 +11,6 @@ import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
-import {BaseSepolia} from "../script/Addresses.sol";
 
 
 /// @title ETH L1 Messenger Contract: receives messages from L2 and processes them
@@ -167,7 +166,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             if (transferTokensInfo.transferRoot != bytes32(0)) {
                 // If transferRoot is returned, bridge to L2 then SenderCCIP transfers tokens to AgentOwner.
                 this.sendMessagePayNative(
-                    BaseSepolia.ChainSelector, // destination chain (send back to L2)
+                    any2EvmMessage.sourceChainSelector, // source chain is destination chain (send back to L2)
                     senderContractL2,
                     transferTokensInfo.transferToAgentOwnerMessage,
                     transferTokensInfo.tokenAmounts,
@@ -300,7 +299,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         if (block.timestamp > expiry) {
             // If message has expired, trigger CCIP call to bridge funds back to L2 signer
             this.sendMessagePayNative(
-                BaseSepolia.ChainSelector, // destination chain
+                any2EvmMessage.sourceChainSelector, // source chain is destination chain (send back to L2)
                 signer, // receiver on L2
                 string.concat(errStr, ": refunding to L2 signer"),
                 tokenAmounts,
