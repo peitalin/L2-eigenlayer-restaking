@@ -35,6 +35,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
     function setSenderHooks(ISenderHooks _senderHooks) external onlyOwner {
         require(address(_senderHooks) != address(0), "_senderHooks cannot be address(0)");
         senderHooks = _senderHooks;
+        emit SetSenderHooks(_senderHooks);
     }
 
     /**
@@ -52,25 +53,12 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
             abi.decode(any2EvmMessage.sender, (address))
         )
     {
-        if (any2EvmMessage.destTokenAmounts.length == 0) {
-            emit MessageReceived(
-                any2EvmMessage.messageId,
-                any2EvmMessage.sourceChainSelector,
-                abi.decode(any2EvmMessage.sender, (address)),
-                address(0),
-                0
-            );
-        } else {
-            for (uint32 i = 0; i < any2EvmMessage.destTokenAmounts.length; ++i) {
-                emit MessageReceived(
-                    any2EvmMessage.messageId,
-                    any2EvmMessage.sourceChainSelector,
-                    abi.decode(any2EvmMessage.sender, (address)),
-                    any2EvmMessage.destTokenAmounts[i].token,
-                    any2EvmMessage.destTokenAmounts[i].amount
-                );
-            }
-        }
+        emit MessageReceived(
+            any2EvmMessage.messageId,
+            any2EvmMessage.sourceChainSelector,
+            abi.decode(any2EvmMessage.sender, (address)),
+            any2EvmMessage.destTokenAmounts
+        );
 
         _afterCCIPReceiveMessage(any2EvmMessage);
     }
@@ -84,26 +72,24 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
     function _afterCCIPReceiveMessage(Client.Any2EVMMessage memory any2EvmMessage) internal {
 
         bytes memory message = any2EvmMessage.data;
+        Client.EVMTokenAmount[] memory destTokenAmounts = any2EvmMessage.destTokenAmounts;
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
+        // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
         if (functionSelector == ISenderHooks.handleTransferToAgentOwner.selector) {
-            // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
+            // Trust chainlink CCIP to not have modified the message
+            address agentOwner = senderHooks.handleTransferToAgentOwner(message);
 
-            ISenderHooks.FundsTransfer[] memory fundsTransfersArray =
-                senderHooks.handleTransferToAgentOwner(message);
-
-            for (uint k = 0; k < fundsTransfersArray.length; ++k) {
-                if (fundsTransfersArray[k].agentOwner != address(0)) {
-
+            for (uint k = 0; k < destTokenAmounts.length; ++k) {
+                if (destTokenAmounts[k].amount > 0) {
                     emit SendingFundsToAgentOwner(
-                        fundsTransfersArray[k].agentOwner,
-                        fundsTransfersArray[k].amount
+                        agentOwner,
+                        destTokenAmounts[k].amount
                     );
-
                     // agentOwner is the signer, first committed when sending completeWithdrawal
-                    IERC20(fundsTransfersArray[k].tokenL2).transfer(
-                        fundsTransfersArray[k].agentOwner,
-                        fundsTransfersArray[k].amount
+                    IERC20(destTokenAmounts[k].token).transfer(
+                        agentOwner,
+                        destTokenAmounts[k].amount
                     );
                 }
             }
@@ -117,8 +103,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
      * @dev This function is called when sending a message.
      * @param _receiver The address of the receiver.
      * @param _text The string data to be sent.
-     * @param _token The token to be transferred.
-     * @param _amount The amount of the token to be transferred.
+     * @param _tokenAmounts array of EVMTokenAmount structs (token and amount).
      * @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
      * @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
      * @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
@@ -126,28 +111,14 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
     function _buildCCIPMessage(
         address _receiver,
         string calldata _text,
-        address _token,
-        uint256 _amount,
+        Client.EVMTokenAmount[] memory _tokenAmounts,
         address _feeTokenAddress,
         uint256 _overrideGasLimit
-    ) internal override returns (Client.EVM2AnyMessage memory) {
-
-        Client.EVMTokenAmount[] memory tokenAmounts;
-        if (_amount <= 0) {
-            // Must be an empty array as no tokens are transferred
-            // non-empty arrays with 0 amounts error with CannotSendZeroTokens() == 0x5cf04449
-            tokenAmounts = new Client.EVMTokenAmount[](0);
-        } else {
-            tokenAmounts = new Client.EVMTokenAmount[](1);
-            tokenAmounts[0] = Client.EVMTokenAmount({
-                token: _token,
-                amount: _amount
-            });
-        }
+    ) cannotSendZeroTokens(_tokenAmounts) internal override  returns (Client.EVM2AnyMessage memory) {
 
         bytes memory message = abi.encode(_text);
 
-        uint256 gasLimit = senderHooks.beforeSendCCIPMessage(message, _amount);
+        uint256 gasLimit = senderHooks.beforeSendCCIPMessage(message, _tokenAmounts);
 
         if (_overrideGasLimit > 0) {
             gasLimit = _overrideGasLimit;
@@ -157,7 +128,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
             Client.EVM2AnyMessage({
                 receiver: abi.encode(_receiver),
                 data: message,
-                tokenAmounts: tokenAmounts,
+                tokenAmounts: _tokenAmounts,
                 feeToken: _feeTokenAddress,
                 extraArgs: Client._argsToBytes(
                     Client.EVMExtraArgsV1({ gasLimit: gasLimit })

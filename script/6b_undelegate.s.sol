@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 
@@ -20,6 +21,8 @@ contract UndelegateScript is BaseScript {
 
     uint256 deployerKey;
     address deployer;
+    uint256 operatorKey;
+    address operator;
 
     function run() public {
         return _run(false);
@@ -35,8 +38,8 @@ contract UndelegateScript is BaseScript {
         deployer = vm.addr(deployerKey);
         readContractsAndSetupEnvironment(isTest, deployer);
 
-        uint256 operatorKey = vm.envUint("OPERATOR_KEY");
-        address operator = vm.addr(operatorKey);
+        operatorKey = vm.envUint("OPERATOR_KEY");
+        operator = vm.addr(operatorKey);
         address TARGET_CONTRACT = address(delegationManager);
 
         vm.selectFork(ethForkId);
@@ -86,38 +89,44 @@ contract UndelegateScript is BaseScript {
         vm.selectFork(l2ForkId);
 
         // Encode undelegate message, and append user signature for EigenAgent execution
-        bytes memory messageWithSignature_UD = signMessageForEigenAgentExecution(
-            deployerKey,
-            address(eigenAgent),
-            EthSepolia.ChainId, // destination chainid where EigenAgent lives
-            TARGET_CONTRACT, // DelegationManager.delegateTo()
-            encodeUndelegateMsg(address(eigenAgent)),
-            execNonce,
-            sigExpiry
-        );
+        {
+            bytes memory messageWithSignature_UD = signMessageForEigenAgentExecution(
+                deployerKey,
+                address(eigenAgent),
+                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                TARGET_CONTRACT, // DelegationManager.delegateTo()
+                encodeUndelegateMsg(address(eigenAgent)),
+                execNonce,
+                sigExpiry
+            );
 
-        uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
-            IDelegationManager.undelegate.selector
-        );
-        uint256 routerFees = getRouterFeesL2(
-            address(receiverContract),
-            string(messageWithSignature_UD),
-            address(tokenL2),
-            0, // not bridging, just sending message
-            gasLimit
-        );
+            Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+            tokenAmounts[0] = Client.EVMTokenAmount({
+                token: address(tokenL2),
+                amount: 0 ether
+            });
 
-        vm.startBroadcast(deployerKey);
+            uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
+                IDelegationManager.undelegate.selector
+            );
+            uint256 routerFees = getRouterFeesL2(
+                address(receiverContract),
+                string(messageWithSignature_UD),
+                tokenAmounts,
+                gasLimit
+            );
 
-        senderContract.sendMessagePayNative{value: routerFees}(
-            EthSepolia.ChainSelector, // destination chain
-            address(receiverContract),
-            string(messageWithSignature_UD),
-            address(tokenL2),
-            0, // not bridging, just sending message
-            gasLimit
-        );
+            vm.startBroadcast(deployerKey);
 
+            senderContract.sendMessagePayNative{value: routerFees}(
+                EthSepolia.ChainSelector, // destination chain
+                address(receiverContract),
+                string(messageWithSignature_UD),
+                tokenAmounts,
+                gasLimit
+            );
+
+        }
         vm.stopBroadcast();
 
         /////////////////////////////////////////////////////////////////

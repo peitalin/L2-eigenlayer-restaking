@@ -10,7 +10,6 @@ import {IAgentFactory} from "./IAgentFactory.sol";
 
 
 contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Adminable {
-    error AlreadyHasAgent(address owner);
 
     uint256 private _tokenIdCounter;
     IAgentFactory public agentFactory;
@@ -19,6 +18,11 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
 
     /// Keeps track of user mintNonces for deterministic EigenAgent creation
     mapping(address user => uint256 mintNonce) public userMintNonces;
+
+    event AddToWhitelistedCallers(address indexed caller);
+    event RemoveFromWhitelistedCallers(address indexed caller);
+
+    error AlreadyHasAgent(address owner);
 
     constructor() {
         _disableInitializers();
@@ -46,6 +50,7 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
     function setAgentFactory(IAgentFactory _agentFactory) external onlyAdminOrOwner {
         require(address(_agentFactory) != address(0), "AgentFactory cannot be address(0)");
         agentFactory = _agentFactory;
+        emit SetAgentFactory(_agentFactory);
     }
 
     /**
@@ -57,11 +62,13 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
      */
     function addToWhitelistedCallers(address caller) external onlyAdminOrOwner {
         whitelistedCallers[caller] = true;
+        emit AddToWhitelistedCallers(caller);
     }
 
     /// @param caller is the contract to remove from whitelist.
     function removeFromWhitelistedCallers(address caller) external onlyAdminOrOwner {
         whitelistedCallers[caller] = false;
+        emit RemoveFromWhitelistedCallers(caller);
     }
 
     function isWhitelistedCaller(address caller) external view returns (bool) {
@@ -80,6 +87,7 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
         // _setTokenURI(tokenId, string(abi.encodePacked("eigen-agent/", Strings.toString(tokenId), ".json")));
         return tokenId;
     }
+
 
     /**
      * @dev Update EigenAgentOwner721 NFT owner whenever a NFT transfer occurs.

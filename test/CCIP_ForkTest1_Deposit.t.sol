@@ -3,6 +3,7 @@ pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
@@ -11,6 +12,7 @@ import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {RouterFees} from "../script/RouterFees.sol";
+import {console} from "forge-std/console.sol";
 
 
 
@@ -183,14 +185,12 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             bytes32(0x0), // messageId
             BaseSepolia.ChainSelector, // destination chain
             bob, // receiver
-            address(tokenL1),
-            amount, // amount of tokens to send
+            destTokenAmounts,
             address(0), // 0 for native gas
             0 // fees
         );
         vm.expectEmit(true, true, true, false);
         emit ReceiverCCIP.RefundingDeposit(bob, address(tokenL1), amount);
-
         receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 
@@ -335,12 +335,16 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
 
         vm.selectFork(ethForkId);
         RouterFees routerFeesL1 = new RouterFees();
+        Client.EVMTokenAmount[] memory tokenAmountsL1 = new Client.EVMTokenAmount[](1);
+        tokenAmountsL1[0] = Client.EVMTokenAmount({
+            token: address(EthSepolia.BridgeToken),
+            amount: 0.1 ether
+        });
 
         uint256 fees1 = routerFeesL1.getRouterFeesL1(
             address(receiverContract), // receiver
             string("some random message"), // message
-            address(EthSepolia.BridgeToken), // tokenL1
-            0.1 ether, // amount
+            tokenAmountsL1,
             0 // gasLimit
         );
 
@@ -348,12 +352,16 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
 
         vm.selectFork(l2ForkId);
         RouterFees routerFeesL2 = new RouterFees();
+        Client.EVMTokenAmount[] memory tokenAmountsL2 = new Client.EVMTokenAmount[](1);
+        tokenAmountsL2[0] = Client.EVMTokenAmount({
+            token: address(BaseSepolia.BridgeToken),
+            amount: 0.1 ether
+        });
 
         uint256 fees2 = routerFeesL2.getRouterFeesL2(
             address(senderContract), // receiver
             string("some random message"), // message
-            address(BaseSepolia.BridgeToken), // tokenL1
-            0.1 ether, // amount
+            tokenAmountsL2,
             0 // gasLimit
         );
 

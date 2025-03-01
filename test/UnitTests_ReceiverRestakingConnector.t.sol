@@ -568,11 +568,11 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         );
 
         // Return default gasLimit of 400_000 for undefined function selectors
-        vm.assertEq(restakingConnector.getGasLimitForFunctionSelector(0xffeeaabb), 200_000);
+        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(0xffeeaabb), 200_000);
 
         // gas limits should be set
-        vm.assertEq(restakingConnector.getGasLimitForFunctionSelector(functionSelectors[0]), 1_000_000);
-        vm.assertEq(restakingConnector.getGasLimitForFunctionSelector(functionSelectors[1]), 800_000);
+        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(functionSelectors[0]), 1_000_000);
+        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(functionSelectors[1]), 800_000);
 
         vm.stopBroadcast();
     }

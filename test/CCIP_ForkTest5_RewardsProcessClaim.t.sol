@@ -12,6 +12,7 @@ import {ERC20Minter} from "./mocks/ERC20Minter.sol";
 
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {Merkle} from "@eigenlayer-contracts/libraries/Merkle.sol";
+import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
@@ -25,12 +26,6 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
     event RewardsTransferRootCommitted(
         bytes32 indexed rewardsTransferRoot,
         address signer
-    );
-
-    event BridgingRewardsToL2(
-        bytes32 indexed rewardsTransferRoot,
-        address indexed rewardToken,
-        uint256 indexed rewardAmount
     );
 
     event SendingFundsToAgentOwner(address indexed, uint256 indexed);
@@ -133,7 +128,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
                 rewardsCoordinator.calculateTokenLeafHash(
                     IRewardsCoordinator.TokenTreeMerkleLeaf({
                         token: memecoin,
-                        cumulativeEarnings: amounts[i]
+                        cumulativeEarnings: amounts[i] * 2
                     })
                 )
             ));
@@ -189,7 +184,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         });
 		tokenLeaves[1] = IRewardsCoordinator.TokenTreeMerkleLeaf({
             token: memecoin,
-            cumulativeEarnings: amount
+            cumulativeEarnings: amount * 2
         });
 
         bytes32 leaf1 = rewardsCoordinator.calculateTokenLeafHash(tokenLeaves[0]);
@@ -304,7 +299,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         expiry = block.timestamp + 1 hours;
 
         // sign the message for EigenAgent to execute Eigenlayer command
-        bytes memory messageWithSignature_PC = signMessageForEigenAgentExecution(
+        bytes memory messageWithSignature_ProcessClaim = signMessageForEigenAgentExecution(
             deployerKey,
             address(eigenAgent),
             EthSepolia.ChainId, // destination chainid where EigenAgent lives
@@ -327,11 +322,12 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         ///////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
+
         routerFees = getRouterFeesL2(
             address(receiverContract),
-            string(messageWithSignature_PC),
-            address(tokenL2),
-            0 ether,
+            string(messageWithSignature_ProcessClaim),
+            tokenAmounts,
             senderHooks.getGasLimitForFunctionSelector(IRewardsCoordinator.processClaim.selector)
             // gasLimit
         );
@@ -344,9 +340,8 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         senderContract.sendMessagePayNative{value: routerFees}(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
-            string(messageWithSignature_PC),
-            address(tokenL2), // destination token
-            0, // not sending tokens, just message
+            string(messageWithSignature_ProcessClaim),
+            tokenAmounts,
             0 // use default gasLimit for this function
         );
 
@@ -384,8 +379,14 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
             rewardsAmount
         );
 
+        Client.EVMTokenAmount[] memory rewardsTokenAmounts = new Client.EVMTokenAmount[](1);
+        rewardsTokenAmounts[0] = Client.EVMTokenAmount({
+            token: rewardsToken,
+            amount: rewardsAmount
+        });
+
         vm.expectEmit(true, true, true, false);
-        emit BridgingRewardsToL2(rewardsTransferRoot, rewardsToken, rewardsAmount);
+        emit ReceiverCCIP.BridgingRewardsToL2(rewardsTransferRoot, rewardsTokenAmounts);
 
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
@@ -393,7 +394,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
                 sourceChainSelector: BaseSepolia.ChainSelector,
                 sender: abi.encode(deployer),
                 data: abi.encode(string(
-                    messageWithSignature_PC
+                    messageWithSignature_ProcessClaim
                 )),
                 destTokenAmounts: new Client.EVMTokenAmount[](0)
             })
@@ -450,9 +451,8 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
 
         uint256 routerFees2 = getRouterFeesL2(
             address(receiverContract),
-            string(messageWithSignature_PC),
-            address(tokenL2),
-            0 ether,
+            string(messageWithSignature_ProcessClaim),
+            new Client.EVMTokenAmount[](0), // empty array
             senderHooks.getGasLimitForFunctionSelector(IRewardsCoordinator.processClaim.selector)
         );
         // attempting to re-commit a spent claim should fail on L2
@@ -460,9 +460,8 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         senderContract.sendMessagePayNative{value: routerFees2}(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
-            string(messageWithSignature_PC),
-            address(tokenL2), // destination token
-            0, // not sending tokens, just message
+            string(messageWithSignature_ProcessClaim),
+            new Client.EVMTokenAmount[](0), // empty array
             0 // use default gasLimit for this function
         );
 

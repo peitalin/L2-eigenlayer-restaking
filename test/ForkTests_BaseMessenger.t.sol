@@ -6,10 +6,13 @@ import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
 import {NonPayableContract} from "./mocks/NonPayableContract.sol";
+import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+import {SenderHooks} from "../src/SenderHooks.sol";
 
 
 contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
@@ -243,20 +246,29 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         vm.selectFork(ethForkId);
 
         uint64 randomChainSelector = 125;
-        uint256 _amount = 0.1 ether;
         uint256 _gasLimit = 800_000;
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1),
+            amount: 0.1 ether
+        });
+
+        bytes memory message2 = encodeDepositIntoStrategyMsg(
+            address(strategy),
+            tokenAmounts[0].token,
+            tokenAmounts[0].amount
+        );
 
         vm.startBroadcast(deployerKey);
         {
             uint256 fees = getRouterFeesL1(
                 address(senderContract),
                 string(message),
-                address(tokenL1),
-                _amount,
+                tokenAmounts,
                 _gasLimit
             );
 
-            tokenL1.approve(address(receiverContract), _amount);
+            tokenL1.approve(address(receiverContract), tokenAmounts[0].amount);
 
             vm.expectRevert(abi.encodeWithSelector(
                 DestinationChainNotAllowed.selector,
@@ -266,8 +278,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 randomChainSelector, // _destinationChainSelector,
                 address(senderContract), // _receiver,
                 string(message),
-                address(tokenL1),
-                _amount,
+                tokenAmounts,
                 _gasLimit
             );
 
@@ -275,8 +286,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 BaseSepolia.ChainSelector, // _destinationChainSelector,
                 address(senderContract), // _receiver,
                 string(message),
-                address(tokenL1),
-                _amount,
+                tokenAmounts,
                 _gasLimit
             );
         }
@@ -289,7 +299,6 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         vm.selectFork(l2ForkId);
 
         uint64 randomChainSelector = 125;
-        uint256 _amount = 0 ether;
         uint256 _gasLimit = 800_000;
 
         vm.deal(deployer, 1 ether);
@@ -299,12 +308,9 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             uint256 fees = getRouterFeesL2(
                 address(receiverContract),
                 string(message),
-                address(tokenL2),
-                _amount,
+                new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
-
-            tokenL2.approve(address(senderContract), _amount);
 
             vm.expectRevert(abi.encodeWithSelector(
                 DestinationChainNotAllowed.selector,
@@ -314,8 +320,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 randomChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
                 string(message),
-                address(tokenL2),
-                _amount,
+                new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
 
@@ -323,8 +328,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 EthSepolia.ChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
                 string(message),
-                address(tokenL2),
-                _amount,
+                new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
         }
@@ -335,21 +339,30 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         // L2 Sender
         vm.selectFork(l2ForkId);
 
-        uint256 _amount = 0 ether;
         uint256 _gasLimit = 800_000;
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL2),
+            amount: 0.01 ether
+        });
+
+        IERC20(tokenL2).approve(address(senderContract), tokenAmounts[0].amount);
 
         vm.startBroadcast(deployerKey);
         {
             uint256 fees = 0 ether;
             uint256 feesExpected = getRouterFeesL2(
                 address(receiverContract), // _receiver,
-                string(message),
-                address(tokenL2),
-                _amount,
+                string(encodeDepositIntoStrategyMsg(
+                    address(strategy),
+                    tokenAmounts[0].token,
+                    tokenAmounts[0].amount
+                )),
+                tokenAmounts,
                 _gasLimit
             );
 
-            tokenL2.approve(address(senderContract), _amount);
+            tokenL2.approve(address(senderContract), tokenAmounts[0].amount);
 
             vm.expectRevert(abi.encodeWithSelector(
                 BaseMessengerCCIP.NotEnoughEthGasFees.selector,
@@ -359,11 +372,48 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             senderContract.sendMessagePayNative{value: fees}(
                 EthSepolia.ChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
-                string(message),
-                address(tokenL2),
-                _amount,
+                string(encodeDepositIntoStrategyMsg(
+                    address(strategy),
+                    tokenAmounts[0].token,
+                    tokenAmounts[0].amount
+                )),
+                tokenAmounts,
                 _gasLimit
             );
+        }
+    }
+
+    function test_BaseMessenger_L2_RefundsExcessGasFees() public {
+
+        // L2 Sender
+        vm.selectFork(l2ForkId);
+
+        uint256 _gasLimit = 800_000;
+
+        vm.deal(deployer, 1 ether);
+        vm.startBroadcast(deployerKey);
+        {
+            uint256 balanceBefore = address(deployer).balance;
+            uint256 fees = 1 ether;
+            uint256 feesExpected = getRouterFeesL2(
+                address(receiverContract), // _receiver,
+                string(message),
+                new Client.EVMTokenAmount[](0),
+                _gasLimit
+            );
+            require(fees > feesExpected, "Fees should be greater than expected");
+
+            senderContract.sendMessagePayNative{value: fees}(
+                EthSepolia.ChainSelector, // _destinationChainSelector,
+                address(receiverContract), // _receiver,
+                string(message),
+                new Client.EVMTokenAmount[](0),
+                _gasLimit
+            );
+
+            uint256 balanceAfter = address(deployer).balance;
+            uint256 expectedBalance = balanceBefore - feesExpected;
+            require(balanceAfter == expectedBalance, "Did not refund excess ETH");
         }
     }
 
@@ -444,13 +494,18 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         // L1 Receiver
         vm.selectFork(ethForkId);
 
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1),
+            amount: 0 ether
+        });
+
         vm.expectRevert(InvalidReceiverAddress.selector);
         receiverContract.sendMessagePayNative(
             BaseSepolia.ChainSelector, // _destinationChainSelector,
             address(0), // _receiver,
             string(message),
-            address(tokenL1),
-            0 ether,
+            tokenAmounts,
             800_000
         );
     }
@@ -459,13 +514,18 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
         vm.selectFork(l2ForkId);
 
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL2),
+            amount: 0 ether
+        });
+
         vm.expectRevert(InvalidReceiverAddress.selector);
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // _destinationChainSelector,
             address(0), // _receiver,
             string(message),
-            address(tokenL2),
-            0 ether,
+            tokenAmounts,
             800_000
         );
     }
@@ -478,6 +538,12 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         vm.prank(deployer);
         senderContract.withdraw(deployer, address(deployer).balance);
 
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL2),
+            amount: 0 ether
+        });
+
         // cheatcode not released yet.
         // vm.expectPartialRevert(NotEnoughBalance.selector);
         // can't use expectRevert with abi.encodeWithSelector because fees is not known
@@ -487,8 +553,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             EthSepolia.ChainSelector, // _destinationChainSelector,
             address(receiverContract), // _receiver,
             string(message),
-            address(tokenL2),
-            0 ether,
+            tokenAmounts,
             800_000
         );
     }
@@ -519,14 +584,18 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         {
             tokenL2.approve(address(senderContract), 0.1 ether);
 
+            Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+            tokenAmounts[0] = Client.EVMTokenAmount({
+                token: address(tokenL2),
+                amount: 0.1 ether
+            });
             // messageId (topic[1]): false as we don't know messageId yet
             vm.expectEmit(false, true, false, false);
             emit BaseMessengerCCIP.MessageSent(
                 bytes32(0x0), // indexed messageId
                 EthSepolia.ChainSelector, // indexed destinationChainSelector
                 address(receiverContract), // receiver
-                address(tokenL2), // token
-                0.1 ether, // token amount
+                tokenAmounts,
                 address(0), // native gas for fees
                 999_000 // fees
             );
@@ -534,16 +603,14 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 value: getRouterFeesL2(
                     address(receiverContract),
                     string(messageWithSignature),
-                    address(tokenL2),
-                    0.1 ether,
+                    tokenAmounts,
                     999_000
                 )
             }(
                 EthSepolia.ChainSelector, // destination chain
                 address(receiverContract),
                 string(messageWithSignature),
-                address(tokenL2), // token to send
-                0.1 ether, // test sending 0.1e18 tokens
+                tokenAmounts,
                 999_000 // use custom gasLimit for this function
             );
         }
@@ -575,33 +642,43 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             );
         }
 
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1),
+            amount: 0.01 ether
+        });
+        require(IERC20(tokenL1).balanceOf(deployer) > 0.01 ether, "Deployer should have enough tokenL1");
+
         // messageId (topic[1]): false as we don't know messageId yet
-        vm.expectEmit(false, true, false, false);
-        emit BaseMessengerCCIP.MessageSent(
-            bytes32(0x0), // indexed messageId
-            BaseSepolia.ChainSelector, // destinationChainSelector
-            address(senderContract), // receiver
-            address(tokenL1), // token to send
-            0 ether, // token amount
-            address(0), // native gas for fees
-            400_000 // gasLimit
-        );
-        receiverContract.sendMessagePayNative{
-            value: getRouterFeesL1(
+        vm.startBroadcast(deployer);
+        {
+            IERC20(tokenL1).approve(address(receiverContract), tokenAmounts[0].amount);
+
+            vm.expectEmit(false, true, false, false);
+            emit BaseMessengerCCIP.MessageSent(
+                bytes32(0x0), // indexed messageId
+                BaseSepolia.ChainSelector, // destinationChainSelector
+                address(senderContract), // receiver
+                tokenAmounts,
+                address(0), // native gas for fees
+                400_000 // gasLimit
+            );
+            receiverContract.sendMessagePayNative{
+                value: getRouterFeesL1(
+                    address(senderContract),
+                    string(messageWithSignature),
+                    tokenAmounts,
+                    400_000
+                )
+            }(
+                BaseSepolia.ChainSelector, // _destinationChainSelector,
                 address(senderContract),
                 string(messageWithSignature),
-                address(tokenL1),
-                0 ether,
-                400_000
-            )
-        }(
-            BaseSepolia.ChainSelector, // _destinationChainSelector,
-            address(senderContract),
-            string(messageWithSignature),
-            address(tokenL1), // token to send
-            0 ether, // test sending 0 tokens
-            400_000 // use custom gasLimit for this function
-        );
+                tokenAmounts,
+                    400_000 // use custom gasLimit for this function
+            );
+        }
+        vm.stopBroadcast();
     }
 
     function test_Receiver_L2_sendMessagePayNative_OutOfGas() public {
@@ -637,8 +714,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         uint256 fees = getRouterFeesL1(
             address(receiverContract),
             string(messageWithSignature),
-            address(tokenL1),
-            0 ether,
+            new Client.EVMTokenAmount[](0),
             hugeGasFees
         );
 
@@ -656,11 +732,53 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             BaseSepolia.ChainSelector, // _destinationChainSelector,
             address(senderContract),
             string(messageWithSignature),
-            address(tokenL1), // token to send
-            0 ether, // test sending 0 tokens
+            new Client.EVMTokenAmount[](0),
             hugeGasFees // use custom gasLimit for this function
         );
 
         require(address(receiverContract).balance == 0, "receiverCCIP should not have any ETH");
     }
+
+   function test_BaseMessenger_UnsupportedFunctionCall() public {
+
+        // L2 Sender
+        vm.selectFork(l2ForkId);
+
+        uint256 _amount = 0 ether;
+        uint256 _gasLimit = 800_000;
+
+        vm.deal(deployer, 1 ether);
+
+        bytes4 randomFunctionSelector = bytes4(keccak256("randomFunctionSelector()"));
+
+        bytes memory unsupportedMessage = abi.encodeWithSelector(
+            randomFunctionSelector
+        );
+
+        vm.startBroadcast(deployerKey);
+        {
+            uint256 fees = getRouterFeesL2(
+                address(receiverContract),
+                string(unsupportedMessage),
+                new Client.EVMTokenAmount[](0),
+                _gasLimit
+            );
+
+            tokenL2.approve(address(senderContract), _amount);
+
+            vm.expectRevert(abi.encodeWithSelector(
+                SenderHooks.UnsupportedFunctionCall.selector,
+                randomFunctionSelector
+            ));
+            senderContract.sendMessagePayNative{value: fees}(
+                EthSepolia.ChainSelector, // _destinationChainSelector,
+                address(receiverContract), // _receiver,
+                string(unsupportedMessage),
+                new Client.EVMTokenAmount[](0),
+                _gasLimit
+            );
+        }
+        vm.stopBroadcast();
+    }
+
 }

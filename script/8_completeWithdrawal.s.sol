@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 
@@ -106,10 +107,8 @@ contract CompleteWithdrawalScript is BaseScript {
             middlewareTimesIndex = 0; // not used yet, for slashing
             receiveAsTokens = true;
 
-            bytes memory completeWithdrawalMessage;
-            bytes memory messageWithSignature;
             {
-                completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
+                bytes memory completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
                     withdrawal,
                     tokensToWithdraw,
                     middlewareTimesIndex,
@@ -117,7 +116,7 @@ contract CompleteWithdrawalScript is BaseScript {
                 );
 
                 // sign the message for EigenAgent to execute Eigenlayer command
-                messageWithSignature = signMessageForEigenAgentExecution(
+                bytes memory messageWithSignature = signMessageForEigenAgentExecution(
                     deployerKey,
                     address(eigenAgent),
                     EthSepolia.ChainId, // destination chainid where EigenAgent lives
@@ -126,31 +125,35 @@ contract CompleteWithdrawalScript is BaseScript {
                     execNonce,
                     expiry
                 );
+
+                Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+                tokenAmounts[0] = Client.EVMTokenAmount({
+                    token: address(tokenL2),
+                    amount: 0
+                });
+
+                uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
+                    IDelegationManager.completeQueuedWithdrawal.selector
+                );
+                uint256 routerFees = getRouterFeesL2(
+                    address(receiverContract),
+                    string(messageWithSignature),
+                    tokenAmounts,
+                    gasLimit // only sending message, not bridging tokens
+                );
+
+                vm.startBroadcast(deployerKey);
+
+                senderContract.sendMessagePayNative{value: routerFees}(
+                    EthSepolia.ChainSelector, // destination chain
+                    address(receiverContract),
+                    string(messageWithSignature),
+                    tokenAmounts,
+                    gasLimit
+                );
+
+                vm.stopBroadcast();
             }
-
-            uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
-                IDelegationManager.completeQueuedWithdrawal.selector
-            );
-            uint256 routerFees = getRouterFeesL2(
-                address(receiverContract),
-                string(messageWithSignature),
-                address(tokenL2),
-                0,
-                gasLimit // only sending message, not bridging tokens
-            );
-
-            vm.startBroadcast(deployerKey);
-
-            senderContract.sendMessagePayNative{value: routerFees}(
-                EthSepolia.ChainSelector, // destination chain
-                address(receiverContract),
-                string(messageWithSignature),
-                address(tokenL2),
-                0, // only sending message, not bridging tokens
-                gasLimit
-            );
-
-            vm.stopBroadcast();
 
             vm.selectFork(ethForkId);
             string memory filePath = "script/withdrawals-completed/";

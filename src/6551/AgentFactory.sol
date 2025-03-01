@@ -24,6 +24,9 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
     mapping(address => uint256) public userToEigenAgentTokenIds;
     mapping(uint256 => address) public tokenIdToEigenAgents;
 
+    event SetRestakingConnector(address indexed);
+    event Set6551Registry(IERC6551Registry indexed);
+    event SetEigenAgentOwner721(IEigenAgentOwner721 indexed);
     event AgentCreated(
         address indexed owner,
         address indexed eigenAgent,
@@ -81,6 +84,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
             revert AddressZero("AgentFactory.setRestakingConnector: cannot be address(0)");
 
         _restakingConnector = newRestakingConnector;
+        emit SetRestakingConnector(newRestakingConnector);
     }
 
     /// @param new6551Registry address of the 6551Registry contract.
@@ -89,6 +93,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
             revert AddressZero("AgentFactory.set6551Registry: cannot be address(0)");
 
         erc6551Registry = new6551Registry;
+        emit Set6551Registry(new6551Registry);
     }
 
     /// @param newEigenAgentOwner721 address of the eigenAgentOwner712 NFT contract.
@@ -97,6 +102,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
             revert AddressZero("AgentFactory.setEigenAgentOwner721: cannot be address(0)");
 
         eigenAgentOwner721 = newEigenAgentOwner721;
+        emit SetEigenAgentOwner721(newEigenAgentOwner721);
     }
 
     /**

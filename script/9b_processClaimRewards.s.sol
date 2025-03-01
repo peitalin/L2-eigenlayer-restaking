@@ -2,6 +2,7 @@
 pragma solidity 0.8.25;
 
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
 import {BaseScript} from "./BaseScript.sol";
@@ -83,6 +84,11 @@ contract ProcessClaimRewardsScript is BaseScript {
         // L2: Send a rewards processClaim message
         ///////////////////////////////////////////////
         vm.selectFork(l2ForkId);
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL2),
+            amount: 0 ether
+        });
 
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
             IRewardsCoordinator.processClaim.selector
@@ -90,8 +96,7 @@ contract ProcessClaimRewardsScript is BaseScript {
         uint256 routerFees = getRouterFeesL2(
             address(receiverContract),
             string(messageWithSignature_PC),
-            address(tokenL2),
-            0 ether,
+            tokenAmounts,
             gasLimit
         );
 
@@ -101,8 +106,7 @@ contract ProcessClaimRewardsScript is BaseScript {
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_PC),
-            address(tokenL2), // destination token
-            0, // not sending tokens, just message
+            tokenAmounts,
             0 // use default gasLimit for this function
         );
 
