@@ -163,14 +163,19 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
                 IRestakingConnector.TransferTokensInfo memory t = transferTokensArray[i];
 
+                Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+                tokenAmounts[0] = Client.EVMTokenAmount({
+                    token: t.transferToken,
+                    amount: t.transferAmount
+                });
+
                 if (t.transferRoot != bytes32(0)) {
                     // If transferRoot is returned bridge to L2, then SenderCCIP transfers tokens to AgentOwner.
                     this.sendMessagePayNative(
                         BaseSepolia.ChainSelector, // destination chain
                         senderContractL2,
                         t.transferToAgentOwnerMessage,
-                        t.transferToken, // L1 token to burn/lock
-                        t.transferAmount,
+                        tokenAmounts,
                         0 // use default gasLimit
                     );
 
@@ -187,8 +192,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                     any2EvmMessage.messageId,
                     any2EvmMessage.sourceChainSelector,
                     abi.decode(any2EvmMessage.sender, (address)), // sender contract on L2
-                    t.transferToken,
-                    t.transferAmount
+                    tokenAmounts
                 );
             }
 
@@ -234,14 +238,11 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         }
     }
 
-    /// TODO: do a multi-token version of _buildCCIPMessage
-
     /**
      * @dev This function is called when sending an outbound message.
      * @param _receiver The address of the receiver.
      * @param _text The string data to be sent.
-     * @param _token The token to be transferred.
-     * @param _amount The amount of the token to be transferred.
+     * @param _tokenAmounts array of EVMTokenAmount structs (token and amount).
      * @param _feeTokenAddress Address of the token used for fees. Set address(0) for native gas.
      * @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
      * @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information
@@ -250,24 +251,10 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     function _buildCCIPMessage(
         address _receiver,
         string calldata _text,
-        address _token,
-        uint256 _amount,
+        Client.EVMTokenAmount[] memory _tokenAmounts,
         address _feeTokenAddress,
         uint256 _overrideGasLimit
-    ) internal override returns (Client.EVM2AnyMessage memory) {
-
-        Client.EVMTokenAmount[] memory tokenAmounts;
-        if (_amount <= 0) {
-            // Must be an empty array as no tokens are transferred
-            // non-empty arrays with 0 amounts error with CannotSendZeroTokens() == 0x5cf04449
-            tokenAmounts = new Client.EVMTokenAmount[](0);
-        } else {
-            tokenAmounts = new Client.EVMTokenAmount[](1);
-            tokenAmounts[0] = Client.EVMTokenAmount({
-                token: _token,
-                amount: _amount
-            });
-        }
+    ) cannotSendZeroTokens(_tokenAmounts) internal override returns (Client.EVM2AnyMessage memory) {
 
         bytes memory message = abi.encode(_text);
 
@@ -282,7 +269,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             Client.EVM2AnyMessage({
                 receiver: abi.encode(_receiver),
                 data: message,
-                tokenAmounts: tokenAmounts,
+                tokenAmounts: _tokenAmounts,
                 feeToken: _feeTokenAddress,
                 extraArgs: Client._argsToBytes(
                     Client.EVMExtraArgsV1({ gasLimit: gasLimit })
@@ -310,14 +297,19 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             string memory errStr
         ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
 
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: tokenAddress,
+            amount: tokenAmount
+        });
+
         if (block.timestamp > expiry) {
             // If message has expired, trigger CCIP call to bridge funds back to L2 signer
             this.sendMessagePayNative(
                 BaseSepolia.ChainSelector, // destination chain
                 signer, // receiver on L2
                 string.concat(errStr, ": refunding to L2 signer"),
-                tokenAddress, // L1 token to burn/lock
-                tokenAmount,
+                tokenAmounts,
                 0 // use default gasLimit
             );
 

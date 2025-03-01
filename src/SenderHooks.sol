@@ -3,6 +3,7 @@ pragma solidity 0.8.25;
 
 import {Initializable} from "@openzeppelin-v5-contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
@@ -42,7 +43,9 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
     );
 
     error AddressZero(string msg);
-    error OnlySendFundsForDeposits(string msg);
+    error OnlySendFundsForDeposits(bytes4 functionSelector, string msg);
+    error OnlyDepositOneTokenAtATime(string msg);
+    error UnsupportedFunctionCall(bytes4 functionSelector);
 
     constructor() {
         _disableInitializers();
@@ -194,19 +197,30 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * and store information about the amount and owner of the EigenAgent doing the withdrawal to
      * transfer withdrawals to later (or rewards claims).
      * @param message is the outbound message passed to CCIP's _buildCCIPMessage function
-     * @param amount is the amount of token being sent
+     * @param tokenAmounts is the amounts of tokens being sent
      */
     function beforeSendCCIPMessage(
         bytes memory message,
-        uint256 amount
+        Client.EVMTokenAmount[] memory tokenAmounts
     ) external onlySenderCCIP returns (uint256 gasLimit) {
 
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
+        gasLimit = getGasLimitForFunctionSelector(functionSelector);
 
+        if (tokenAmounts.length > 1) {
+            revert OnlyDepositOneTokenAtATime("Eigenlayer only deposits one token at a time");
+        }
         if (functionSelector != IStrategyManager.depositIntoStrategy.selector) {
             // check tokens are only bridged for deposit calls
-            if (amount > 0) revert OnlySendFundsForDeposits("Only send funds for deposit messages");
+            if (tokenAmounts[0].amount > 0) {
+                revert OnlySendFundsForDeposits(functionSelector,"Only send funds for DepositIntoStrategy calls");
+            }
         }
+
+        // if (gasLimit == DEFAULT_GAS_LIMIT) {
+        //     // default gas means functionSelector parameter finds no matches
+        //     revert UnsupportedFunctionCall(functionSelector);
+        // }
 
         if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
             // 0x60d7faed
@@ -216,7 +230,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             _commitRewardsTransferRootInfo(message);
         }
 
-        return getGasLimitForFunctionSelector(functionSelector);
+        return gasLimit;
     }
 
     /**

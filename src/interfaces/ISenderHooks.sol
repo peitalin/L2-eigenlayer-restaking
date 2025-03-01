@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 
 interface ISenderHooks {
 
@@ -42,7 +43,7 @@ interface ISenderHooks {
 
     function beforeSendCCIPMessage(
         bytes memory message,
-        uint256 amount
+        Client.EVMTokenAmount[] memory tokenAmounts
     ) external returns (uint256 gasLimit);
 
     function handleTransferToAgentOwner(bytes memory message) external returns (address);
