@@ -3,6 +3,7 @@ pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
@@ -11,6 +12,7 @@ import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {RouterFees} from "../script/RouterFees.sol";
+import {console} from "forge-std/console.sol";
 
 
 
@@ -172,24 +174,17 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         vm.warp(block.timestamp + 3666); // 1 hour, 1 min, 6 seconds
         vm.roll((block.timestamp + 3666) / 12); // 305 blocks on ETH
 
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-        tokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL1),
-            amount: amount
-        });
-
         vm.expectEmit(false, true, true, false);
         emit BaseMessengerCCIP.MessageSent(
             bytes32(0x0), // messageId
             BaseSepolia.ChainSelector, // destination chain
             bob, // receiver
-            tokenAmounts,
+            destTokenAmounts,
             address(0), // 0 for native gas
             0 // fees
         );
         vm.expectEmit(true, true, true, false);
         emit ReceiverCCIP.RefundingDeposit(bob, address(tokenL1), amount);
-
         receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 

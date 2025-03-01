@@ -69,13 +69,12 @@ interface IRestakingConnector {
         TransferType transferType;
         string transferToAgentOwnerMessage;
         bytes32 transferRoot;
-        address transferToken;
-        uint256 transferAmount;
+        Client.EVMTokenAmount[] tokenAmounts;
     }
 
     function dispatchMessageToEigenAgent(Client.Any2EVMMessage memory any2EvmMessage)
         external
-        returns (TransferTokensInfo[] memory);
+        returns (TransferTokensInfo memory);
 
     function mintEigenAgent(bytes memory message) external;
 }

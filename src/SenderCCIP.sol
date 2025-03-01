@@ -15,11 +15,8 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
     ISenderHooks public senderHooks;
 
-    uint256 internal constant DEFAULT_GAS_LIMIT = 199_998;
-
     event MatchedReceivedFunctionSelector(bytes4 indexed);
     event SendingFundsToAgentOwner(address indexed, uint256 indexed);
-    error UnsupportedFunctionCall();
 
     /// @param _router address of the router contract.
     constructor(address _router) BaseMessengerCCIP(_router) {
@@ -121,11 +118,6 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
         bytes memory message = abi.encode(_text);
 
         uint256 gasLimit = senderHooks.beforeSendCCIPMessage(message, _tokenAmounts);
-
-        if (gasLimit == DEFAULT_GAS_LIMIT) {
-            // default gas means functionSelector parameter finds no matches
-            revert UnsupportedFunctionCall();
-        }
 
         if (_overrideGasLimit > 0) {
             gasLimit = _overrideGasLimit;

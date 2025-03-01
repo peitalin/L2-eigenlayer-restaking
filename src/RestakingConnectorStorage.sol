@@ -196,7 +196,7 @@ ter finds no matches.
     function dispatchMessageToEigenAgent(Client.Any2EVMMessage memory any2EvmMessage)
         external
         virtual
-        returns (TransferTokensInfo[] memory);
+        returns (TransferTokensInfo memory);
 
     function mintEigenAgent(bytes memory message) external virtual;
 }

@@ -20,7 +20,6 @@ import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 
-import {console} from "forge-std/Test.sol";
 
 contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFees {
 
@@ -280,11 +279,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             IDelegationManager.completeQueuedWithdrawal.selector
         );
 
-        Client.EVMTokenAmount[] memory tokenAmounts1 = new Client.EVMTokenAmount[](1);
-        tokenAmounts1[0] = Client.EVMTokenAmount({
-            token: address(tokenL2),
-            amount: 0 ether
-        });
+        Client.EVMTokenAmount[] memory tokenAmounts1 = new Client.EVMTokenAmount[](0);
 
         vm.expectEmit(true, false, true, false);
         emit WithdrawalTransferRootCommitted(
@@ -320,12 +315,17 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         vm.warp(block.timestamp + 120); // 120 seconds = 10 blocks (12second per block)
         vm.roll((block.timestamp + 120) / 12);
 
+        Client.EVMTokenAmount[] memory withdrawalTokenAmounts = new Client.EVMTokenAmount[](1);
+        withdrawalTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1),
+            amount: amount
+        });
+
         // sender contract is forked from testnet, addr will differ
         vm.expectEmit(false, true, true, false);
         emit ReceiverCCIP.BridgingWithdrawalToL2(
             withdrawalTransferRoot,
-            address(tokenL1),
-            amount
+            withdrawalTokenAmounts
         );
         // Mock L1 bridge receiving CCIP message and calling CompleteWithdrawal on Eigenlayer
         receiverContract.mockCCIPReceive(
@@ -403,11 +403,6 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         /////////////////////////////////////////////////////////////////
         //// Test Attempts to re-use WithdrawalAgentOwnerRoots
         /////////////////////////////////////////////////////////////////
-        Client.EVMTokenAmount[] memory tokenAmounts2 = new Client.EVMTokenAmount[](1);
-        tokenAmounts2[0] = Client.EVMTokenAmount({
-            token: address(BaseSepolia.BridgeToken),
-            amount: 0 ether
-        });
 
         // attempting to commit a spent withdrawalTransferRoot should fail on L2
         vm.expectRevert("SenderHooks._commitWithdrawalTransferRootInfo: TransferRoot already used");
@@ -415,7 +410,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_CW),
-            tokenAmounts2,
+            new Client.EVMTokenAmount[](0),
             0 // use default gasLimit for this function
         );
 
@@ -677,6 +672,12 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             );
         }
 
+        Client.EVMTokenAmount[] memory withdrawalTokenAmounts = new Client.EVMTokenAmount[](1);
+        withdrawalTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1),
+            amount: amount
+        });
+
         uint256 bobBalanceBefore = token3.balanceOf(bob);
 
         vm.expectEmit(true, true, true, false);
@@ -685,8 +686,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
                 delegationManager.calculateWithdrawalRoot(withdrawal),
                 bob
             ),
-            address(tokenL1),
-            amount
+            withdrawalTokenAmounts
         );
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({

@@ -30,6 +30,8 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
     /// @notice lookup L2 token addresses of bridgeable tokens
     mapping(address bridgeTokenL1 => address bridgeTokenL2) public bridgeTokensL1toL2;
 
+    uint256 internal constant DEFAULT_GAS_LIMIT = 199_998;
+
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
 
     event WithdrawalTransferRootCommitted(
@@ -210,17 +212,21 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         if (tokenAmounts.length > 1) {
             revert OnlyDepositOneTokenAtATime("Eigenlayer only deposits one token at a time");
         }
-        if (functionSelector != IStrategyManager.depositIntoStrategy.selector) {
+        if (
+            tokenAmounts.length > 0 &&
+            (functionSelector != IStrategyManager.depositIntoStrategy.selector &&
+            functionSelector != ISenderHooks.handleTransferToAgentOwner.selector)
+        ) {
             // check tokens are only bridged for deposit calls
             if (tokenAmounts[0].amount > 0) {
                 revert OnlySendFundsForDeposits(functionSelector,"Only send funds for DepositIntoStrategy calls");
             }
         }
 
-        // if (gasLimit == DEFAULT_GAS_LIMIT) {
-        //     // default gas means functionSelector parameter finds no matches
-        //     revert UnsupportedFunctionCall(functionSelector);
-        // }
+        if (gasLimit == DEFAULT_GAS_LIMIT) {
+            // default gasLimit means functionSelector is not supported
+            revert UnsupportedFunctionCall(functionSelector);
+        }
 
         if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
             // 0x60d7faed

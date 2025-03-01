@@ -300,11 +300,6 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
         uint64 randomChainSelector = 125;
         uint256 _gasLimit = 800_000;
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-        tokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL2),
-            amount: 0 ether
-        });
 
         vm.deal(deployer, 1 ether);
 
@@ -313,11 +308,9 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             uint256 fees = getRouterFeesL2(
                 address(receiverContract),
                 string(message),
-                tokenAmounts,
+                new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
-
-            tokenL2.approve(address(senderContract), tokenAmounts[0].amount);
 
             vm.expectRevert(abi.encodeWithSelector(
                 DestinationChainNotAllowed.selector,
@@ -327,7 +320,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 randomChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
                 string(message),
-                tokenAmounts,
+                new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
 
@@ -335,7 +328,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 EthSepolia.ChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
                 string(message),
-                tokenAmounts,
+                new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
         }
@@ -396,11 +389,6 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         vm.selectFork(l2ForkId);
 
         uint256 _gasLimit = 800_000;
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-        tokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL2),
-            amount: 0 ether
-        });
 
         vm.deal(deployer, 1 ether);
         vm.startBroadcast(deployerKey);
@@ -410,18 +398,16 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             uint256 feesExpected = getRouterFeesL2(
                 address(receiverContract), // _receiver,
                 string(message),
-                tokenAmounts,
+                new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
             require(fees > feesExpected, "Fees should be greater than expected");
-
-            tokenL2.approve(address(senderContract), tokenAmounts[0].amount);
 
             senderContract.sendMessagePayNative{value: fees}(
                 EthSepolia.ChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
                 string(message),
-                tokenAmounts,
+                new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
 
@@ -698,12 +684,6 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         // L1 fork
         vm.selectFork(ethForkId);
 
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-        tokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL1),
-            amount: 0 ether
-        });
-
         bytes memory messageWithSignature;
         {
             uint256 execNonce = 0;
@@ -731,7 +711,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         uint256 fees = getRouterFeesL1(
             address(receiverContract),
             string(messageWithSignature),
-            tokenAmounts,
+            new Client.EVMTokenAmount[](0),
             hugeGasFees
         );
 
@@ -749,7 +729,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             BaseSepolia.ChainSelector, // _destinationChainSelector,
             address(senderContract),
             string(messageWithSignature),
-            tokenAmounts,
+            new Client.EVMTokenAmount[](0),
             hugeGasFees // use custom gasLimit for this function
         );
 
@@ -763,11 +743,6 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
         uint256 _amount = 0 ether;
         uint256 _gasLimit = 800_000;
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-        tokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL2),
-            amount: _amount
-        });
 
         vm.deal(deployer, 1 ether);
 
@@ -782,7 +757,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             uint256 fees = getRouterFeesL2(
                 address(receiverContract),
                 string(unsupportedMessage),
-                tokenAmounts,
+                new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
 
@@ -796,7 +771,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 EthSepolia.ChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
                 string(unsupportedMessage),
-                tokenAmounts,
+                new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
         }

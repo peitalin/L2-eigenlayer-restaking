@@ -175,19 +175,19 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         validateGasFees(fees);
 
         for (uint256 i = 0; i < _tokenAmounts.length; i++) {
-            if (msg.sender != address(this)) {
+            if (_tokenAmounts[i].amount > 0 && msg.sender != address(this)) {
                 // transfer tokens from user to this contract
                 IERC20(_tokenAmounts[i].token).transferFrom(
                     msg.sender,
                     address(this),
                     _tokenAmounts[i].amount
                 );
-                // then approve router to move tokens from this contract
-                IERC20(_tokenAmounts[i].token).approve(
-                    address(router),
-                    _tokenAmounts[i].amount
-                );
             }
+            // then approve router to move tokens from this contract
+            IERC20(_tokenAmounts[i].token).approve(
+                address(router),
+                _tokenAmounts[i].amount
+            );
         }
 
         messageId = router.ccipSend{value: fees}(
