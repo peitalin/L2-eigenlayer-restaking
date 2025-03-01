@@ -46,6 +46,9 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         /////////////////////////////////////
         vm.selectFork(ethForkId);
 
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
         uint256 execNonce = 0;
         bytes memory messageWithSignature;
         {
@@ -58,6 +61,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgentBob),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager to approve + deposit
                 depositMessage,
@@ -106,12 +110,10 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         // mock receiving CCIP message from L2
         receiverContract.mockCCIPReceive(any2EvmMessage);
 
-        IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(bob);
-
-        uint256 valueOfShares = strategy.userUnderlying(address(eigenAgent));
+        uint256 valueOfShares = strategy.userUnderlying(address(eigenAgentBob));
         require(amount == valueOfShares, "valueofShares incorrect");
         require(
-            amount == strategyManager.stakerStrategyShares(address(eigenAgent), strategy),
+            amount == strategyManager.stakerStrategyShares(address(eigenAgentBob), strategy),
             "Bob's EigenAgent stakerStrategyShares should equal deposited amount"
         );
     }
@@ -126,6 +128,9 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         // make expiryShort to test refund on expiry feature
         uint256 expiryShort = block.timestamp + 60 seconds;
 
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
         bytes memory messageWithSignature;
         {
             bytes memory depositMessage = encodeDepositIntoStrategyMsg(
@@ -137,6 +142,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgentBob),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager to approve + deposit
                 depositMessage,
@@ -202,11 +208,15 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         vm.prank(deployer);
         agentFactory.setRestakingConnector(vm.addr(1233));
 
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
         bytes memory messageWithSignature;
         {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgentBob),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager to approve + deposit
                 encodeDepositIntoStrategyMsg(
@@ -266,11 +276,15 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         // make expiryShort to test refund on expiry feature
         bytes32 messageId = bytes32(abi.encode(124));
 
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
         bytes memory messageWithSignature;
         {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgentBob),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager to approve + deposit
                 encodeDepositIntoStrategyMsg(
@@ -365,6 +379,9 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         uint256 execNonce = 0;
         uint256 mismatchAmount = amount + 0.001 ether; // Different amount than what's sent
 
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
         bytes memory messageWithSignature;
         {
             // Create message with a different amount than what's in destTokenAmounts
@@ -377,6 +394,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             // Sign the message for EigenAgent execution
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgentBob),
                 block.chainid,
                 address(strategyManager),
                 depositMessage,
@@ -421,6 +439,9 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
     function test_ReceiverL1_TokenMismatch_Validation() public {
         vm.selectFork(ethForkId);
 
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
         // Deploy a different token for mismatch testing
         address differentToken = address(0xDEADBEEF);
 
@@ -437,6 +458,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             // Sign the message for EigenAgent execution
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgentBob),
                 block.chainid,
                 address(strategyManager),
                 depositMessage,

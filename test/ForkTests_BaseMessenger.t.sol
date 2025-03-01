@@ -567,6 +567,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             bobKey,
+            address(eigenAgent),
             block.chainid, // destination chainid where EigenAgent lives
             address(strategyManager), // StrategyManager to approve + deposit
             encodeDepositIntoStrategyMsg(
@@ -632,6 +633,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager to approve + deposit
                 message,
@@ -696,6 +698,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager to approve + deposit
                 message,

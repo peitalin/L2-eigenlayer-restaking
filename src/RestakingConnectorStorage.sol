@@ -34,7 +34,7 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
     event SetReceiverCCIP(address indexed);
     event SetAgentFactory(address indexed);
-    event SetEigenlayerContracts(IDelegationManager indexed, IStrategyManager indexed, IStrategy indexed, IRewardsCoordinator indexed);
+    event SetEigenlayerContracts(address, address, address, address);
     event SetBridgeTokens(address indexed, address indexed);
     event ClearBridgeTokens(address indexed);
 
@@ -141,10 +141,10 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
         rewardsCoordinator = _rewardsCoordinator;
 
         emit SetEigenlayerContracts(
-            _delegationManager,
-            _strategyManager,
-            _strategy,
-            _rewardsCoordinator
+            address(_delegationManager),
+            address(_strategyManager),
+            address(_strategy),
+            address(_rewardsCoordinator)
         );
     }
 

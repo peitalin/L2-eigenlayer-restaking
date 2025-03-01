@@ -374,6 +374,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         // sign the message for EigenAgent to execute Eigenlayer command
         messageWithSignature_PC = signMessageForEigenAgentExecution(
             signerKey,
+            address(eigenAgent),
             EthSepolia.ChainId, // destination chainid where EigenAgent lives
             address(rewardsCoordinator),
             encodeProcessClaimMsg(claim, signer),
@@ -424,6 +425,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_CW = signMessageForEigenAgentExecution(
                 signerKey,
+                address(eigenAgent),
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 completeWithdrawalMessage,

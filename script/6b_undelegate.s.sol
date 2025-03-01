@@ -92,6 +92,7 @@ contract UndelegateScript is BaseScript {
         {
             bytes memory messageWithSignature_UD = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 TARGET_CONTRACT, // DelegationManager.delegateTo()
                 encodeUndelegateMsg(address(eigenAgent)),

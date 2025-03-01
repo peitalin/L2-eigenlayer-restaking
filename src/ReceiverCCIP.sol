@@ -210,7 +210,12 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                         // ...mark messageId as refunded
                         amountRefundedToMessageIds[any2EvmMessage.messageId][tokenAddress] = tokenAmount;
                         // ...then initiate a refund back to the signer on L2
-                        return _refundToSignerAfterExpiry(customError, tokenAddress, tokenAmount);
+                        return _refundToSignerAfterExpiry(
+                            any2EvmMessage,
+                            customError,
+                            tokenAddress,
+                            tokenAmount
+                        );
 
                     } else {
                         // Transaction not refundable (or already refunded). Display original error instead
@@ -279,6 +284,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
      * No other Eigenlayer call bridges tokens, this is the only edgecase to cover.
      */
     function _refundToSignerAfterExpiry(
+        Client.Any2EVMMessage memory any2EvmMessage,
         bytes memory customError,
         address tokenAddress,
         uint256 tokenAmount

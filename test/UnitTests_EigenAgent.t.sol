@@ -22,12 +22,14 @@ import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {MockMultisigSigner} from "./mocks/MockMultisigSigner.sol";
 
+import {console} from "forge-std/console.sol";
 
 contract UnitTests_EigenAgent is BaseTestEnvironment {
 
     error CallerNotWhitelisted(string reason);
     error SignatureInvalid(string reason);
     error AlreadySigned();
+    error ERC1167FailedCreateClone();
 
     uint256 expiry;
     uint256 amount;
@@ -60,10 +62,6 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
     function test_EigenAgent_DomainTypehash() public {
         vm.assertEq(
-            delegationManager.domainSeparator(),
-            eigenAgent.domainSeparator(address(delegationManager), block.chainid)
-        );
-        vm.assertEq(
             delegationManager.DOMAIN_TYPEHASH(),
             eigenAgent.DOMAIN_TYPEHASH()
         );
@@ -75,6 +73,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
         bytes32 digestHashClient = createEigenAgentCallDigestHash(
             address(delegationManager),
+            address(eigenAgent),
             0 ether,
             message1,
             1,
@@ -112,16 +111,16 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
     function test_EigenAgent_ExecuteWithSignatures() public {
 
         vm.startBroadcast(deployerKey);
-        IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
         vm.stopBroadcast();
 
         vm.startBroadcast(bobKey);
 
-        uint256 execNonce0 = eigenAgent.execNonce();
+        uint256 execNonce0 = eigenAgentBob.execNonce();
         // encode a simple getSenderContractL2 call
         bytes memory data = abi.encodeWithSelector(receiverContract.getSenderContractL2.selector);
 
-        bytes32 digestHash = eigenAgent.createEigenAgentCallDigestHash(
+            bytes32 digestHash = eigenAgentBob.createEigenAgentCallDigestHash(
             address(receiverContract),
             0 ether,
             data,
@@ -144,7 +143,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         vm.startBroadcast(address(restakingConnector));
 
         // msg.sender = EigenAgent's address
-        bytes memory result = eigenAgent.executeWithSignature(
+        bytes memory result = eigenAgentBob.executeWithSignature(
             address(receiverContract),
             0 ether,
             data,
@@ -162,7 +161,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         // should fail if anyone else tries to call with Bob's EigenAgent without Bob's signature
         vm.startBroadcast(address(restakingConnector));
         vm.expectRevert("Invalid signer");
-        EigenAgent6551(payable(address(eigenAgent))).execute(
+        EigenAgent6551(payable(address(eigenAgentBob))).execute(
             address(receiverContract),
             0 ether,
             abi.encodeWithSelector(receiverContract.getSenderContractL2.selector),
@@ -174,7 +173,9 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
     function test_EigenAgent_RevertOnInvalidSignature() public {
 
-        uint256 execNonce0 = eigenAgent.execNonce();
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgentAlice = agentFactory.spawnEigenAgentOnlyOwner(alice);
+        uint256 execNonce0 = eigenAgentAlice.execNonce();
         // alice signs
         (
             bytes memory data1,
@@ -182,10 +183,12 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             bytes memory signature1
         ) = createEigenAgentDepositSignature(
             aliceKey,
+            address(eigenAgentAlice),
             amount,
             execNonce0
         );
 
+        // attempt to use eigenAgentAlice's signature on another EigenAgent
         vm.assertEq(
             eigenAgent.isValidSignature(digestHash1, signature1),
             bytes4(0) // returns bytes4(0) when signature verification fails
@@ -193,7 +196,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
         // alice attempts to execute using deployer's EigenAgent
         vm.expectRevert("Only RestakingConnector or owner can execute");
-        eigenAgent.executeWithSignature(
+        eigenAgentAlice.executeWithSignature(
             address(strategyManager), // strategyManager
             0,
             data1, // encodeDepositIntoStrategyMsg
@@ -386,6 +389,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             bytes memory signature1
         ) = createEigenAgentDepositSignature(
             deployerKey,
+            address(eigenAgent),
             amount,
             0
         );
@@ -449,31 +453,38 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         //////////////////////////////////////////////////////
 
         vm.startBroadcast(deployerKey);
-        IEigenAgent6551 eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
         vm.stopBroadcast();
 
         vm.deal(address(restakingConnector), 1 ether);
 
         //////////////////////////////////////////////////////
-        //// 1) EigenAgent approves StrategyManager to transfer tokens
+        //// 1) EigenAgentBob approves StrategyManager to transfer tokens
         //////////////////////////////////////////////////////
-        uint256 execNonce0 = eigenAgent.execNonce();
+        uint256 execNonce0 = eigenAgentBob.execNonce();
         {
             vm.startBroadcast(address(restakingConnector));
+
+            bytes memory data0 = abi.encodeWithSelector(
+                // bytes4(keccak256("approve(address,uint256)")),
+                IERC20.approve.selector,
+                address(strategyManager),
+                amount
+            );
+
             (
-                bytes memory data0,
                 bytes32 digestHash0,
                 bytes memory signature0
             ) = createEigenAgentERC20ApproveSignature(
                 bobKey,
+                address(eigenAgentBob),
                 address(tokenL1),
-                address(strategyManager),
-                amount,
+                data0,
                 execNonce0
             );
             checkSignature_EIP1271(bob, digestHash0, signature0);
 
-            eigenAgent.executeWithSignature(
+            eigenAgentBob.executeWithSignature(
                 address(tokenL1), // CCIP-BnM token
                 0 ether, // value
                 data0,
@@ -481,15 +492,15 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 signature0
             );
 
-            // receiver sends eigenAgent tokens
-            tokenL1.transfer(address(eigenAgent), amount);
+            // receiver sends eigenAgentBob tokens
+            tokenL1.transfer(address(eigenAgentBob), amount);
             vm.stopBroadcast();
         }
 
         //////////////////////////////////////////////////////
-        //// 2) EigenAgent Deposits into StrategyManager
+        //// 2) EigenAgentBob Deposits into StrategyManager
         //////////////////////////////////////////////////////
-        uint256 execNonce1 = eigenAgent.execNonce();
+        uint256 execNonce1 = eigenAgentBob.execNonce();
         {
             vm.startBroadcast(address(restakingConnector));
             (
@@ -498,12 +509,13 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 bytes memory signature1
             ) = createEigenAgentDepositSignature(
                 bobKey,
+                address(eigenAgentBob),
                 amount,
                 execNonce1
             );
             checkSignature_EIP1271(bob, digestHash1, signature1);
 
-            eigenAgent.executeWithSignature(
+            eigenAgentBob.executeWithSignature(
                 address(strategyManager), // strategyManager
                 0,
                 data1, // encodeDepositIntoStrategyMsg
@@ -514,22 +526,22 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         }
 
         //////////////////////////////////////////////////////
-        //// 3) Transfer EigenAgentOwner NFT to Alice
+        //// 3) Transfer EigenAgentBobOwner NFT to Alice
         //////////////////////////////////////////////////////
         {
             vm.startBroadcast(bob);
 
-            uint256 transferredTokenId = agentFactory.getEigenAgentOwnerTokenId(bob);
+            uint256 transferTokenId = agentFactory.getEigenAgentOwnerTokenId(bob);
             IEigenAgentOwner721 eigenAgentOwner721 = agentFactory.eigenAgentOwner721();
-            eigenAgentOwner721.approve(alice, transferredTokenId);
+            eigenAgentOwner721.approve(alice, transferTokenId);
 
             vm.expectEmit(true, true, true, true);
-            emit IAgentFactory.EigenAgentOwnerUpdated(bob, alice, transferredTokenId);
-            eigenAgentOwner721.safeTransferFrom(bob, alice, transferredTokenId);
+            emit IAgentFactory.EigenAgentOwnerUpdated(bob, alice, transferTokenId);
+            eigenAgentOwner721.safeTransferFrom(bob, alice, transferTokenId);
 
             require(
-                eigenAgentOwner721.ownerOf(transferredTokenId) == alice,
-                "alice should be owner of the token"
+                eigenAgentOwner721.ownerOf(transferTokenId) == alice,
+                "Alice should now be owner of Bob's EigenAgentBobOwner NFT"
             );
             vm.stopBroadcast();
         }
@@ -552,25 +564,26 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 IDelegationManager.QueuedWithdrawalParams({
                     strategies: strategiesToWithdraw,
                     shares: sharesToWithdraw,
-                    withdrawer: address(eigenAgent)
+                    withdrawer: address(eigenAgentBob)
                 });
 
             queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](1);
             queuedWithdrawalParams[0] = queuedWithdrawal;
 
-            uint256 execNonce2 = eigenAgent.execNonce();
+            uint256 execNonce2 = eigenAgentBob.execNonce();
             (
                 bytes memory data2,
                 bytes32 digestHash2,
                 bytes memory signature2
             ) = createEigenAgentQueueWithdrawalsSignature(
                 aliceKey,
+                address(eigenAgentBob),
                 execNonce2,
                 queuedWithdrawalParams
             );
             checkSignature_EIP1271(alice, digestHash2, signature2);
 
-            bytes memory result = eigenAgent.executeWithSignature(
+            bytes memory result = eigenAgentBob.executeWithSignature(
                 address(delegationManager), // delegationManager
                 0,
                 data2, // encodeQueueWithdrawals
@@ -590,7 +603,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
     function test_EigenAgent_HoldsOnlyOneAgentAtATime() public {
 
-        // Mint Bob and EigenAgent
+        // Mint Bob an EigenAgent
         vm.prank(deployer);
         IEigenAgent6551 eigenAgent1 = agentFactory.spawnEigenAgentOnlyOwner(bob);
 
@@ -617,99 +630,6 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         // they should have one EigenAgent each
         vm.assertEq(eigenAgentOwner721.balanceOf(alice), 1);
         vm.assertEq(eigenAgentOwner721.balanceOf(bob), 1);
-    }
-
-    function createEigenAgentQueueWithdrawalsSignature(
-        uint256 signerKey,
-        uint256 execNonce,
-        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
-    ) public view returns (bytes memory, bytes32, bytes memory) {
-
-        bytes memory data = EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
-            queuedWithdrawalParams
-        );
-
-        bytes32 digestHash = createEigenAgentCallDigestHash(
-            address(delegationManager), // target to call
-            0 ether,
-            data,
-            execNonce,
-            block.chainid,
-            expiry
-        );
-
-        bytes memory signature;
-        {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
-            signature = abi.encodePacked(r, s, v);
-        }
-
-        return (data, digestHash, signature);
-    }
-
-
-    function createEigenAgentERC20ApproveSignature(
-        uint256 signerKey,
-        address targetToken,
-        address to,
-        uint256 _amount,
-        uint256 execNonce
-    ) public view returns (bytes memory, bytes32, bytes memory) {
-
-        bytes memory data = abi.encodeWithSelector(
-            // bytes4(keccak256("approve(address,uint256)")),
-            IERC20.approve.selector,
-            to,
-            _amount
-        );
-
-        bytes32 digestHash = createEigenAgentCallDigestHash(
-            targetToken, // CCIP-BnM token
-            0 ether,
-            data,
-            execNonce,
-            block.chainid,
-            expiry
-        );
-
-        bytes memory signature;
-        {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
-            signature = abi.encodePacked(r, s, v);
-        }
-
-        return (data, digestHash, signature);
-    }
-
-
-    function createEigenAgentDepositSignature(
-        uint256 signerKey,
-        uint256 _amount,
-        uint256 _nonce
-    ) public view returns (bytes memory, bytes32, bytes memory) {
-
-        bytes memory data = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
-            address(strategy),
-            address(tokenL1),
-            _amount
-        );
-
-        bytes32 digestHash = createEigenAgentCallDigestHash(
-            address(strategyManager),
-            0 ether,
-            data,
-            _nonce,
-            block.chainid,
-            expiry
-        );
-
-        bytes memory signature;
-        {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
-            signature = abi.encodePacked(r, s, v);
-        }
-
-        return (data, digestHash, signature);
     }
 
     function test_EigenAgent_ValidSigners() public {
@@ -768,5 +688,123 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         vm.assertEq(chainId, block.chainid);
         vm.assertEq(tokenContract, address(eigenAgentOwner721));
         vm.assertTrue(tokenId >= 1);
+    }
+
+    function test_EigenAgent_predictEigenAgentAddress() public {
+
+        vm.prank(deployer);
+        eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
+        eigenAgentOwner721 = agentFactory.eigenAgentOwner721();
+        (,, uint256 tokenId2) = eigenAgent.token();
+        assertEq(eigenAgentOwner721.ownerOf(tokenId2), bob);
+
+        address precalculated_eigenAgentAddress0 = agentFactory.predictEigenAgentAddress(
+            bob,
+            0
+        );
+
+        assertEq(precalculated_eigenAgentAddress0 , address(eigenAgent));
+
+        vm.prank(bob);
+        eigenAgentOwner721.transferFrom(bob, alice, tokenId2);
+
+        // Check if there is no CreateCollision error
+        // even after the EigenAgentOwner721 is transferred
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgent2 = agentFactory.spawnEigenAgentOnlyOwner(bob);
+    }
+
+    //////////////////////////////////////////////////////
+    // Helper functions
+    //////////////////////////////////////////////////////
+
+    function createEigenAgentQueueWithdrawalsSignature(
+        uint256 signerKey,
+        address eigenAgentAddr,
+        uint256 execNonce,
+        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
+    ) public view returns (bytes memory, bytes32, bytes memory) {
+
+        bytes memory data = EigenlayerMsgEncoders.encodeQueueWithdrawalsMsg(
+            queuedWithdrawalParams
+        );
+
+        bytes32 digestHash = createEigenAgentCallDigestHash(
+            address(delegationManager), // target to call
+            eigenAgentAddr,
+            0 ether,
+            data,
+            execNonce,
+            block.chainid,
+            expiry
+        );
+
+        bytes memory signature;
+        {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
+            signature = abi.encodePacked(r, s, v);
+        }
+
+        return (data, digestHash, signature);
+    }
+
+    function createEigenAgentERC20ApproveSignature(
+        uint256 signerKey,
+        address eigenAgentAddr,
+        address targetToken,
+        bytes memory data,
+        uint256 execNonce
+    ) public view returns (bytes32, bytes memory) {
+
+        bytes32 digestHash = createEigenAgentCallDigestHash(
+            targetToken, // CCIP-BnM token
+            eigenAgentAddr,
+            0 ether,
+            data,
+            execNonce,
+            block.chainid,
+            expiry
+        );
+
+        bytes memory signature;
+        {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
+            signature = abi.encodePacked(r, s, v);
+        }
+
+        return (digestHash, signature);
+    }
+
+    function createEigenAgentDepositSignature(
+        uint256 signerKey,
+        address eigenAgentAddr,
+        uint256 _amount,
+        uint256 _nonce
+    ) public view returns (bytes memory, bytes32, bytes memory) {
+
+        bytes memory data = EigenlayerMsgEncoders.encodeDepositIntoStrategyMsg(
+            address(strategy),
+            address(tokenL1),
+            _amount
+        );
+
+        bytes32 digestHash = createEigenAgentCallDigestHash(
+            address(strategyManager),
+            eigenAgentAddr,
+            0 ether,
+            data,
+            _nonce,
+            block.chainid,
+            expiry
+        );
+
+        bytes memory signature;
+        {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
+            signature = abi.encodePacked(r, s, v);
+        }
+
+        return (data, digestHash, signature);
     }
 }
