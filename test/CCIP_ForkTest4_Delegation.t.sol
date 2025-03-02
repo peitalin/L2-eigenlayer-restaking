@@ -4,7 +4,7 @@ pragma solidity 0.8.25;
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {ISignatureUtils} from "@eigenlayer-contracts/interfaces/ISignatureUtils.sol";
@@ -78,6 +78,8 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         uint256 expiry = block.timestamp + 1 days;
         uint256 execNonce0 = 0; // no eigenAgent yet, execNonce is 0
 
+        eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
+
         bytes memory depositMessage;
         bytes memory messageWithSignature_D;
         {
@@ -90,6 +92,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_D = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager),
                 depositMessage,
@@ -167,6 +170,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_DT = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(delegationManager), // DelegationManager.delegateTo()
                 delegateToMessage,
@@ -269,6 +273,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_UD = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(delegationManager), // DelegationManager
                 message_UD,
@@ -371,6 +376,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_CW = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 completeWithdrawalMessage,
@@ -454,6 +460,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_UD = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(delegationManager), // DelegationManager
                 message_UD,
@@ -533,6 +540,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_CW = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 completeWithdrawalMessage,

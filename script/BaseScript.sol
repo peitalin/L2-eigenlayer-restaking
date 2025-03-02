@@ -4,7 +4,7 @@ pragma solidity 0.8.25;
 import {Script} from "forge-std/Script.sol";
 // CCIP interfaces
 import {IRouterClient} from "@chainlink/ccip/interfaces/IRouterClient.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 // Eigenlayer interfaecs
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
@@ -27,6 +27,7 @@ import {FileReader} from "./FileReader.sol";
 import {ClientEncoders} from "./ClientEncoders.sol";
 import {ClientSigners} from "./ClientSigners.sol";
 import {RouterFees} from "./RouterFees.sol";
+import {GasLimits} from "./GasLimits.sol";
 
 
 
@@ -34,6 +35,7 @@ contract BaseScript is
     Script,
     FileReader,
     RouterFees,
+    GasLimits,
     ClientEncoders,
     ClientSigners
 {

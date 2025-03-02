@@ -18,16 +18,18 @@ This also keeps custody of funds with the user (who owns the 6551 NFT) and gives
     - [6. Undelegate with EigenAgent](#undelegate-with-eigenagent)
     - [7. Redeposit with EigenAgent (re-delegate)](#redeposit-with-eigenagent)
 - [ERC-6551 EigenAgents](#ERC-6551-eigenagents)
-- [Messaging and Bridging Behavior](#messaging-and-bridging-behavior)
-- [Message Encoding and Decoder](#message-encoding-and-decoding)
-- [Todo Features](#todo-features)
+- [Bridging Behavior Defaults](#bridging-behavior-defaults)
+    - [1. Refunds Behavior](#refunds-behavior)
+    - [2. Rewards Claiming Behavior](#rewards-claiming-behavior)
+- [Message Encoding and Decoding](#message-encoding-and-decoding)
+- [Supported Features](#supported-features)
 
 
 <a name="running-tests-and-restaking-scripts"/>
 
 ### Running Tests and Restaking Scripts
 
-The following test will bridge from L2 to L1, deposit in Eigenlayer, queueWithdrawals, completeWithdrawal, then bridge back to the original user on L2.
+The following tests will bridge from L2 to L1, deposit in Eigenlayer, queueWithdrawals, completeWithdrawal, then bridge back to the original user on L2.
 ```
 forge test --match-test test_FullFlow_CompleteWithdrawal -vvvv
 ```
@@ -37,10 +39,16 @@ The following test will test delegating, undelegating, and re-depositing:
 forge test --match-test test_FullFlow_Undelegate_Delegate_Redeposit -vvvv
 ```
 
-See test coverage (there is an `lcov.info` file for coverage as well):
+See test coverage
 ```
 forge coverage
 ```
+You can generate a `lcov.info` file to see line-by-line test coverage in code editors, run this with:
+```
+forge coverage --report lcov
+```
+
+Set `SKIP_SCRIPTS_TESTS=false` in `.env` to run the scripts tests. Forks tests may need to be run separately or you may hit API throttling limits.
 
 Frontend clients will make contract calls similar to the scripts in the `scripts` folder. These scripts run on Base Sepolia and dispatches CCIP calls to Eth Sepolia, bridging `CCIP-BnM` ERC20 tokens and interacting with mock Eigenlayer Strategy Vaults setup for the `CCIP-BnM` token.
 
@@ -70,7 +78,7 @@ It currently takes +20 minutes to bridge a message [Base and ZkSync has finality
 
 <a name="sepolia-L2-restaking-example"/>
 
-## Sepolia L2 Restaking Example
+## Sepolia L2 Restaking Flows
 
 <a name="deposit-with-eigenagent"/>
 
@@ -79,15 +87,6 @@ It currently takes +20 minutes to bridge a message [Base and ZkSync has finality
 We first bridge `0.0619` tokens from L2 to L1 with a message to mint an ERC-6551 EigenAgent and forward a  `DepositIntoStrategy` [message to Eigenlayer](https://ccip.chain.link/msg/0x5e37d8f0b80d3c489fb8fcc5bd00d761b47eeee214e3b06cb564484a9841914d), resulting in `Deposit` and 6551 EigenAgent [minting events](https://sepolia.etherscan.io/tx/0xc13273ab04e87f91b30eeac7d2ed23979904aec02cb1e090f1a85596e2fbb497).
 
 We can see tokens routing through the [6551 EigenAgent contract here](https://sepolia.etherscan.io/address/0x2fd5589daa0eb790b9237a300479924f9023efef#tokentxns).
-
-```
-Cost: 0.014686 ETH on Sepolia at 20.27 GWEI (724,221 gas)
-approx. $38
-
-Assuming 10 GWEI on mainnet: 0.00724 ETH
-Assuming 30 GWEI on mainnet: 0.0217 ETH
-```
-
 
 See [Tenderly transaction for an execution trace](https://dashboard.tenderly.co/tx/sepolia/0xc13273ab04e87f91b30eeac7d2ed23979904aec02cb1e090f1a85596e2fbb497).
 
@@ -175,12 +174,12 @@ There is no way to directly re-delegate to another operator, a staker must undel
 
 ## ERC-6551 EigenAgents
 
-EigenAgent accounts will only execute calls if the signature came from the user who owns the associated EigenAgentOwner 721 NFT.
+EigenAgent accounts will only execute calls if the message has a signature from the user who owns the associated EigenAgentOwner 721 NFT.
 See: [https://eips.ethereum.org/EIPS/eip-6551](https://eips.ethereum.org/EIPS/eip-6551)
 
-Each user can only have 1 EigenAgentOwner NFT at the moment. We can make them tradeable or soulbound.
+Each user can only have 1 EigenAgentOwner NFT at the moment. They are currently transferable (but can be made soulbound if need be).
 
-EigenAgent accounts are ERC1967 Proxies and can be upgraded. We can also look at BeaconProxy implementation if we want upgradeability for all accounts (Agents just route contract calls, so upgradeability is not strictly needed).
+EigenAgent accounts are ERC1967 minimal proxies (the accounts just route contract calls, so upgradeability is not needed).
 
 EigenAgentOwner NFTs are minted via the AgentFactory (which talks to a 6551 Registry and keeps track of EigenAgent 6551 accounts and ownership).
 
@@ -193,19 +192,41 @@ Note: at the moment you cannot have more than 1 cross-chain message in-flight at
 - CCIP bridging takes ~20min (Ethereum finality takes ~12.8 min)
 - A solution is to track in-flight txs and increment nonces on the client-side for subsequent messages (at least until the messages successfully execute on L1). Note this assumes CCIP messages land on L1 in the correct order.
 
-<a name="messaging-and-bridging-behavior"/>
+<a name="bridging-behavior-defaults"/>
 
-## Messaging and Bridging Behavior
+## Bridging Behavior Defaults
 
-When sending a TX to SenderCCIP bridge, if the CCIP message:
+When sending a transaction to the SenderCCIP bridge, if the CCIP message:
 
 | Contains Message | Sends Funds  | Outcome  |
 | ------- | --- | --- |
-| true | false | The TX reverts early on L2 if the Message is not a `depositIntoStrategy` function call. This makes it harder for frontend clients to make mistakes, e.g. frontend clients accidentally sending funds to L1 for a `queueWithdrawal` call. |
+| true | true | The TX reverts early on L2 if the Message is not a `depositIntoStrategy` function call. This makes it harder for frontend clients to make mistakes, e.g. frontend clients accidentally sending funds to L1 for a `queueWithdrawal` call. |
 | true | false | Tries to match an Eigenlayer function selector and execute that function (queueWithdrawal, claim rewards, delegate, etc). If no function selectors match, nothing happens.
-| true | false | Simply bridges funds |
+| false | true | Simply bridges funds |
 
 These choices are made because this repo is intended just for Eigenlayer function calls, not general purpose function calls.
+
+<a name="refunds-behavior"/>
+
+### Refund behaviour for failed deposits
+If a deposit reverts on L1 (e.g Operator goes offline while CCIP message is in flight), the protocol does *not* automatically refund the user their deposit. Users must manually trigger the refund after waiting (a configurable expiry parameter in the message, e.g. 30min).
+- Having the refund trigger automatically without delay may be confusing for users, manually triggering refunds makes this action explicit.
+- This also gives Operators a window of opportunity to fix deposit issues, and allow users to re-try deposits.
+- Admins may also trigger the refunds for the user if the user does not have gas on L1, or if the expiry is too long. It will mark the messageId as refunded in this case.
+
+Auditors might note that this expiry paramater in the signature (in the CCIP message) does not do anything except for this refund mechanic. See [here for details](https://github.com/TreasureProject/L2-eigenlayer-restaking/blob/b1d2827415ca600dfbafe83fa4575bfbcb910f7b/src/6551/EigenAgent6551.sol#L86).
+
+<a name="rewards-claiming-behavior"/>
+
+### Rewards claiming behaviour
+Eigenlayer allows users to claim multiple token rewards at a time (MAGIC, ETH, other ERC20s).
+The protocol claims multiple tokens and bridges just the MAGIC rewards back to the user's address on L2, while sending all other tokens and ETH rewards to the user's (the owner of the ERC-6551 NFT) address on L1.
+- The protocol checks which tokens are marked as bridgeable (the mapping `bridgeTokensL1toL2` on `RestakingConnectorStorage.sol` and `SenderHooks.sol`) then bridges only those reward tokens.
+- Cross-chain claiming of multiple reward tokens is somewhat new in web3, so we will have to let users know where their tokens are going on the frontend (either L1 or L2).
+- Alternatively we can just claim MAGIC and let users manually claim their other tokens and ETH rewards on L1 (but this is arguable worse UX).
+
+There's a configurable list of reward tokens (the mapping `bridgeTokensL1toL2`) that the protocol will try bridge back to the user's address on L2. This list needs to mirror the tokens that have a CCIP lane setup. If we want to bridge other reward tokens back to L2, CCIP lanes needs to be setup for those tokens as well, and we need to make sure `bridgeTokensL1toL2` and tokens with CCIP lanes match (or rewards claiming attempts will revert).
+- [ ] We should write tests to ensure that CCIP lanes the list of tokens in `bridgeTokensL1toL2` once CCIP deploys on Treasure chain.
 
 
 <a name="message-encoding-and-decoding"/>
@@ -213,6 +234,7 @@ These choices are made because this repo is intended just for Eigenlayer functio
 ## Message Encoding and Decoding
 
 Every message sent from L2 to L1 abi.encodes the message to send to Eigenlayer, then appends a user signature that signs the message digest of that Eigenlayer message to the end of it.
+Frontend clients will need to implement this.
 
 Please see the `signMessageForEigenAgentExecution` function [here](https://github.com/peitalin/L2-eigenlayer-restaking/blob/f1bd5c91b2c47ec6dad50cf518102f13355f521c/script/ClientSigners.sol#L166).
 
@@ -255,9 +277,9 @@ The decoding functions can be found in `src/utils/EigenlayerMsgDecoders.sol` wit
 `test/UnitTests_MsgEncodingDecoding.t.sol`.
 
 
-<a name="todo-features"/>
+<a name="supported-features"/>
 
-## Todo Features
+## Supported Features
 
 - [x] Cross-chain messages for EigenAgent to execute Eigenlayer actions:
     - [x] `depositIntoStrategy`
@@ -273,11 +295,24 @@ The decoding functions can be found in `src/utils/EigenlayerMsgDecoders.sol` wit
         - [x] Transfer bridgeable rewards tokens back to L2.
         - [x] Transfer L1 rewards tokens to AgentOwner address on L1.
 
-- [ ] Gas optimization
+- [x] Gas optimization
     - [x] Estimate gas limit for each of the previous operations
     - [x] Reduce gas costs associated with 6551 accounts creation + delegate calls
-        - [ ] Remove proxies if we don't need upgradeability.
 
-- [ ] Chainlink to setup a "lane" for CCIP bridges:
+
+## Todo Checklist
+
+Upgradeability
+- [ ] Remove proxies for specific contracts if we don't need upgradeability.
+
+CCIP
+- [ ] Chainlink to setup a "lane" for CCIP token bridges:
     - [ ] Setup Chainlink lanes on Holesky and target L2.
     - [ ] Adapt differences in bridging model (mint/burn vs lock/mint) for target chain.
+
+Frontend Helper Functions
+- [ ] Frontend message signing helper functions (to append signatures for the 6551 EigenAgent account to the CCIP messages).
+
+Tests
+- [ ] Write tests to ensure that the tokens with CCIP lanes matches the list of bridgeable tokens (the mapping `bridgeTokensL1toL2` on `RestakingConnectorStorage.sol` and `SenderHooks.sol`) once CCIP deploys on Treasure chain.
+

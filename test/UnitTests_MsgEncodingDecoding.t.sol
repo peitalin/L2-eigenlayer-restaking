@@ -7,7 +7,7 @@ import {ISignatureUtils} from "@eigenlayer-contracts/interfaces/ISignatureUtils.
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 
 import {
     AgentOwnerSignature,
@@ -79,6 +79,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             deployerKey,
+            address(eigenAgent),
             block.chainid,
             address(strategy),
             messageToEigenlayer,
@@ -152,6 +153,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             deployerKey,
+            address(eigenAgent),
             block.chainid,
             address(strategy),
             messageToEigenlayer,
@@ -251,6 +253,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_QW = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(123123), // StrategyManager to approve + deposit
                 message_QW,
@@ -310,6 +313,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_QW = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(123123), // StrategyManager to approve + deposit
                 message_QW,
@@ -371,6 +375,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_CW = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(123123), // StrategyManager to approve + deposit
                 message_CW,
@@ -467,6 +472,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         {
             messageWithSignature_CW_Array = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(123123), // StrategyManager to approve + deposit
                 encodeCompleteWithdrawalsMsg(
@@ -632,6 +638,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_DT = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(123123), // StrategyManager to approve + deposit
                 message_DT,
@@ -676,6 +683,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_UD = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(123123), // StrategyManager to approve + deposit
                 message_UD,
@@ -772,6 +780,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature_PC = signMessageForEigenAgentExecution(
             deployerKey,
+            address(eigenAgent),
             block.chainid, // destination chainid where EigenAgent lives
             address(123123), // StrategyManager to approve + deposit
             encodeProcessClaimMsg(claim, recipient),
@@ -811,7 +820,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         vm.assertEq(_expiry, expiry);
     }
 
-    function test_Decode_RewardsProcessClaim_DynamicLengthProofs() public {
+    function test_Decode_RewardsProcessClaim_DynamicLengthProofs() view public {
         // Trickier example where tokenTreeProofs (dynamic bytestrings) are uneven lengths.
         bytes32 earnerTokenRoot = 0x899e3bde2c009bda46a51ecacd5b3f6df0af2833168cc21cac5f75e8c610ce0d;
         IRewardsCoordinator.EarnerTreeMerkleLeaf memory earnerLeaf = IRewardsCoordinator.EarnerTreeMerkleLeaf({
@@ -856,6 +865,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
         bytes memory messageWithSignature_PC = signMessageForEigenAgentExecution(
             deployerKey,
+            address(eigenAgent),
             block.chainid, // destination chainid where EigenAgent lives
             address(123123), // StrategyManager to approve + deposit
             encodeProcessClaimMsg(claim, recipient),
@@ -924,6 +934,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
             messageWithSignature_PC = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(123123), // StrategyManager to approve + deposit
                 encodeProcessClaimMsg(claim, recipient),
@@ -958,6 +969,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
             messageWithSignature_PC = signMessageForEigenAgentExecution(
                 deployerKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(123123), // StrategyManager to approve + deposit
                 encodeProcessClaimMsg(claim2, recipient),

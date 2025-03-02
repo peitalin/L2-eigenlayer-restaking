@@ -2,8 +2,8 @@
 pragma solidity 0.8.25;
 
 import {Script} from "forge-std/Script.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
 
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
@@ -94,16 +94,18 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
 
 
         // upgrade 6551 EigenAgentOwner NFT
-        proxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(eigenAgentOwner721Proxy))),
-            address(new EigenAgentOwner721())
+        proxyAdmin.upgradeAndCall(
+            ITransparentUpgradeableProxy(payable(address(eigenAgentOwner721Proxy))),
+            address(new EigenAgentOwner721()),
+            ""
         );
         eigenAgentOwner721Proxy.addToWhitelistedCallers(address(restakingConnectorProxy));
 
         // upgrade agentFactoryProxy
-        proxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(agentFactoryProxy))),
-            address(new AgentFactory())
+        proxyAdmin.upgradeAndCall(
+            ITransparentUpgradeableProxy(payable(address(agentFactoryProxy))),
+            address(new AgentFactory()),
+            ""
         );
 
         //////////////////////////////////////////////////
@@ -111,17 +113,19 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
         //////////////////////////////////////////////////
 
         // Upgrade ReceiverCCIP proxy to new implementation
-        proxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(receiverProxy))),
-            address(new ReceiverCCIP(EthSepolia.Router))
+        proxyAdmin.upgradeAndCall(
+            ITransparentUpgradeableProxy(payable(address(receiverProxy))),
+            address(new ReceiverCCIP(EthSepolia.Router)),
+            ""
         );
         vm.stopBroadcast();
 
         vm.startBroadcast(deployerKey);
         // Upgrade RestakingConnector proxy to new implementation
-        proxyAdmin.upgrade(
-            TransparentUpgradeableProxy(payable(address(restakingConnectorProxy))),
-            address(new RestakingConnector())
+        proxyAdmin.upgradeAndCall(
+            ITransparentUpgradeableProxy(payable(address(restakingConnectorProxy))),
+            address(new RestakingConnector()),
+            ""
         );
 
         receiverProxy.setRestakingConnector(restakingConnectorProxy);

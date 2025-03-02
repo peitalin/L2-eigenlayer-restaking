@@ -2,7 +2,8 @@
 pragma solidity 0.8.25;
 
 import {Test} from "forge-std/Test.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+// eigenlayer RewardsCoordinator is expecting v4.7 erc20
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
@@ -22,6 +23,7 @@ import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
 import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
 import {ClientSigners} from "../script/ClientSigners.sol";
 import {ClientEncoders} from "../script/ClientEncoders.sol";
+import {GasLimits} from "../script/GasLimits.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
@@ -30,8 +32,7 @@ import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 
 
-
-contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
+contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
 
     DeployReceiverOnL1Script public deployReceiverOnL1Script;
     DeploySenderOnL2Script public deploySenderOnL2Script;
@@ -137,6 +138,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         restakingConnector.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
 
         vm.deal(address(receiverContract), 1 ether);
+        vm.deal(address(restakingConnector), 1 ether);
     }
 
     function _setupL2ForkedEnvironment() private {
@@ -158,6 +160,17 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         // only for tests
         vm.prank(deployer);
         senderContract.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
+
+        (
+            bytes4[] memory functionSelectors,
+            uint256[] memory gasLimits
+        ) = getGasLimits();
+
+        vm.prank(deployer);
+        senderHooks.setGasLimitsForFunctionSelectors(
+            functionSelectors,
+            gasLimits
+        );
     }
 
     function _whitelistContracts() private {
@@ -178,6 +191,8 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy, rewardsCoordinator);
 
             IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
+            IERC20_CCIPBnM(address(tokenL1)).drip(address(restakingConnector));
+            IERC20_CCIPBnM(address(tokenL1)).drip(address(deployer));
             IERC20_CCIPBnM(address(tokenL1)).drip(address(deployer));
         }
         vm.stopBroadcast();
@@ -196,6 +211,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             senderContract.allowlistSender(deployer, true);
 
             IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(senderContract));
+            IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(deployer));
             IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(deployer));
         }
         vm.stopBroadcast();
@@ -244,6 +260,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
         eigenAgentOwner721 = agentFactory.eigenAgentOwner721();
 
         vm.deal(address(receiverContract), 1 ether);
+        vm.deal(address(restakingConnector), 1 ether);
 
         vm.startBroadcast(deployerKey);
         {
@@ -257,6 +274,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
             restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy, rewardsCoordinator);
 
             IERC20Minter(address(tokenL1)).mint(address(receiverContract), 1 ether);
+            IERC20Minter(address(tokenL1)).mint(address(restakingConnector), 1 ether);
             IERC20Minter(address(tokenL1)).mint(deployer, 1 ether);
 
             // for mock testing only
@@ -285,6 +303,17 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders {
 
             // for mock testing only
             senderHooks.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
+
+            (
+                bytes4[] memory functionSelectors,
+                uint256[] memory gasLimits
+            ) = getGasLimits();
+
+            senderHooks.setGasLimitsForFunctionSelectors(
+                functionSelectors,
+                gasLimits
+            );
+
         }
         vm.stopBroadcast();
     }

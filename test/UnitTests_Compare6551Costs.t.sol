@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
+import {Clones} from "@openzeppelin-v5-contracts/proxy/Clones.sol";
+import {IERC721} from "@openzeppelin-v5-contracts/token/ERC721/IERC721.sol";
 import {ERC6551Account} from "@6551/examples/simple/ERC6551Account.sol";
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
+import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
+
+import {console} from "forge-std/console.sol";
 
 
 contract UnitTests_Compare6551Costs is BaseTestEnvironment {
@@ -18,7 +21,7 @@ contract UnitTests_Compare6551Costs is BaseTestEnvironment {
     function setUp() public {
 
         setUpLocalEnvironment();
-        proxyAdmin = new ProxyAdmin();
+        proxyAdmin = new ProxyAdmin(address(this));
     }
 
     /*
@@ -32,58 +35,68 @@ contract UnitTests_Compare6551Costs is BaseTestEnvironment {
     function test_Compare6551DeploymentCosts() public {
 
         EigenAgent6551 defaultAgent = new EigenAgent6551();
-        ERC6551Account defaultAgent2 = new ERC6551Account();
+        ERC6551Account defaultagentBob = new ERC6551Account();
 
         IEigenAgent6551 testAgentGasCost = IEigenAgent6551(payable(Clones.clone(address(defaultAgent))));
 
         vm.prank(deployer);
-        IEigenAgent6551 agent1 = agentFactory.spawnEigenAgentOnlyOwner(alice);
+        IEigenAgent6551 agentAlice = agentFactory.spawnEigenAgentOnlyOwner(alice);
         vm.prank(deployer);
-        IEigenAgent6551 agent2 = agentFactory.spawnEigenAgentOnlyOwner(bob);
+        IEigenAgent6551 agentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
 
-        vm.assertEq(agent1.EIGEN_AGENT_EXEC_TYPEHASH(), agent2.EIGEN_AGENT_EXEC_TYPEHASH());
-        vm.assertEq(defaultAgent.EIGEN_AGENT_EXEC_TYPEHASH(), agent1.EIGEN_AGENT_EXEC_TYPEHASH());
-        vm.assertEq(defaultAgent.EIGEN_AGENT_EXEC_TYPEHASH(), agent2.EIGEN_AGENT_EXEC_TYPEHASH());
+        vm.assertEq(agentAlice.EIGEN_AGENT_EXEC_TYPEHASH(), agentBob.EIGEN_AGENT_EXEC_TYPEHASH());
+        vm.assertEq(defaultAgent.EIGEN_AGENT_EXEC_TYPEHASH(), agentAlice.EIGEN_AGENT_EXEC_TYPEHASH());
+        vm.assertEq(defaultAgent.EIGEN_AGENT_EXEC_TYPEHASH(), agentBob.EIGEN_AGENT_EXEC_TYPEHASH());
 
         bytes memory testMessage = abi.encodeWithSelector(IERC721.balanceOf.selector, address(alice));
         address targetContract = address(eigenAgentOwner721);
         uint256 expiry = block.timestamp;
 
+        console.log("Signing message for agentAlice: ", address(agentAlice));
         // simulate agents executing messages
         bytes memory sig1 = signMessage(
             aliceKey,
+            address(agentAlice),
             targetContract,
             testMessage,
             0, // execNonce = 0
             expiry
         );
-        agent1.executeWithSignature(targetContract, 0, testMessage, expiry, sig1);
+        vm.startBroadcast(address(restakingConnector));
+        agentAlice.executeWithSignature(targetContract, 0, testMessage, expiry, sig1);
+        vm.stopBroadcast();
 
         bytes memory sig2 = signMessage(
             aliceKey,
+            address(agentAlice),
             targetContract,
             testMessage,
             1, // execNonce = 1
             expiry
         );
-        agent1.executeWithSignature(targetContract, 0, testMessage, expiry, sig2);
+        vm.startBroadcast(address(restakingConnector));
+        agentAlice.executeWithSignature(targetContract, 0, testMessage, expiry, sig2);
+        vm.stopBroadcast();
 
         bytes memory sig3 = signMessage(
             bobKey,
+            address(agentBob),
             targetContract,
             testMessage,
             0, // execNonce = 0
             expiry
         );
-        agent2.executeWithSignature(targetContract, 0, testMessage, expiry, sig3);
-
-        vm.assertEq(agent1.execNonce(), 2);
-        vm.assertEq(agent2.execNonce(), 1);
+        vm.startBroadcast(address(restakingConnector));
+        agentBob.executeWithSignature(targetContract, 0, testMessage, expiry, sig3);
+        vm.stopBroadcast();
+        vm.assertEq(agentAlice.execNonce(), 2);
+        vm.assertEq(agentBob.execNonce(), 1);
         vm.assertEq(defaultAgent.execNonce(), 0);
     }
 
     function signMessage(
         uint256 signerKey,
+        address eigenAgentAddr,
         address targetContractAddr,
         bytes memory message,
         uint256 execNonce,
@@ -92,6 +105,7 @@ contract UnitTests_Compare6551Costs is BaseTestEnvironment {
 
         bytes32 digestHash = createEigenAgentCallDigestHash(
             targetContractAddr,
+            eigenAgentAddr,
             0 ether, // not sending ether
             message,
             execNonce,

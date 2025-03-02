@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Initializable} from "@openzeppelin-v5-contracts-upgradeable/proxy/utils/Initializable.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
@@ -16,9 +17,7 @@ import {Adminable} from "./utils/Adminable.sol";
 /// @title Sender Hooks: processes SenderCCIP messages and stores state
 contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
 
-    /// @notice links transferRoot to amounts[], tokensL2[], agentOwners for withdrawals and rewards
-    mapping(bytes32 transferRoot => uint256[] amount) public transferCommitmentsAmount;
-    mapping(bytes32 transferRoot => address[] tokenL2) public transferCommitmentsTokenL2;
+    /// @notice links transferRoots to agentOwners for withdrawals and rewards
     mapping(bytes32 transferRoot => address agentOwner) public transferCommitmentsAgentOwner;
 
     /// @notice tracks whether transferRoots have been used, marking a transfer complete.
@@ -30,6 +29,8 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
 
     /// @notice lookup L2 token addresses of bridgeable tokens
     mapping(address bridgeTokenL1 => address bridgeTokenL2) public bridgeTokensL1toL2;
+
+    uint256 internal constant DEFAULT_GAS_LIMIT = 199_998;
 
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
 
@@ -43,8 +44,14 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         address signer
     );
 
+    event SetSenderCCIP(address indexed);
+    event SetBridgeTokens(address indexed, address indexed);
+    event ClearBridgeTokens(address indexed);
+
     error AddressZero(string msg);
-    error OnlySendFundsForDeposits(string msg);
+    error OnlySendFundsForDeposits(bytes4 functionSelector, string msg);
+    error OnlyDepositOneTokenAtATime(string msg);
+    error UnsupportedFunctionCall(bytes4 functionSelector);
 
     constructor() {
         _disableInitializers();
@@ -80,6 +87,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             revert AddressZero("SenderCCIP cannot be address(0)");
 
         _senderCCIP = newSenderCCIP;
+        emit SetSenderCCIP(newSenderCCIP);
     }
 
     /**
@@ -91,7 +99,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * - delegateTo(address,(bytes,uint256),bytes32) == 0xeea9064b
      * - undelegate(address) == 0xda8be864
      * @param functionSelector bytes4 functionSelector to get estimated gasLimits for.
-     * @return gasLimit a default gasLimit of 200_000 functionSelector parameter finds no matches.
+     * @return gasLimit returns 199_998 default if functionSelector does not match any entries
      */
     function getGasLimitForFunctionSelector(bytes4 functionSelector)
         public
@@ -99,7 +107,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         returns (uint256)
     {
         uint256 gasLimit = _gasLimitsForFunctionSelectors[functionSelector];
-        return (gasLimit > 0) ? gasLimit : 200_000;
+        return (gasLimit > 0) ? gasLimit : 199_998;
     }
 
     /**
@@ -133,6 +141,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             revert AddressZero("_bridgeTokenL2 cannot be address(0)");
 
         bridgeTokensL1toL2[_bridgeTokenL1] = _bridgeTokenL2;
+        emit SetBridgeTokens(_bridgeTokenL1, _bridgeTokenL2);
     }
 
     /**
@@ -141,6 +150,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      */
     function clearBridgeTokens(address _bridgeTokenL1) external onlyOwner {
         delete bridgeTokensL1toL2[_bridgeTokenL1];
+        emit ClearBridgeTokens(_bridgeTokenL1);
     }
 
     /*
@@ -169,7 +179,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
     function handleTransferToAgentOwner(bytes memory message)
         external
         onlySenderCCIP
-        returns (ISenderHooks.FundsTransfer[] memory)
+        returns (address agentOwner)
     {
 
         TransferToAgentOwnerMsg memory transferToAgentOwnerMsg = decodeTransferToAgentOwnerMsg(message);
@@ -181,15 +191,13 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         );
 
         // Read the withdrawalTransferRoot (or rewardsTransferRoot) that signer previously committed to.
-        ISenderHooks.FundsTransfer[] memory fundsTransfers = getFundsTransferCommitment(transferRoot);
+        agentOwner = getTransferRootAgentOwner(transferRoot);
 
         // Mark withdrawalTransferRoot (or rewardsTransferRoot) as spent to prevent double withdrawals/claims
         transferRootsSpent[transferRoot] = true;
-        delete transferCommitmentsAmount[transferRoot];
-        delete transferCommitmentsTokenL2[transferRoot];
         delete transferCommitmentsAgentOwner[transferRoot];
 
-        return fundsTransfers;
+        return agentOwner;
     }
 
     /**
@@ -198,18 +206,33 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * and store information about the amount and owner of the EigenAgent doing the withdrawal to
      * transfer withdrawals to later (or rewards claims).
      * @param message is the outbound message passed to CCIP's _buildCCIPMessage function
-     * @param amount is the amount of token being sent
+     * @param tokenAmounts is the amounts of tokens being sent
      */
     function beforeSendCCIPMessage(
         bytes memory message,
-        uint256 amount
+        Client.EVMTokenAmount[] memory tokenAmounts
     ) external onlySenderCCIP returns (uint256 gasLimit) {
 
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
+        gasLimit = getGasLimitForFunctionSelector(functionSelector);
 
-        if (functionSelector != IStrategyManager.depositIntoStrategy.selector) {
+        if (tokenAmounts.length > 1) {
+            revert OnlyDepositOneTokenAtATime("Eigenlayer only deposits one token at a time");
+        }
+        if (
+            tokenAmounts.length > 0 &&
+            (functionSelector != IStrategyManager.depositIntoStrategy.selector &&
+            functionSelector != ISenderHooks.handleTransferToAgentOwner.selector)
+        ) {
             // check tokens are only bridged for deposit calls
-            if (amount > 0) revert OnlySendFundsForDeposits("Only send funds for deposit messages");
+            if (tokenAmounts[0].amount > 0) {
+                revert OnlySendFundsForDeposits(functionSelector,"Only send funds for DepositIntoStrategy calls");
+            }
+        }
+
+        if (gasLimit == DEFAULT_GAS_LIMIT) {
+            // default gasLimit means functionSelector is not supported
+            revert UnsupportedFunctionCall(functionSelector);
         }
 
         if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
@@ -220,35 +243,18 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             _commitRewardsTransferRootInfo(message);
         }
 
-        return getGasLimitForFunctionSelector(functionSelector);
+        return gasLimit;
     }
 
     /**
-     * @dev Gets FundsTransfer structs (amount, tokenl2, agentOwner) associated with a transferRoot
+     * @dev Gets agentOwner associated with a transferRoot
      * @param transferRoot is calculated when dispatching a completeWithdrawal message.
      * A transferRoot may be either a rewardsTransferRoot or withdrawalsTransferRoot depending on
      * whether we are sending a completeWithdrawal message, or a rewards claimProcess message.
-     * @return transferTokensArray is an array of FundsTransfer(amount, tokenL2, agentOwner) structs
+     * @return agentOwner the address who owns the EigenAgent
      */
-    function getFundsTransferCommitment(bytes32 transferRoot)
-        public
-        view
-        returns (ISenderHooks.FundsTransfer[] memory transferTokensArray)
-    {
-        uint256[] memory amounts = transferCommitmentsAmount[transferRoot];
-        address[] memory tokensL2 = transferCommitmentsTokenL2[transferRoot];
-        address agentOwner = transferCommitmentsAgentOwner[transferRoot];
-
-        // instantiate array size. amounts.length == tokensL2.length by construction
-        transferTokensArray = new ISenderHooks.FundsTransfer[](amounts.length);
-
-        for (uint256 i = 0; i < amounts.length; ++i) {
-            transferTokensArray[i] = ISenderHooks.FundsTransfer({
-                amount: amounts[i],
-                tokenL2: tokensL2[i],
-                agentOwner: agentOwner
-            });
-        }
+    function getTransferRootAgentOwner(bytes32 transferRoot) public view returns (address agentOwner) {
+        return transferCommitmentsAgentOwner[transferRoot];
     }
 
     /**
@@ -300,28 +306,6 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         // If receveAsTokens = false, we don't need to do anything.
         if (receiveAsTokens) {
 
-            uint256 n; // track bridgeable tokens index
-
-            ISenderHooks.FundsTransfer[] memory fundsTransfersArray =
-                new ISenderHooks.FundsTransfer[](_numBridgeableTokens(tokensToWithdraw));
-
-            for (uint256 i = 0; i < tokensToWithdraw.length; ++i) {
-
-                uint256 amount = withdrawal.shares[i];
-                address tokenL2 = bridgeTokensL1toL2[address(tokensToWithdraw[i])];
-                // Check whether tokenToWithdraw is bridgeable:
-                if (tokenL2 != address(0)) {
-
-                    fundsTransfersArray[n] = ISenderHooks.FundsTransfer({
-                        amount: amount,
-                        tokenL2: tokenL2,
-                        agentOwner: signer
-                    });
-
-                    ++n;
-                }
-            }
-
             // Calculate withdrawalTransferRoot: hash(withdrawalRoot, amount, tokenL2, signer)
             // and commit to it on L2, so that when the withdrawalTransferRoot message is
             // returned from L1 we can lookup and verify which AgentOwner to transfer funds to.
@@ -337,9 +321,8 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
                 "SenderHooks._commitWithdrawalTransferRootInfo: TransferRoot already used"
             );
 
-            // Commit to (amount, tokenL2, agentOwner) before sending completeWithdrawal message,
-            _setFundsTransferCommitment(withdrawalTransferRoot, fundsTransfersArray);
-
+            // Commit to agentOwner before sending completeWithdrawal message,
+            _setTransferRootAgentOwner(withdrawalTransferRoot, signer);
             emit WithdrawalTransferRootCommitted(withdrawalTransferRoot, signer);
         }
     }
@@ -353,31 +336,6 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             , // expiry
             // signature
         ) = decodeProcessClaimMsg(message);
-
-        uint256 n = 0; // index to keep track of bridgeable tokens
-
-        ISenderHooks.FundsTransfer[] memory fundsTransfersArray =
-            new ISenderHooks.FundsTransfer[](_numBridgeableTokenLeaves(claim.tokenLeaves));
-
-        for (uint32 j = 0; j < claim.tokenLeaves.length; ++j) {
-            // Only bridgeable tokens will be bridged back to L2.
-            // Other L1 tokens will be claimed and transferred to AgentOwner on L1
-            // and do not need a TransferRoot commitment.
-            uint256 rewardAmount = claim.tokenLeaves[j].cumulativeEarnings;
-            address rewardToken = address(claim.tokenLeaves[j].token);
-            address tokenL2 = bridgeTokensL1toL2[rewardToken];
-            // Check whether tokenToWithdraw is bridgeable:
-            if (tokenL2 != address(0)) {
-
-                fundsTransfersArray[n] = ISenderHooks.FundsTransfer({
-                    amount: rewardAmount,
-                    tokenL2: tokenL2,
-                    agentOwner: signer // signer is owner of recipient (EigenAgent)
-                });
-
-                ++n;
-            }
-        }
 
         // Calculate rewardsTransferRoot and commit to it on L2, so that when the
         // rewardsTransferRoot message is returned from L1 we can lookup and verify
@@ -394,9 +352,8 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             "SenderHooks._commitRewardsTransferRootInfo: TransferRoot already used"
         );
 
-        // Commit rewardsTransferRoot to fundsTransferArray before sending processClaim message,
-        _setFundsTransferCommitment(rewardsTransferRoot, fundsTransfersArray);
-
+        // Commit rewardsTransferRoot to signer before sending processClaim message,
+        _setTransferRootAgentOwner(rewardsTransferRoot, signer);
         emit RewardsTransferRootCommitted(rewardsTransferRoot, signer);
     }
 
@@ -406,57 +363,10 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * @param transferRoot is calculated when dispatching a completeWithdrawal message.
      * A transferRoot may be either a rewardsTransferRoot or withdrawalsTransferRoot depending on
      * whether we are sending a completeWithdrawal message, or a rewards claimProcess message.
-     * @param transferTokensArray is an array of FundsTransfer(amount, tokenL2, agentOwner) structs
-     * Assumes all elements have non-zero fields for: amount, tokenl2, agentOwner
+     * @param agentOwner is EigenAgent owner's address
      */
-    function _setFundsTransferCommitment(
-        bytes32 transferRoot,
-        ISenderHooks.FundsTransfer[] memory transferTokensArray
-    ) private {
-
-        if (transferTokensArray.length > 0) {
-
-            uint256[] memory amounts = new uint256[](transferTokensArray.length);
-            address[] memory tokensL2 = new address[](transferTokensArray.length);
-            address agentOwner = transferTokensArray[0].agentOwner;
-
-            for (uint32 i = 0; i < transferTokensArray.length; ++i) {
-                amounts[i] = transferTokensArray[i].amount;
-                tokensL2[i] = transferTokensArray[i].tokenL2;
-            }
-
-            transferCommitmentsAmount[transferRoot] = amounts;
-            transferCommitmentsTokenL2[transferRoot] = tokensL2;
-            transferCommitmentsAgentOwner[transferRoot] = agentOwner;
-        }
-    }
-
-    /**
-     * @dev gets number of bridgeable tokens from an array that contains both bridgeable
-     * and non-bridgeable tokens for withdrawals
-     */
-    function _numBridgeableTokens(IERC20[] memory tokens) private view returns (uint256 num) {
-        for (uint256 i = 0; i < tokens.length; ++i) {
-            if (bridgeTokensL1toL2[address(tokens[i])] != address(0)) {
-                ++num;
-            }
-        }
-    }
-
-    /**
-     * @dev gets number of bridgeable tokens from an array that contains both bridgeable
-     * and non-bridgeable tokens for rewards claims
-     */
-    function _numBridgeableTokenLeaves(IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeafs)
-        private
-        view
-        returns (uint256 num)
-    {
-        for (uint256 i = 0; i < tokenLeafs.length; ++i) {
-            if (bridgeTokensL1toL2[address(tokenLeafs[i].token)] != address(0)) {
-                ++num;
-            }
-        }
+    function _setTransferRootAgentOwner(bytes32 transferRoot, address agentOwner) private {
+        transferCommitmentsAgentOwner[transferRoot] = agentOwner;
     }
 
     /**

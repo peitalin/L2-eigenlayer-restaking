@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {BaseScript} from "./BaseScript.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
@@ -58,6 +59,7 @@ contract DepositIntoStrategyScript is BaseScript {
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             deployerKey,
+            address(eigenAgent),
             EthSepolia.ChainId, // destination chainid where EigenAgent lives
             TARGET_CONTRACT, // StrategyManager is the target
             encodeDepositIntoStrategyMsg(
@@ -69,12 +71,17 @@ contract DepositIntoStrategyScript is BaseScript {
             expiry
         );
 
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL2),
+            amount: amount
+        });
+
         uint256 gasLimit = 570_000; // gas: 564,969
         uint256 routerFees = getRouterFeesL2(
             address(receiverContract),
             string(messageWithSignature),
-            address(tokenL2),
-            amount,
+            tokenAmounts,
             gasLimit
         );
 
@@ -86,8 +93,7 @@ contract DepositIntoStrategyScript is BaseScript {
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature),
-            address(tokenL2),
-            amount,
+            tokenAmounts,
             gasLimit
         );
 

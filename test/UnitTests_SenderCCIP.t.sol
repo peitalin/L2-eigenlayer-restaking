@@ -3,13 +3,14 @@ pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
+import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
-
+import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 
 contract UnitTests_SenderCCIP is BaseTestEnvironment {
@@ -40,7 +41,10 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
 
         vm.startBroadcast(bob);
         {
-            vm.expectRevert("Ownable: caller is not the owner");
+            vm.expectRevert(abi.encodeWithSelector(
+                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+                bob
+            ));
             senderContract.setSenderHooks(ISenderHooks(newSenderHooks));
         }
         vm.stopBroadcast();
@@ -90,8 +94,7 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
                 ccipMessage.messageId,
                 ccipMessage.sourceChainSelector,
                 address(deployer),
-                destTokenAmounts[0].token,
-                destTokenAmounts[0].amount
+                destTokenAmounts
             );
             vm.expectEmit(true, true, true, true);
             emit SenderCCIP.MatchedReceivedFunctionSelector(randomFunctionSelector);
@@ -120,6 +123,7 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
                 destTokenAmounts: destTokenAmounts
             });
 
+            Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
             // event MessageReceived(
             //     bytes32 indexed messageId,
             //     uint64 indexed sourceChainSelector,
@@ -132,8 +136,7 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
                 ccipMessage.messageId,
                 ccipMessage.sourceChainSelector,
                 address(deployer),
-                address(0),
-                0
+                tokenAmounts
             );
             vm.expectEmit(true, true, true, true);
             emit SenderCCIP.MatchedReceivedFunctionSelector(randomFunctionSelector);
@@ -144,5 +147,7 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
         }
         vm.stopBroadcast();
     }
+
+
 
 }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {BaseScript} from "./BaseScript.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
-
 
 contract MintEigenAgentScript is BaseScript {
 

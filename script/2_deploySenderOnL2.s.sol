@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
 
 import {FileReader} from "./FileReader.sol";
 import {Script} from "forge-std/Script.sol";
@@ -40,7 +40,7 @@ contract DeploySenderOnL2Script is Script, FileReader {
 
         vm.startBroadcast(deployerKey);
 
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
+        ProxyAdmin proxyAdmin = new ProxyAdmin(deployer);
 
         // deploy sender utils proxy
         SenderHooks senderHooksProxy = SenderHooks(

@@ -5,9 +5,9 @@ import {IRouterClient} from "@chainlink/ccip/interfaces/IRouterClient.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {CCIPReceiver} from "@chainlink/ccip/applications/CCIPReceiver.sol";
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {IERC20} from "@openzeppelin-v5-contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin-v5-contracts/token/ERC20/utils/SafeERC20.sol";
+import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 
 abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
@@ -29,8 +29,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         bytes32 indexed messageId,
         uint64 indexed destinationChainSelector,
         address receiver,
-        address token,
-        uint256 tokenAmount,
+        Client.EVMTokenAmount[] tokenAmounts,
         address feeToken,
         uint256 fees
     );
@@ -39,9 +38,12 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         bytes32 indexed messageId,
         uint64 indexed sourceChainSelector,
         address sender,
-        address token,
-        uint256 tokenAmount
+        Client.EVMTokenAmount[] tokenAmounts
     );
+
+    event AllowlistDestinationChain(uint64 indexed destinationChainSelector, bool allowed);
+    event AllowlistSourceChain(uint64 indexed sourceChainSelector, bool allowed);
+    event AllowlistSender(address indexed sender, bool allowed);
 
     error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees);
     error WithdrawalExceedsBalance(uint256 amount, uint256 currentBalance);
@@ -51,11 +53,13 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     error SenderNotAllowed(address sender);
     error InvalidReceiverAddress();
     error NotEnoughEthGasFees(uint256 setGasFees, uint256 requiredGasFees);
+    error FailedToRefundExcessEth(address sender, uint256 refundAmount);
+    error CannotSendZeroTokens(address token);
 
     constructor(address _router) CCIPReceiver(_router) { }
 
     function __BaseMessengerCCIP_init() internal {
-        OwnableUpgradeable.__Ownable_init();
+        OwnableUpgradeable.__Ownable_init(msg.sender);
     }
 
     /// @param _destinationChainSelector The selector of the destination chain.
@@ -80,6 +84,38 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         _;
     }
 
+    modifier cannotSendZeroTokens(Client.EVMTokenAmount[] memory _tokenAmounts) {
+        for (uint256 i = 0; i < _tokenAmounts.length; i++) {
+            if (_tokenAmounts[i].amount <= 0) {
+                revert CannotSendZeroTokens(_tokenAmounts[i].token);
+            }
+        }
+        _;
+    }
+
+    function validateGasFees(uint256 fees) internal {
+        if (msg.sender != address(this)) {
+            // user sends ETH to the router
+            if (fees > msg.value) {
+                // User sent too little gas, revert.
+                revert NotEnoughEthGasFees(msg.value, fees);
+            } else if (msg.value > fees) {
+                // User sent too much gas, refund the excess.
+                uint256 refundAmount = msg.value - fees;
+                (bool success, ) = msg.sender.call{value: refundAmount}("");
+                if (!success) {
+                    revert FailedToRefundExcessEth(msg.sender, refundAmount);
+                }
+            } else {
+                // Do nothing. User sent just the right amount of gas.
+            }
+        } else {
+            // when contract initiates refund, or transfers withdrawals back to L1
+            if (fees > address(this).balance)
+                revert NotEnoughBalance(address(this).balance, fees);
+        }
+    }
+
     /// @param _destinationChainSelector The selector of the destination chain to be updated.
     /// @param allowed allowlist status to be set for the destination chain.
     function allowlistDestinationChain(
@@ -87,6 +123,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         bool allowed
     ) external onlyOwner {
         allowlistedDestinationChains[_destinationChainSelector] = allowed;
+        emit AllowlistDestinationChain(_destinationChainSelector, allowed);
     }
 
     /// @param _sourceChainSelector The selector of the source chain to be updated.
@@ -96,13 +133,17 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         bool allowed
     ) external onlyOwner {
         allowlistedSourceChains[_sourceChainSelector] = allowed;
+        emit AllowlistSourceChain(_sourceChainSelector, allowed);
     }
 
     /// @param _sender address of the sender to be updated.
     /// @param allowed allowlist status to be set for the sender.
     function allowlistSender(address _sender, bool allowed) external onlyOwner {
         allowlistedSenders[_sender] = allowed;
+        emit AllowlistSender(_sender, allowed);
     }
+
+    /// TODO: do a multi-token version of sendMessagePayNative
 
     /// @notice Sends data and transfer tokens to receiver on the destination chain.
     /// @notice Pay for fees in native gas.
@@ -110,16 +151,14 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     /// @param _destinationChainSelector The identifier (aka selector) for the destination blockchain.
     /// @param _receiver address of the recipient on the destination blockchain.
     /// @param _text string data to be sent.
-    /// @param _token token address.
-    /// @param _amount token amount.
+    /// @param _tokenAmounts array of EVMTokenAmount structs (token and amount).
     /// @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
     /// @return messageId ID of the CCIP message that was sent.
     function sendMessagePayNative(
         uint64 _destinationChainSelector,
         address _receiver,
         string calldata _text,
-        address _token,
-        uint256 _amount,
+        Client.EVMTokenAmount[] memory _tokenAmounts,
         uint256 _overrideGasLimit
     )
         external
@@ -132,8 +171,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         Client.EVM2AnyMessage memory evm2AnyMessage = _buildCCIPMessage(
             _receiver,
             _text,
-            _token,
-            _amount,
+            _tokenAmounts,
             address(0), // address(0) means fees are paid in native gas
             _overrideGasLimit
         );
@@ -141,23 +179,23 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         IRouterClient router = IRouterClient(this.getRouter());
 
         uint256 fees = router.getFee(_destinationChainSelector, evm2AnyMessage);
+        validateGasFees(fees);
 
-        if (msg.sender != address(this)) {
-            // user sends ETH to the router
-            if (fees > msg.value)
-                revert NotEnoughEthGasFees(msg.value, fees);
-        } else {
-            // when contract initiates refund, or transfers withdrawals back to L1
-            if (fees > address(this).balance)
-                revert NotEnoughBalance(address(this).balance, fees);
+        for (uint256 i = 0; i < _tokenAmounts.length; i++) {
+            if (_tokenAmounts[i].amount > 0 && msg.sender != address(this)) {
+                // transfer tokens from user to this contract
+                IERC20(_tokenAmounts[i].token).transferFrom(
+                    msg.sender,
+                    address(this),
+                    _tokenAmounts[i].amount
+                );
+            }
+            // then approve router to move tokens from this contract
+            IERC20(_tokenAmounts[i].token).approve(
+                address(router),
+                _tokenAmounts[i].amount
+            );
         }
-
-        // transfer tokens from user to this contract
-        if (_amount > 0 && msg.sender != address(this)) {
-            IERC20(_token).transferFrom(msg.sender, address(this), _amount);
-        }
-        // then approve router to move tokens from this contract
-        IERC20(_token).approve(address(router), _amount);
 
         messageId = router.ccipSend{value: fees}(
             _destinationChainSelector,
@@ -168,8 +206,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
             messageId,
             _destinationChainSelector,
             _receiver,
-            _token,
-            _amount,
+            _tokenAmounts,
             address(0),
             fees
         );
@@ -181,16 +218,14 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
     /// @param _receiver The address of the receiver.
     /// @param _text The string data to be sent.
-    /// @param _token The token to be transferred.
-    /// @param _amount The amount of the token to be transferred.
+    /// @param _tokenAmounts array of EVMTokenAmount structs (token and amount).
     /// @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
     /// @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
     /// @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
     function _buildCCIPMessage(
         address _receiver,
         string calldata _text,
-        address _token,
-        uint256 _amount,
+        Client.EVMTokenAmount[] memory _tokenAmounts,
         address _feeTokenAddress,
         uint256 _overrideGasLimit
     ) internal virtual returns (Client.EVM2AnyMessage memory);

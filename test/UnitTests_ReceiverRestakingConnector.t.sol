@@ -4,22 +4,24 @@ pragma solidity 0.8.25;
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
+import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 
+import {TestERC20} from "./mocks/TestERC20.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
+import {console} from "forge-std/Script.sol";
 
 
 contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
@@ -39,6 +41,9 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         expiry = block.timestamp + 1 hours;
         execNonce0 = 0;
+
+        vm.prank(deployer);
+        eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
     }
 
     /*
@@ -53,10 +58,16 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         IRestakingConnector restakingImpl = IRestakingConnector(address(new RestakingConnector()));
 
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(
+            OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+            address(this)
+        ));
         receiverContract.setRestakingConnector(IRestakingConnector(address(0)));
 
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(
+            OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+            address(this)
+        ));
         receiverContract.setSenderContractL2(address(senderContract));
 
         vm.prank(deployer);
@@ -81,7 +92,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
      function test_Initialize_Receiver() public {
 
         ReceiverCCIP receiverImpl = new ReceiverCCIP(EthSepolia.Router);
-        ProxyAdmin pa = new ProxyAdmin();
+        ProxyAdmin pa = new ProxyAdmin(address(this));
 
         vm.expectRevert(
             abi.encodeWithSelector(AddressZero.selector, "RestakingConnector cannot be address(0)")
@@ -113,7 +124,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
      function test_Initialize_RestakingConnector() public {
 
         RestakingConnector restakingImpl = new RestakingConnector();
-        ProxyAdmin pa = new ProxyAdmin();
+        ProxyAdmin pa = new ProxyAdmin(address(this));
 
         vm.expectRevert(
             abi.encodeWithSelector(AddressZero.selector, "AgentFactory cannot be address(0)")
@@ -138,6 +149,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             bobKey,
+            address(eigenAgent),
             block.chainid,
             address(123123), // invalid targetContract to cause revert
             encodeDepositIntoStrategyMsg(
@@ -193,6 +205,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             bobKey,
+            address(eigenAgent),
             block.chainid,
             address(strategyManager),
             encodeDepositIntoStrategyMsg(
@@ -224,7 +237,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         vm.prank(deployer);
         eigenAgentOwner721.removeFromWhitelistedCallers(address(restakingConnector));
 
-        vm.expectRevert(abi.encodeWithSelector(CallerNotWhitelisted.selector, "EigenAgent: caller not allowed"));
+        vm.expectRevert(abi.encodeWithSelector(CallerNotWhitelisted.selector, "EigenAgent6551: caller not allowed"));
         receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 
@@ -237,8 +250,14 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         uint256 expiryShort = block.timestamp + 60 seconds;
         uint256 amount = 0.1 ether;
 
+        vm.startPrank(deployer);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+        vm.stopPrank();
+
+        console.log("111111 address(eigenAgentBob): ", address(eigenAgentBob));
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
-            bobKey,
+            bobKey, // sign with Bob's key
+            address(eigenAgentBob),
             block.chainid, // destination chainid where EigenAgent lives
             address(strategyManager), // StrategyManager to approve + deposit
             encodeDepositIntoStrategyMsg(
@@ -249,6 +268,9 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             execNonce,
             expiryShort
         );
+        bytes32 domainSeparator = eigenAgentBob.domainSeparator(block.chainid);
+        console.log("222222 domainSeparator: ");
+        console.logBytes32(domainSeparator);
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
@@ -287,6 +309,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             bobKey,
+            address(eigenAgent),
             block.chainid, // destination chainid where EigenAgent lives
             address(strategyManager), // StrategyManager to approve + deposit
             encodeDepositIntoStrategyMsg(
@@ -298,7 +321,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             expiryShort
         );
 
-        ERC20 token2 = new ERC20("token2", "TKN2");
+        TestERC20 token2 = new TestERC20("token2", "TKN2");
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](2);
         destTokenAmounts[0] = Client.EVMTokenAmount({
@@ -372,7 +395,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             "Bob should have minted a new EigenAgent for Alice"
         );
         require(
-            address(agentFactory.getEigenAgent(deployer)) == address(0),
+            address(agentFactory.getEigenAgent(deployer)) == address(eigenAgent),
             "Deployer should not have minted a new EigenAgent"
         );
     }
@@ -410,8 +433,10 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
 
     function test_RestakingConnector_SetAndGet_AgentFactory() public {
-
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(
+            OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+            address(this)
+        ));
         restakingConnector.setAgentFactory(
             address(agentFactory)
         );
@@ -434,8 +459,10 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
     }
 
     function test_RestakingConnector_SetAndGet_EigenlayerContracts() public {
-
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(
+            OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+            address(this)
+        ));
         restakingConnector.setEigenlayerContracts(
             delegationManager,
             strategyManager,
@@ -541,11 +568,11 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         );
 
         // Return default gasLimit of 400_000 for undefined function selectors
-        vm.assertEq(restakingConnector.getGasLimitForFunctionSelector(0xffeeaabb), 200_000);
+        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(0xffeeaabb), 200_000);
 
         // gas limits should be set
-        vm.assertEq(restakingConnector.getGasLimitForFunctionSelector(functionSelectors[0]), 1_000_000);
-        vm.assertEq(restakingConnector.getGasLimitForFunctionSelector(functionSelectors[1]), 800_000);
+        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(functionSelectors[0]), 1_000_000);
+        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(functionSelectors[1]), 800_000);
 
         vm.stopBroadcast();
     }
@@ -589,7 +616,10 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         bytes32 messageId = bytes32(abi.encode(1,2,3));
 
         vm.prank(bob);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(
+            OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+            bob
+        ));
         receiverContract.withdrawTokenForMessageId(messageId, bob, address(tokenL1), 1 ether);
 
         vm.expectRevert(abi.encodeWithSelector(WithdrawalExceedsBalance.selector, 2 ether, 1 ether));
@@ -632,7 +662,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
     function test_RestakingConnector_SetBridgeTokens() public {
 
-        ProxyAdmin proxyAdmin = new ProxyAdmin();
+        ProxyAdmin proxyAdmin = new ProxyAdmin(address(this));
 
         address _bridgeTokenL1 = vm.addr(1001);
         address _bridgeTokenL2 = vm.addr(2002);
@@ -679,7 +709,10 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
         vm.startBroadcast(bob);
         {
-            vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(
+            OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+            bob
+        ));
             rc.setBridgeTokens(_bridgeTokenL1, _bridgeTokenL2);
         }
         vm.stopBroadcast();

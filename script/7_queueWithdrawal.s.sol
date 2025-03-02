@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 
@@ -118,6 +119,7 @@ contract QueueWithdrawalScript is BaseScript {
         // sign the message for EigenAgent to execute Eigenlayer command
         messageWithSignature = signMessageForEigenAgentExecution(
             deployerKey,
+            address(eigenAgent),
             EthSepolia.ChainId, // destination chainid where EigenAgent lives
             TARGET_CONTRACT,
             withdrawalMessage,
@@ -130,31 +132,37 @@ contract QueueWithdrawalScript is BaseScript {
         ///////////////////////////
 
         vm.selectFork(l2ForkId);
+        {
 
-        uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
-            IDelegationManager.queueWithdrawals.selector
-        );
-        uint256 routerFees = getRouterFeesL2(
-            address(receiverContract),
-            string(messageWithSignature),
-            address(tokenL2),
-            0, // not bridging, just sending message
-            gasLimit
-        );
-        // gas: 315,798
+            Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+            tokenAmounts[0] = Client.EVMTokenAmount({
+                token: address(tokenL2),
+                amount: amount // 0, not bridging tokens
+            });
 
-        vm.startBroadcast(deployerKey);
+            uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
+                IDelegationManager.queueWithdrawals.selector
+            );
+            uint256 routerFees = getRouterFeesL2(
+                address(receiverContract),
+                string(messageWithSignature),
+                tokenAmounts,
+                gasLimit
+            );
+            // gas: 315,798
 
-        senderContract.sendMessagePayNative{value: routerFees}(
-            EthSepolia.ChainSelector, // destination chain
-            address(receiverContract),
-            string(messageWithSignature),
-            address(tokenL2),
-            amount,
-            gasLimit
-        );
+            vm.startBroadcast(deployerKey);
 
-        vm.stopBroadcast();
+            senderContract.sendMessagePayNative{value: routerFees}(
+                EthSepolia.ChainSelector, // destination chain
+                address(receiverContract),
+                string(messageWithSignature),
+                tokenAmounts,
+                gasLimit
+            );
+
+            vm.stopBroadcast();
+        }
 
         string memory filePath = "script/withdrawals-queued/";
         if (isTest) {
