@@ -15,7 +15,7 @@ import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
-import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
+import {BaseSepolia, EthHolesky} from "../script/Addresses.sol";
 
 
 
@@ -374,7 +374,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         // sign the message for EigenAgent to execute Eigenlayer command
         messageWithSignature_PC = signMessageForEigenAgentExecution(
             signerKey,
-            EthSepolia.ChainId, // destination chainid where EigenAgent lives
+            EthHolesky.ChainId, // destination chainid where EigenAgent lives
             address(rewardsCoordinator),
             encodeProcessClaimMsg(claim, signer),
             execNonce,
@@ -424,7 +424,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_CW = signMessageForEigenAgentExecution(
                 signerKey,
-                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                EthHolesky.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 completeWithdrawalMessage,
                 execNonce,

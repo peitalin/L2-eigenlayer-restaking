@@ -9,7 +9,7 @@ import {SenderCCIP} from "../src/SenderCCIP.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
-import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
+import {BaseSepolia, EthHolesky} from "../script/Addresses.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 
@@ -74,7 +74,7 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
 
             Client.Any2EVMMessage memory ccipMessage = Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: EthHolesky.ChainSelector,
                 sender: abi.encode(address(deployer)),
                 data: abi.encode(string(
                     randomMessage
@@ -115,7 +115,7 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
 
             Client.Any2EVMMessage memory ccipMessage = Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: EthHolesky.ChainSelector,
                 sender: abi.encode(address(deployer)),
                 data: abi.encode(string(
                     randomMessage

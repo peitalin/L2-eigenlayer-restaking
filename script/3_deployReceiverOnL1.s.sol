@@ -20,7 +20,7 @@ import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 import {FileReader} from "./FileReader.sol";
-import {BaseSepolia, EthSepolia} from "./Addresses.sol";
+import {BaseSepolia, EthHolesky} from "./Addresses.sol";
 
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 import {ERC6551Registry} from "@6551/ERC6551Registry.sol";
@@ -138,7 +138,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
                     abi.encodeWithSelector(
                         RestakingConnector.initialize.selector,
                         agentFactoryProxy,
-                        EthSepolia.BridgeToken,
+                        EthHolesky.BridgeToken,
                         BaseSepolia.BridgeToken
                     )
                 )
@@ -155,9 +155,9 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         // deploy real receiver implementation and upgradeAndCall initializer
         ReceiverCCIP receiverImpl;
         if (isMockRun) {
-            receiverImpl = new ReceiverCCIPMock(EthSepolia.Router);
+            receiverImpl = new ReceiverCCIPMock(EthHolesky.Router);
         } else {
-            receiverImpl = new ReceiverCCIP(EthSepolia.Router);
+            receiverImpl = new ReceiverCCIP(EthHolesky.Router);
         }
         receiverProxy = ReceiverCCIP(
             payable(address(
@@ -174,10 +174,10 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         );
 
         // Receiver both receives and sends messages back to L2 Sender
-        receiverProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
+        receiverProxy.allowlistSourceChain(EthHolesky.ChainSelector, true);
         receiverProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
         receiverProxy.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
-        receiverProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
+        receiverProxy.allowlistDestinationChain(EthHolesky.ChainSelector, true);
 
         receiverProxy.allowlistSender(address(senderContract), true);
         receiverProxy.setSenderContractL2(address(senderContract));

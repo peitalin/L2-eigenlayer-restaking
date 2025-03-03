@@ -18,7 +18,7 @@ import {
 } from "../src/utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 import {FunctionSelectorDecoder} from "../src/utils/FunctionSelectorDecoder.sol";
-import {EthSepolia} from "../script/Addresses.sol";
+import {EthHolesky} from "../script/Addresses.sol";
 
 
 contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
@@ -604,7 +604,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
                 approverSalt,
                 sig1_expiry,
                 address(delegationManager),
-                EthSepolia.ChainSelector
+                EthHolesky.ChainSelector
             );
 
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash1);

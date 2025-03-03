@@ -19,7 +19,7 @@ import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
 
 import {ClientEncoders} from "../script/ClientEncoders.sol";
 import {ClientSigners} from "../script/ClientSigners.sol";
-import {EthSepolia} from "../script/Addresses.sol";
+import {EthHolesky} from "../script/Addresses.sol";
 
 
 
@@ -90,7 +90,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
     function test_ClientSigner_createEigenlayerDepositDigest() public view {
 
-        bytes32 domainSeparator = clientSignersTest.domainSeparator(address(strategyManager), EthSepolia.ChainId);
+        bytes32 domainSeparator = clientSignersTest.domainSeparator(address(strategyManager), EthHolesky.ChainId);
 
         bytes32 digest1 = clientSignersTest.createEigenlayerDepositDigest(
             strategy,
@@ -120,7 +120,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
     function test_ClientSigner_getDomainSeparator() public view {
 
         address contractAddr = address(strategyManager);
-        uint256 chainid = EthSepolia.ChainId;
+        uint256 chainid = EthHolesky.ChainId;
         bytes32 DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
 
         bytes32 domainSeparator1 = keccak256(abi.encode(
@@ -144,7 +144,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
         bytes32 approverSalt = bytes32(uint256(222222));
         address delegationManagerAddr = address(delegationManager);
-        uint256 destinationChainid = EthSepolia.ChainId;
+        uint256 destinationChainid = EthHolesky.ChainId;
 
         // calculate the struct hash
         bytes32 approverStructHash = keccak256(
@@ -182,7 +182,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         uint256 _value = 0 ether;
         bytes memory _data = abi.encodeWithSelector(0x11992233, 1233, "something");
         uint256 _nonce = 0;
-        uint256 _chainid = EthSepolia.ChainId;
+        uint256 _chainid = EthHolesky.ChainId;
         uint256 _expiry = expiry;
 
         bytes32 structHash = keccak256(abi.encode(
@@ -217,7 +217,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
     ) public view returns (bytes memory) {
 
         uint256 signerKey = bobKey;
-        uint256 chainid = EthSepolia.ChainId;
+        uint256 chainid = EthHolesky.ChainId;
         address targetContractAddr = address(delegationManager);
         bytes memory messageToEigenlayer = abi.encodeWithSelector(0x11992233, 1233, "something");
         uint256 execNonceEigenAgent = 0;
@@ -457,7 +457,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
                 approverSalt,
                 sig1_expiry,
                 address(delegationManager),
-                EthSepolia.ChainSelector
+                EthHolesky.ChainSelector
             );
 
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash1);

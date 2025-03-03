@@ -30,7 +30,7 @@ import {StrategyBaseTVLLimits} from "@eigenlayer-contracts/strategies/StrategyBa
 import {ERC20Minter} from "../test/mocks/ERC20Minter.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
-import {EthSepolia} from "./Addresses.sol";
+import {EthHolesky} from "./Addresses.sol";
 
 /// @dev This deploys mock Eigenlayer contracts from the `dev` branch for the purpose
 /// of testing deposits, withdrawals, and delegation with custom ERC20 strategies only.
@@ -106,7 +106,7 @@ contract DeployMockEigenlayerContractsScript is Script {
             tokenERC20 = IERC20(address(deployERC20Minter("Mock MAGIC", "MMAGIC", proxyAdmin)));
         } else {
             // can't mint, you need to transfer CCIP-BnM tokens to receiver contract
-            tokenERC20 = IERC20(address(IERC20_CCIPBnM(EthSepolia.BridgeToken)));
+            tokenERC20 = IERC20(address(IERC20_CCIPBnM(EthHolesky.BridgeToken)));
         }
 
         (StrategyFactory strategyFactory, UpgradeableBeacon strategyBeacon) = _deployStrategyFactory(
@@ -438,8 +438,6 @@ contract DeployMockEigenlayerContractsScript is Script {
         chains[31337] = "localhost";
         chains[17000] = "holesky";
         chains[84532] = "basesepolia";
-        chains[11155111] = "ethsepolia";
-        // Eigenlayer contract addresses are only on EthSepolia and localhost, not L2
 
         string memory deploymentData = vm.readFile(
             string(abi.encodePacked(
@@ -540,7 +538,6 @@ contract DeployMockEigenlayerContractsScript is Script {
         chains[31337] = "localhost";
         chains[17000] = "holesky";
         chains[84532] = "basesepolia";
-        chains[11155111] = "ethsepolia";
 
         string memory finalOutputPath = string(abi.encodePacked(
             "script/",

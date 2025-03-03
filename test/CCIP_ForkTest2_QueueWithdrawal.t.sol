@@ -2,7 +2,7 @@
 pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
-import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
+import {EthHolesky, BaseSepolia} from "../script/Addresses.sol";
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
@@ -136,7 +136,7 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature1 = signMessageForEigenAgentExecution(
                 bobKey,
-                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                EthHolesky.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 withdrawalMessage,
                 execNonce1,
@@ -198,7 +198,7 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature1 = signMessageForEigenAgentExecution(
                 bobKey,
-                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                EthHolesky.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 withdrawalMessage,
                 execNonce1,

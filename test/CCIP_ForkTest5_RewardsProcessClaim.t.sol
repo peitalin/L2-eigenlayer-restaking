@@ -14,7 +14,7 @@ import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoor
 import {Merkle} from "@eigenlayer-contracts/libraries/Merkle.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 
-import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
+import {EthHolesky, BaseSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 
@@ -301,7 +301,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature_ProcessClaim = signMessageForEigenAgentExecution(
             deployerKey,
-            EthSepolia.ChainId, // destination chainid where EigenAgent lives
+            EthHolesky.ChainId, // destination chainid where EigenAgent lives
             address(rewardsCoordinator),
             encodeProcessClaimMsg(claim, earners[0]),
             execNonce,
@@ -337,7 +337,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
             deployer // signer (agentOwner)
         );
         senderContract.sendMessagePayNative{value: routerFees}(
-            EthSepolia.ChainSelector, // destination chain
+            EthHolesky.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_ProcessClaim),
             tokenAmounts,
@@ -423,7 +423,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         senderContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: EthHolesky.ChainSelector,
                 sender: abi.encode(address(receiverContract)),
                 data: abi.encode(string(
                     encodeTransferToAgentOwnerMsg(
@@ -439,7 +439,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         senderContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: EthHolesky.ChainSelector,
                 sender: abi.encode(address(receiverContract)),
                 data: abi.encode(string(
                     encodeTransferToAgentOwnerMsg(rewardsTransferRoot)
@@ -457,7 +457,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         // attempting to re-commit a spent claim should fail on L2
         vm.expectRevert("SenderHooks._commitRewardsTransferRootInfo: TransferRoot already used");
         senderContract.sendMessagePayNative{value: routerFees2}(
-            EthSepolia.ChainSelector, // destination chain
+            EthHolesky.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_ProcessClaim),
             new Client.EVMTokenAmount[](0), // empty array

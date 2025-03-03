@@ -1,0 +1,16 @@
+{
+  "chainInfo": {
+    "block": 6774229,
+    "chainid": 11155111,
+    "timestamp": 1727514804
+  },
+  "contracts": {
+    "agentFactory": "",
+    "baseEigenAgent": "",
+    "eigenAgentOwner721": "",
+    "proxyAdminL1": "",
+    "receiverCCIP": "",
+    "registry6551": "",
+    "restakingConnector": ""
+  }
+}

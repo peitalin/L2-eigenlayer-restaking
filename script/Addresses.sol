@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+// https://test.tokenmanager.chain.link/dashboard/holesky/0xada5cc8a9aab0bc23cfb2ff3a991ab642ade3033
+
 library BaseSepolia {
     //////////////////////////////////////////////
     // Base Sepolia
@@ -21,7 +23,8 @@ library BaseSepolia {
 
     // The CCIP-BnM contract address at the source chain
     // https://docs.chain.link/ccip/supported-networks/v1_2_0/testnet#base-sepolia
-    address constant CcipBnM = 0x88A2d74F47a237a62e7A51cdDa67270CE381555e;
+    address constant CcipBnM = 0x38bb3d685f16196963763ad34cefa120dd897e71;
+    address constant MagicBnM = 0x38bb3d685f16196963763ad34cefa120dd897e71;
 
     address constant BridgeToken = CcipBnM;
 
@@ -35,62 +38,34 @@ library BaseSepolia {
     address constant EVM2EVMOnRamp = 0x6486906bB2d85A6c0cCEf2A2831C11A2059ebfea;
 }
 
-library EthSepolia {
+library EthHolesky {
     //////////////////////////////////////////////
-    // ETH Sepolia
-    //////////////////////////////////////////////
-    // Router:
-    // 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59
-    //
-    // chain selector:
-    // 16015286601757825753
-    //
-    // CCIP-BnM token:
-    // 0xFd57b4ddBf88a4e07fF4e34C487b99af2Fe82a05
-    //////////////////////////////////////////////
-
-    address constant Router = 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59;
-
-    uint64 constant ChainSelector = 16015286601757825753;
-
-    address constant CcipBnM = 0xFd57b4ddBf88a4e07fF4e34C487b99af2Fe82a05;
-
-    address constant BridgeToken = CcipBnM;
-
-    address constant Link = 0x779877A7B0D9E8603169DdbD7836e478b4624789;
-
-    uint256 constant ChainId = 11155111;
-}
-
-library ArbSepolia {
-    //////////////////////////////////////////////
-    // Arb Sepolia
+    // ETH Holesky
     //////////////////////////////////////////////
     // Router:
-    // 0x2a9C5afB0d0e4BAb2BCdaE109EC4b0c4Be15a165
+    // 0xb9531b46fE8808fB3659e39704953c2B1112DD43
     //
     // chain selector:
-    // 3478487238524512106
+    // 7717148896336251131
     //
     // CCIP-BnM token:
-    // 0xA8C0c11bf64AF62CDCA6f93D3769B88BdD7cb93D
+    // 0xada5cc8a9aab0bc23cfb2ff3a991ab642ade3033
     //////////////////////////////////////////////
 
-    address constant Router = 0x2a9C5afB0d0e4BAb2BCdaE109EC4b0c4Be15a165;
+    address constant Router = 0xb9531b46fe8808fb3659e39704953c2b1112dd43;
 
-    uint64 constant ChainSelector = 3478487238524512106;
+    uint64 constant ChainSelector = 7717148896336251131;
 
-    // The CCIP-BnM contract address at the source chain
-    // https://docs.chain.link/ccip/supported-networks/v1_2_0/testnet#arbitrum-sepolia-ethereum-sepolia
-    address constant CcipBnM = 0xA8C0c11bf64AF62CDCA6f93D3769B88BdD7cb93D;
-
+    // The CCIP-BnM contract address at the destination chain
+    address constant CcipBnM = 0xada5cc8a9aab0bc23cfb2ff3a991ab642ade3033;
+    address constant MagicBnM = 0xada5cc8a9aab0bc23cfb2ff3a991ab642ade3033;
     address constant BridgeToken = CcipBnM;
 
-    address constant Link = 0xb1D4538B4571d411F07960EF2838Ce337FE1E80E;
+    address constant Link = 0x685cE6742351ae9b618F383883D6d1e0c5A31B4B;
 
-    uint256 constant ChainId = 421614;
+    uint256 constant ChainId = 17000;
 
     // Risk Management Network contract that curses / blesses
-    address constant RMN = 0xbcBDf0aDEDC9a33ED5338Bdb4B6F7CE664DC2e8B;
+    address constant RMN = 0x8607115fd037d4f182b0eBaEC3cF08Df67080d05;
 
 }

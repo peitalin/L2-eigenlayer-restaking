@@ -18,7 +18,7 @@ import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
-import {EthSepolia, BaseSepolia} from "./Addresses.sol";
+import {EthHolesky, BaseSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
 
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
@@ -52,7 +52,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
     }
 
     function mockrun() public {
-        vm.createSelectFork("ethsepolia");
+        vm.createSelectFork("holesky");
         return _run(true);
     }
 
@@ -115,7 +115,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
         // Upgrade ReceiverCCIP proxy to new implementation
         proxyAdmin.upgradeAndCall(
             ITransparentUpgradeableProxy(payable(address(receiverProxy))),
-            address(new ReceiverCCIP(EthSepolia.Router)),
+            address(new ReceiverCCIP(EthHolesky.Router)),
             ""
         );
         vm.stopBroadcast();
@@ -133,7 +133,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
         restakingConnectorProxy.setAgentFactory(address(agentFactoryProxy));
         restakingConnectorProxy.setReceiverCCIP(address(receiverProxy));
         restakingConnectorProxy.setBridgeTokens(
-            EthSepolia.BridgeToken,
+            EthHolesky.BridgeToken,
             BaseSepolia.BridgeToken
         );
 

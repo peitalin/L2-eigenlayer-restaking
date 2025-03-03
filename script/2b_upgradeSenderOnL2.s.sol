@@ -11,7 +11,7 @@ import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 
-import {BaseSepolia, EthSepolia} from "./Addresses.sol";
+import {BaseSepolia, EthHolesky} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
 
 
@@ -59,14 +59,14 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
         );
 
         /// whitelist destination chain
-        senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
-        senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
+        senderProxy.allowlistDestinationChain(EthHolesky.ChainSelector, true);
+        senderProxy.allowlistSourceChain(EthHolesky.ChainSelector, true);
         senderProxy.allowlistSender(address(receiverProxy), true);
         senderProxy.setSenderHooks(senderHooksProxy);
 
         senderHooksProxy.setSenderCCIP(address(senderProxy));
         senderHooksProxy.setBridgeTokens(
-            EthSepolia.BridgeToken,
+            EthHolesky.BridgeToken,
             BaseSepolia.BridgeToken
         );
 
@@ -83,12 +83,12 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
             "senderProxy: must allowlistSender(receiverProxy)"
         );
         require(
-            senderProxy.allowlistedSourceChains(EthSepolia.ChainSelector),
-            "senderProxy: must allowlist SourceChain: EthSepolia"
+            senderProxy.allowlistedSourceChains(EthHolesky.ChainSelector),
+            "senderProxy: must allowlist SourceChain: EthHolesky"
         );
         require(
-            senderProxy.allowlistedDestinationChains(EthSepolia.ChainSelector),
-            "senderProxy: must allowlist DestinationChain: EthSepolia)"
+            senderProxy.allowlistedDestinationChains(EthHolesky.ChainSelector),
+            "senderProxy: must allowlist DestinationChain: EthHolesky)"
         );
 
         vm.stopBroadcast();

@@ -11,16 +11,6 @@ forge script script/5_depositAndMintEigenAgent.s.sol:DepositAndMintEigenAgentScr
     -vvvv
 
 
-### TODO: automatically verify EigenAgent contract after they are spawned
-# forge verify-contract \
-#     --watch \
-#     --rpc-url ethsepolia \
-#     --etherscan-api-key $ETHERSCAN_API_KEY \
-#     --compiler-version v0.8.25 \
-#     0x0aEDf2bfF862E2e8D31951E20f329F3776ceF974 \
-#     src/6551/EigenAgent6551.sol:EigenAgent6551
-
-
 ## After running this script, search for the TX hash on https://ccip.chain.link/
 
 # We bridge the token from L2 to L1, then deposit into Eigenlayer through 6551 accounts owned by the user, with user signatures:

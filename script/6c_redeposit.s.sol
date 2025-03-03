@@ -6,7 +6,7 @@ import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationMa
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
-import {EthSepolia} from "./Addresses.sol";
+import {EthHolesky} from "./Addresses.sol";
 import {BaseScript} from "./BaseScript.sol";
 
 
@@ -99,7 +99,7 @@ contract RedepositScript is BaseScript {
             // sign the message for EigenAgent to execute Eigenlayer command
             bytes memory messageWithSignature = signMessageForEigenAgentExecution(
                 deployerKey,
-                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                EthHolesky.ChainId, // destination chainid where EigenAgent lives
                 TARGET_CONTRACT,
                 encodeCompleteWithdrawalMsg(
                     withdrawal,
@@ -130,7 +130,7 @@ contract RedepositScript is BaseScript {
             vm.startBroadcast(deployerKey);
 
             senderContract.sendMessagePayNative{value: routerFees}(
-                EthSepolia.ChainSelector, // destination chain
+                EthHolesky.ChainSelector, // destination chain
                 address(receiverContract),
                 string(messageWithSignature),
                 tokenAmounts,

@@ -7,7 +7,7 @@ import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
-import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
+import {BaseSepolia, EthHolesky} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
 import {NonPayableContract} from "./mocks/NonPayableContract.sol";
@@ -206,7 +206,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             senderContract.mockCCIPReceive(
                 Client.Any2EVMMessage({
                     messageId: bytes32(0x0),
-                    sourceChainSelector: EthSepolia.ChainSelector,
+                    sourceChainSelector: EthHolesky.ChainSelector,
                     sender: abi.encode(user),
                     destTokenAmounts: new Client.EVMTokenAmount[](0),
                     data: abi.encode(string(
@@ -219,7 +219,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         senderContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: EthHolesky.ChainSelector,
                 sender: abi.encode(address(receiverContract)),
                 destTokenAmounts: new Client.EVMTokenAmount[](0),
                 data: abi.encode(string(
@@ -230,7 +230,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         senderContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: EthHolesky.ChainSelector,
                 sender: abi.encode(deployer),
                 destTokenAmounts: new Client.EVMTokenAmount[](0),
                 data: abi.encode(string(
@@ -325,7 +325,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             );
 
             senderContract.sendMessagePayNative{value: fees}(
-                EthSepolia.ChainSelector, // _destinationChainSelector,
+                EthHolesky.ChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
                 string(message),
                 new Client.EVMTokenAmount[](0),
@@ -370,7 +370,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 feesExpected
             ));
             senderContract.sendMessagePayNative{value: fees}(
-                EthSepolia.ChainSelector, // _destinationChainSelector,
+                EthHolesky.ChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
                 string(encodeDepositIntoStrategyMsg(
                     address(strategy),
@@ -404,7 +404,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             require(fees > feesExpected, "Fees should be greater than expected");
 
             senderContract.sendMessagePayNative{value: fees}(
-                EthSepolia.ChainSelector, // _destinationChainSelector,
+                EthHolesky.ChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
                 string(message),
                 new Client.EVMTokenAmount[](0),
@@ -479,7 +479,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         senderContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
-                sourceChainSelector: EthSepolia.ChainSelector, // L2 source chain selector
+                sourceChainSelector: EthHolesky.ChainSelector, // L2 source chain selector
                 sender: abi.encode(deployer),
                 destTokenAmounts: new Client.EVMTokenAmount[](0),
                 data: abi.encode(string(
@@ -522,7 +522,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
         vm.expectRevert(InvalidReceiverAddress.selector);
         senderContract.sendMessagePayNative(
-            EthSepolia.ChainSelector, // _destinationChainSelector,
+            EthHolesky.ChainSelector, // _destinationChainSelector,
             address(0), // _receiver,
             string(message),
             tokenAmounts,
@@ -550,7 +550,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         // vm.expectRevert(abi.encodeWithSelector(NotEnoughEthGasFees.selector, 0, 6716943154164788));
         vm.expectRevert();
         senderContract.sendMessagePayNative(
-            EthSepolia.ChainSelector, // _destinationChainSelector,
+            EthHolesky.ChainSelector, // _destinationChainSelector,
             address(receiverContract), // _receiver,
             string(message),
             tokenAmounts,
@@ -592,7 +592,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             vm.expectEmit(false, true, false, false);
             emit BaseMessengerCCIP.MessageSent(
                 bytes32(0x0), // indexed messageId
-                EthSepolia.ChainSelector, // indexed destinationChainSelector
+                EthHolesky.ChainSelector, // indexed destinationChainSelector
                 address(receiverContract), // receiver
                 tokenAmounts,
                 address(0), // native gas for fees
@@ -606,7 +606,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                     999_000
                 )
             }(
-                EthSepolia.ChainSelector, // destination chain
+                EthHolesky.ChainSelector, // destination chain
                 address(receiverContract),
                 string(messageWithSignature),
                 tokenAmounts,
@@ -768,7 +768,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 randomFunctionSelector
             ));
             senderContract.sendMessagePayNative{value: fees}(
-                EthSepolia.ChainSelector, // _destinationChainSelector,
+                EthHolesky.ChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
                 string(unsupportedMessage),
                 new Client.EVMTokenAmount[](0),

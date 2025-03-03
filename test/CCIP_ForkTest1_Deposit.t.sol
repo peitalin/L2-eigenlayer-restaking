@@ -6,7 +6,7 @@ import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
-import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
+import {EthHolesky, BaseSepolia} from "../script/Addresses.sol";
 import {EigenlayerMsgDecoders} from "../src/utils/EigenlayerMsgDecoders.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
@@ -323,7 +323,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         RouterFees routerFeesL1 = new RouterFees();
         Client.EVMTokenAmount[] memory tokenAmountsL1 = new Client.EVMTokenAmount[](1);
         tokenAmountsL1[0] = Client.EVMTokenAmount({
-            token: address(EthSepolia.BridgeToken),
+            token: address(EthHolesky.BridgeToken),
             amount: 0.1 ether
         });
 

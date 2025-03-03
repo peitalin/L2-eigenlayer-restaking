@@ -7,7 +7,7 @@ import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 
 import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
 import {BaseScript} from "./BaseScript.sol";
-import {EthSepolia} from "./Addresses.sol";
+import {EthHolesky} from "./Addresses.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
 
@@ -119,7 +119,7 @@ contract QueueWithdrawalScript is BaseScript {
         // sign the message for EigenAgent to execute Eigenlayer command
         messageWithSignature = signMessageForEigenAgentExecution(
             deployerKey,
-            EthSepolia.ChainId, // destination chainid where EigenAgent lives
+            EthHolesky.ChainId, // destination chainid where EigenAgent lives
             TARGET_CONTRACT,
             withdrawalMessage,
             execNonce,
@@ -153,7 +153,7 @@ contract QueueWithdrawalScript is BaseScript {
             vm.startBroadcast(deployerKey);
 
             senderContract.sendMessagePayNative{value: routerFees}(
-                EthSepolia.ChainSelector, // destination chain
+                EthHolesky.ChainSelector, // destination chain
                 address(receiverContract),
                 string(messageWithSignature),
                 tokenAmounts,

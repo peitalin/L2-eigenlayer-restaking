@@ -22,7 +22,7 @@ import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
 import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
-import {EthSepolia, BaseSepolia} from "./Addresses.sol";
+import {EthHolesky, BaseSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
 import {ClientEncoders} from "./ClientEncoders.sol";
 import {ClientSigners} from "./ClientSigners.sol";
@@ -69,7 +69,7 @@ contract BaseScript is
      */
     function readContractsAndSetupEnvironment(bool isTest, address deployer) public {
 
-        ethForkId = vm.createFork("ethsepolia");
+        ethForkId = vm.createFork("holesky");
         l2ForkId = vm.createFork("basesepolia");
 
         ///////////////////////////////////////
@@ -96,7 +96,7 @@ contract BaseScript is
         ) = readReceiverRestakingConnector();
 
         agentFactory = readAgentFactory();
-        tokenL1 = IERC20(address(EthSepolia.BridgeToken)); // CCIP-BnM on L1
+        tokenL1 = IERC20(address(EthHolesky.BridgeToken)); // CCIP-BnM on L1
 
         if (isTest) {
             vm.deal(deployer, 1 ether); // fund L1 balance

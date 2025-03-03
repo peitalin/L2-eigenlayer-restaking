@@ -11,7 +11,7 @@ import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
-import {EthSepolia, BaseSepolia} from "./Addresses.sol";
+import {EthHolesky, BaseSepolia} from "./Addresses.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
@@ -19,7 +19,7 @@ import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 
 contract FileReader is Script {
 
-    string public FILEPATH_BRIDGE_CONTRACTS_L1 = "script/ethsepolia/bridgeContractsL1.config.json";
+    string public FILEPATH_BRIDGE_CONTRACTS_L1 = "script/holesky/bridgeContractsL1.config.json";
     string public FILEPATH_BRIDGE_CONTRACTS_L2 = "script/basesepolia/bridgeContractsL2.config.json";
 
     /////////////////////////////////////////////////
@@ -76,7 +76,6 @@ contract FileReader is Script {
         // chains[31337] = "localhost";
         // chains[17000] = "holesky";
         // chains[84532] = "basesepolia";
-        // chains[11155111] = "ethsepolia";
         string memory finalOutputPath2 = string(abi.encodePacked(
             filePath
         ));
@@ -175,7 +174,6 @@ contract FileReader is Script {
         // chains[31337] = "localhost";
         // chains[17000] = "holesky";
         // chains[84532] = "basesepolia";
-        // chains[11155111] = "ethsepolia";
         string memory finalOutputPath1 = string(abi.encodePacked(filePath));
         vm.writeJson(finalJson1, finalOutputPath1);
     }
@@ -223,7 +221,7 @@ contract FileReader is Script {
         vm.serializeUint("chainInfo", "block", block.number);
         vm.serializeUint("chainInfo", "timestamp", block.timestamp);
         vm.serializeUint("chainInfo", "destinationChain", BaseSepolia.ChainId);
-        string memory chainInfo_data = vm.serializeUint("chainInfo", "sourceChain", EthSepolia.ChainId);
+        string memory chainInfo_data = vm.serializeUint("chainInfo", "sourceChain", EthHolesky.ChainId);
 
         /////////////////////////////////////////////////
         // combine objects to a root object

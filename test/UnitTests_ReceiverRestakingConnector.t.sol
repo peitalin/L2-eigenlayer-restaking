@@ -18,7 +18,7 @@ import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
-import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
+import {EthHolesky, BaseSepolia} from "../script/Addresses.sol";
 
 
 
@@ -86,7 +86,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
      function test_Initialize_Receiver() public {
 
-        ReceiverCCIP receiverImpl = new ReceiverCCIP(EthSepolia.Router);
+        ReceiverCCIP receiverImpl = new ReceiverCCIP(EthHolesky.Router);
         ProxyAdmin pa = new ProxyAdmin(address(this));
 
         vm.expectRevert(

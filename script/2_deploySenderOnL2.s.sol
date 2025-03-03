@@ -11,7 +11,7 @@ import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {ISenderCCIPMock, SenderCCIPMock} from "../test/mocks/SenderCCIPMock.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
-import {BaseSepolia, EthSepolia} from "./Addresses.sol";
+import {BaseSepolia, EthHolesky} from "./Addresses.sol";
 
 
 contract DeploySenderOnL2Script is Script, FileReader {
@@ -50,7 +50,7 @@ contract DeploySenderOnL2Script is Script, FileReader {
                     address(proxyAdmin),
                     abi.encodeWithSelector(
                         SenderHooks.initialize.selector,
-                        EthSepolia.BridgeToken,
+                        EthHolesky.BridgeToken,
                         BaseSepolia.BridgeToken
                     )
                 )
@@ -75,8 +75,8 @@ contract DeploySenderOnL2Script is Script, FileReader {
             ))
         );
         // whitelist both chain to receive and send messages
-        senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
-        senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
+        senderProxy.allowlistDestinationChain(EthHolesky.ChainSelector, true);
+        senderProxy.allowlistSourceChain(EthHolesky.ChainSelector, true);
         senderProxy.setSenderHooks(ISenderHooks(address(senderHooksProxy)));
 
         senderHooksProxy.setSenderCCIP(address(senderProxy));
@@ -90,12 +90,12 @@ contract DeploySenderOnL2Script is Script, FileReader {
             "senderHooksProxy: missing senderCCIP"
         );
         require(
-            senderProxy.allowlistedSourceChains(EthSepolia.ChainSelector),
-            "senderProxy: must allowlist SourceChain: EthSepolia"
+            senderProxy.allowlistedSourceChains(EthHolesky.ChainSelector),
+            "senderProxy: must allowlist SourceChain: EthHolesky"
         );
         require(
-            senderProxy.allowlistedDestinationChains(EthSepolia.ChainSelector),
-            "senderProxy: must allowlist DestinationChain: EthSepolia)"
+            senderProxy.allowlistedDestinationChains(EthHolesky.ChainSelector),
+            "senderProxy: must allowlist DestinationChain: EthHolesky)"
         );
 
         if (!isMockRun) {

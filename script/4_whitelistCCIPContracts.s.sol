@@ -14,7 +14,7 @@ import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 
 import {GasLimits} from "./GasLimits.sol";
 import {FileReader} from "./FileReader.sol";
-import {BaseSepolia, EthSepolia} from "./Addresses.sol";
+import {BaseSepolia, EthHolesky} from "./Addresses.sol";
 
 
 contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
@@ -62,7 +62,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
         address tokenL2 = BaseSepolia.BridgeToken;
 
         uint256 l2ForkId = vm.createFork("basesepolia");
-        uint256 ethForkId = vm.createSelectFork("ethsepolia");
+        uint256 ethForkId = vm.createSelectFork("holesky");
 
         /////////////////////////////////////////////
         //////////// Setup L2 SenderCCIP ////////////
@@ -73,7 +73,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
         // allow L2 sender contract to send tokens to L1
         senderProxy.allowlistSender(address(receiverProxy), true);
         senderProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
-        senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
+        senderProxy.allowlistDestinationChain(EthHolesky.ChainSelector, true);
 
         (
             bytes4[] memory functionSelectors,
@@ -100,12 +100,12 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
             "senderProxy: must allowlistSender(receiverProxy)"
         );
         require(
-            senderProxy.allowlistedSourceChains(EthSepolia.ChainSelector),
-            "senderProxy: must allowlist SourceChain: EthSepolia"
+            senderProxy.allowlistedSourceChains(EthHolesky.ChainSelector),
+            "senderProxy: must allowlist SourceChain: EthHolesky"
         );
         require(
-            senderProxy.allowlistedDestinationChains(EthSepolia.ChainSelector),
-            "senderProxy: must allowlist DestinationChain: EthSepolia)"
+            senderProxy.allowlistedDestinationChains(EthHolesky.ChainSelector),
+            "senderProxy: must allowlist DestinationChain: EthHolesky)"
         );
 
         vm.stopBroadcast();
@@ -118,7 +118,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
 
         receiverProxy.allowlistSender(address(senderProxy), true);
         receiverProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
-        receiverProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
+        receiverProxy.allowlistSourceChain(EthHolesky.ChainSelector, true);
         receiverProxy.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
         // Remember to fund L1 receiver with gas and tokens in production.
 

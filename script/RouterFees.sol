@@ -3,7 +3,7 @@ pragma solidity 0.8.25;
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IRouterClient} from "@chainlink/ccip/interfaces/IRouterClient.sol";
-import {EthSepolia, BaseSepolia} from "./Addresses.sol";
+import {EthHolesky, BaseSepolia} from "./Addresses.sol";
 
 
 contract RouterFees {
@@ -15,7 +15,7 @@ contract RouterFees {
         uint256 _gasLimit
     ) public view returns (uint256) {
 
-        return IRouterClient(EthSepolia.Router).getFee(
+        return IRouterClient(EthHolesky.Router).getFee(
             BaseSepolia.ChainSelector,
             Client.EVM2AnyMessage({
                 receiver: abi.encode(_receiver),
@@ -37,7 +37,7 @@ contract RouterFees {
     ) public view returns (uint256) {
 
         return IRouterClient(BaseSepolia.Router).getFee(
-            EthSepolia.ChainSelector,
+            EthHolesky.ChainSelector,
             Client.EVM2AnyMessage({
                 receiver: abi.encode(_receiver),
                 data: abi.encode(_message),

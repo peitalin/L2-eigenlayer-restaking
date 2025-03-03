@@ -28,7 +28,7 @@ contract RestakingConnector is
 
     event SetQueueWithdrawalBlock(address indexed, uint256 indexed, uint256 indexed);
     event SetUndelegateBlock(address indexed, uint256 indexed, uint256 indexed);
-    event UnsupportedFunctionCall(bytes4 functionSelector indexed);
+    event UnsupportedFunctionCall(bytes4 functionSelector);
     event SendingRewardsToAgentOwnerOnL1(address indexed, address indexed, uint256 indexed);
     event SendingWithdrawalToAgentOwnerOnL1(address indexed, address indexed, uint256 indexed);
 

@@ -6,7 +6,7 @@ import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 
-import {EthSepolia} from "./Addresses.sol";
+import {EthHolesky} from "./Addresses.sol";
 import {BaseScript} from "./BaseScript.sol";
 
 
@@ -80,7 +80,7 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             stakerKey,
-            EthSepolia.ChainId, // destination chainid where EigenAgent lives
+            EthHolesky.ChainId, // destination chainid where EigenAgent lives
             TARGET_CONTRACT, // StrategyManager is the target
             encodeDepositIntoStrategyMsg(
                 address(strategy),
@@ -113,7 +113,7 @@ contract DepositAndMintEigenAgentScript is BaseScript {
             tokenL2.approve(address(senderContract), amount);
 
             senderContract.sendMessagePayNative{value: routerFees}(
-                EthSepolia.ChainSelector, // destination chain
+                EthHolesky.ChainSelector, // destination chain
                 address(receiverContract),
                 string(messageWithSignature),
                 tokenAmounts,

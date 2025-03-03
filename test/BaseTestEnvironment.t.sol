@@ -24,7 +24,7 @@ import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
 import {ClientSigners} from "../script/ClientSigners.sol";
 import {ClientEncoders} from "../script/ClientEncoders.sol";
 import {GasLimits} from "../script/GasLimits.sol";
-import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
+import {EthHolesky, BaseSepolia} from "../script/Addresses.sol";
 
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
@@ -93,7 +93,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
         vm.deal(dani, 1 ether);
 
         l2ForkId = vm.createFork("basesepolia"); // 0
-        ethForkId = vm.createFork("ethsepolia"); // 1
+        ethForkId = vm.createFork("holesky"); // 1
 
         // setup L1 forked environment
         _setupL1ForkedEnvironment();
@@ -183,7 +183,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
         {
             // allowlist receiverContract chains and senders
             receiverContract.allowlistSourceChain(BaseSepolia.ChainSelector, true);
-            receiverContract.allowlistDestinationChain(EthSepolia.ChainSelector, true);
+            receiverContract.allowlistDestinationChain(EthHolesky.ChainSelector, true);
 
             receiverContract.allowlistSender(deployer, true);
             receiverContract.allowlistSender(address(senderContract), true);
@@ -204,7 +204,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
         vm.startBroadcast(deployerKey);
         {
             // allow L2 sender contract to receive tokens back from L1
-            senderContract.allowlistSourceChain(EthSepolia.ChainSelector, true);
+            senderContract.allowlistSourceChain(EthHolesky.ChainSelector, true);
             senderContract.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
 
             senderContract.allowlistSender(address(receiverContract), true);
@@ -266,7 +266,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
         {
             // allowlist receiverContract chains and senders
             receiverContract.allowlistSourceChain(BaseSepolia.ChainSelector, true);
-            receiverContract.allowlistDestinationChain(EthSepolia.ChainSelector, true);
+            receiverContract.allowlistDestinationChain(EthHolesky.ChainSelector, true);
 
             receiverContract.allowlistSender(deployer, true);
             receiverContract.allowlistSender(address(senderContract), true);
@@ -295,7 +295,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
         vm.startBroadcast(deployerKey);
         {
             // allow L2 sender contract to receive tokens back from L1
-            senderContract.allowlistSourceChain(EthSepolia.ChainSelector, true);
+            senderContract.allowlistSourceChain(EthHolesky.ChainSelector, true);
             senderContract.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
 
             senderContract.allowlistSender(address(receiverContract), true);

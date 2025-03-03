@@ -9,7 +9,7 @@ import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {ISignatureUtils} from "@eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 
-import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
+import {EthHolesky, BaseSepolia} from "../script/Addresses.sol";
 
 
 contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
@@ -371,7 +371,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_CW = signMessageForEigenAgentExecution(
                 deployerKey,
-                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                EthHolesky.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 completeWithdrawalMessage,
                 execNonce4,
@@ -386,7 +386,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: EthHolesky.ChainSelector,
                 sender: abi.encode(deployer),
                 data: abi.encode(string(
                     messageWithSignature_CW
@@ -533,7 +533,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_CW = signMessageForEigenAgentExecution(
                 deployerKey,
-                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                EthHolesky.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 completeWithdrawalMessage,
                 execNonce4,
@@ -548,7 +548,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: EthHolesky.ChainSelector,
                 sender: abi.encode(deployer),
                 data: abi.encode(string(
                     messageWithSignature_CW

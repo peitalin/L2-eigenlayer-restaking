@@ -8,7 +8,7 @@ import {ISignatureUtils} from "@eigenlayer-contracts/interfaces/ISignatureUtils.
 
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {BaseScript} from "./BaseScript.sol";
-import {EthSepolia} from "./Addresses.sol";
+import {EthHolesky} from "./Addresses.sol";
 
 
 contract DelegateToScript is BaseScript {
@@ -96,7 +96,7 @@ contract DelegateToScript is BaseScript {
                 approverSalt,
                 sigExpiry,
                 address(delegationManager), // delegationManagerAddr
-                EthSepolia.ChainId
+                EthHolesky.ChainId
             );
 
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(operatorKey, digestHash1);
@@ -111,7 +111,7 @@ contract DelegateToScript is BaseScript {
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature_DT = signMessageForEigenAgentExecution(
             deployerKey,
-            EthSepolia.ChainId, // destination chainid where EigenAgent lives
+            EthHolesky.ChainId, // destination chainid where EigenAgent lives
             TARGET_CONTRACT, // DelegationManager.delegateTo()
             encodeDelegateTo(
                 operator,
@@ -141,7 +141,7 @@ contract DelegateToScript is BaseScript {
         vm.startBroadcast(deployerKey);
 
         senderContract.sendMessagePayNative{value: routerFees}(
-            EthSepolia.ChainSelector, // destination chain
+            EthHolesky.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_DT),
             tokenAmounts,

@@ -16,7 +16,7 @@ import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {ERC20Minter} from "../test/mocks/ERC20Minter.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
-import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
+import {EthHolesky, BaseSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
 
@@ -160,7 +160,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_QW = signMessageForEigenAgentExecution(
                 bobKey,
-                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                EthHolesky.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 withdrawalMessage,
                 execNonce1,
@@ -262,7 +262,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_CW = signMessageForEigenAgentExecution(
                 bobKey,
-                EthSepolia.ChainId, // destination chainid where EigenAgent lives
+                EthHolesky.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 completeWithdrawalMessage,
                 execNonce2,
@@ -294,7 +294,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
                 gasLimit
             )
         }(
-            EthSepolia.ChainSelector, // destination chain
+            EthHolesky.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_CW),
             tokenAmounts1,
@@ -309,7 +309,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         //// 2. [L1] Mock receiving CompleteWithdrawals message on L1 Bridge
         /////////////////////////////////////////////////////////////////
 
-        // fork ethsepolia so ReceiverCCIP -> Router calls work
+        // fork holesky so ReceiverCCIP -> Router calls work
         vm.selectFork(ethForkId);
 
         vm.warp(block.timestamp + 120); // 120 seconds = 10 blocks (12second per block)
@@ -345,7 +345,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         console.log("balanceOf(receiverContract) after:", tokenL1.balanceOf(address(receiverContract)));
         console.log("balanceOf(eigenAgent) after:", tokenL1.balanceOf(address(eigenAgent)));
         console.log("balanceOf(restakingConnector) after:", tokenL1.balanceOf(address(restakingConnector)));
-        console.log("balanceOf(router) after:", tokenL1.balanceOf(address(EthSepolia.Router)));
+        console.log("balanceOf(router) after:", tokenL1.balanceOf(address(EthHolesky.Router)));
         require(
             tokenL1.balanceOf(address(receiverContract)) == (balanceOfReceiverBefore - amount),
             "receiverContract did not send tokens to L1 completeWithdrawal"
@@ -379,7 +379,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         senderContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: EthHolesky.ChainSelector,
                 sender: abi.encode(address(receiverContract)),
                 data: abi.encode(string(
                     encodeTransferToAgentOwnerMsg(
@@ -407,7 +407,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         // attempting to commit a spent withdrawalTransferRoot should fail on L2
         vm.expectRevert("SenderHooks._commitWithdrawalTransferRootInfo: TransferRoot already used");
         senderContract.sendMessagePayNative(
-            EthSepolia.ChainSelector, // destination chain
+            EthHolesky.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_CW),
             new Client.EVMTokenAmount[](0),
@@ -425,7 +425,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         senderContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: EthHolesky.ChainSelector,
                 sender: abi.encode(address(receiverContract)),
                 data: abi.encode(string(
                     messageWithdrawalReuse
