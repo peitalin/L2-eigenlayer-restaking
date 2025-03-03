@@ -530,31 +530,35 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         );
     }
 
-    function test_RevertWhen_BaseMessenger_L2_NotEnoughBalance() public {
+    function test_RevertWhen_BaseMessenger_L2_NotEnoughEthGasFees() public {
 
         // L2 Sender
         vm.selectFork(l2ForkId);
+        uint256 _gasLimit = 800_000;
 
         vm.prank(deployer);
-        senderContract.withdraw(deployer, address(deployer).balance);
+        senderContract.withdraw(deployer, address(senderContract).balance);
 
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-        tokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL2),
-            amount: 0 ether
-        });
+        uint256 expectedFees = getRouterFeesL2(
+            address(receiverContract),
+            string(message),
+            new Client.EVMTokenAmount[](0), // empty array
+            _gasLimit
+        );
 
-        // cheatcode not released yet.
-        // vm.expectPartialRevert(NotEnoughBalance.selector);
-        // can't use expectRevert with abi.encodeWithSelector because fees is not known
-        // vm.expectRevert(abi.encodeWithSelector(NotEnoughEthGasFees.selector, 0, 6716943154164788));
-        vm.expectRevert();
-        senderContract.sendMessagePayNative(
+        uint stingyFees = 1 gwei;
+
+        vm.expectRevert(abi.encodeWithSelector(
+            BaseMessengerCCIP.NotEnoughEthGasFees.selector,
+            stingyFees,
+            expectedFees
+        ));
+        senderContract.sendMessagePayNative{value: stingyFees}(
             EthSepolia.ChainSelector, // _destinationChainSelector,
             address(receiverContract), // _receiver,
             string(message),
-            tokenAmounts,
-            800_000
+            new Client.EVMTokenAmount[](0),
+            _gasLimit
         );
     }
 
