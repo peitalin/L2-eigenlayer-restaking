@@ -81,14 +81,17 @@ contract BaseScript is
         deployReceiverOnL1Script = new DeployReceiverOnL1Script();
 
         (
-            strategy,
             strategyManager,
             , // strategyFactory
             , // pauserRegistry
             delegationManager,
-            rewardsCoordinator,
-            // tokenL1
+            rewardsCoordinator
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+        (
+            strategy,
+            // IERC20 _tokenL1,
+            // ProxyAdmin _proxyAdmin
+        ) = deployMockEigenlayerContractsScript.readSavedEigenlayerStrategy();
 
         (
             receiverContract,

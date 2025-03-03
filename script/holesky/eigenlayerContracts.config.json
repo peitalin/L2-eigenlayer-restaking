@@ -2,19 +2,18 @@
   "addresses": {
     "DelegationManager": "0xA44151489861Fe9e3055d95adC98FbD462B948e7",
     "PauserRegistry": "0x41Dbe7BbacA97D986FCF6f5203b98Ec02412ec1D",
-    "ProxyAdmin": "",
+    "ProxyAdmin": "0x1489A1755CC3088452b9Fd6Af60e70e08c491cc0",
     "RewardsCoordinator": "0xAcc1fb458a1317E886dB376Fc8141540537E68fE",
-    "StrategyBeacon": "0xd3c6C6BA4E40dB9288c6a2077e5635344F8aFA4F",
     "StrategyFactory": "0x9c01252B580efD11a05C00Aa42Dd3ac1Ec52DF6d",
     "StrategyManager": "0xdfB5f6CE42aAA7830E94ECFCcAd411beF4d4D5b6",
-    "TokenERC20": "",
+    "TokenERC20": "0x8e7aB3b9Ddf313a7c239BFA422aC01d401cb8216",
     "strategies": {
-      "CCIPStrategy": ""
+      "CCIPStrategy": "0x8bf1beb7aEA6c1532fFAcff045406Fe7B45F27a1"
     }
   },
   "chainInfo": {
     "chainId": 17000,
-    "deploymentBlock": 6539897
+    "deploymentBlock": 3438040
   },
   "parameters": {
     "deployer": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c"

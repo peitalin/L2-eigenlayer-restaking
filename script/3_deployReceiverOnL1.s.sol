@@ -78,14 +78,17 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
         (
-            strategy,
             strategyManager,
             , // strategyFactory
             , // pauserRegistry
             delegationManager,
-            rewardsCoordinator,
-            // token
+            rewardsCoordinator
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+        (
+            strategy,
+            // IERC20 _tokenERC20,
+            // ProxyAdmin _proxyAdmin
+        ) = deployMockEigenlayerContractsScript.readSavedEigenlayerStrategy();
 
         senderContract = readSenderContract();
 

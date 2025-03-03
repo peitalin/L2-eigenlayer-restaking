@@ -49,14 +49,17 @@ contract ScriptsTests_ReadEigenlayerContracts is Test {
         ) = deployMockEigenlayerContractsScript.run();
 
         (
-            IStrategy _strategy,
             IStrategyManager _strategyManager,
             IStrategyFactory _strategyFactory,
             IPauserRegistry _pauserRegistry,
             IDelegationManager _delegationManager,
-            IRewardsCoordinator _rewardsCoordinator,
-            IERC20 _tokenL1
+            IRewardsCoordinator _rewardsCoordinator
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+        (
+            IStrategy _strategy,
+            IERC20 _tokenL1,
+            // ProxyAdmin _proxyAdmin
+        ) = deployMockEigenlayerContractsScript.readSavedEigenlayerStrategy();
 
         vm.assertEq(address(strategy), address(_strategy));
         vm.assertEq(address(strategyManager), address(_strategyManager));

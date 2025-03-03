@@ -38,8 +38,8 @@ remappings = [
 [rpc_endpoints]
 localhost = "http://localhost:8545"
 # Note: Free RPCs may sometimes fail
-holesky = "https://holesky.drpc.org"
-# holesky = "https://holesky.infura.io/v3/${INFURA_API_KEY}"
+# holesky = "https://holesky.drpc.org"
+holesky = "https://holesky.infura.io/v3/${INFURA_API_KEY}"
 basesepolia = "https://sepolia.base.org"
 
 [etherscan]

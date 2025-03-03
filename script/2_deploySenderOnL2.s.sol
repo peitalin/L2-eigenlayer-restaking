@@ -3,6 +3,7 @@ pragma solidity 0.8.25;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
+import {ERC20Minter} from "../test/mocks/ERC20Minter.sol";
 
 import {FileReader} from "./FileReader.sol";
 import {Script} from "forge-std/Script.sol";
@@ -20,7 +21,23 @@ contract DeploySenderOnL2Script is Script, FileReader {
     address deployer = vm.addr(deployerKey);
 
     function run() public returns (ISenderCCIP, ISenderHooks) {
-        return _run(false);
+
+        vm.startBroadcast(deployer);
+        ProxyAdmin _proxyAdmin = new ProxyAdmin(deployer);
+
+        ERC20Minter erc20proxy = ERC20Minter(address(
+            new TransparentUpgradeableProxy(
+                address(new ERC20Minter()),
+                address(_proxyAdmin),
+                abi.encodeWithSelector(
+                    ERC20Minter.initialize.selector,
+                    "Mock MAGIC",
+                    "MMAGIC"
+                )
+            )
+        ));
+        vm.stopBroadcast();
+        // return _run(false);
     }
 
     function mockrun() public returns (ISenderCCIPMock, ISenderHooks) {

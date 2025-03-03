@@ -331,8 +331,8 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         // fork holesky so ReceiverCCIP -> Router calls work
         vm.selectFork(ethForkId);
 
-        vm.warp(block.timestamp + 120); // 120 seconds = 10 blocks (12second per block)
-        vm.roll((block.timestamp + 120) / 12);
+        vm.warp(block.timestamp + 8 days); // 120 seconds = 10 blocks (12second per block)
+        vm.roll((block.timestamp + 8 days) / 12);
 
         Client.EVMTokenAmount[] memory withdrawalTokenAmounts = new Client.EVMTokenAmount[](1);
         withdrawalTokenAmounts[0] = Client.EVMTokenAmount({
@@ -643,8 +643,8 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             })
         );
 
-        vm.warp(block.timestamp + 3600);
-        vm.roll((block.timestamp + 3600)/12);
+        vm.warp(block.timestamp + 8 days);
+        vm.roll((block.timestamp + 8 days)/12);
 
         /////////////////////////////////////
         //// Complete Withdrawal - Multiple Tokens

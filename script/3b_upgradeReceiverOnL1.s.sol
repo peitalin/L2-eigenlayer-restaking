@@ -64,14 +64,17 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
         (
-            strategy,
             strategyManager,
             , // strategyFactory
             , // pauserRegistry
             delegationManager,
-            , // _rewardsCoordinator
-            // token
+            // _rewardsCoordinator
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+        (
+            strategy,
+            // IERC20 _tokenL1,
+            // ProxyAdmin _proxyAdmin
+        ) = deployMockEigenlayerContractsScript.readSavedEigenlayerStrategy();
 
         (
             IReceiverCCIP receiverProxy,
