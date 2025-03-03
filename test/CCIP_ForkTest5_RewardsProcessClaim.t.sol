@@ -301,6 +301,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature_ProcessClaim = signMessageForEigenAgentExecution(
             deployerKey,
+            address(eigenAgent),
             EthHolesky.ChainId, // destination chainid where EigenAgent lives
             address(rewardsCoordinator),
             encodeProcessClaimMsg(claim, earners[0]),

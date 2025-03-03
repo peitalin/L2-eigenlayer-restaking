@@ -52,15 +52,27 @@ contract ClientSigners is Script {
         /// @notice The EIP-712 typehash for the deposit struct used by the contract
         bytes32 DEPOSIT_TYPEHASH = keccak256("Deposit(address staker,address strategy,address token,uint256 amount,uint256 nonce,uint256 expiry)");
 
-        bytes32 structHash = keccak256(abi.encode(DEPOSIT_TYPEHASH, staker, strategy, token, amount, nonce, expiry));
+        bytes32 structHash = keccak256(abi.encode(
+            DEPOSIT_TYPEHASH,
+            staker,
+            strategy,
+            token,
+            amount,
+            nonce,
+            expiry
+        ));
         // calculate the digest hash
-        bytes32 digestHash = keccak256(abi.encodePacked("\x19\x01", _domainSeparator, structHash));
+        bytes32 digestHash = keccak256(abi.encodePacked(
+            "\x19\x01",
+            _domainSeparator,
+            structHash
+        ));
 
         return digestHash;
     }
 
     function domainSeparator(
-        address contractAddr, // strategyManagerAddr, or delegationManagerAddr
+        address contractAddr,
         uint256 destinationChainid
     ) public pure returns (bytes32) {
 
@@ -68,7 +80,8 @@ contract ClientSigners is Script {
 
         return keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes("EigenLayer")), chainid, contractAddr));
         // Note: in calculating the domainSeparator:
-        // address(this) is the StrategyManager, not this contract (SignatureUtils)
+        // contractAddr is the target contract validating the signature, not this contract (SignatureUtils)
+        // e.g the DepositManager, or StrategyManager, or EigenAgent
         // chainid is the chain Eigenlayer is deployed on (it can fork!), not the chain you are calling this function
         // So chainid should be destination chainid in the context of L2 -> L1 restaking calls
     }
@@ -103,6 +116,7 @@ contract ClientSigners is Script {
 
     function createEigenAgentCallDigestHash(
         address _target,
+        address _eigenAgent,
         uint256 _value,
         bytes memory _data,
         uint256 _nonce,
@@ -122,15 +136,24 @@ contract ClientSigners is Script {
         // calculate the digest hash
         bytes32 digestHash = keccak256(abi.encodePacked(
             "\x19\x01",
-            domainSeparator(_target, _chainid),
+            domainSeparator(_eigenAgent, _chainid),
             structHash
         ));
 
         return digestHash;
     }
 
+    struct EigenAgentExecution {
+        uint256 chainid;
+        address targetContractAddr;
+        bytes messageToEigenlayer;
+        uint256 execNonceEigenAgent;
+        uint256 expiry;
+    }
+
     function signMessageForEigenAgentExecution(
         uint256 signerKey,
+        address eigenAgentAddr,
         uint256 chainid,
         address targetContractAddr,
         bytes memory messageToEigenlayer,
@@ -145,6 +168,7 @@ contract ClientSigners is Script {
         {
             bytes32 digestHash = createEigenAgentCallDigestHash(
                 targetContractAddr,
+                eigenAgentAddr,
                 0 ether, // not sending ether
                 messageToEigenlayer,
                 execNonceEigenAgent,
@@ -152,9 +176,10 @@ contract ClientSigners is Script {
                 expiry
             );
 
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
-            signatureEigenAgent = abi.encodePacked(r, s, v);
-            address signer = vm.addr(signerKey);
+            {
+                (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
+                signatureEigenAgent = abi.encodePacked(r, s, v);
+            }
 
             // Join the payload + signer + expiry + signature
             // NOTE: the order:
@@ -164,14 +189,14 @@ contract ClientSigners is Script {
             // 4: signature
             messageWithSignature = abi.encodePacked(
                 messageToEigenlayer,
-                bytes32(abi.encode(signer)), // pad signer to 32byte word
+                bytes32(abi.encode(vm.addr(signerKey))), // pad signer to 32byte word
                 expiry,
                 signatureEigenAgent
             );
 
             _logClientEigenAgentExecutionMessage(chainid, targetContractAddr, messageToEigenlayer, execNonceEigenAgent, expiry);
-            _logClientSignature(signer, digestHash, signatureEigenAgent);
-            checkSignature_EIP1271(signer, digestHash, signatureEigenAgent);
+            _logClientSignature(vm.addr(signerKey), digestHash, signatureEigenAgent);
+            checkSignature_EIP1271(vm.addr(signerKey), digestHash, signatureEigenAgent);
         }
 
         return messageWithSignature;

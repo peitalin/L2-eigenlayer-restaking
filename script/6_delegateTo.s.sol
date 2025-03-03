@@ -111,6 +111,7 @@ contract DelegateToScript is BaseScript {
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature_DT = signMessageForEigenAgentExecution(
             deployerKey,
+            address(eigenAgent),
             EthHolesky.ChainId, // destination chainid where EigenAgent lives
             TARGET_CONTRACT, // DelegationManager.delegateTo()
             encodeDelegateTo(

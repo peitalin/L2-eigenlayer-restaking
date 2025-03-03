@@ -23,8 +23,8 @@ library BaseSepolia {
 
     // The CCIP-BnM contract address at the source chain
     // https://docs.chain.link/ccip/supported-networks/v1_2_0/testnet#base-sepolia
-    address constant CcipBnM = 0x38bb3d685f16196963763ad34cefa120dd897e71;
-    address constant MagicBnM = 0x38bb3d685f16196963763ad34cefa120dd897e71;
+    address constant CcipBnM = 0x38Bb3D685f16196963763Ad34CEfa120DD897E71;
+    address constant MagicBnM = 0x38Bb3D685f16196963763Ad34CEfa120DD897E71;
 
     address constant BridgeToken = CcipBnM;
 
@@ -52,13 +52,13 @@ library EthHolesky {
     // 0xada5cc8a9aab0bc23cfb2ff3a991ab642ade3033
     //////////////////////////////////////////////
 
-    address constant Router = 0xb9531b46fe8808fb3659e39704953c2b1112dd43;
+    address constant Router = 0xb9531b46fE8808fB3659e39704953c2B1112DD43;
 
     uint64 constant ChainSelector = 7717148896336251131;
 
     // The CCIP-BnM contract address at the destination chain
-    address constant CcipBnM = 0xada5cc8a9aab0bc23cfb2ff3a991ab642ade3033;
-    address constant MagicBnM = 0xada5cc8a9aab0bc23cfb2ff3a991ab642ade3033;
+    address constant CcipBnM = 0xADa5CC8a9aAB0Bc23CFb2ff3a991Ab642aDe3033;
+    address constant MagicBnM = 0xADa5CC8a9aAB0Bc23CFb2ff3a991Ab642aDe3033;
     address constant BridgeToken = CcipBnM;
 
     address constant Link = 0x685cE6742351ae9b618F383883D6d1e0c5A31B4B;

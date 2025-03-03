@@ -17,6 +17,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
     event MatchedReceivedFunctionSelector(bytes4 indexed);
     event SendingFundsToAgentOwner(address indexed, uint256 indexed);
+    event SetSenderHooks(address indexed);
 
     /// @param _router address of the router contract.
     constructor(address _router) BaseMessengerCCIP(_router) {
@@ -35,7 +36,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
     function setSenderHooks(ISenderHooks _senderHooks) external onlyOwner {
         require(address(_senderHooks) != address(0), "_senderHooks cannot be address(0)");
         senderHooks = _senderHooks;
-        emit SetSenderHooks(_senderHooks);
+        emit SetSenderHooks(address(_senderHooks));
     }
 
     /**

@@ -90,7 +90,10 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
     function test_ClientSigner_createEigenlayerDepositDigest() public view {
 
-        bytes32 domainSeparator = clientSignersTest.domainSeparator(address(strategyManager), EthHolesky.ChainId);
+        bytes32 domainSeparator = clientSignersTest.domainSeparator(
+            address(strategyManager),
+            EthHolesky.ChainId
+        );
 
         bytes32 digest1 = clientSignersTest.createEigenlayerDepositDigest(
             strategy,
@@ -159,7 +162,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         // calculate the digest hash
         bytes32 approverDigestHash = keccak256(abi.encodePacked(
             "\x19\x01",
-            domainSeparator(delegationManagerAddr, destinationChainid),
+            clientSignersTest.domainSeparator(delegationManagerAddr, destinationChainid),
             approverStructHash
         ));
 
@@ -197,12 +200,13 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         // calculate the digest hash
         bytes32 digestHash = keccak256(abi.encodePacked(
             "\x19\x01",
-            domainSeparator(_target, _chainid),
+            clientSignersTest.domainSeparator(address(eigenAgent), _chainid),
             structHash
         ));
 
         bytes32 digestHash2 = clientSignersTest.createEigenAgentCallDigestHash(
             _target,
+            address(eigenAgent),
             _value,
             _data,
             _nonce,
@@ -213,8 +217,9 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         vm.assertEq(digestHash, digestHash2);
     }
 
-    function test_ClientSigner_signMessageForEigenAgentExecution(
-    ) public view returns (bytes memory) {
+    function test_ClientSigner_signMessageForEigenAgentExecution()
+        public view returns (bytes memory)
+    {
 
         uint256 signerKey = bobKey;
         uint256 chainid = EthHolesky.ChainId;
@@ -225,8 +230,9 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         bytes memory messageWithSignature1;
         bytes memory signatureEigenAgent1;
         {
-            bytes32 digestHash = createEigenAgentCallDigestHash(
+            bytes32 digestHash = clientSignersTest.createEigenAgentCallDigestHash(
                 targetContractAddr,
+                address(eigenAgent),
                 0 ether, // not sending ether
                 messageToEigenlayer,
                 execNonceEigenAgent,
@@ -248,6 +254,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
         bytes memory messageWithSignature2 = clientSignersTest.signMessageForEigenAgentExecution(
             signerKey,
+            address(eigenAgent),
             chainid,
             targetContractAddr,
             messageToEigenlayer,
@@ -549,8 +556,6 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
         IRewardsCoordinator.RewardsMerkleClaim memory claim = makeMockRewardsMerkleClaim();
         bytes32 rewardsRoot = clientEncodersTest.calculateRewardsRoot(claim);
-        uint256 rewardAmount = 2.5 ether;
-        address rewardToken = address(tokenL1);
         address agentOwner = deployer;
 
         vm.assertEq(
@@ -567,8 +572,6 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
         IRewardsCoordinator.RewardsMerkleClaim memory claim = makeMockRewardsMerkleClaim();
         bytes32 rewardsRoot = clientEncodersTest.calculateRewardsRoot(claim);
-        uint256 rewardAmount = 1.5 ether;
-        address rewardToken = address(tokenL1);
         address agentOwner = deployer;
 
         vm.assertEq(
@@ -585,8 +588,6 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
         IRewardsCoordinator.RewardsMerkleClaim memory claim = makeMockRewardsMerkleClaim();
         bytes32 rewardsRoot = clientEncodersTest.calculateRewardsRoot(claim);
-        uint256 rewardAmount = 1.5 ether;
-        address rewardToken = address(tokenL1);
         address agentOwner = deployer;
 
         bytes32 rewardsTransferRoot = EigenlayerMsgEncoders.calculateRewardsTransferRoot(

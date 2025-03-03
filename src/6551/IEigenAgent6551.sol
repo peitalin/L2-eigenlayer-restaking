@@ -49,12 +49,9 @@ interface IEigenAgent6551 is IERC6551, IERC6551Executable {
         uint256 nonce,
         uint256 chainid,
         uint256 expiry
-    ) external pure returns (bytes32);
+    ) external view returns (bytes32);
 
-    function domainSeparator(
-        address contractAddr,
-        uint256 chainid
-    ) external pure returns (bytes32);
+    function domainSeparator(uint256 chainid) external view returns (bytes32);
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool);
 

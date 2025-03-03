@@ -69,6 +69,7 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature0 = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager for deposits
                 depositMessage,
@@ -136,6 +137,7 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature1 = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgent),
                 EthHolesky.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 withdrawalMessage,
@@ -198,6 +200,7 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature1 = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgent),
                 EthHolesky.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 withdrawalMessage,

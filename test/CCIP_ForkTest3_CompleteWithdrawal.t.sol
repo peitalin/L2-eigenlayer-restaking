@@ -16,6 +16,7 @@ import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {ERC20Minter} from "../test/mocks/ERC20Minter.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {EthHolesky, BaseSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
@@ -26,6 +27,9 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
     uint256 expiry;
     uint256 balanceOfReceiverBefore;
     uint256 balanceOfEigenAgent;
+
+    uint256 amount;
+    bytes32 messageId1;
 
     // SenderHooks.WithdrawalTransferRootCommitted
     event WithdrawalTransferRootCommitted(
@@ -48,18 +52,18 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
      *
      */
 
-    function setupL1State_DepositAndQueueWithdrawal(uint256 amount) public {
+    function setupL1State_DepositAndQueueWithdrawal(uint256 _amount) public {
 
-        vm.assume(amount <= 1 ether);
-        vm.assume(amount > 0);
+        vm.assume(_amount <= 1 ether);
+        vm.assume(_amount > 0);
 
         //////////////////////////////////////////////////////
         /// L1: ReceiverCCIP -> EigenAgent -> Eigenlayer
         //////////////////////////////////////////////////////
         vm.selectFork(ethForkId);
 
-        eigenAgent = agentFactory.getEigenAgent(bob); // should not exist yet
-        require(address(eigenAgent) == address(0), "test assumes no EigenAgent yet");
+        // eigenAgent for Bob should not exist yet
+        require(address(agentFactory.getEigenAgent(bob)) == address(0), "test assumes no EigenAgent yet");
 
         console.log("bob address:", bob);
         console.log("eigenAgent:", address(eigenAgent));
@@ -75,17 +79,26 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
 
         uint256 execNonce0 = 0; // no eigenAgent yet, execNonce is 0
 
+        /// We need to calculate the eigenAgentBob address first,
+        /// So that the signature to deposit is correct when the
+        /// EigenAgentBob is spawned later and passed the deposit message
+        address precalculated_eigenAgentBobAddress = agentFactory.predictEigenAgentAddress(
+            bob,
+            0 // userTokenIdNonce starts at 0
+        );
+
         bytes memory messageWithSignature_D;
         {
             bytes memory depositMessage = encodeDepositIntoStrategyMsg(
                 address(strategy),
                 address(tokenL1),
-                amount
+                _amount
             );
 
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_D = signMessageForEigenAgentExecution(
                 bobKey,
+                precalculated_eigenAgentBobAddress, // future EigenAgentBob address
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager),
                 depositMessage,
@@ -97,13 +110,14 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
             token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
-            amount: amount
+            amount: _amount
         });
 
         vm.selectFork(ethForkId);
         {
-            vm.expectEmit(true, false, true, false); // don't check topic[2] EigenAgent address
-            emit AgentFactory.AgentCreated(bob, vm.addr(1111), 1);
+
+            vm.expectEmit(true, true, false, false); // check topic[2] EigenAgent address
+            emit AgentFactory.AgentCreated(bob, precalculated_eigenAgentBobAddress, 1);
             receiverContract.mockCCIPReceive(
                 Client.Any2EVMMessage({
                     messageId: bytes32(0x0),
@@ -119,6 +133,8 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             console.log("--------------- After Deposit -----------------");
             eigenAgent = agentFactory.getEigenAgent(bob);
             console.log("spawned eigenAgent: ", address(eigenAgent));
+            // check that the precalculated address matches the spawned address
+            assertEq(precalculated_eigenAgentBobAddress, address(eigenAgent));
 
             require(
                 tokenL1.balanceOf(address(receiverContract)) == (balanceOfReceiverBefore - amount),
@@ -131,6 +147,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             require(eigenAgentShares > 0, "eigenAgent should have >0 shares after deposit");
         }
 
+
         /////////////////////////////////////
         //// [L1] Queue Withdrawal with EigenAgent
         /////////////////////////////////////
@@ -142,7 +159,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
             uint256[] memory sharesToWithdraw = new uint256[](1);
             strategiesToWithdraw[0] = strategy;
-            sharesToWithdraw[0] = amount;
+            sharesToWithdraw[0] = _amount;
 
             IDelegationManager.QueuedWithdrawalParams[] memory QWPArray;
             QWPArray = new IDelegationManager.QueuedWithdrawalParams[](1);
@@ -160,6 +177,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_QW = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgent),
                 EthHolesky.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 withdrawalMessage,
@@ -206,7 +224,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
 
     function test_FullFlow_CompleteWithdrawal() public {
 
-        uint256 amount = 0.003 ether;
+        amount = 0.003 ether;
         setupL1State_DepositAndQueueWithdrawal(amount);
 
         /////////////////////////////////////////////////////////////////
@@ -262,6 +280,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_CW = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgent),
                 EthHolesky.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 completeWithdrawalMessage,
@@ -506,10 +525,10 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         ///////////////////////////////////
         // Deposit Token 1
         ///////////////////////////////////
-        uint256 amount = 0.1 ether;
-        bytes32 messageId1 = bytes32(abi.encode(0x123333444555));
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
 
+        amount = 0.1 ether;
+        messageId1 = bytes32(abi.encode(0x123333444555));
         destTokenAmounts[0] = Client.EVMTokenAmount({
             token: address(tokenL1),
             amount: amount
@@ -526,6 +545,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
                     data: abi.encode(string(
                         signMessageForEigenAgentExecution(
                             bobKey,
+                            address(eigenAgent),
                             block.chainid,
                             address(strategyManager),
                             encodeDepositIntoStrategyMsg(
@@ -560,6 +580,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
                     data: abi.encode(string(
                         signMessageForEigenAgentExecution(
                             bobKey,
+                            address(eigenAgent),
                             block.chainid,
                             address(strategyManager),
                             encodeDepositIntoStrategyMsg(
@@ -601,6 +622,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
 
             messageWithSignature_QW = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgent),
                 block.chainid,
                 address(delegationManager),
                 encodeQueueWithdrawalsMsg(QWPArray),
@@ -659,6 +681,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_CW = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 encodeCompleteWithdrawalMsg(

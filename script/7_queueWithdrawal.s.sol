@@ -119,6 +119,7 @@ contract QueueWithdrawalScript is BaseScript {
         // sign the message for EigenAgent to execute Eigenlayer command
         messageWithSignature = signMessageForEigenAgentExecution(
             deployerKey,
+            address(eigenAgent),
             EthHolesky.ChainId, // destination chainid where EigenAgent lives
             TARGET_CONTRACT,
             withdrawalMessage,

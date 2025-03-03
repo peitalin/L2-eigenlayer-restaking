@@ -25,12 +25,12 @@ contract RestakingConnector is
     EigenlayerMsgDecoders,
     RestakingConnectorStorage
 {
-
     event SetQueueWithdrawalBlock(address indexed, uint256 indexed, uint256 indexed);
     event SetUndelegateBlock(address indexed, uint256 indexed, uint256 indexed);
-    event UnsupportedFunctionCall(bytes4 functionSelector);
     event SendingRewardsToAgentOwnerOnL1(address indexed, address indexed, uint256 indexed);
     event SendingWithdrawalToAgentOwnerOnL1(address indexed, address indexed, uint256 indexed);
+
+    error UnsupportedFunctionCall(bytes4 functionSelector);
 
     constructor() {
         _disableInitializers();
@@ -127,7 +127,7 @@ contract RestakingConnector is
             transferTokensInfo = _processClaimWithEigenAgent(message);
 
         } else {
-            revert IRestakingConnector.UnsupportedFunctionCall(functionSelector);
+            revert UnsupportedFunctionCall(functionSelector);
             // Should not reach this state with bridged funds, as SenderCCIP only sends funds for deposits.
         }
     }
@@ -383,7 +383,7 @@ contract RestakingConnector is
                         balanceDiffsAmountsToBridge[i]
                     );
                     emit SendingWithdrawalToAgentOwnerOnL1(
-                        vars.tokensToWithdraw[i],
+                        address(vars.tokensToWithdraw[i]),
                         agentOwner,
                         balanceDiffsAmountsToBridge[i]
                     );

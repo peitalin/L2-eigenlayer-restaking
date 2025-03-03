@@ -72,6 +72,7 @@ contract ProcessClaimRewardsScript is BaseScript {
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature_PC = signMessageForEigenAgentExecution(
             deployerKey,
+            address(eigenAgent),
             EthHolesky.ChainId, // destination chainid where EigenAgent lives
             address(rewardsCoordinator),
             encodeProcessClaimMsg(claim, address(eigenAgent)),
