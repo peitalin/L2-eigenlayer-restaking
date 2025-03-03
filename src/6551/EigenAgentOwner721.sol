@@ -18,6 +18,7 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
 
     event AddToWhitelistedCallers(address indexed caller);
     event RemoveFromWhitelistedCallers(address indexed caller);
+    event SetAgentFactory(address indexed agentFactory);
 
     error AlreadyHasAgent(address owner);
 
@@ -47,7 +48,7 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
     function setAgentFactory(IAgentFactory _agentFactory) external onlyAdminOrOwner {
         require(address(_agentFactory) != address(0), "AgentFactory cannot be address(0)");
         agentFactory = _agentFactory;
-        emit SetAgentFactory(_agentFactory);
+        emit SetAgentFactory(address(_agentFactory));
     }
 
     /**
