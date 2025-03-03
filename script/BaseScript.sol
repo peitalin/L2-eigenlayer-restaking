@@ -27,6 +27,7 @@ import {FileReader} from "./FileReader.sol";
 import {ClientEncoders} from "./ClientEncoders.sol";
 import {ClientSigners} from "./ClientSigners.sol";
 import {RouterFees} from "./RouterFees.sol";
+import {GasLimits} from "./GasLimits.sol";
 
 
 
@@ -34,6 +35,7 @@ contract BaseScript is
     Script,
     FileReader,
     RouterFees,
+    GasLimits,
     ClientEncoders,
     ClientSigners
 {

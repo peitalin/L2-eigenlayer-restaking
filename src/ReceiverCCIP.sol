@@ -11,7 +11,6 @@ import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
-import {BaseSepolia} from "../script/Addresses.sol";
 
 
 /// @title ETH L1 Messenger Contract: receives messages from L2 and processes them
@@ -25,14 +24,12 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
     event BridgingWithdrawalToL2(
         bytes32 indexed withdrawalTransferRoot,
-        address indexed withdrawalToken,
-        uint256 indexed withdrawalAmount
+        Client.EVMTokenAmount[] indexed withdrawalTokenAmounts
     );
 
     event BridgingRewardsToL2(
         bytes32 indexed rewardsTransferRoot,
-        address indexed rewardsToken,
-        uint256 indexed rewardsAmount
+        Client.EVMTokenAmount[] indexed rewardsTokenAmounts
     );
 
     event RefundingDeposit(
@@ -144,7 +141,6 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             abi.decode(any2EvmMessage.sender, (address))
         )
     {
-
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(any2EvmMessage.data);
         // For depositIntoStrategy: approve RestakingConnector to transfer tokens to EigenAgent
         if (functionSelector == IStrategyManager.depositIntoStrategy.selector) {
@@ -156,40 +152,39 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             }
         }
 
+        emit MessageReceived(
+            any2EvmMessage.messageId,
+            any2EvmMessage.sourceChainSelector,
+            abi.decode(any2EvmMessage.sender, (address)), // sender contract on L2
+            any2EvmMessage.destTokenAmounts
+        );
+
         try restakingConnector.dispatchMessageToEigenAgent(any2EvmMessage)
-            returns (IRestakingConnector.TransferTokensInfo[] memory transferTokensArray)
+            returns (IRestakingConnector.TransferTokensInfo memory transferTokensInfo)
         {
-            for (uint32 i = 0; i < transferTokensArray.length; ++i) {
+            // Only completeWithdrawals and rewardsClaims return a transferRoot
+            if (transferTokensInfo.transferRoot != bytes32(0)) {
+                // If transferRoot is returned, bridge to L2 then SenderCCIP transfers tokens to AgentOwner.
+                this.sendMessagePayNative(
+                    any2EvmMessage.sourceChainSelector, // source chain is destination chain (send back to L2)
+                    senderContractL2,
+                    transferTokensInfo.transferToAgentOwnerMessage,
+                    transferTokensInfo.tokenAmounts,
+                    0 // use default gasLimit
+                );
 
-                IRestakingConnector.TransferTokensInfo memory t = transferTokensArray[i];
-
-                if (t.transferRoot != bytes32(0)) {
-                    // If transferRoot is returned bridge to L2, then SenderCCIP transfers tokens to AgentOwner.
-                    this.sendMessagePayNative(
-                        BaseSepolia.ChainSelector, // destination chain
-                        senderContractL2,
-                        t.transferToAgentOwnerMessage,
-                        t.transferToken, // L1 token to burn/lock
-                        t.transferAmount,
-                        0 // use default gasLimit
+                if (transferTokensInfo.transferType == IRestakingConnector.TransferType.Withdrawal) {
+                    emit BridgingWithdrawalToL2(
+                        transferTokensInfo.transferRoot,
+                        transferTokensInfo.tokenAmounts
                     );
 
-                    if (t.transferType == IRestakingConnector.TransferType.Withdrawal) {
-                        emit BridgingWithdrawalToL2(t.transferRoot, t.transferToken, t.transferAmount);
-
-                    } else if (t.transferType == IRestakingConnector.TransferType.RewardsClaim) {
-                        emit BridgingRewardsToL2(t.transferRoot, t.transferToken, t.transferAmount);
-
-                    }
+                } else if (transferTokensInfo.transferType == IRestakingConnector.TransferType.RewardsClaim) {
+                    emit BridgingRewardsToL2(
+                        transferTokensInfo.transferRoot,
+                        transferTokensInfo.tokenAmounts
+                    );
                 }
-                // EigenAgent executes message successfully.
-                emit MessageReceived(
-                    any2EvmMessage.messageId,
-                    any2EvmMessage.sourceChainSelector,
-                    abi.decode(any2EvmMessage.sender, (address)), // sender contract on L2
-                    t.transferToken,
-                    t.transferAmount
-                );
             }
 
         } catch (bytes memory customError) {
@@ -200,6 +195,8 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             if (errorSelector == IRestakingConnector.EigenAgentExecutionError.selector) {
                 // If there were bridged tokens and the deposit has not been refunded yet...
                 // (there should only be 1 token for deposits, but handle input destTokenAmounts[] as an array)
+                // This makes it easier to track refunds for multiple tokens with amountRefundedToMessageIds.
+
                 for (uint32 i = 0; i < any2EvmMessage.destTokenAmounts.length; ++i) {
 
                     address tokenAddress = any2EvmMessage.destTokenAmounts[i].token;
@@ -213,7 +210,12 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                         // ...mark messageId as refunded
                         amountRefundedToMessageIds[any2EvmMessage.messageId][tokenAddress] = tokenAmount;
                         // ...then initiate a refund back to the signer on L2
-                        return _refundToSignerAfterExpiry(customError, tokenAddress, tokenAmount);
+                        return _refundToSignerAfterExpiry(
+                            any2EvmMessage,
+                            customError,
+                            tokenAddress,
+                            tokenAmount
+                        );
 
                     } else {
                         // Transaction not refundable (or already refunded). Display original error instead
@@ -238,8 +240,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
      * @dev This function is called when sending an outbound message.
      * @param _receiver The address of the receiver.
      * @param _text The string data to be sent.
-     * @param _token The token to be transferred.
-     * @param _amount The amount of the token to be transferred.
+     * @param _tokenAmounts array of EVMTokenAmount structs (token and amount).
      * @param _feeTokenAddress Address of the token used for fees. Set address(0) for native gas.
      * @param _overrideGasLimit set the gaslimit manually. If 0, uses default gasLimits.
      * @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information
@@ -248,30 +249,16 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     function _buildCCIPMessage(
         address _receiver,
         string calldata _text,
-        address _token,
-        uint256 _amount,
+        Client.EVMTokenAmount[] memory _tokenAmounts,
         address _feeTokenAddress,
         uint256 _overrideGasLimit
-    ) internal override returns (Client.EVM2AnyMessage memory) {
-
-        Client.EVMTokenAmount[] memory tokenAmounts;
-        if (_amount <= 0) {
-            // Must be an empty array as no tokens are transferred
-            // non-empty arrays with 0 amounts error with CannotSendZeroTokens() == 0x5cf04449
-            tokenAmounts = new Client.EVMTokenAmount[](0);
-        } else {
-            tokenAmounts = new Client.EVMTokenAmount[](1);
-            tokenAmounts[0] = Client.EVMTokenAmount({
-                token: _token,
-                amount: _amount
-            });
-        }
+    ) cannotSendZeroTokens(_tokenAmounts) internal override returns (Client.EVM2AnyMessage memory) {
 
         bytes memory message = abi.encode(_text);
 
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
-        uint256 gasLimit = restakingConnector.getGasLimitForFunctionSelector(functionSelector);
+        uint256 gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(functionSelector);
         if (_overrideGasLimit > 0) {
             gasLimit = _overrideGasLimit;
         }
@@ -280,7 +267,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             Client.EVM2AnyMessage({
                 receiver: abi.encode(_receiver),
                 data: message,
-                tokenAmounts: tokenAmounts,
+                tokenAmounts: _tokenAmounts,
                 feeToken: _feeTokenAddress,
                 extraArgs: Client._argsToBytes(
                     Client.EVMExtraArgsV1({ gasLimit: gasLimit })
@@ -297,6 +284,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
      * No other Eigenlayer call bridges tokens, this is the only edgecase to cover.
      */
     function _refundToSignerAfterExpiry(
+        Client.Any2EVMMessage memory any2EvmMessage,
         bytes memory customError,
         address tokenAddress,
         uint256 tokenAmount
@@ -308,14 +296,19 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             string memory errStr
         ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
 
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: tokenAddress,
+            amount: tokenAmount
+        });
+
         if (block.timestamp > expiry) {
             // If message has expired, trigger CCIP call to bridge funds back to L2 signer
             this.sendMessagePayNative(
-                BaseSepolia.ChainSelector, // destination chain
+                any2EvmMessage.sourceChainSelector, // source chain is destination chain (send back to L2)
                 signer, // receiver on L2
                 string.concat(errStr, ": refunding to L2 signer"),
-                tokenAddress, // L1 token to burn/lock
-                tokenAmount,
+                tokenAmounts,
                 0 // use default gasLimit
             );
 

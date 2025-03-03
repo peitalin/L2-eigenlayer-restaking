@@ -3,6 +3,7 @@ pragma solidity 0.8.25;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
@@ -11,6 +12,7 @@ import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {RouterFees} from "../script/RouterFees.sol";
+import {console} from "forge-std/console.sol";
 
 
 
@@ -44,6 +46,9 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         /////////////////////////////////////
         vm.selectFork(ethForkId);
 
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
         uint256 execNonce = 0;
         bytes memory messageWithSignature;
         {
@@ -56,6 +61,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgentBob),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager to approve + deposit
                 depositMessage,
@@ -104,12 +110,10 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         // mock receiving CCIP message from L2
         receiverContract.mockCCIPReceive(any2EvmMessage);
 
-        IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(bob);
-
-        uint256 valueOfShares = strategy.userUnderlying(address(eigenAgent));
+        uint256 valueOfShares = strategy.userUnderlying(address(eigenAgentBob));
         require(amount == valueOfShares, "valueofShares incorrect");
         require(
-            amount == strategyManager.stakerStrategyShares(address(eigenAgent), strategy),
+            amount == strategyManager.stakerStrategyShares(address(eigenAgentBob), strategy),
             "Bob's EigenAgent stakerStrategyShares should equal deposited amount"
         );
     }
@@ -124,6 +128,9 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         // make expiryShort to test refund on expiry feature
         uint256 expiryShort = block.timestamp + 60 seconds;
 
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
         bytes memory messageWithSignature;
         {
             bytes memory depositMessage = encodeDepositIntoStrategyMsg(
@@ -135,6 +142,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgentBob),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager to approve + deposit
                 depositMessage,
@@ -172,20 +180,17 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         vm.warp(block.timestamp + 3666); // 1 hour, 1 min, 6 seconds
         vm.roll((block.timestamp + 3666) / 12); // 305 blocks on ETH
 
-
         vm.expectEmit(false, true, true, false);
         emit BaseMessengerCCIP.MessageSent(
             bytes32(0x0), // messageId
             BaseSepolia.ChainSelector, // destination chain
             bob, // receiver
-            address(tokenL1),
-            amount, // amount of tokens to send
+            destTokenAmounts,
             address(0), // 0 for native gas
             0 // fees
         );
         vm.expectEmit(true, true, true, false);
         emit ReceiverCCIP.RefundingDeposit(bob, address(tokenL1), amount);
-
         receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 
@@ -203,11 +208,15 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         vm.prank(deployer);
         agentFactory.setRestakingConnector(vm.addr(1233));
 
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
         bytes memory messageWithSignature;
         {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgentBob),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager to approve + deposit
                 encodeDepositIntoStrategyMsg(
@@ -267,11 +276,15 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         // make expiryShort to test refund on expiry feature
         bytes32 messageId = bytes32(abi.encode(124));
 
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
         bytes memory messageWithSignature;
         {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
+                address(eigenAgentBob),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager to approve + deposit
                 encodeDepositIntoStrategyMsg(
@@ -322,12 +335,16 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
 
         vm.selectFork(ethForkId);
         RouterFees routerFeesL1 = new RouterFees();
+        Client.EVMTokenAmount[] memory tokenAmountsL1 = new Client.EVMTokenAmount[](1);
+        tokenAmountsL1[0] = Client.EVMTokenAmount({
+            token: address(EthSepolia.BridgeToken),
+            amount: 0.1 ether
+        });
 
         uint256 fees1 = routerFeesL1.getRouterFeesL1(
             address(receiverContract), // receiver
             string("some random message"), // message
-            address(EthSepolia.BridgeToken), // tokenL1
-            0.1 ether, // amount
+            tokenAmountsL1,
             0 // gasLimit
         );
 
@@ -335,15 +352,147 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
 
         vm.selectFork(l2ForkId);
         RouterFees routerFeesL2 = new RouterFees();
+        Client.EVMTokenAmount[] memory tokenAmountsL2 = new Client.EVMTokenAmount[](1);
+        tokenAmountsL2[0] = Client.EVMTokenAmount({
+            token: address(BaseSepolia.BridgeToken),
+            amount: 0.1 ether
+        });
 
         uint256 fees2 = routerFeesL2.getRouterFeesL2(
             address(senderContract), // receiver
             string("some random message"), // message
-            address(BaseSepolia.BridgeToken), // tokenL1
-            0.1 ether, // amount
+            tokenAmountsL2,
             0 // gasLimit
         );
 
         require(fees2 > 0, "RouterFees on L2 did not esimate bridging fees");
+    }
+
+   /**
+     * @notice Test that verifies the token/amount mismatch validation works correctly
+     * @dev This test creates a deposit message with a token/amount that doesn't match
+     * what's actually being sent in the CCIP message's destTokenAmounts
+     */
+    function test_ReceiverL1_AmountMismatch_Validation() public {
+        vm.selectFork(ethForkId);
+
+        uint256 execNonce = 0;
+        uint256 mismatchAmount = amount + 0.001 ether; // Different amount than what's sent
+
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
+        bytes memory messageWithSignature;
+        {
+            // Create message with a different amount than what's in destTokenAmounts
+            bytes memory depositMessage = encodeDepositIntoStrategyMsg(
+                address(strategy),
+                address(tokenL1),
+                mismatchAmount // Mismatch amount
+            );
+
+            // Sign the message for EigenAgent execution
+            messageWithSignature = signMessageForEigenAgentExecution(
+                bobKey,
+                address(eigenAgentBob),
+                block.chainid,
+                address(strategyManager),
+                depositMessage,
+                execNonce,
+                expiry
+            );
+        }
+
+        // Set up CCIP message with a different amount than in the signed message
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1),
+            amount: amount // Different from mismatchAmount in the message
+        });
+
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0x0),
+            sourceChainSelector: BaseSepolia.ChainSelector,
+            sender: abi.encode(deployer),
+            destTokenAmounts: destTokenAmounts,
+            data: abi.encode(string(messageWithSignature))
+        });
+
+        // Expect it to revert with TokenAmountMismatch
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
+                "Token or amount in message does not match received tokens",
+                "Manually execute to refund after timestamp:",
+                expiry
+            )
+        );
+
+        // Attempt to receive the message with mismatched amounts
+        receiverContract.mockCCIPReceive(any2EvmMessage);
+    }
+
+    /**
+     * @notice Test that verifies token mismatch validation works correctly
+     * @dev This test creates a deposit message with a different token than what's sent
+     */
+    function test_ReceiverL1_TokenMismatch_Validation() public {
+        vm.selectFork(ethForkId);
+
+        vm.prank(deployer);
+        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
+        // Deploy a different token for mismatch testing
+        address differentToken = address(0xDEADBEEF);
+
+        uint256 execNonce = 0;
+        bytes memory messageWithSignature;
+        {
+            // Create message with a different token than what's in destTokenAmounts
+            bytes memory depositMessage = encodeDepositIntoStrategyMsg(
+                address(strategy),
+                differentToken, // Different token address
+                amount
+            );
+
+            // Sign the message for EigenAgent execution
+            messageWithSignature = signMessageForEigenAgentExecution(
+                bobKey,
+                address(eigenAgentBob),
+                block.chainid,
+                address(strategyManager),
+                depositMessage,
+                execNonce,
+                expiry
+            );
+        }
+
+        // Set up CCIP message with a different token than in the signed message
+        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+        destTokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1), // Different from differentToken in the message
+            amount: amount
+        });
+
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: bytes32(0x0),
+            sourceChainSelector: BaseSepolia.ChainSelector,
+            sender: abi.encode(deployer),
+            destTokenAmounts: destTokenAmounts,
+            data: abi.encode(string(messageWithSignature))
+        });
+
+        // Expect it to revert with TokenAmountMismatch
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
+                "Token or amount in message does not match received tokens",
+                "Manually execute to refund after timestamp:",
+                expiry
+            )
+        );
+
+        // Attempt to receive the message with mismatched token
+        receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 }

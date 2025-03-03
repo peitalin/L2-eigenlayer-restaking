@@ -36,7 +36,7 @@ interface IRestakingConnector {
         IRewardsCoordinator _rewardsCoordinator
     ) external;
 
-    function getGasLimitForFunctionSelector(bytes4 functionSelector) external returns (uint256);
+    function getGasLimitForFunctionSelectorL1(bytes4 functionSelector) external returns (uint256);
 
     function setGasLimitsForFunctionSelectors(
         bytes4[] memory functionSelectors,
@@ -69,13 +69,12 @@ interface IRestakingConnector {
         TransferType transferType;
         string transferToAgentOwnerMessage;
         bytes32 transferRoot;
-        address transferToken;
-        uint256 transferAmount;
+        Client.EVMTokenAmount[] tokenAmounts;
     }
 
     function dispatchMessageToEigenAgent(Client.Any2EVMMessage memory any2EvmMessage)
         external
-        returns (TransferTokensInfo[] memory);
+        returns (TransferTokensInfo memory);
 
     function mintEigenAgent(bytes memory message) external;
 }

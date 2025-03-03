@@ -29,7 +29,7 @@ This also keeps custody of funds with the user (who owns the 6551 NFT) and gives
 
 ### Running Tests and Restaking Scripts
 
-The following test will bridge from L2 to L1, deposit in Eigenlayer, queueWithdrawals, completeWithdrawal, then bridge back to the original user on L2.
+The following tests will bridge from L2 to L1, deposit in Eigenlayer, queueWithdrawals, completeWithdrawal, then bridge back to the original user on L2.
 ```
 forge test --match-test test_FullFlow_CompleteWithdrawal -vvvv
 ```
@@ -47,6 +47,8 @@ You can generate a `lcov.info` file to see line-by-line test coverage in code ed
 ```
 forge coverage --report lcov
 ```
+
+Set `SKIP_SCRIPTS_TESTS=false` in `.env` to run the scripts tests. Forks tests may need to be run separately or you may hit API throttling limits.
 
 Frontend clients will make contract calls similar to the scripts in the `scripts` folder. These scripts run on Base Sepolia and dispatches CCIP calls to Eth Sepolia, bridging `CCIP-BnM` ERC20 tokens and interacting with mock Eigenlayer Strategy Vaults setup for the `CCIP-BnM` token.
 
@@ -220,7 +222,7 @@ Auditors might note that this expiry paramater in the signature (in the CCIP mes
 Eigenlayer allows users to claim multiple token rewards at a time (MAGIC, ETH, other ERC20s).
 The protocol claims multiple tokens and bridges just the MAGIC rewards back to the user's address on L2, while sending all other tokens and ETH rewards to the user's (the owner of the ERC-6551 NFT) address on L1.
 - The protocol checks which tokens are marked as bridgeable (the mapping `bridgeTokensL1toL2` on `RestakingConnectorStorage.sol` and `SenderHooks.sol`) then bridges only those reward tokens.
-- Cross-chain claiming of multiple reward tokens is somewhat new in web3, so we will have to let users know where their tokens are going on the frontend (either L1 or L2). 
+- Cross-chain claiming of multiple reward tokens is somewhat new in web3, so we will have to let users know where their tokens are going on the frontend (either L1 or L2).
 - Alternatively we can just claim MAGIC and let users manually claim their other tokens and ETH rewards on L1 (but this is arguable worse UX).
 
 There's a configurable list of reward tokens (the mapping `bridgeTokensL1toL2`) that the protocol will try bridge back to the user's address on L2. This list needs to mirror the tokens that have a CCIP lane setup. If we want to bridge other reward tokens back to L2, CCIP lanes needs to be setup for those tokens as well, and we need to make sure `bridgeTokensL1toL2` and tokens with CCIP lanes match (or rewards claiming attempts will revert).

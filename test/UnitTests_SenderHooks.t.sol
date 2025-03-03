@@ -8,6 +8,7 @@ import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/
 import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
@@ -28,7 +29,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
     uint256 withdrawalNonce = 0;
 
     error AddressZero(string msg);
-    error OnlySendFundsForDeposits(string msg);
+    error OnlySendFundsForDeposits(bytes4 functionSelector, string msg);
 
     function setUp() public {
         setUpLocalEnvironment();
@@ -164,7 +165,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         );
 
         // Return default gasLimit of 400_000 for undefined function selectors
-        vm.assertEq(senderHooks.getGasLimitForFunctionSelector(0xffeeaabb), 200_000);
+        vm.assertEq(senderHooks.getGasLimitForFunctionSelector(0xffeeaabb), 199_998);
 
         // gas limits should be set
         vm.assertEq(senderHooks.getGasLimitForFunctionSelector(functionSelectors[0]), 1_000_000);
@@ -199,10 +200,15 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             withdrawalAgentOwnerRoot,
             bob
         );
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1),
+            amount: 0 ether
+        });
         // called by senderContract
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-            0 ether // not bridging tokens
+            tokenAmounts
         );
 
         vm.stopBroadcast();
@@ -227,21 +233,20 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             withdrawalTransferRoot,
             bob
         );
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1),
+            amount: 0 ether
+        });
         // called by senderContract
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-            0 ether // not bridging tokens
+            tokenAmounts
         );
 
+        address agentOwner = senderHooks.getTransferRootAgentOwner(withdrawalTransferRoot);
         vm.stopBroadcast();
-
-        // fundsTransfer info should be available
-        ISenderHooks.FundsTransfer[] memory fundsTransfer = senderHooks.getFundsTransferCommitment(
-            withdrawalTransferRoot
-        );
-        vm.assertEq(fundsTransfer[0].amount, amount);
-        vm.assertEq(fundsTransfer[0].tokenL2, address(BaseSepolia.BridgeToken));
-        vm.assertEq(fundsTransfer[0].agentOwner, bob);
+        vm.assertEq(agentOwner, bob);
     }
 
     function test_beforeSendCCIPMessage_OnlyCalledBySenderCCIP(uint256 signerKey) public {
@@ -257,11 +262,17 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
                 bytes memory messageWithSignature_CW
             ) = mockCompleteWithdrawalMessage(bobKey, amount);
 
+            Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+            tokenAmounts[0] = Client.EVMTokenAmount({
+                token: address(tokenL1),
+                amount: 0 ether
+            });
+
             // Should revert if called by anyone other than senderContract
             vm.expectRevert("not called by SenderCCIP");
             senderHooks.beforeSendCCIPMessage(
                 abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-                0 ether
+                tokenAmounts
             );
         }
         vm.stopBroadcast();
@@ -278,11 +289,20 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
 
         require(rewardsRoot != bytes32(abi.encode(0)), "rewardsRoot cannot be 0x0");
 
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL1),
+            amount: amount
+        });
+
         vm.expectRevert(abi.encodeWithSelector(
-            OnlySendFundsForDeposits.selector, "Only send funds for deposit messages"));
+            OnlySendFundsForDeposits.selector,
+            IRewardsCoordinator.processClaim.selector,
+            "Only send funds for DepositIntoStrategy calls"
+        ));
         senderHooks.beforeSendCCIPMessage(
             abi.encode(string(messageWithSignature_PC)), // CCIP string encodes when messaging
-            amount
+            tokenAmounts
         );
 
         vm.stopBroadcast();
@@ -354,6 +374,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         // sign the message for EigenAgent to execute Eigenlayer command
         messageWithSignature_PC = signMessageForEigenAgentExecution(
             signerKey,
+            address(eigenAgent),
             EthSepolia.ChainId, // destination chainid where EigenAgent lives
             address(rewardsCoordinator),
             encodeProcessClaimMsg(claim, signer),
@@ -404,6 +425,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature_CW = signMessageForEigenAgentExecution(
                 signerKey,
+                address(eigenAgent),
                 EthSepolia.ChainId, // destination chainid where EigenAgent lives
                 address(delegationManager),
                 completeWithdrawalMessage,

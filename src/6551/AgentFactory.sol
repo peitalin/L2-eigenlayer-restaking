@@ -24,6 +24,9 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
     mapping(address => uint256) public userToEigenAgentTokenIds;
     mapping(uint256 => address) public tokenIdToEigenAgents;
 
+    event SetRestakingConnector(address indexed);
+    event Set6551Registry(IERC6551Registry indexed);
+    event SetEigenAgentOwner721(IEigenAgentOwner721 indexed);
     event AgentCreated(
         address indexed owner,
         address indexed eigenAgent,
@@ -81,6 +84,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
             revert AddressZero("AgentFactory.setRestakingConnector: cannot be address(0)");
 
         _restakingConnector = newRestakingConnector;
+        emit SetRestakingConnector(newRestakingConnector);
     }
 
     /// @param new6551Registry address of the 6551Registry contract.
@@ -89,6 +93,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
             revert AddressZero("AgentFactory.set6551Registry: cannot be address(0)");
 
         erc6551Registry = new6551Registry;
+        emit Set6551Registry(new6551Registry);
     }
 
     /// @param newEigenAgentOwner721 address of the eigenAgentOwner712 NFT contract.
@@ -97,6 +102,7 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
             revert AddressZero("AgentFactory.setEigenAgentOwner721: cannot be address(0)");
 
         eigenAgentOwner721 = newEigenAgentOwner721;
+        emit SetEigenAgentOwner721(newEigenAgentOwner721);
     }
 
     /**
@@ -177,24 +183,40 @@ contract AgentFactory is Initializable, Adminable, ReentrancyGuardUpgradeable {
         require(eigenAgentOwner721.balanceOf(user) == 0, "User already has an EigenAgent");
         // if the user transfers their AgentOwnerNft they can mint another one.
 
-        bytes32 salt = bytes32(abi.encode(user));
         uint256 tokenId = eigenAgentOwner721.mint(user);
         // userToEigenAgentTokenIds[user] = tokenId is set in EigenAgentOwner721._afterTokenTransfer
+        bytes32 salt2 = keccak256(abi.encodePacked(tokenId));
 
+        // Clone the baseEigenAgent
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(
             erc6551Registry.createAccount(
-                Clones.clone(baseEigenAgent), // ERC-1167 minimal viable proxy clone
-                salt,
+                Clones.cloneDeterministic(baseEigenAgent, salt2), // ERC-1167 minimal viable proxy clone
+                salt2,
                 block.chainid,
                 address(eigenAgentOwner721),
                 tokenId
             )
         ));
 
+        // set the RestakingConnector on the new EigenAgent
+        eigenAgent.setInitialRestakingConnector(_restakingConnector);
+
         tokenIdToEigenAgents[tokenId] = address(eigenAgent);
 
         emit AgentCreated(user, address(eigenAgent), tokenId);
 
         return eigenAgent;
+    }
+
+    function predictEigenAgentAddress(address user, uint256 userTokenIdNonce) external view returns (address) {
+        uint256 predictedTokenId = eigenAgentOwner721.predictTokenId(user, userTokenIdNonce);
+        bytes32 salt2 = keccak256(abi.encodePacked(predictedTokenId));
+        return erc6551Registry.account(
+            Clones.predictDeterministicAddress(baseEigenAgent, salt2, address(this)),
+            salt2,
+            block.chainid,
+            address(eigenAgentOwner721),
+            predictedTokenId
+        );
     }
 }

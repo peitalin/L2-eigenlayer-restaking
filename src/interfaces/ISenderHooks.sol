@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 
 interface ISenderHooks {
 
     struct FundsTransfer {
-        uint256 amount;
         address tokenL2;
         address agentOwner;
     }
@@ -27,9 +27,7 @@ interface ISenderHooks {
 
     function clearBridgeTokens(address _bridgeTokenL1) external;
 
-    function getFundsTransferCommitment(bytes32 transferRoot)
-        external
-        returns (ISenderHooks.FundsTransfer[] memory);
+    function getTransferRootAgentOwner(bytes32 transferRoot) external returns (address);
 
     function isTransferRootSpent(bytes32 transferRoot) external returns (bool);
 
@@ -45,12 +43,10 @@ interface ISenderHooks {
 
     function beforeSendCCIPMessage(
         bytes memory message,
-        uint256 amount
+        Client.EVMTokenAmount[] memory tokenAmounts
     ) external returns (uint256 gasLimit);
 
-    function handleTransferToAgentOwner(bytes memory message)
-        external
-        returns (ISenderHooks.FundsTransfer[] memory);
+    function handleTransferToAgentOwner(bytes memory message) external returns (address);
 
 }
 

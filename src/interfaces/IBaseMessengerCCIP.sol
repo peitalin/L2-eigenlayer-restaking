@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
+
 interface IBaseMessengerCCIP {
 
     function allowlistDestinationChain(uint64 _destinationChainSelector, bool allowed) external;
@@ -19,8 +21,7 @@ interface IBaseMessengerCCIP {
         uint64 _destinationChainSelector,
         address _receiver,
         string calldata _text,
-        address _token,
-        uint256 _amount,
+        Client.EVMTokenAmount[] memory _tokenAmounts,
         uint256 _overrideGasLimit
     ) external payable returns (bytes32 messageId);
 

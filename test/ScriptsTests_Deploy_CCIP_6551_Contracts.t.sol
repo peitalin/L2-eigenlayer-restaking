@@ -13,6 +13,7 @@ import {WhitelistCCIPContractsScript} from "../script/4_whitelistCCIPContracts.s
 
 contract ScriptsTests_Deploy_CCIP_6551_Contracts is Test, TestErrorHandlers {
 
+    bool skip_scripts_tests = vm.envBool("SKIP_SCRIPTS_TESTS");
     function setUp() public {}
 
     /*
@@ -24,14 +25,14 @@ contract ScriptsTests_Deploy_CCIP_6551_Contracts is Test, TestErrorHandlers {
      */
 
     function test_step2_DeploySenderOnL2Script() public {
-
+        vm.skip(skip_scripts_tests);
         DeploySenderOnL2Script deploySenderOnL2Script = new DeploySenderOnL2Script();
 
         deploySenderOnL2Script.mockrun();
     }
 
     function test_step2b_UpgradeSenderOnL2Script() public {
-
+        vm.skip(skip_scripts_tests);
         UpgradeSenderOnL2Script upgradeSenderOnL2Script = new UpgradeSenderOnL2Script();
         // This test fails if L2 contracts have not been deployed + saved to disk
         try upgradeSenderOnL2Script.mockrun() {
@@ -46,7 +47,7 @@ contract ScriptsTests_Deploy_CCIP_6551_Contracts is Test, TestErrorHandlers {
     }
 
     function test_step3_DeployReceiverOnL1Script() public {
-
+        vm.skip(skip_scripts_tests);
         DeployReceiverOnL1Script deployReceiverOnL1Script =
             new DeployReceiverOnL1Script();
 
@@ -55,7 +56,7 @@ contract ScriptsTests_Deploy_CCIP_6551_Contracts is Test, TestErrorHandlers {
     }
 
     function test_step3b_UpgradeReceiverOnL1Script() public {
-
+        vm.skip(skip_scripts_tests);
         UpgradeReceiverOnL1Script upgradeReceiverOnL1Script =
             new UpgradeReceiverOnL1Script();
 
@@ -73,7 +74,7 @@ contract ScriptsTests_Deploy_CCIP_6551_Contracts is Test, TestErrorHandlers {
     }
 
     function test_step4_WhitelistCCIPContractsScript() public {
-
+        vm.skip(skip_scripts_tests);
         WhitelistCCIPContractsScript whitelistCCIPContractsScript =
             new WhitelistCCIPContractsScript();
 

@@ -5,11 +5,15 @@ import {IERC1271} from "@openzeppelin-v5-contracts/interfaces/IERC1271.sol";
 import {IERC20} from "@openzeppelin-v5-contracts/token/ERC20/IERC20.sol";
 import {SignatureChecker} from "@openzeppelin-v5-contracts/utils/cryptography/SignatureChecker.sol";
 import {ERC6551Account as ERC6551} from "@6551/examples/simple/ERC6551Account.sol";
+import {SafeERC20} from "@openzeppelin-v5-contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
 
 
+
 contract EigenAgent6551 is ERC6551 {
+
+    using SafeERC20 for IERC20;
 
     /// @notice The EIP-712 typehash for the deposit struct used by the contract
     bytes32 public constant EIGEN_AGENT_EXEC_TYPEHASH = keccak256(
@@ -21,6 +25,9 @@ contract EigenAgent6551 is ERC6551 {
 
     /// @notice Nonce for signing executeWithSignature calls
     uint256 public execNonce;
+
+    /// @notice Only the RestakingConnector address can call executeWithSignature
+    address public restakingConnector;
 
     event ExecutedSignedCall(
         address indexed targetContract,
@@ -36,25 +43,46 @@ contract EigenAgent6551 is ERC6551 {
         // get the 721 NFT associated with 6551 account and check if caller is whitelisted
         (uint256 chainId, address contractAddress, uint256 tokenId) = token();
         if (!IEigenAgentOwner721(contractAddress).isWhitelistedCaller(msg.sender)) {
-            revert CallerNotWhitelisted("EigenAgent: caller not allowed");
+            revert CallerNotWhitelisted("EigenAgent6551: caller not allowed");
         }
         _;
+    }
+
+    /**
+     * @dev Initializes the EigenAgent6551 with a RestakingConnector address
+     * @param _restakingConnector The address of the RestakingConnector contract
+     */
+    function setInitialRestakingConnector(address _restakingConnector) external {
+        // Only allow initialization if restakingConnector is not set yet
+        require(restakingConnector == address(0), "EigenAgent6551: already initialized");
+        require(_restakingConnector != address(0), "EigenAgent6551: invalid RestakingConnector");
+
+        restakingConnector = _restakingConnector;
+    }
+
+    // Add a function to set the RestakingConnector
+    function setRestakingConnector(address _restakingConnector) external {
+        // Only the owner of the EigenAgent should be able to set this
+        require(msg.sender == owner(), "Only owner can set RestakingConnector");
+        restakingConnector = _restakingConnector;
     }
 
     /**
      * @dev This function is used by RestakingConnector.sol to approve Eigenlayer StrategyManager
      * to transfer and EigenAgent's tokens into Eigenlayer strategy vaults. This avoids needing
      * extra transfers and signed messages to complete L2 restaking deposits.
-     * @param targetContract to approve transfer for, expected to be the Eigenlayer StrategyManager contract
+     * @param spenderContract to approve transfer for, expected to be the Eigenlayer StrategyManager contract
      * @param token the token used in the Eigenlayer Strategy vault.
      * @param amount of tokens user is depositing into the strategy vault.
      */
     function approveByWhitelistedContract(
-        address targetContract,
+        address spenderContract,
         address token,
         uint256 amount
-    ) external onlyWhitelistedCallers returns (bool) {
-        return IERC20(token).approve(targetContract, amount);
+    ) external onlyWhitelistedCallers {
+        // forceApprove handles the two-step approval process internally
+        // for tokens like USDT that require setting to 0 first
+        IERC20(token).forceApprove(spenderContract, amount);
     }
 
     /**
@@ -82,6 +110,11 @@ contract EigenAgent6551 is ERC6551 {
         virtual
         returns (bytes memory result)
     {
+        // Only allow RestakingConnector or NFT owner to call this function
+        require(
+            msg.sender == restakingConnector || msg.sender == owner(),
+            "Only RestakingConnector or owner can execute"
+        );
 
         // require(expiry >= block.timestamp, "Signature for EigenAgent execution expired");
         /// Note: do not revert on expiry. CCIP may take hours to deliver messages if gas spikes.
@@ -153,13 +186,13 @@ contract EigenAgent6551 is ERC6551 {
         uint256 nonce,
         uint256 chainid,
         uint256 expiry
-    ) public pure returns (bytes32) {
+    ) public view returns (bytes32) {
         // EIP-712 struct hash
         bytes32 structHash = keccak256(abi.encode(
             EIGEN_AGENT_EXEC_TYPEHASH,
             target,
             value,
-            data,
+            keccak256(data),
             nonce,
             chainid,
             expiry
@@ -167,7 +200,7 @@ contract EigenAgent6551 is ERC6551 {
         // calculate the digest hash
         bytes32 digestHash = keccak256(abi.encodePacked(
             "\x19\x01",
-            domainSeparator(target, chainid),
+            domainSeparator(chainid),
             structHash
         ));
 
@@ -175,15 +208,17 @@ contract EigenAgent6551 is ERC6551 {
     }
 
     /**
-     * @param contractAddr is the address of the contract where the signature will be verified,
-     * either EigenAgent, Eigenlayer StrategyManager, or DelegationManager.
      * @param chainid is the chain Eigenlayer and EigenAgent are deployed on.
      */
     function domainSeparator(
-        address contractAddr, // strategyManagerAddr, or delegationManagerAddr
         uint256 chainid
-    ) public pure returns (bytes32) {
-        return keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes("EigenLayer")), chainid, contractAddr));
+    ) public view returns (bytes32) {
+        return keccak256(abi.encode(
+            DOMAIN_TYPEHASH,
+            keccak256(bytes("EigenLayer")),
+            chainid,
+            address(this)
+        ));
     }
 }
 

@@ -32,9 +32,17 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     mapping(bytes4 => uint256) internal _gasLimitsForFunctionSelectors;
 
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
+    event SetReceiverCCIP(address indexed);
+    event SetAgentFactory(address indexed);
+    event SetEigenlayerContracts(address, address, address, address);
+    event SetBridgeTokens(address indexed, address indexed);
+    event ClearBridgeTokens(address indexed);
 
+    // When adding custom errors, update decodeEigenAgentExecutionError
+    // to decode the new error selector and display error messages properly.
     error AddressZero(string reason);
     error TooManyTokensToDeposit(string reason);
+    error TokenAmountMismatch(string reason);
 
     /*
      *
@@ -83,6 +91,7 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     /// @param newReceiverCCIP address of the ReceiverCCIP contract.
     function setReceiverCCIP(address newReceiverCCIP) external onlyOwner {
         _receiverCCIP = newReceiverCCIP;
+        emit SetReceiverCCIP(newReceiverCCIP);
     }
 
     function getAgentFactory() external view returns (address) {
@@ -95,6 +104,7 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
             revert AddressZero("AgentFactory cannot be address(0)");
 
         agentFactory = IAgentFactory(newAgentFactory);
+        emit SetAgentFactory(newAgentFactory);
     }
 
     function getEigenlayerContracts() external view returns (
@@ -129,6 +139,13 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
         strategyManager = _strategyManager;
         strategy = _strategy;
         rewardsCoordinator = _rewardsCoordinator;
+
+        emit SetEigenlayerContracts(
+            address(_delegationManager),
+            address(_strategyManager),
+            address(_strategy),
+            address(_rewardsCoordinator)
+        );
     }
 
     /**
@@ -145,6 +162,8 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
             revert AddressZero("_bridgeTokenL2 cannot be address(0)");
 
         bridgeTokensL1toL2[_bridgeTokenL1] = _bridgeTokenL2;
+
+        emit SetBridgeTokens(_bridgeTokenL1, _bridgeTokenL2);
     }
 
     /**
@@ -153,15 +172,18 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
      */
     function clearBridgeTokens(address _bridgeTokenL1) external onlyOwner {
         delete bridgeTokensL1toL2[_bridgeTokenL1];
+
+        emit ClearBridgeTokens(_bridgeTokenL1);
     }
 
     /**
      * @dev Retrieves estimated gasLimits for different L2 restaking functions, e.g:
      * "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
      * @param functionSelector bytes4 functionSelector to get estimated gasLimits for.
-     * @return gasLimit a default gasLimit of 200_000 functionSelector parameter finds no matches.
+     * @return gasLimit a default gasLimit of 200_000 functionSelector parame
+ter finds no matches.
      */
-    function getGasLimitForFunctionSelector(bytes4 functionSelector)
+    function getGasLimitForFunctionSelectorL1(bytes4 functionSelector)
         external
         view
         returns (uint256)
@@ -192,7 +214,7 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     function dispatchMessageToEigenAgent(Client.Any2EVMMessage memory any2EvmMessage)
         external
         virtual
-        returns (TransferTokensInfo[] memory);
+        returns (TransferTokensInfo memory);
 
     function mintEigenAgent(bytes memory message) external virtual;
 }

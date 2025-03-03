@@ -2,7 +2,7 @@
 pragma solidity 0.8.25;
 
 import {console} from "forge-std/Test.sol";
-
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {ISignatureUtils} from "@eigenlayer-contracts/interfaces/ISignatureUtils.sol";
 
@@ -111,6 +111,7 @@ contract DelegateToScript is BaseScript {
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature_DT = signMessageForEigenAgentExecution(
             deployerKey,
+            address(eigenAgent),
             EthSepolia.ChainId, // destination chainid where EigenAgent lives
             TARGET_CONTRACT, // DelegationManager.delegateTo()
             encodeDelegateTo(
@@ -122,14 +123,19 @@ contract DelegateToScript is BaseScript {
             sigExpiry
         );
 
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        tokenAmounts[0] = Client.EVMTokenAmount({
+            token: address(tokenL2),
+            amount: 0 ether
+        });
+
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
             IDelegationManager.delegateTo.selector
         );
         uint256 routerFees = getRouterFeesL2(
             address(receiverContract),
             string(messageWithSignature_DT),
-            address(tokenL2),
-            0, // not bridging, just sending message
+            tokenAmounts,
             gasLimit
         );
 
@@ -139,8 +145,7 @@ contract DelegateToScript is BaseScript {
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_DT),
-            address(tokenL2),
-            0, // not bridging, just sending message
+            tokenAmounts,
             gasLimit // use default gasLimit for this function
         );
 
