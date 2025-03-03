@@ -91,7 +91,7 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
         return tokenId;
     }
 
-    function predictTokenId(address user, uint256 userTokenIdNonce) public view returns (uint256) {
+    function predictTokenId(address user, uint256 userTokenIdNonce) public pure returns (uint256) {
         // keccak256 hash user and userTokenIdNonce to ensure unique but deterministic tokenId
         bytes32 fullHash = keccak256(abi.encodePacked(user, userTokenIdNonce));
         // Shorten tokenId to the last 6 bytes (12 hex digits) by masking with 0xFFFFFFFFFFFF
