@@ -76,7 +76,6 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
             vm.addr(4),
             vm.addr(5),
             vm.addr(6),
-            vm.addr(7),
             "test/temp-files/bridgeContractsL1.config.json"
         );
         fileReaderTest.saveSenderBridgeContracts(

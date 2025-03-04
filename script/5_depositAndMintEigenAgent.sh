@@ -10,6 +10,8 @@ forge script script/5_depositAndMintEigenAgent.s.sol:DepositAndMintEigenAgentScr
     --private-key $DEPLOYER_KEY \
     -vvvv
 
+    # --gas-estimate-multiplier 350 \
+    # --priority-gas-price 9 \
 
 ## After running this script, search for the TX hash on https://ccip.chain.link/
 

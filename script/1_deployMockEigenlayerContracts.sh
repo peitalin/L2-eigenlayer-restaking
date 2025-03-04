@@ -5,7 +5,7 @@ echo forge script script/1_deployMockEigenlayerContracts.s.sol:DeployMockEigenla
 
 forge script script/1_deployMockEigenlayerContracts.s.sol:DeployMockEigenlayerContractsScript \
     --rpc-url holesky \
-    # --broadcast \
+    --broadcast \
     --verify  \
     --private-key $DEPLOYER_KEY \
     --gas-estimate-multiplier 150 \
