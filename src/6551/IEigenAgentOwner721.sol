@@ -8,7 +8,7 @@ import {IAgentFactory} from "../6551/IAgentFactory.sol";
 
 interface IEigenAgentOwner721 is IAdminable, IERC721 {
 
-    function getAgentFactory() external returns (address);
+    function getAgentFactory() external view returns (address);
 
     function setAgentFactory(IAgentFactory _agentFactory) external;
 

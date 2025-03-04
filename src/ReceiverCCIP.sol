@@ -170,7 +170,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                     senderContractL2,
                     transferTokensInfo.transferToAgentOwnerMessage,
                     transferTokensInfo.tokenAmounts,
-                    0 // use default gasLimit
+                    0 // use default gasLimit`
                 );
 
                 if (transferTokensInfo.transferType == IRestakingConnector.TransferType.Withdrawal) {

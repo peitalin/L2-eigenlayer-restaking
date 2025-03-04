@@ -40,7 +40,7 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
         _;
     }
 
-    function getAgentFactory() external view returns (address) {
+    function getAgentFactory() public view returns (address) {
         return address(agentFactory);
     }
 

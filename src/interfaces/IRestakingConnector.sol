@@ -51,8 +51,6 @@ interface IRestakingConnector {
 
     function setBridgeTokens(address _bridgeTokenL1, address _bridgeTokenL2) external;
 
-    function clearBridgeTokens(address _bridgeTokenL1) external;
-
     /*
      *
      *           EigenAgent -> Eigenlayer Handlers

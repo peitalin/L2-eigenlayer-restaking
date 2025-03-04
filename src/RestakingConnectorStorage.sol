@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
@@ -15,12 +16,12 @@ import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 
 abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
 
-    IDelegationManager public delegationManager;
-    IStrategyManager public strategyManager;
-    IStrategy public strategy;
-    IRewardsCoordinator public rewardsCoordinator;
+    IDelegationManager internal delegationManager;
+    IStrategyManager internal strategyManager;
+    IStrategy internal strategy;
+    IRewardsCoordinator internal rewardsCoordinator;
 
-    IAgentFactory public agentFactory;
+    IAgentFactory internal agentFactory;
     address internal _receiverCCIP;
 
     /// @notice lookup L2 token addresses of bridgeable tokens
@@ -31,18 +32,13 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
 
     mapping(bytes4 => uint256) internal _gasLimitsForFunctionSelectors;
 
-    event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
-    event SetReceiverCCIP(address indexed);
-    event SetAgentFactory(address indexed);
-    event SetEigenlayerContracts(address, address, address, address);
-    event SetBridgeTokens(address indexed, address indexed);
-    event ClearBridgeTokens(address indexed);
+    event SetGasLimitForFunctionSelector(bytes4, uint256);
 
     // When adding custom errors, update decodeEigenAgentExecutionError
     // to decode the new error selector and display error messages properly.
-    error AddressZero(string reason);
-    error TooManyTokensToDeposit(string reason);
-    error TokenAmountMismatch(string reason);
+    error AddressZero();
+    error TooManyTokensToDeposit();
+    error TokenAmountMismatch();
 
     /*
      *
@@ -65,13 +61,13 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     ) internal {
 
         if (address(_agentFactory) == address(0))
-            revert AddressZero("AgentFactory cannot be address(0)");
+            revert AddressZero();
 
         if (_bridgeTokenL1 == address(0))
-            revert AddressZero("_bridgeTokenL1 cannot be address(0)");
+            revert AddressZero();
 
         if (_bridgeTokenL2 == address(0))
-            revert AddressZero("_bridgeTokenL2 cannot be address(0)");
+            revert AddressZero();
 
         agentFactory = _agentFactory;
         bridgeTokensL1toL2[_bridgeTokenL1] = _bridgeTokenL2;
@@ -91,7 +87,6 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     /// @param newReceiverCCIP address of the ReceiverCCIP contract.
     function setReceiverCCIP(address newReceiverCCIP) external onlyOwner {
         _receiverCCIP = newReceiverCCIP;
-        emit SetReceiverCCIP(newReceiverCCIP);
     }
 
     function getAgentFactory() external view returns (address) {
@@ -101,10 +96,9 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     /// @param newAgentFactory address of the AgentFactory contract.
     function setAgentFactory(address newAgentFactory) external onlyOwner {
         if (newAgentFactory == address(0))
-            revert AddressZero("AgentFactory cannot be address(0)");
+            revert AddressZero();
 
         agentFactory = IAgentFactory(newAgentFactory);
-        emit SetAgentFactory(newAgentFactory);
     }
 
     function getEigenlayerContracts() external view returns (
@@ -124,28 +118,21 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     ) external onlyOwner {
 
         if (address(_delegationManager) == address(0))
-            revert AddressZero("_delegationManager cannot be address(0)");
+            revert AddressZero();
 
         if (address(_strategyManager) == address(0))
-            revert AddressZero("_strategyManager cannot be address(0)");
+            revert AddressZero();
 
         if (address(_strategy) == address(0))
-            revert AddressZero("_strategy cannot be address(0)");
+            revert AddressZero();
 
         if (address(_rewardsCoordinator) == address(0))
-            revert AddressZero("_rewardsCoordinator cannot be address(0)");
+            revert AddressZero();
 
         delegationManager = _delegationManager;
         strategyManager = _strategyManager;
         strategy = _strategy;
         rewardsCoordinator = _rewardsCoordinator;
-
-        emit SetEigenlayerContracts(
-            address(_delegationManager),
-            address(_strategyManager),
-            address(_strategy),
-            address(_rewardsCoordinator)
-        );
     }
 
     /**
@@ -156,24 +143,12 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     function setBridgeTokens(address _bridgeTokenL1, address _bridgeTokenL2) external onlyOwner {
 
         if (_bridgeTokenL1 == address(0))
-            revert AddressZero("_bridgeTokenL1 cannot be address(0)");
+            revert AddressZero();
 
         if (_bridgeTokenL2 == address(0))
-            revert AddressZero("_bridgeTokenL2 cannot be address(0)");
+            revert AddressZero();
 
         bridgeTokensL1toL2[_bridgeTokenL1] = _bridgeTokenL2;
-
-        emit SetBridgeTokens(_bridgeTokenL1, _bridgeTokenL2);
-    }
-
-    /**
-     * @notice clears a token pair
-     * @param _bridgeTokenL1 bridging token's address on L1
-     */
-    function clearBridgeTokens(address _bridgeTokenL1) external onlyOwner {
-        delete bridgeTokensL1toL2[_bridgeTokenL1];
-
-        emit ClearBridgeTokens(_bridgeTokenL1);
     }
 
     /**

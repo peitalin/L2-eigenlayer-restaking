@@ -15,7 +15,7 @@ import {Adminable} from "./utils/Adminable.sol";
 
 
 /// @title Sender Hooks: processes SenderCCIP messages and stores state
-contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
+contract SenderHooks is Initializable, Adminable {
 
     /// @notice links transferRoots to agentOwners for withdrawals and rewards
     mapping(bytes32 transferRoot => address agentOwner) public transferCommitmentsAgentOwner;
@@ -182,7 +182,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         returns (address agentOwner)
     {
 
-        TransferToAgentOwnerMsg memory transferToAgentOwnerMsg = decodeTransferToAgentOwnerMsg(message);
+        TransferToAgentOwnerMsg memory transferToAgentOwnerMsg = EigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(message);
         bytes32 transferRoot = transferToAgentOwnerMsg.transferRoot;
 
         require(
@@ -299,7 +299,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             address signer, // signer
             , // expiry
             // signature
-        ) = decodeCompleteWithdrawalMsg(message);
+        ) = EigenlayerMsgDecoders.decodeCompleteWithdrawalMsg(message);
 
         // @param receiveAsTokens is an Eigenlayer parameter that determines whether a user is withdraws
         // tokens (receiveAsTokens = true), or re-deposits tokens as part of redelegating to an Operator.
@@ -335,7 +335,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             address signer, // signer
             , // expiry
             // signature
-        ) = decodeProcessClaimMsg(message);
+        ) = EigenlayerMsgDecoders.decodeProcessClaimMsg(message);
 
         // Calculate rewardsTransferRoot and commit to it on L2, so that when the
         // rewardsTransferRoot message is returned from L1 we can lookup and verify
