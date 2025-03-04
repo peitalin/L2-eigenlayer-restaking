@@ -36,9 +36,9 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
 
     // When adding custom errors, update decodeEigenAgentExecutionError
     // to decode the new error selector and display error messages properly.
-    error AddressZero();
-    error TooManyTokensToDeposit();
-    error TokenAmountMismatch();
+    error AddressZero(string reason);
+    error TooManyTokensToDeposit(string reason);
+    error TokenAmountMismatch(string reason);
 
     /*
      *
@@ -61,13 +61,13 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     ) internal {
 
         if (address(_agentFactory) == address(0))
-            revert AddressZero();
+            revert AddressZero("AgentFactory cannot be address(0)");
 
         if (_bridgeTokenL1 == address(0))
-            revert AddressZero();
+            revert AddressZero("_bridgeTokenL1 cannot be address(0)");
 
         if (_bridgeTokenL2 == address(0))
-            revert AddressZero();
+            revert AddressZero("_bridgeTokenL2 cannot be address(0)");
 
         agentFactory = _agentFactory;
         bridgeTokensL1toL2[_bridgeTokenL1] = _bridgeTokenL2;
@@ -96,7 +96,7 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     /// @param newAgentFactory address of the AgentFactory contract.
     function setAgentFactory(address newAgentFactory) external onlyOwner {
         if (newAgentFactory == address(0))
-            revert AddressZero();
+            revert AddressZero("AgentFactory cannot be address(0)");
 
         agentFactory = IAgentFactory(newAgentFactory);
     }
@@ -118,16 +118,16 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     ) external onlyOwner {
 
         if (address(_delegationManager) == address(0))
-            revert AddressZero();
+            revert AddressZero("_delegationManager cannot be address(0)");
 
         if (address(_strategyManager) == address(0))
-            revert AddressZero();
+            revert AddressZero("_strategyManager cannot be address(0)");
 
         if (address(_strategy) == address(0))
-            revert AddressZero();
+            revert AddressZero("_strategy cannot be address(0)");
 
         if (address(_rewardsCoordinator) == address(0))
-            revert AddressZero();
+            revert AddressZero("_rewardsCoordinator cannot be address(0)");
 
         delegationManager = _delegationManager;
         strategyManager = _strategyManager;
@@ -143,10 +143,10 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     function setBridgeTokens(address _bridgeTokenL1, address _bridgeTokenL2) external onlyOwner {
 
         if (_bridgeTokenL1 == address(0))
-            revert AddressZero();
+            revert AddressZero("_bridgeTokenL1 cannot be address(0)");
 
         if (_bridgeTokenL2 == address(0))
-            revert AddressZero();
+            revert AddressZero("_bridgeTokenL2 cannot be address(0)");
 
         bridgeTokensL1toL2[_bridgeTokenL1] = _bridgeTokenL2;
     }
