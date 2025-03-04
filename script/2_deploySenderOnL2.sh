@@ -22,12 +22,3 @@ forge script script/2_deploySenderOnL2.s.sol:DeploySenderOnL2Script \
 #     0x92EE79732857189A16f5f3139F13c22F1d40C247 \
 #     ./src/SenderCCIP.sol:SenderCCIP
 
-
-# forge verify-contract \
-#     --flatten \
-#     --watch \
-#     --rpc-url https://sepolia.base.org \
-#     --etherscan-api-key $BASESCAN_API_KEY \
-#     --compiler-version v0.8.25 \
-#     0xDcDe3cA0E30d287541bCc1755047e7828e0EEEd8 \
-#     ./test/mocks/ERC20Minter.sol:ERC20Minter

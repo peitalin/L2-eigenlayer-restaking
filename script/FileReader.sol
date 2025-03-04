@@ -3,14 +3,13 @@ pragma solidity 0.8.25;
 
 import {Script, stdJson} from "forge-std/Script.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
-
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
-import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {EthHolesky, BaseSepolia} from "./Addresses.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
@@ -40,25 +39,16 @@ contract FileReader is Script {
         return ISenderHooks(senderHooksAddr);
     }
 
-    function readProxyAdminL2() public view returns (address) {
-        string memory addrData;
-        addrData = vm.readFile(FILEPATH_BRIDGE_CONTRACTS_L2);
-        address proxyAdminL2Addr = stdJson.readAddress(addrData, ".contracts.proxyAdminL2");
-        return proxyAdminL2Addr;
-    }
-
     /// @dev hardcoded chainid for contracts. Update for prod
     function saveSenderBridgeContracts(
         address senderCCIP,
         address senderHooks,
-        address proxyAdminL2,
         string memory filePath
     ) public {
         // { "inputs": <inputs_data>}
         /////////////////////////////////////////////////
         vm.serializeAddress("contracts" , "senderCCIP", senderCCIP);
-        vm.serializeAddress("contracts" , "senderHooks", senderHooks);
-        string memory inputs_data = vm.serializeAddress("contracts" , "proxyAdminL2", proxyAdminL2);
+        string memory inputs_data = vm.serializeAddress("contracts" , "senderHooks", senderHooks);
 
         /////////////////////////////////////////////////
         // { "chainInfo": <chain_info_data>}

@@ -46,7 +46,7 @@ contract ScriptsTests_ReadEigenlayerContracts is Test {
             IDelegationManager delegationManager,
             IRewardsCoordinator rewardsCoordinator,
             IERC20 tokenL1
-        ) = deployMockEigenlayerContractsScript.run();
+        ) = deployMockEigenlayerContractsScript.run(true);
 
         (
             IStrategyManager _strategyManager,

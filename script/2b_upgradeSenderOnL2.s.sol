@@ -2,7 +2,11 @@
 pragma solidity 0.8.25;
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {ERC1967Utils} from "@openzeppelin-v5-contracts/proxy/ERC1967/ERC1967Utils.sol";
+
 
 import {Script} from "forge-std/Script.sol";
 import {SenderCCIP} from "../src/SenderCCIP.sol";
@@ -31,8 +35,6 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
 
     function _run() private {
 
-        ProxyAdmin proxyAdmin = ProxyAdmin(readProxyAdminL2());
-
         (
             IReceiverCCIP receiverProxy,
             // restakingConnectorProxy
@@ -46,14 +48,34 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
         /////////////////////////////
         vm.startBroadcast(deployerKey);
 
-        proxyAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(payable(address(senderProxy))),
-            address(new SenderCCIP(BaseSepolia.Router)),
-            ""
-        );
+        // OZ5 upgradeAndCall
+        ITransparentUpgradeableProxy(payable(address(senderProxy)))
+            .upgradeToAndCall(address(new SenderCCIP(BaseSepolia.Router)), "");
+            // empty data, don't need to initialize
+
+
+        // SenderHooks senderHooksProxy = SenderHooks(
+        //     payable(address(
+        //         new TransparentUpgradeableProxy(
+        //             address(new SenderHooks()),
+        //             address(deployer),
+        //             abi.encodeWithSelector(
+        //                 SenderHooks.initialize.selector,
+        //                 EthHolesky.BridgeToken,
+        //                 BaseSepolia.BridgeToken
+        //             )
+        //         )
+        //     ))
+        // );
+
+        ProxyAdmin proxyAdmin = ProxyAdmin(getAdminAddress(address(senderHooksProxy)));
+
+        // ITransparentUpgradeableProxy(payable(address(senderHooksProxy)))
+        //     .upgradeToAndCall(address(new SenderHooks()), "");
+        //     // empty data, don't need to initialize
 
         proxyAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(payable(address(senderHooksProxy))),
+            ITransparentUpgradeableProxy(payable(address(senderProxy))),
             address(new SenderHooks()),
             ""
         );
@@ -62,7 +84,7 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
         senderProxy.allowlistDestinationChain(EthHolesky.ChainSelector, true);
         senderProxy.allowlistSourceChain(EthHolesky.ChainSelector, true);
         senderProxy.allowlistSender(address(receiverProxy), true);
-        senderProxy.setSenderHooks(senderHooksProxy);
+        senderProxy.setSenderHooks(ISenderHooks(address(senderHooksProxy)));
 
         senderHooksProxy.setSenderCCIP(address(senderProxy));
         senderHooksProxy.setBridgeTokens(
@@ -92,5 +114,13 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
         );
 
         vm.stopBroadcast();
+    }
+
+    function getAdminAddress(address proxy) internal view returns (address) {
+        address CHEATCODE_ADDRESS = 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D;
+        Vm vm = Vm(CHEATCODE_ADDRESS);
+
+        bytes32 adminSlot = vm.load(proxy, ERC1967Utils.ADMIN_SLOT);
+        return address(uint160(uint256(adminSlot)));
     }
 }

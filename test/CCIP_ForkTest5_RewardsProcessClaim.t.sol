@@ -7,7 +7,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/tran
 import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {ERC20Minter} from "./mocks/ERC20Minter.sol";
 
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
@@ -258,7 +257,8 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         vm.assertTrue(rewardsCoordinator.getDistributionRootsLength() == 1);
 
         // Send RewardsCoordinator some tokens for rewards claims
-        IERC20_CCIPBnM(address(tokenL1)).drip(address(rewardsCoordinator));
+        vm.prank(deployer);
+        IERC20(address(tokenL1)).transfer(address(rewardsCoordinator), 1 ether);
 
 		// Fast forward to present time
         vm.warp(timeNow);

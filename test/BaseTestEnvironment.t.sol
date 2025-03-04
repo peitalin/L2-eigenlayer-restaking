@@ -4,7 +4,7 @@ pragma solidity 0.8.25;
 import {Test} from "forge-std/Test.sol";
 // eigenlayer RewardsCoordinator is expecting v4.7 erc20
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
+import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
@@ -114,6 +114,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
         deployReceiverOnL1Script = new DeployReceiverOnL1Script();
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
+        //// Eigenlayer Contracts
         (
             strategy,
             strategyManager,
@@ -122,7 +123,10 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             delegationManager,
             rewardsCoordinator,
             tokenL1
-        ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
+        ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false, true);
+
+        require(address(tokenL1) != address(0), "TokenL1 not deployed");
+        require(address(strategy) != address(0), "Strategy not deployed");
 
         //// Setup L1 CCIP contracts and 6551 EigenAgent
         (
@@ -134,8 +138,10 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
         eigenAgentOwner721 = agentFactory.eigenAgentOwner721();
 
         // only for tests
-        vm.prank(deployer);
+        vm.startBroadcast(deployer);
         restakingConnector.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
+        IBurnMintERC20(address(tokenL1)).mint(deployer, 10 ether);
+        vm.stopBroadcast();
 
         vm.deal(address(receiverContract), 1 ether);
         vm.deal(address(restakingConnector), 1 ether);
@@ -190,10 +196,9 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             // set eigenlayer contracts
             restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy, rewardsCoordinator);
 
-            IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
-            IERC20_CCIPBnM(address(tokenL1)).drip(address(restakingConnector));
-            IERC20_CCIPBnM(address(tokenL1)).drip(address(deployer));
-            IERC20_CCIPBnM(address(tokenL1)).drip(address(deployer));
+            require(IERC20(address(tokenL1)).balanceOf(deployer) > 0, "Deployer has no tokens on live fork");
+            IERC20(address(tokenL1)).transfer(address(receiverContract), 1 ether);
+            IERC20(address(tokenL1)).transfer(address(restakingConnector), 1 ether);
         }
         vm.stopBroadcast();
 
@@ -210,9 +215,8 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             senderContract.allowlistSender(address(receiverContract), true);
             senderContract.allowlistSender(deployer, true);
 
-            IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(senderContract));
-            IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(deployer));
-            IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(deployer));
+            IERC20Minter(BaseSepolia.BridgeToken).mint(address(senderContract), 1 ether);
+            IERC20Minter(BaseSepolia.BridgeToken).mint(address(deployer), 1 ether);
         }
         vm.stopBroadcast();
     }
@@ -248,7 +252,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             delegationManager,
             rewardsCoordinator,
             tokenL1
-        ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
+        ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false, true);
 
         //// L1 CCIP contracts and 6551 EigenAgent contracts
         (

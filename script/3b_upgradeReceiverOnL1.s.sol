@@ -72,7 +72,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
         (
             strategy,
-            // IERC20 _tokenL1,
+            , // IERC20 _tokenL1,
             // ProxyAdmin _proxyAdmin
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerStrategy();
 

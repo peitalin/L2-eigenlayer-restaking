@@ -21,23 +21,7 @@ contract DeploySenderOnL2Script is Script, FileReader {
     address deployer = vm.addr(deployerKey);
 
     function run() public returns (ISenderCCIP, ISenderHooks) {
-
-        vm.startBroadcast(deployer);
-        ProxyAdmin _proxyAdmin = new ProxyAdmin(deployer);
-
-        ERC20Minter erc20proxy = ERC20Minter(address(
-            new TransparentUpgradeableProxy(
-                address(new ERC20Minter()),
-                address(_proxyAdmin),
-                abi.encodeWithSelector(
-                    ERC20Minter.initialize.selector,
-                    "Mock MAGIC",
-                    "MMAGIC"
-                )
-            )
-        ));
-        vm.stopBroadcast();
-        // return _run(false);
+        return _run(false);
     }
 
     function mockrun() public returns (ISenderCCIPMock, ISenderHooks) {
@@ -57,14 +41,12 @@ contract DeploySenderOnL2Script is Script, FileReader {
 
         vm.startBroadcast(deployerKey);
 
-        ProxyAdmin proxyAdmin = new ProxyAdmin(deployer);
-
         // deploy sender utils proxy
         SenderHooks senderHooksProxy = SenderHooks(
             payable(address(
                 new TransparentUpgradeableProxy(
                     address(new SenderHooks()),
-                    address(proxyAdmin),
+                    address(deployer),
                     abi.encodeWithSelector(
                         SenderHooks.initialize.selector,
                         EthHolesky.BridgeToken,
@@ -82,11 +64,13 @@ contract DeploySenderOnL2Script is Script, FileReader {
             senderImpl = new SenderCCIP(BaseSepolia.Router);
         }
 
+        // Deployer, not ProxyAdmin for 2nd argument in TransparentUpgradeableProxy constructor
+        // https://forum.openzeppelin.com/t/5-0-transparentupgradeableproxy-upgradeandcall-error/41540/2
         SenderCCIP senderProxy = SenderCCIP(
             payable(address(
                 new TransparentUpgradeableProxy(
                     address(senderImpl),
-                    address(proxyAdmin),
+                    address(deployer),
                     abi.encodeWithSelector(SenderCCIP.initialize.selector)
                 )
             ))
@@ -119,7 +103,6 @@ contract DeploySenderOnL2Script is Script, FileReader {
             saveSenderBridgeContracts(
                 address(senderProxy),
                 address(senderHooksProxy),
-                address(proxyAdmin),
                 FILEPATH_BRIDGE_CONTRACTS_L2
             );
         }

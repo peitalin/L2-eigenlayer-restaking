@@ -21,6 +21,7 @@ allow_internal_expect_revert = true
 remappings = [
   "@chainlink/ccip/=lib/ccip/contracts/src/v0.8/ccip/",
   "@chainlink/ccip-vendor/=lib/ccip/contracts/src/v0.8/vendor/",
+  "@chainlink/shared/=lib/ccip/contracts/src/v0.8/shared/",
   "forge-std/=lib/forge-std/src/",
   "@6551/=lib/reference/src/",
   "@openzeppelin-v5-contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts",

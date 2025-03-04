@@ -293,7 +293,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
 
         (
             IDelegationManager.Withdrawal memory withdrawal,
-            IERC20[] memory tokensToWithdraw,
+            , // IERC20[] memory tokensToWithdraw
             , // middlewareTimesIndex
             bool receiveAsTokens, // receiveAsTokens
             address signer, // signer

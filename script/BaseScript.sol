@@ -5,7 +5,6 @@ import {Script} from "forge-std/Script.sol";
 // CCIP interfaces
 import {IRouterClient} from "@chainlink/ccip/interfaces/IRouterClient.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 // Eigenlayer interfaecs
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
@@ -89,7 +88,7 @@ contract BaseScript is
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
         (
             strategy,
-            // IERC20 _tokenL1,
+            , // IERC20 tokenL1,
             // ProxyAdmin _proxyAdmin
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerStrategy();
 
@@ -116,7 +115,7 @@ contract BaseScript is
         tokenL2 = IERC20(address(BaseSepolia.BridgeToken)); // CCIP-BnM on L2
 
         if (isTest) {
-            IERC20_CCIPBnM(address(tokenL2)).drip(deployer);
+            IERC20(address(tokenL2)).transfer(deployer, 1 ether);
             vm.deal(deployer, 1 ether); // fund L2 balance
         }
     }

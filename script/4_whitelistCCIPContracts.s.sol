@@ -2,7 +2,8 @@
 pragma solidity 0.8.25;
 
 import {Script} from "forge-std/Script.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
@@ -88,7 +89,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
         senderHooksProxy.setSenderCCIP(address(senderProxy));
 
         if (isTest) {
-            IERC20_CCIPBnM(tokenL2).drip(deployer);
+            IERC20(tokenL2).transfer(deployer, 1 ether);
         }
 
         require(

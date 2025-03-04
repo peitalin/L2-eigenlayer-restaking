@@ -3,9 +3,9 @@ pragma solidity 0.8.25;
 
 import {console} from "forge-std/Test.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
-import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 
+import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {EthHolesky} from "./Addresses.sol";
 import {BaseScript} from "./BaseScript.sol";
 
@@ -66,7 +66,7 @@ contract DepositAndMintEigenAgentScript is BaseScript {
                 (bool success, ) = staker.call{value: 0.03 ether}("");
             }
         }
-        IERC20_CCIPBnM(address(tokenL2)).drip(staker);
+        IERC20(address(tokenL2)).transfer(address(staker), 1 ether);
         vm.stopBroadcast();
 
         //////////////////////////////////////////////////////

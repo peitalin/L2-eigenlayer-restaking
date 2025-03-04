@@ -60,7 +60,6 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
         fileReaderTest.readBaseEigenAgent();
         fileReaderTest.readReceiverRestakingConnector();
         fileReaderTest.readProxyAdminL1();
-        fileReaderTest.readProxyAdminL2();
         fileReaderTest.readSenderContract();
         fileReaderTest.readSenderHooks();
         {
