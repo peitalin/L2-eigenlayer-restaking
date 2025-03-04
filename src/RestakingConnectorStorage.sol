@@ -32,7 +32,7 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
 
     mapping(bytes4 => uint256) internal _gasLimitsForFunctionSelectors;
 
-    event SetGasLimitForFunctionSelector(bytes4, uint256);
+    event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
 
     // When adding custom errors, update decodeEigenAgentExecutionError
     // to decode the new error selector and display error messages properly.

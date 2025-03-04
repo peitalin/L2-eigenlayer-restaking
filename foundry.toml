@@ -43,7 +43,9 @@ localhost = "http://localhost:8545"
 # Note: Free RPCs may sometimes fail
 # holesky = "https://holesky.drpc.org"
 # holesky = "https://holesky.infura.io/v3/${INFURA_API_KEY}"
-holesky = "https://ethereum-holesky-rpc.publicnode.com"
+# holesky = "https://ethereum-holesky-rpc.publicnode.com"
+# holesky = "https://rpc-holesky.rockx.com"
+holesky = "https://holesky.gateway.tenderly.co"
 ## Holesky RPCs breaking with Pectra upgrade
 
 

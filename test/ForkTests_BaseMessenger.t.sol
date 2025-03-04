@@ -53,7 +53,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         // L1 Receiver
         vm.selectFork(ethForkId);
 
-        IERC20(address(tokenL1)).transfer(address(receiverContract), 1 ether);
+        IERC20(address(tokenL1)).transfer(address(receiverContract), 0.98 ether);
         uint256 totalWithdraw = tokenL1.balanceOf(address(receiverContract));
         uint256 halfWithdraw = totalWithdraw / 2;
 

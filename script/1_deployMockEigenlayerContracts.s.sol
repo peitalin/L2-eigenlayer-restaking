@@ -32,6 +32,8 @@ import {ERC20Minter} from "../test/mocks/ERC20Minter.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 import {EthHolesky} from "./Addresses.sol";
 
+import "forge-std/console.sol";
+
 /// @dev This deploys mock Eigenlayer contracts from the `dev` branch for the purpose
 /// of testing deposits, withdrawals, and delegation with custom ERC20 strategies only.
 /// It does not deploy and configure EigenPod and Slashing features (can add later).
@@ -133,27 +135,33 @@ contract DeployMockEigenlayerContractsScript is Script {
         if (deployNewToken) {
             // deploy a new ERC20 in localhost tests
             tokenERC20 = IERC20(address(deployERC20Minter("Mock MAGIC", "MMAGIC", proxyAdmin)));
+
+            // NOTE: when forking Holesky as we don't have permission over delegationManager/strategyManager
+            vm.startBroadcast(deployer);
+            {
+                // deploy a new strategy (only works once)
+                // automatically whitelists strategy
+                strategy = strategyFactory.deployNewStrategy(tokenERC20);
+
+                // set withdrawal delay to 1 block
+                IStrategy[] memory strategies = new IStrategy[](1);
+                strategies[0] = strategy;
+                uint256[] memory withdrawalDelayBlocks = new uint256[](1);
+                withdrawalDelayBlocks[0] = 1;
+
+                DelegationManager(address(delegationManager)).setStrategyWithdrawalDelayBlocks(
+                    strategies,
+                    withdrawalDelayBlocks
+                );
+            }
+            vm.stopBroadcast();
         } else {
-            // can't mint, you need to transfer CCIP-BnM tokens to deployer
             tokenERC20 = IERC20(address(EthHolesky.BridgeToken));
-            // BurnMintERC20 tokenBurnMint = BurnMintERC20(address(EthHolesky.BridgeToken));
-            // tokenERC20 = IERC20(address(deployERC20Minter("Mock MAGIC", "MMAGIC", proxyAdmin)));
+            vm.startBroadcast(deployer);
+            // automatically whitelists strategy
+            strategy = strategyFactory.deployNewStrategy(tokenERC20);
+            vm.stopBroadcast();
         }
-
-        vm.startBroadcast(deployer);
-        strategy = strategyFactory.deployNewStrategy(tokenERC20);
-
-        // setStrategyWithdrawalDelayBlocks
-        IStrategy[] memory strategies = new IStrategy[](1);
-        strategies[0] = strategy;
-
-        uint256[] memory withdrawalDelayBlocks = new uint256[](1);
-        withdrawalDelayBlocks[0] = 1;
-
-        DelegationManager(address(delegationManager))
-            .setStrategyWithdrawalDelayBlocks(strategies, withdrawalDelayBlocks);
-
-        vm.stopBroadcast();
 
         if (saveDeployedContracts) {
             // only when deploying
@@ -382,19 +390,17 @@ contract DeployMockEigenlayerContractsScript is Script {
     ) public returns (ERC20Minter) {
         vm.startBroadcast(deployer);
 
-        ERC20Minter erc20proxy = ERC20Minter(
-            address(
-                new TransparentUpgradeableProxy(
-                    address(new ERC20Minter()),
-                    address(_proxyAdmin),
-                    abi.encodeWithSelector(
-                        ERC20Minter.initialize.selector,
-                        name,
-                        symbol
-                    )
+        ERC20Minter erc20proxy = ERC20Minter(address(
+            new TransparentUpgradeableProxy(
+                address(new ERC20Minter()),
+                address(_proxyAdmin),
+                abi.encodeWithSelector(
+                    ERC20Minter.initialize.selector,
+                    name,
+                    symbol
                 )
             )
-        );
+        ));
 
         erc20proxy.mint(deployer, 10 ether);
 

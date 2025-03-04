@@ -123,7 +123,21 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             delegationManager,
             rewardsCoordinator,
             tokenL1
-        ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false, true);
+        ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false, false);
+        // use existing CCIP token on Holesky
+
+        // (
+        //     strategyManager,
+        //     strategyFactory,
+        //     , // pauserRegistry
+        //     delegationManager,
+        //     rewardsCoordinator
+        // ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+        // (
+        //     strategy,
+        //     tokenL1,
+        //     // proxyAdmin
+        // ) = deployMockEigenlayerContractsScript.readSavedEigenlayerStrategy();
 
         require(address(tokenL1) != address(0), "TokenL1 not deployed");
         require(address(strategy) != address(0), "Strategy not deployed");
@@ -141,6 +155,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
         vm.startBroadcast(deployer);
         restakingConnector.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
         IBurnMintERC20(address(tokenL1)).mint(deployer, 10 ether);
+        IBurnMintERC20(address(tokenL1)).mint(address(this), 10 ether);
         vm.stopBroadcast();
 
         vm.deal(address(receiverContract), 1 ether);

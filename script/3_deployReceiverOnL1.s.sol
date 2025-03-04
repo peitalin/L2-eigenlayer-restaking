@@ -98,6 +98,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
             // deploy 6551 Registry -- only for testing
             registry6551 = IERC6551Registry(address(new ERC6551Registry()));
         } else {
+            // on mainnet use the proper registry
             // https://holesky.etherscan.io/address/0x000000006551c19487814612e58FE06813775758#code
             registry6551 = IERC6551Registry(address(0x000000006551c19487814612e58FE06813775758));
         }

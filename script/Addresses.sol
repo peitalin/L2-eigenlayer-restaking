@@ -33,7 +33,7 @@ library BaseSepolia {
     uint256 constant ChainId = 84532;
 
     // Risk Management Network contract that curses / blesses
-    // address constant RMN = ;
+    address constant RMN = 0x99360767a4705f68CcCb9533195B761648d6d807;
 
     address constant EVM2EVMOnRamp = 0x6486906bB2d85A6c0cCEf2A2831C11A2059ebfea;
 }
@@ -68,5 +68,4 @@ library EthHolesky {
 
     // Risk Management Network contract that curses / blesses
     address constant RMN = 0x8607115fd037d4f182b0eBaEC3cF08Df67080d05;
-
 }

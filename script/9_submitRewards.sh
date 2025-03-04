@@ -5,6 +5,6 @@ echo forge script script/9_submitRewards.s.sol:SubmitRewardsScript --rpc-url hol
 
 forge script script/9_submitRewards.s.sol:SubmitRewardsScript \
     --rpc-url holesky \
-    --broadcast \
+    # --broadcast \
     --private-key $DEPLOYER_KEY \
     -vvvv
