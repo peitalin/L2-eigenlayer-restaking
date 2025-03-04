@@ -25,7 +25,6 @@ import {EthHolesky} from "../script/Addresses.sol";
 
 contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
-    EigenlayerMsgDecoders public eigenlayerMsgDecoders;
     ClientSigners public clientSignersTest;
     ClientEncoders public clientEncodersTest;
 
@@ -58,7 +57,6 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         vm.prank(deployer);
         eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
 
-        eigenlayerMsgDecoders = new EigenlayerMsgDecoders();
         // test clientEncoders, create a new instance.
         clientSignersTest = new ClientSigners();
         clientEncodersTest = new ClientEncoders();

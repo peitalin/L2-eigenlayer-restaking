@@ -406,6 +406,7 @@ contract DeployMockEigenlayerContractsScript is Script {
         IStrategy,
         IERC20,
         ProxyAdmin
+        // Eigenlayer OZv4 contracts use a separateProxyAdmin.
     ) {
 
         chains[31337] = "localhost";

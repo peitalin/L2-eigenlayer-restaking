@@ -112,13 +112,6 @@ contract FileReader is Script {
         );
     }
 
-    function readProxyAdminL1() public view returns (address) {
-        string memory addrData;
-        addrData = vm.readFile(FILEPATH_BRIDGE_CONTRACTS_L1);
-        address proxyAdminL1Addr = stdJson.readAddress(addrData, ".contracts.proxyAdminL1");
-        return proxyAdminL1Addr;
-    }
-
     function saveReceiverBridgeContracts(
         address receiverCCIP,
         address restakingConnector,
@@ -126,7 +119,6 @@ contract FileReader is Script {
         address registry6551,
         address eigenAgentOwner721,
         address baseEigenAgent,
-        address proxyAdminL1,
         string memory filePath
     ) public {
 
@@ -136,7 +128,6 @@ contract FileReader is Script {
         require(registry6551 != address(0), "registry6551 cannot be null");
         require(eigenAgentOwner721 != address(0), "eigenAgentOwner721 cannot be null");
         require(baseEigenAgent != address(0), "baseEigenAgent cannot be null");
-        require(proxyAdminL1 != address(0), "proxyAdminL1 cannot be null");
 
         // { "inputs": <inputs_data>}
         /////////////////////////////////////////////////
@@ -145,8 +136,7 @@ contract FileReader is Script {
         vm.serializeAddress("contracts" , "agentFactory", agentFactory);
         vm.serializeAddress("contracts" , "registry6551", registry6551);
         vm.serializeAddress("contracts" , "eigenAgentOwner721", eigenAgentOwner721);
-        vm.serializeAddress("contracts" , "baseEigenAgent", baseEigenAgent);
-        string memory inputs_data = vm.serializeAddress("contracts" , "proxyAdminL1", proxyAdminL1);
+        string memory inputs_data = vm.serializeAddress("contracts" , "baseEigenAgent", baseEigenAgent);
 
         /////////////////////////////////////////////////
         // { "chainInfo": <chain_info_data>}

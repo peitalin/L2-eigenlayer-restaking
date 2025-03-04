@@ -27,6 +27,7 @@ import {ClientEncoders} from "./ClientEncoders.sol";
 import {ClientSigners} from "./ClientSigners.sol";
 import {RouterFees} from "./RouterFees.sol";
 import {GasLimits} from "./GasLimits.sol";
+import {UpgradesOZ5} from "./UpgradesOZ5.sol";
 
 
 
@@ -35,6 +36,7 @@ contract BaseScript is
     FileReader,
     RouterFees,
     GasLimits,
+    UpgradesOZ5,
     ClientEncoders,
     ClientSigners
 {

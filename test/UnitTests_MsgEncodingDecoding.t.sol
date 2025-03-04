@@ -23,8 +23,6 @@ import {EthHolesky} from "../script/Addresses.sol";
 
 contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
-    EigenlayerMsgDecoders public eigenlayerMsgDecoders;
-
     uint256 amount;
     address staker;
     uint256 expiry;
@@ -33,8 +31,6 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
     function setUp() public {
 
         setUpLocalEnvironment();
-
-        eigenlayerMsgDecoders = new EigenlayerMsgDecoders();
 
         amount = 0.0077 ether;
         staker = deployer;
@@ -96,7 +92,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             address _signer,
             uint256 _expiry,
             bytes memory _signature
-        ) = eigenlayerMsgDecoders.decodeDepositIntoStrategyMsg(
+        ) = EigenlayerMsgDecoders.decodeDepositIntoStrategyMsg(
             // CCIP string and encodes message when sending
             abi.encode(string(messageWithSignature))
         );
@@ -130,7 +126,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         // CCIP turns the message into string when sending
         bytes memory messageCCIP = abi.encode(string(messageToMint));
 
-        address recipient = eigenlayerMsgDecoders.decodeMintEigenAgent(messageCCIP);
+        address recipient = EigenlayerMsgDecoders.decodeMintEigenAgent(messageCCIP);
 
         vm.assertEq(recipient, staker);
     }
@@ -173,7 +169,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             address _signer,
             uint256 _expiry,
             bytes memory _signature
-        ) = eigenlayerMsgDecoders.decodeDepositIntoStrategyMsg(messageWithSignatureCCIP);
+        ) = EigenlayerMsgDecoders.decodeDepositIntoStrategyMsg(messageWithSignatureCCIP);
 
         vm.assertEq(address(_strategy), address(strategy));
         vm.assertEq(address(tokenL1), _token);
@@ -267,7 +263,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             address signer,
             uint256 expiry2,
             bytes memory _signature
-        ) = eigenlayerMsgDecoders.decodeQueueWithdrawalsMsg(
+        ) = EigenlayerMsgDecoders.decodeQueueWithdrawalsMsg(
             // CCIP string-encodes the message when sending
             abi.encode(string(
                 messageWithSignature_QW
@@ -323,7 +319,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         }
 
         vm.expectRevert("decodeQueueWithdrawalsMsg: arrayLength must be at least 1");
-        eigenlayerMsgDecoders.decodeQueueWithdrawalsMsg(
+        EigenlayerMsgDecoders.decodeQueueWithdrawalsMsg(
             // CCIP string-encodes the message when sending
             abi.encode(string(
                 messageWithSignature_QW
@@ -392,7 +388,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             address _signer,
             uint256 _expiry,
             bytes memory _signature
-        ) = eigenlayerMsgDecoders.decodeCompleteWithdrawalMsg(
+        ) = EigenlayerMsgDecoders.decodeCompleteWithdrawalMsg(
             // CCIP string-encodes the message when sending
             abi.encode(string(
                 messageWithSignature_CW
@@ -542,7 +538,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             bob
         ));
 
-        TransferToAgentOwnerMsg memory tta_msg = eigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(
+        TransferToAgentOwnerMsg memory tta_msg = EigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(
             abi.encode(string(
                 encodeTransferToAgentOwnerMsg(
                     calculateWithdrawalTransferRoot(
@@ -570,7 +566,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             agentOwner
         );
 
-        TransferToAgentOwnerMsg memory tta_msg = eigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(
+        TransferToAgentOwnerMsg memory tta_msg = EigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(
             abi.encode(string(
                 encodeTransferToAgentOwnerMsg(
                     calculateRewardsTransferRoot(
@@ -794,7 +790,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             address _signer,
             uint256 _expiry,
             bytes memory _signature
-        ) = eigenlayerMsgDecoders.decodeProcessClaimMsg(
+        ) = EigenlayerMsgDecoders.decodeProcessClaimMsg(
             abi.encode(string(
                 messageWithSignature_PC
             ))
@@ -878,7 +874,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             ,
             ,
             ,
-        ) = eigenlayerMsgDecoders.decodeProcessClaimMsg(
+        ) = EigenlayerMsgDecoders.decodeProcessClaimMsg(
             abi.encode(string(
                 messageWithSignature_PC
             ))
@@ -943,7 +939,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             );
 
             vm.expectRevert("tokenTreeProof length must be a multiple of 32");
-            eigenlayerMsgDecoders.decodeProcessClaimMsg(
+            EigenlayerMsgDecoders.decodeProcessClaimMsg(
                 abi.encode(string(
                     messageWithSignature_PC
                 ))
@@ -978,7 +974,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             );
 
             vm.expectRevert("earnerTreeProofLength must be divisible by 32");
-            eigenlayerMsgDecoders.decodeProcessClaimMsg(
+            EigenlayerMsgDecoders.decodeProcessClaimMsg(
                 abi.encode(string(
                     messageWithSignature_PC
                 ))

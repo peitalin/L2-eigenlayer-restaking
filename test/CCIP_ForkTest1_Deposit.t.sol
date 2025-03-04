@@ -70,7 +70,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             );
         }
 
-        EigenlayerMsgDecoders decoders = new EigenlayerMsgDecoders();
+        // EigenlayerMsgDecoders decoders = new EigenlayerMsgDecoders();
         (
             address strategy_,
             address token_,
@@ -78,7 +78,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             address signer_,
             uint256 expiry_,
             bytes memory signature_
-        ) = decoders.decodeDepositIntoStrategyMsg(
+        ) = EigenlayerMsgDecoders.decodeDepositIntoStrategyMsg(
             abi.encode(string(
                 messageWithSignature
             ))

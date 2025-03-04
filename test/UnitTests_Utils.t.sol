@@ -59,7 +59,6 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
         fileReaderTest.readEigenAgent721AndRegistry();
         fileReaderTest.readBaseEigenAgent();
         fileReaderTest.readReceiverRestakingConnector();
-        fileReaderTest.readProxyAdminL1();
         fileReaderTest.readSenderContract();
         fileReaderTest.readSenderHooks();
         {
@@ -83,7 +82,6 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
         fileReaderTest.saveSenderBridgeContracts(
             vm.addr(1),
             vm.addr(2),
-            vm.addr(3),
             "test/temp-files/bridgeContractsL2.config.json"
         );
     }

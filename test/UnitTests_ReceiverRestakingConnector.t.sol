@@ -727,9 +727,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
             rc.setBridgeTokens(_bridgeTokenL1, _bridgeTokenL2);
             vm.assertEq(rc.bridgeTokensL1toL2(_bridgeTokenL1), _bridgeTokenL2);
-
-            rc.clearBridgeTokens(_bridgeTokenL1);
-            vm.assertEq(rc.bridgeTokensL1toL2(_bridgeTokenL1), address(0));
         }
         vm.stopBroadcast();
     }

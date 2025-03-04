@@ -20,6 +20,7 @@ import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 import {EthHolesky, BaseSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
+import {UpgradesOZ5} from "./UpgradesOZ5.sol";
 
 import {EigenAgentOwner721} from "../src/6551/EigenAgentOwner721.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
@@ -27,16 +28,16 @@ import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 
+import {console} from "forge-std/console.sol";
 
 
-contract UpgradeReceiverOnL1Script is Script, FileReader {
+contract UpgradeReceiverOnL1Script is Script, FileReader, UpgradesOZ5 {
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
 
     IAgentFactory public agentFactoryProxy;
     ISenderCCIP public senderProxy;
     RestakingConnector public restakingConnectorImpl;
-    ProxyAdmin public proxyAdmin;
 
     IERC6551Registry public registry6551;
     IEigenAgentOwner721 public eigenAgentOwner721Proxy;
@@ -73,7 +74,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
         (
             strategy,
             , // IERC20 _tokenL1,
-            // ProxyAdmin _proxyAdmin
+            // ProxyAdmin _eigenlayerProxyAdmin
         ) = deployMockEigenlayerContractsScript.readSavedEigenlayerStrategy();
 
         (
@@ -88,48 +89,53 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
         senderProxy = readSenderContract();
         agentFactoryProxy = readAgentFactory();
         baseEigenAgent = readBaseEigenAgent();
-        proxyAdmin = ProxyAdmin(readProxyAdminL1());
 
         /////////////////////////////
         /// Begin Broadcast
         /////////////////////////////
         vm.startBroadcast(deployerKey);
 
+        ProxyAdmin(getProxyAdminOZ5(address(eigenAgentOwner721Proxy)))
+            .upgradeAndCall(
+                ITransparentUpgradeableProxy(payable(address(eigenAgentOwner721Proxy))),
+                address(new EigenAgentOwner721()),
+                ""
+            );
 
-        // upgrade 6551 EigenAgentOwner NFT
-        proxyAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(payable(address(eigenAgentOwner721Proxy))),
-            address(new EigenAgentOwner721()),
-            ""
-        );
         eigenAgentOwner721Proxy.addToWhitelistedCallers(address(restakingConnectorProxy));
 
         // upgrade agentFactoryProxy
-        proxyAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(payable(address(agentFactoryProxy))),
-            address(new AgentFactory()),
-            ""
-        );
+        ProxyAdmin(getProxyAdminOZ5(address(agentFactoryProxy)))
+            .upgradeAndCall(
+                ITransparentUpgradeableProxy(payable(address(agentFactoryProxy))),
+                address(new AgentFactory()),
+                ""
+            );
 
         //////////////////////////////////////////////////
         // Upgrade proxies to new implementations
         //////////////////////////////////////////////////
 
         // Upgrade ReceiverCCIP proxy to new implementation
-        proxyAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(payable(address(receiverProxy))),
-            address(new ReceiverCCIP(EthHolesky.Router)),
-            ""
-        );
+        // proxyAdmin = ProxyAdmin(address(receiverProxy));
+
+        ProxyAdmin(getProxyAdminOZ5(address(receiverProxy)))
+            .upgradeAndCall(
+                ITransparentUpgradeableProxy(payable(address(receiverProxy))),
+                address(new ReceiverCCIP(EthHolesky.Router)),
+                ""
+            );
+
         vm.stopBroadcast();
 
         vm.startBroadcast(deployerKey);
         // Upgrade RestakingConnector proxy to new implementation
-        proxyAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(payable(address(restakingConnectorProxy))),
-            address(new RestakingConnector()),
-            ""
-        );
+        ProxyAdmin(getProxyAdminOZ5(address(restakingConnectorProxy)))
+            .upgradeAndCall(
+                ITransparentUpgradeableProxy(payable(address(restakingConnectorProxy))),
+                address(new RestakingConnector()),
+                ""
+            );
 
         receiverProxy.setRestakingConnector(restakingConnectorProxy);
 
@@ -176,7 +182,6 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
                 address(registry6551),
                 address(eigenAgentOwner721Proxy),
                 address(baseEigenAgent),
-                address(proxyAdmin),
                 FILEPATH_BRIDGE_CONTRACTS_L1
             );
         }

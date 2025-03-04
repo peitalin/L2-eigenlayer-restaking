@@ -4,7 +4,6 @@ pragma solidity 0.8.25;
 import {Script} from "forge-std/Script.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
 
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
@@ -30,8 +29,6 @@ import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {IERC6551Registry} from "@6551/interfaces/IERC6551Registry.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
 
-
-
 contract DeployReceiverOnL1Script is Script, FileReader {
 
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
@@ -39,7 +36,6 @@ contract DeployReceiverOnL1Script is Script, FileReader {
     RestakingConnector public restakingProxy;
     ReceiverCCIP public receiverProxy;
     ISenderCCIP public senderContract;
-    ProxyAdmin public proxyAdmin;
     IERC6551Registry public registry6551;
     IEigenAgentOwner721 public eigenAgentOwner721;
     IAgentFactory public agentFactoryProxy;
@@ -97,19 +93,23 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         ////////////////////////////////////////////////////////////
 
         vm.startBroadcast(deployerKey);
+        // deploy 6551 Registry -- only for testing
+        // registry6551 = IERC6551Registry(address(new ERC6551Registry()));
 
-        proxyAdmin = new ProxyAdmin(address(this));
-        // deploy 6551 Registry
-        registry6551 = IERC6551Registry(address(new ERC6551Registry()));
+        // https://holesky.etherscan.io/address/0x000000006551c19487814612e58FE06813775758#code
+        registry6551 = IERC6551Registry(address(0x000000006551c19487814612e58FE06813775758));
+
         // deploy 6551 EigenAgentOwner NFT
         eigenAgentOwner721 = IEigenAgentOwner721(
-            address(new TransparentUpgradeableProxy(
-                address(new EigenAgentOwner721()),
-                address(proxyAdmin),
-                abi.encodeWithSelector(
-                    EigenAgentOwner721.initialize.selector,
-                    "EigenAgentOwner",
-                    "EAO"
+            payable(address(
+                new TransparentUpgradeableProxy(
+                    address(new EigenAgentOwner721()),
+                    address(deployer),
+                    abi.encodeWithSelector(
+                        EigenAgentOwner721.initialize.selector,
+                        "EigenAgentOwner",
+                        "EAO"
+                    )
                 )
             ))
         );
@@ -121,7 +121,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
             payable(address(
                 new TransparentUpgradeableProxy(
                     address(new AgentFactory()),
-                    address(proxyAdmin),
+                    address(deployer),
                     abi.encodeWithSelector(
                         AgentFactory.initialize.selector,
                         registry6551,
@@ -137,7 +137,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
             payable(address(
                 new TransparentUpgradeableProxy(
                     address(new RestakingConnector()),
-                    address(proxyAdmin),
+                    address(deployer),
                     abi.encodeWithSelector(
                         RestakingConnector.initialize.selector,
                         agentFactoryProxy,
@@ -166,7 +166,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
             payable(address(
                 new TransparentUpgradeableProxy(
                     address(receiverImpl),
-                    address(proxyAdmin),
+                    address(deployer),
                     abi.encodeWithSelector(
                         ReceiverCCIP.initialize.selector,
                         IRestakingConnector(address(restakingProxy)),
@@ -241,7 +241,6 @@ contract DeployReceiverOnL1Script is Script, FileReader {
                 address(registry6551),
                 address(eigenAgentOwner721),
                 address(baseEigenAgent),
-                address(proxyAdmin),
                 FILEPATH_BRIDGE_CONTRACTS_L1
             );
         }

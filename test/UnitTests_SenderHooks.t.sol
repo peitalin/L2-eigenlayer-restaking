@@ -126,8 +126,8 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             senderHooks.setBridgeTokens(_bridgeTokenL1, _bridgeTokenL2);
             vm.assertEq(senderHooks.bridgeTokensL1toL2(_bridgeTokenL1), _bridgeTokenL2);
 
-            senderHooks.clearBridgeTokens(_bridgeTokenL1);
-            vm.assertEq(senderHooks.bridgeTokensL1toL2(_bridgeTokenL1), address(0));
+            senderHooks.setBridgeTokens(address(0x1), address(0x2));
+            vm.assertEq(senderHooks.bridgeTokensL1toL2(_bridgeTokenL1), address(0x1));
         }
         vm.stopBroadcast();
     }

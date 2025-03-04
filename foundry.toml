@@ -9,6 +9,8 @@ fs_permissions = [
 evm_version = "Cancun"
 # optimizer is enabled by default, can produce different bytecode and mess with contract verification
 # optimizer = false
+optimizer_runs = 200
+# reduces contract size
 
 # Note: If DeployScripts tests run into OutofGas errors, could be a memory issue:
 # https://github.com/foundry-rs/foundry/issues/3971
@@ -40,8 +42,13 @@ remappings = [
 localhost = "http://localhost:8545"
 # Note: Free RPCs may sometimes fail
 # holesky = "https://holesky.drpc.org"
-holesky = "https://holesky.infura.io/v3/${INFURA_API_KEY}"
+# holesky = "https://holesky.infura.io/v3/${INFURA_API_KEY}"
+holesky = "https://ethereum-holesky-rpc.publicnode.com"
+## Holesky RPCs breaking with Pectra upgrade
+
+
 basesepolia = "https://sepolia.base.org"
+# sepolia = "https://sepolia.infura.io/v3/${INFURA_API_KEY}"
 
 [etherscan]
 holesky = { key = "${ETHERSCAN_API_KEY}" }

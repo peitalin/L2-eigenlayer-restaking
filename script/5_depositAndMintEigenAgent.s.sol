@@ -4,6 +4,7 @@ pragma solidity 0.8.25;
 import {console} from "forge-std/Test.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {EthHolesky} from "./Addresses.sol";
@@ -62,11 +63,14 @@ contract DepositAndMintEigenAgentScript is BaseScript {
             vm.deal(staker, 1 ether);
             (bool success, ) = staker.call{value: 0.5 ether}("");
         } else {
-            if (address(staker).balance < 0.04 ether) {
+            if (staker.balance < 0.04 ether) {
                 (bool success, ) = staker.call{value: 0.03 ether}("");
             }
         }
-        IERC20(address(tokenL2)).transfer(address(staker), 1 ether);
+
+        if (tokenL2.balanceOf(deployer) < 1 ether) {
+            IBurnMintERC20(address(tokenL2)).mint(deployer, 1 ether);
+        }
         vm.stopBroadcast();
 
         //////////////////////////////////////////////////////
@@ -107,10 +111,12 @@ contract DepositAndMintEigenAgentScript is BaseScript {
             tokenAmounts,
             gasLimit
         );
-        console.log("Router fees:", routerFees);
 
         vm.startBroadcast(stakerKey);
         {
+            if (staker != deployer) {
+                tokenL2.transfer(staker, amount);
+            }
             tokenL2.approve(address(senderContract), amount);
 
             senderContract.sendMessagePayNative{value: routerFees}(

@@ -8,7 +8,7 @@ forge script script/1_deployMockEigenlayerContracts.s.sol:DeployMockEigenlayerCo
     # --broadcast \
     --verify  \
     --private-key $DEPLOYER_KEY \
-    --gas-estimate-multiplier 200 \
+    --gas-estimate-multiplier 150 \
     --priority-gas-price 5 \
     -vvvv
 
