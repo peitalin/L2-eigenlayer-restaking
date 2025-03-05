@@ -465,7 +465,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         {
             vm.startBroadcast(address(restakingConnector));
 
-            bytes memory data0 = abi.encodeWithSelector(
+            bytes memory message0 = abi.encodeWithSelector(
                 // bytes4(keccak256("approve(address,uint256)")),
                 IERC20.approve.selector,
                 address(strategyManager),
@@ -479,7 +479,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 bobKey,
                 address(eigenAgentBob),
                 address(tokenL1),
-                data0,
+                message0,
                 execNonce0
             );
             checkSignature_EIP1271(bob, digestHash0, signature0);
@@ -487,7 +487,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             eigenAgentBob.executeWithSignature(
                 address(tokenL1), // CCIP-BnM token
                 0 ether, // value
-                data0,
+                message0,
                 expiry,
                 signature0
             );
@@ -504,7 +504,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         {
             vm.startBroadcast(address(restakingConnector));
             (
-                bytes memory data1,
+                bytes memory message1,
                 bytes32 digestHash1,
                 bytes memory signature1
             ) = createEigenAgentDepositSignature(
@@ -518,7 +518,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             eigenAgentBob.executeWithSignature(
                 address(strategyManager), // strategyManager
                 0,
-                data1, // encodeDepositIntoStrategyMsg
+                message1, // encodeDepositIntoStrategyMsg
                 expiry,
                 signature1
             );
@@ -578,7 +578,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
             uint256 execNonce2 = eigenAgentBob.execNonce();
             (
-                bytes memory data2,
+                bytes memory message2,
                 bytes32 digestHash2,
                 bytes memory signature2
             ) = createEigenAgentQueueWithdrawalsSignature(
@@ -592,7 +592,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             bytes memory result = eigenAgentBob.executeWithSignature(
                 address(delegationManager), // delegationManager
                 0,
-                data2, // encodeQueueWithdrawals
+                message2, // encodeQueueWithdrawals
                 expiry,
                 signature2
             );
@@ -603,6 +603,44 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 "no withdrawalRoot returned by EigenAgent queueWithdrawals"
             );
 
+            vm.stopBroadcast();
+        }
+        {
+            vm.startBroadcast(address(restakingConnector));
+            // Suppose BoB pre-approved message for EigenAgentBob.
+            // Check this message cannot be used after EigenAgentBob is transferred to Alice
+            bytes memory message3 = abi.encodeWithSelector(
+                // bytes4(keccak256("approve(address,uint256)")),
+                IERC20.approve.selector,
+                address(strategyManager),
+                amount
+            );
+            uint256 execNonce3 = 3;
+            bytes32 digestHash3;
+            bytes memory signature3;
+            (
+                digestHash3,
+                signature3
+            ) = createEigenAgentERC20ApproveSignature(
+                bobKey,
+                address(eigenAgentBob),
+                address(tokenL1),
+                message3,
+                execNonce3
+            );
+            checkSignature_EIP1271(bob, digestHash3, signature3);
+
+            vm.expectRevert(abi.encodeWithSelector(
+                SignatureInvalid.selector,
+                "Invalid signer, or incorrect digestHash parameters."
+            ));
+            eigenAgentBob.executeWithSignature(
+                address(strategyManager), // strategyManager
+                0,
+                message3, // encodeDepositIntoStrategyMsg
+                expiry,
+                signature3
+            );
             vm.stopBroadcast();
         }
     }
