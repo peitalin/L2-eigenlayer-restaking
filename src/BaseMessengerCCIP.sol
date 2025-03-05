@@ -93,7 +93,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         _;
     }
 
-    function validateGasFees(uint256 fees) internal {
+    function validateGasFeesAndRefundExcess(uint256 fees) internal {
         if (msg.sender != address(this)) {
             // user sends ETH to the router
             if (fees > msg.value) {
@@ -179,7 +179,17 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         IRouterClient router = IRouterClient(this.getRouter());
 
         uint256 fees = router.getFee(_destinationChainSelector, evm2AnyMessage);
-        validateGasFees(fees);
+
+        emit MessageSent(
+            messageId,
+            _destinationChainSelector,
+            _receiver,
+            _tokenAmounts,
+            address(0),
+            fees
+        );
+        // validate gas fees after emitting event to follow Checks-effects-interactions pattern
+        validateGasFeesAndRefundExcess(fees);
 
         for (uint256 i = 0; i < _tokenAmounts.length; i++) {
             if (_tokenAmounts[i].amount > 0 && msg.sender != address(this)) {
@@ -200,15 +210,6 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         messageId = router.ccipSend{value: fees}(
             _destinationChainSelector,
             evm2AnyMessage
-        );
-
-        emit MessageSent(
-            messageId,
-            _destinationChainSelector,
-            _receiver,
-            _tokenAmounts,
-            address(0),
-            fees
         );
 
         return messageId;
