@@ -30,8 +30,6 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
     /// @notice lookup L2 token addresses of bridgeable tokens
     mapping(address bridgeTokenL1 => address bridgeTokenL2) public bridgeTokensL1toL2;
 
-    uint256 internal constant DEFAULT_GAS_LIMIT = 199_998;
-
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
 
     event WithdrawalTransferRootCommitted(
@@ -99,7 +97,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * - delegateTo(address,(bytes,uint256),bytes32) == 0xeea9064b
      * - undelegate(address) == 0xda8be864
      * @param functionSelector bytes4 functionSelector to get estimated gasLimits for.
-     * @return gasLimit returns 199_998 default if functionSelector does not match any entries
+     * @return gasLimit if functionSelector is supported, otherwise reverts.
      */
     function getGasLimitForFunctionSelector(bytes4 functionSelector)
         public
@@ -107,7 +105,10 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
         returns (uint256)
     {
         uint256 gasLimit = _gasLimitsForFunctionSelectors[functionSelector];
-        return (gasLimit > 0) ? gasLimit : 199_998;
+        if (gasLimit == 0) {
+            revert UnsupportedFunctionCall(functionSelector);
+        }
+        return gasLimit;
     }
 
     /**
@@ -228,11 +229,6 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             if (tokenAmounts[0].amount > 0) {
                 revert OnlySendFundsForDeposits(functionSelector,"Only send funds for DepositIntoStrategy calls");
             }
-        }
-
-        if (gasLimit == DEFAULT_GAS_LIMIT) {
-            // default gasLimit means functionSelector is not supported
-            revert UnsupportedFunctionCall(functionSelector);
         }
 
         if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {

@@ -164,8 +164,12 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             gasLimits
         );
 
-        // Return default gasLimit of 400_000 for undefined function selectors
-        vm.assertEq(senderHooks.getGasLimitForFunctionSelector(0xffeeaabb), 199_998);
+        // revert for unsupported function selectors with no set gasLimit
+        vm.expectRevert(abi.encodeWithSelector(
+            SenderHooks.UnsupportedFunctionCall.selector,
+            bytes4(0xffeeaabb)
+        ));
+        senderHooks.getGasLimitForFunctionSelector(0xffeeaabb);
 
         // gas limits should be set
         vm.assertEq(senderHooks.getGasLimitForFunctionSelector(functionSelectors[0]), 1_000_000);
