@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import {console} from "forge-std/Test.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
@@ -53,6 +52,10 @@ contract DepositAndMintEigenAgentScript is BaseScript {
 
         require(address(eigenAgent) == address(0), "User already has an EigenAgent");
         // User already has an EigenAgent, use script 5b_depositIntoStrategy for lower cost.
+        //
+        // If user does not have an EigenAgent yet, we need to predict the address of the
+        // EigenAgent to use in the message signature that the EigenAgent (yet to be minted) will execute.
+        address predictedEigenAgentAddr = agentFactory.predictEigenAgentAddress(staker, 0);
 
         //////////////////////////////////////////////////////
         /// L2: Fund staker account
@@ -84,7 +87,7 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             stakerKey,
-            address(eigenAgent),
+            predictedEigenAgentAddr,
             EthHolesky.ChainId, // destination chainid where EigenAgent lives
             TARGET_CONTRACT, // StrategyManager is the target
             encodeDepositIntoStrategyMsg(
