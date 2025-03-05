@@ -10,6 +10,7 @@ import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManage
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IStrategyFactory} from "@eigenlayer-contracts/interfaces/IStrategyFactory.sol";
+import {IPauserRegistry} from "@eigenlayer-contracts/interfaces/IPauserRegistry.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 
 import {IERC20Minter} from "./mocks/IERC20Minter.sol";
@@ -47,6 +48,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
     IDelegationManager public delegationManager;
     IStrategy public strategy;
     IStrategyFactory public strategyFactory;
+    IPauserRegistry public pauserRegistry;
     IRewardsCoordinator public rewardsCoordinator;
     IERC20 public tokenL1;
     IERC20 public tokenL2;
@@ -118,7 +120,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             strategy,
             strategyManager,
             strategyFactory,
-            , // pauserRegistry
+            pauserRegistry,
             delegationManager,
             rewardsCoordinator,
             tokenL1

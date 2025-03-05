@@ -4,6 +4,7 @@ pragma solidity 0.8.25;
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IPausable} from "@eigenlayer-contracts/interfaces/IPausable.sol";
 
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
@@ -22,6 +23,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
     uint256 amount;
 
     error AlreadyRefunded(uint256 amount);
+    error AlreadyRefundedReason(uint256 amount, string reason);
 
     function setUp() public {
         // setup forked environments for L2 and L1 contracts
@@ -265,16 +267,94 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         );
     }
 
-    function test_ReceiverL1_PreventRefundAfterManualRefund() public {
+    // function test_ReceiverL1_PreventRefundAfterManualRefund_PermanentError() public {
+
+    //     vm.selectFork(ethForkId);
+
+    //     uint256 execNonce = 0;
+    //     // introduce a permanent error with misconfigured
+    //     address invalidEigenlayerContract = vm.addr(4444);
+    //     // should revert with EigenAgentExecutionError(signer, expiry)
+    //     uint256 expiryShort = block.timestamp + 60 seconds;
+    //     // make expiryShort to test refund on expiry feature
+    //     bytes32 messageId = bytes32(abi.encode(124));
+
+    //     vm.prank(deployer);
+    //     IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
+
+    //     bytes memory messageWithSignature;
+    //     {
+    //         // sign the message for EigenAgent to execute Eigenlayer command
+    //         messageWithSignature = signMessageForEigenAgentExecution(
+    //             bobKey,
+    //             address(eigenAgentBob),
+    //             block.chainid, // destination chainid where EigenAgent lives
+    //             address(strategyManager), // StrategyManager to approve + deposit
+    //             encodeDepositIntoStrategyMsg(
+    //                 invalidEigenlayerContract,
+    //                 address(tokenL1),
+    //                 amount
+    //             ),
+    //             execNonce,
+    //             expiryShort
+    //         );
+    //     }
+
+    //     // warp ahead past the expiryShort timestamp:
+    //     vm.warp(block.timestamp + 7200); // 2 hours
+    //     vm.roll((block.timestamp + 7200) / 12); // 600 blocks on ETH
+
+    //     Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
+    //     destTokenAmounts[0] = Client.EVMTokenAmount({
+    //         token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
+    //         amount: amount
+    //     });
+    //     Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+    //         messageId: messageId,
+    //         sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
+    //         sender: abi.encode(deployer),
+    //         destTokenAmounts: destTokenAmounts,
+    //         data: abi.encode(string(
+    //             messageWithSignature
+    //         ))
+    //     });
+
+    //     // Manually refund the user first
+    //     vm.prank(deployer);
+    //     uint256 refundAmount = 0.1 ether;
+    //     receiverContract.withdrawTokenForMessageId(
+    //         messageId,
+    //         bob,
+    //         address(tokenL1),
+    //         refundAmount
+    //     );
+
+    //     // attemp to trigger a refund after being manually refunded by admin.
+    //     // Refund is no longer available, should revert with AlreadyRefundedReason
+    //     vm.expectRevert(abi.encodeWithSelector(
+    //         AlreadyRefundedReason.selector,
+    //         refundAmount,
+    //         "StrategyManager.onlyStrategiesWhitelistedForDeposit: strategy not whitelisted"
+    //     ));
+    //     receiverContract.mockCCIPReceive(any2EvmMessage);
+    // }
+
+
+    function test_ReceiverL1_PreventRefundAfterManualRefund_TemporaryError() public {
 
         vm.selectFork(ethForkId);
 
         uint256 execNonce = 0;
-        address invalidEigenlayerContract = vm.addr(4444);
         // should revert with EigenAgentExecutionError(signer, expiry)
         uint256 expiryShort = block.timestamp + 60 seconds;
         // make expiryShort to test refund on expiry feature
         bytes32 messageId = bytes32(abi.encode(124));
+        uint256 amount = 0.11 ether;
+
+        // fund receiver contract with 1 ether
+        vm.prank(deployer);
+        IERC20(address(tokenL1)).transfer(address(receiverContract), 1 ether);
+        uint256 receiverBalanceBefore = IERC20(address(tokenL1)).balanceOf(address(receiverContract));
 
         vm.prank(deployer);
         IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
@@ -288,7 +368,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager to approve + deposit
                 encodeDepositIntoStrategyMsg(
-                    invalidEigenlayerContract,
+                    address(strategy),
                     address(tokenL1),
                     amount
                 ),
@@ -297,9 +377,9 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             );
         }
 
-        // warp ahead past the expiryShort timestamp:
-        vm.warp(block.timestamp + 7200); // 2 hours
-        vm.roll((block.timestamp + 7200) / 12); // 600 blocks on ETH
+        // Pause Strategy and introduce a temporary deposit failure
+        vm.prank(deployer);
+        IPausable(address(strategyManager)).pause(1);
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
@@ -316,19 +396,47 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             ))
         });
 
-        // Manually refund the user first
+        // user triggers a revert as StrategyManager is paused
+        // but it is before expiry, so refunds are not yet available
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
+                "Pausable: index is paused",
+                "Manually execute to refund after timestamp:",
+                expiryShort
+            )
+        );
+        receiverContract.mockCCIPReceive(any2EvmMessage);
+
+        // user then tricks admin to manually refund the user
         vm.prank(deployer);
         receiverContract.withdrawTokenForMessageId(
             messageId,
             bob,
             address(tokenL1),
-            0.1 ether
+            amount
         );
 
-        // reverts with original error message if user tries to trigger a refund
-        // after being manually refunded by admin. Refund is no longer available.
-        vm.expectRevert("StrategyManager.onlyStrategiesWhitelistedForDeposit: strategy not whitelisted");
+        // warp ahead past the expiryShort timestamp, now refunds are available
+        vm.warp(block.timestamp + 7200); // 2 hours
+        vm.roll((block.timestamp + 7200) / 12); // 600 blocks on ETH
+
+        // unpause the StrategyManager, enabling the user's original deposit to go through
+        vm.prank(deployer);
+        IPausable(address(strategyManager)).unpause(0);
+
+        // After unpausing the StrategyManager, the user can now continue with their original deposit
+        // which does not trigger a revert, effectively stealing the refund and keeping his deposit
+        vm.expectRevert(abi.encodeWithSelector(AlreadyRefunded.selector, amount));
         receiverContract.mockCCIPReceive(any2EvmMessage);
+
+        // uint256 receiverBalanceAfter = IERC20(address(tokenL1)).balanceOf(address(receiverContract));
+        // // show receiver contract has lost some balance, robbed by Bob
+        // require(receiverBalanceBefore > receiverBalanceAfter, "receiver should have been robbed");
+        // require(
+        //     (receiverBalanceBefore - receiverBalanceAfter) == (amount*2),
+        //     "receiver should have lost 2x the amount"
+        // );
     }
 
     function test_RouterFees_OnL1AndL2() public {

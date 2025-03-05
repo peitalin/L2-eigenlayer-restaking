@@ -47,6 +47,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
     error AddressZero(string msg);
     error AlreadyRefunded(uint256 amount);
+    error AlreadyRefundedReason(uint256 amount, string reason);
 
     /// @param _router address of the router contract.
     constructor(address _router) BaseMessengerCCIP(_router) {
@@ -159,6 +160,14 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             any2EvmMessage.destTokenAmounts
         );
 
+        // Check if any tokens have already been refunded
+        for (uint32 i = 0; i < any2EvmMessage.destTokenAmounts.length; ++i) {
+            address tokenAddress = any2EvmMessage.destTokenAmounts[i].token;
+            if (amountRefundedToMessageIds[any2EvmMessage.messageId][tokenAddress] > 0) {
+                revert AlreadyRefunded(amountRefundedToMessageIds[any2EvmMessage.messageId][tokenAddress]);
+            }
+        }
+
         try restakingConnector.dispatchMessageToEigenAgent(any2EvmMessage)
             returns (IRestakingConnector.TransferTokensInfo memory transferTokensInfo)
         {
@@ -225,7 +234,9 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                             string memory errStr
                         ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
 
-                        revert(errStr);
+                        uint256 amountRefunded = amountRefundedToMessageIds[any2EvmMessage.messageId][tokenAddress];
+                        // revert(errStr);
+                        revert AlreadyRefundedReason(amountRefunded, errStr);
                     }
                 }
 
