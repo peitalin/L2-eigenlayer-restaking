@@ -4,14 +4,18 @@ pragma solidity 0.8.25;
 import {ERC721URIStorageUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
 import {Initializable} from "@openzeppelin-v5-contracts-upgradeable/proxy/utils/Initializable.sol";
 import {Strings} from "@openzeppelin-v5-contracts/utils/Strings.sol";
+import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 
 import {Adminable} from "../utils/Adminable.sol";
 import {IAgentFactory} from "./IAgentFactory.sol";
+
+import {console} from "forge-std/console.sol";
 
 
 contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Adminable {
 
     IAgentFactory public agentFactory;
+    IRewardsCoordinator public rewardsCoordinator;
 
     mapping(address contracts => bool whitelisted) public whitelistedCallers;
 
@@ -21,6 +25,7 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
     event AddToWhitelistedCallers(address indexed caller);
     event RemoveFromWhitelistedCallers(address indexed caller);
     event SetAgentFactory(address indexed agentFactory);
+    event SetRewardsCoordinator(address indexed rewardsCoordinator);
 
     error AlreadyHasAgent(address owner);
 
@@ -44,11 +49,22 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
         return address(agentFactory);
     }
 
+    function getRewardsCoordinator() external view returns (address) {
+        return address(rewardsCoordinator);
+    }
+
     /// @param _agentFactory is the AgentFactory contract that creates EigenAgents
     function setAgentFactory(IAgentFactory _agentFactory) external onlyAdminOrOwner {
         require(address(_agentFactory) != address(0), "AgentFactory cannot be address(0)");
         agentFactory = _agentFactory;
         emit SetAgentFactory(address(_agentFactory));
+    }
+
+    /// @param _rewardsCoordinator is the RewardsCoordinator contract that distributes rewards
+    function setRewardsCoordinator(IRewardsCoordinator _rewardsCoordinator) external onlyAdminOrOwner {
+        require(address(_rewardsCoordinator) != address(0), "RewardsCoordinator cannot be address(0)");
+        rewardsCoordinator = _rewardsCoordinator;
+        emit SetRewardsCoordinator(address(_rewardsCoordinator));
     }
 
     /**
@@ -115,6 +131,8 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
         address from = super._update(to, tokenId, auth);
         require(balanceOf(to) <= 1, "Cannot own more than one EigenAgentOwner721 at a time.");
         agentFactory.updateEigenAgentOwnerTokenId(from, to, tokenId);
+        // reset claimers for RewardsCoordinator upon transfer so old claimer/owner can't claim rewards
+        rewardsCoordinator.setClaimerFor(address(0));
         return from;
     }
 

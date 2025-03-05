@@ -543,6 +543,12 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 eigenAgentOwner721.ownerOf(transferTokenId) == alice,
                 "Alice should now be owner of Bob's EigenAgentBobOwner NFT"
             );
+
+            require(
+                rewardsCoordinator.claimerFor(address(eigenAgentBob)) == address(0),
+                "Claimer should be reset to address(0) upon transfer"
+            );
+
             vm.stopBroadcast();
         }
 
