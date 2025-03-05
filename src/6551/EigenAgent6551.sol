@@ -60,7 +60,6 @@ contract EigenAgent6551 is ERC6551 {
         restakingConnector = _restakingConnector;
     }
 
-    // Add a function to set the RestakingConnector
     function setRestakingConnector(address _restakingConnector) external {
         // Only the owner of the EigenAgent should be able to set this
         require(msg.sender == owner(), "Only owner can set RestakingConnector");

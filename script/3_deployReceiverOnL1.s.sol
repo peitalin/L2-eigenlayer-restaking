@@ -186,6 +186,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         eigenAgentOwner721.addAdmin(address(restakingProxy));
         eigenAgentOwner721.addToWhitelistedCallers(address(restakingProxy));
         eigenAgentOwner721.setAgentFactory(agentFactoryProxy);
+        eigenAgentOwner721.setRewardsCoordinator(rewardsCoordinator);
 
         restakingProxy.setReceiverCCIP(address(receiverProxy));
 
@@ -214,6 +215,10 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         require(
             address(eigenAgentOwner721.getAgentFactory()) == address(agentFactoryProxy),
             "EigenAgentOwner721 NFT: missing AgentFactory"
+        );
+        require(
+            address(eigenAgentOwner721.getRewardsCoordinator()) == address(rewardsCoordinator),
+            "EigenAgentOwner721 NFT: missing RewardsCoordinator"
         );
         require(
             address(agentFactoryProxy.getRestakingConnector()) == address(restakingProxy),

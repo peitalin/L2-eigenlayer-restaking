@@ -174,14 +174,14 @@ contract UnitTests_AgentFactory is BaseTestEnvironment {
         vm.expectRevert("AgentFactory.updateEigenAgentOwnerTokenId: caller not EigenAgentOwner721 contract");
         agentFactory.updateEigenAgentOwnerTokenId(deployer, bob, tokenId);
 
-        // transer to bob
+        // transfer to bob
         vm.prank(address(eigenAgentOwner721));
         agentFactory.updateEigenAgentOwnerTokenId(deployer, bob, tokenId);
 
         uint256 tokenId2 = agentFactory.getEigenAgentOwnerTokenId(bob);
         vm.assertEq(tokenId, tokenId2);
 
-        // transer back to deployer
+        // transfer back to deployer
         vm.prank(address(eigenAgentOwner721));
         agentFactory.updateEigenAgentOwnerTokenId(bob, deployer, tokenId);
 
