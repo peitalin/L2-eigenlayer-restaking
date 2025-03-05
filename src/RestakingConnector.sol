@@ -3,7 +3,7 @@ pragma solidity 0.8.25;
 
 import {Initializable} from "@openzeppelin-v5-contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin-v5-contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeERC20} from "@openzeppelin-v47-contracts/token/ERC20/utils/SafeERC20.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
@@ -220,7 +220,7 @@ contract RestakingConnector is
             );
 
             // ReceiverCCIP approves RestakingConnector just before calling this function
-            IERC20(token).transferFrom(
+            IERC20(token).safeTransferFrom(
                 _receiverCCIP,
                 address(eigenAgent),
                 amount
@@ -380,7 +380,7 @@ contract RestakingConnector is
                 if (tokenL2 == address(0)) {
                     // (2) If the token cannot bridge to L2, transfer to AgentOwner on L1.
                     // Shouldn't reach this state, unless user deposits L1 tokens via EigenAgent on L1.
-                    IERC20(vars.tokensToWithdraw[i]).transferFrom(
+                    IERC20(vars.tokensToWithdraw[i]).safeTransferFrom(
                         address(eigenAgent),
                         agentOwner, // AgentOwner
                         balanceDiffsAmountsToBridge[i]
@@ -401,7 +401,7 @@ contract RestakingConnector is
                     ++n; // increment transferTokensArray index
 
                     // RestakingConnector transfers tokens to ReceiverCCIP to bridge
-                    IERC20(vars.tokensToWithdraw[i]).transferFrom(
+                    IERC20(vars.tokensToWithdraw[i]).safeTransferFrom(
                         address(eigenAgent),
                         _receiverCCIP,
                         balanceDiffsAmountsToBridge[i]
@@ -558,12 +558,12 @@ contract RestakingConnector is
             // Only transfer bridgeable tokens back to L2. Transfer remaining L1 tokens to AgentOwner.
             if (tokenL2 == address(0)) {
                 // (2) If the token cannot be bridged to L2, transfer to AgentOwner on L1.
-                IERC20(rewardsToken).transferFrom(address(eigenAgent), agentOwner, rewardsAmount);
+                IERC20(rewardsToken).safeTransferFrom(address(eigenAgent), agentOwner, rewardsAmount);
                 emit SendingRewardsToAgentOwnerOnL1(rewardsToken, agentOwner, rewardsAmount);
 
             } else {
                 // (2) RestakingConnector transfers tokens to ReceiverCCIP to bridge tokens
-                IERC20(rewardsToken).transferFrom(address(eigenAgent), _receiverCCIP, rewardsAmount);
+                IERC20(rewardsToken).safeTransferFrom(address(eigenAgent), _receiverCCIP, rewardsAmount);
 
                 transferTokensArray[n] = Client.EVMTokenAmount({
                     token: rewardsToken,

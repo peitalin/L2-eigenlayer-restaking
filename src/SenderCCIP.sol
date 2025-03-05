@@ -3,7 +3,7 @@ pragma solidity 0.8.25;
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin-v5-contracts/token/ERC20/utils/SafeERC20.sol";
+import {SafeERC20} from "@openzeppelin-v47-contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin-v5-contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
@@ -89,7 +89,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
                         destTokenAmounts[k].amount
                     );
                     // agentOwner is the signer, first committed when sending completeWithdrawal
-                    IERC20(destTokenAmounts[k].token).transfer(
+                    IERC20(destTokenAmounts[k].token).safeTransfer(
                         agentOwner,
                         destTokenAmounts[k].amount
                     );

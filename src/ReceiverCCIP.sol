@@ -145,7 +145,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         // For depositIntoStrategy: approve RestakingConnector to transfer tokens to EigenAgent
         if (functionSelector == IStrategyManager.depositIntoStrategy.selector) {
             for (uint32 i = 0; i < any2EvmMessage.destTokenAmounts.length; ++i) {
-                IERC20(any2EvmMessage.destTokenAmounts[i].token).approve(
+                IERC20(any2EvmMessage.destTokenAmounts[i].token).forceApprove(
                     address(restakingConnector),
                     any2EvmMessage.destTokenAmounts[i].amount
                 );

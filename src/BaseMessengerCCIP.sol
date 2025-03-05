@@ -194,14 +194,14 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         for (uint256 i = 0; i < _tokenAmounts.length; i++) {
             if (_tokenAmounts[i].amount > 0 && msg.sender != address(this)) {
                 // transfer tokens from user to this contract
-                IERC20(_tokenAmounts[i].token).transferFrom(
+                IERC20(_tokenAmounts[i].token).safeTransferFrom(
                     msg.sender,
                     address(this),
                     _tokenAmounts[i].amount
                 );
             }
             // then approve router to move tokens from this contract
-            IERC20(_tokenAmounts[i].token).approve(
+            IERC20(_tokenAmounts[i].token).forceApprove(
                 address(router),
                 _tokenAmounts[i].amount
             );
