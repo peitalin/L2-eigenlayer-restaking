@@ -9,8 +9,6 @@ import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoor
 import {Adminable} from "../utils/Adminable.sol";
 import {IAgentFactory} from "./IAgentFactory.sol";
 
-import {console} from "forge-std/console.sol";
-
 
 contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Adminable {
 
