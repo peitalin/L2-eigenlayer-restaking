@@ -2,7 +2,8 @@
 pragma solidity 0.8.25;
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
-import {IERC20} from "@openzeppelin-v5-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin-v5-contracts/token/ERC20/utils/SafeERC20.sol";
 import {Initializable} from "@openzeppelin-v5-contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
@@ -12,7 +13,7 @@ import {ISenderHooks} from "./interfaces/ISenderHooks.sol";
 
 /// @title L2 Messenger Contract: sends Eigenlayer messages to CCIP Router
 contract SenderCCIP is Initializable, BaseMessengerCCIP {
-
+    using SafeERC20 for IERC20;
     ISenderHooks public senderHooks;
 
     event MatchedReceivedFunctionSelector(bytes4 indexed);
