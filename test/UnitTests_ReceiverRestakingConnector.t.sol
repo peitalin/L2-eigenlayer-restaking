@@ -466,7 +466,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         restakingConnector.setEigenlayerContracts(
             delegationManager,
             strategyManager,
-            strategy,
             rewardsCoordinator
         );
 
@@ -478,7 +477,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             restakingConnector.setEigenlayerContracts(
                 IDelegationManager(address(0)),
                 strategyManager,
-                strategy,
                 rewardsCoordinator
             );
 
@@ -488,17 +486,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             restakingConnector.setEigenlayerContracts(
                 delegationManager,
                 IStrategyManager(address(0)),
-                strategy,
-                rewardsCoordinator
-            );
-
-            vm.expectRevert(
-                abi.encodeWithSelector(AddressZero.selector, "_strategy cannot be address(0)")
-            );
-            restakingConnector.setEigenlayerContracts(
-                delegationManager,
-                strategyManager,
-                IStrategy(address(0)),
                 rewardsCoordinator
             );
 
@@ -508,7 +495,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             restakingConnector.setEigenlayerContracts(
                 delegationManager,
                 strategyManager,
-                strategy,
                 IRewardsCoordinator(address(0))
             );
 
@@ -516,20 +502,17 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             restakingConnector.setEigenlayerContracts(
                 delegationManager,
                 strategyManager,
-                strategy,
                 rewardsCoordinator
             );
 
             (
                 IDelegationManager _delegationManager,
                 IStrategyManager _strategyManager,
-                IStrategy _strategy,
                 IRewardsCoordinator _rewardsCoordinator
             ) = restakingConnector.getEigenlayerContracts();
 
             vm.assertEq(address(delegationManager), address(_delegationManager));
             vm.assertEq(address(strategyManager), address(_strategyManager));
-            vm.assertEq(address(strategy), address(_strategy));
             vm.assertEq(address(rewardsCoordinator), address(_rewardsCoordinator));
         }
         vm.stopBroadcast();

@@ -146,7 +146,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         );
 
         restakingProxy.addAdmin(deployer);
-        restakingProxy.setEigenlayerContracts(delegationManager, strategyManager, strategy, rewardsCoordinator);
+        restakingProxy.setEigenlayerContracts(delegationManager, strategyManager, rewardsCoordinator);
         agentFactoryProxy.addAdmin(deployer);
         agentFactoryProxy.setRestakingConnector(address(restakingProxy));
         // doesn't strictly need to be set, as AgentFactory clones the baseEigenAgent, but good to have.

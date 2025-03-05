@@ -188,7 +188,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             receiverContract.allowlistSender(deployer, true);
             receiverContract.allowlistSender(address(senderContract), true);
             // set eigenlayer contracts
-            restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy, rewardsCoordinator);
+            restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, rewardsCoordinator);
 
             IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
             IERC20_CCIPBnM(address(tokenL1)).drip(address(restakingConnector));
@@ -271,7 +271,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             receiverContract.allowlistSender(deployer, true);
             receiverContract.allowlistSender(address(senderContract), true);
             // set eigenlayer contracts
-            restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, strategy, rewardsCoordinator);
+            restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, rewardsCoordinator);
 
             IERC20Minter(address(tokenL1)).mint(address(receiverContract), 1 ether);
             IERC20Minter(address(tokenL1)).mint(address(restakingConnector), 1 ether);

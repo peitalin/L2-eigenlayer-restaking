@@ -25,14 +25,12 @@ interface IRestakingConnector {
     function getEigenlayerContracts() external returns (
         IDelegationManager,
         IStrategyManager,
-        IStrategy,
         IRewardsCoordinator
     );
 
     function setEigenlayerContracts(
         IDelegationManager _delegationManager,
         IStrategyManager _strategyManager,
-        IStrategy _strategy,
         IRewardsCoordinator _rewardsCoordinator
     ) external;
 

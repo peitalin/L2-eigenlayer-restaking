@@ -17,7 +17,6 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
 
     IDelegationManager public delegationManager;
     IStrategyManager public strategyManager;
-    IStrategy public strategy;
     IRewardsCoordinator public rewardsCoordinator;
 
     IAgentFactory public agentFactory;
@@ -34,7 +33,7 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
     event SetReceiverCCIP(address indexed);
     event SetAgentFactory(address indexed);
-    event SetEigenlayerContracts(address, address, address, address);
+    event SetEigenlayerContracts(address, address, address);
     event SetBridgeTokens(address indexed, address indexed);
     event ClearBridgeTokens(address indexed);
 
@@ -110,16 +109,14 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     function getEigenlayerContracts() external view returns (
         IDelegationManager,
         IStrategyManager,
-        IStrategy,
         IRewardsCoordinator
     ) {
-        return (delegationManager, strategyManager, strategy, rewardsCoordinator);
+        return (delegationManager, strategyManager, rewardsCoordinator);
     }
 
     function setEigenlayerContracts(
         IDelegationManager _delegationManager,
         IStrategyManager _strategyManager,
-        IStrategy _strategy,
         IRewardsCoordinator _rewardsCoordinator
     ) external onlyOwner {
 
@@ -129,21 +126,16 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
         if (address(_strategyManager) == address(0))
             revert AddressZero("_strategyManager cannot be address(0)");
 
-        if (address(_strategy) == address(0))
-            revert AddressZero("_strategy cannot be address(0)");
-
         if (address(_rewardsCoordinator) == address(0))
             revert AddressZero("_rewardsCoordinator cannot be address(0)");
 
         delegationManager = _delegationManager;
         strategyManager = _strategyManager;
-        strategy = _strategy;
         rewardsCoordinator = _rewardsCoordinator;
 
         emit SetEigenlayerContracts(
             address(_delegationManager),
             address(_strategyManager),
-            address(_strategy),
             address(_rewardsCoordinator)
         );
     }
