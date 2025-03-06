@@ -317,6 +317,44 @@ contract EigenlayerMsgDecoders {
      *
     */
 
+    struct PackedCompleteWithdrawalVars {
+        IDelegationManager.Withdrawal withdrawal;
+        IERC20[] tokensToWithdraw;
+        uint256 middlewareTimesIndex;
+        bool receiveAsTokens;
+        address signer;
+        uint256 expiry;
+        bytes signature;
+    }
+
+    function decodeCompleteWithdrawalVarsPacked(bytes memory messageWithSignature)
+        public
+        pure
+        returns (PackedCompleteWithdrawalVars memory vars)
+    {
+        (
+            // original message
+            IDelegationManager.Withdrawal memory withdrawal,
+            IERC20[] memory tokensToWithdraw,
+            uint256 middlewareTimesIndex,
+            bool receiveAsTokens,
+            // message signature
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        ) = decodeCompleteWithdrawalMsg(messageWithSignature);
+
+        return PackedCompleteWithdrawalVars({
+            withdrawal: withdrawal,
+            tokensToWithdraw: tokensToWithdraw,
+            middlewareTimesIndex: middlewareTimesIndex,
+            receiveAsTokens: receiveAsTokens,
+            signer: signer,
+            expiry: expiry,
+            signature: signature
+        });
+    }
+
     /**
      * @param message CCIP message to Eigenlayer
      * @return withdrawal is the message sent to Eigenlayer to call completeWithdrawal()
@@ -534,6 +572,47 @@ contract EigenlayerMsgDecoders {
             transferRoot: transferRoot
         });
     }
+
+    struct PackedRewardsClaimVars {
+        IRewardsCoordinator.RewardsMerkleClaim claim;
+        address recipient; // eigenAgent
+        address signer;
+        uint256 expiry;
+        bytes signature;
+    }
+
+    function decodeRewardsClaimVarsPacked(bytes memory messageWithSignature)
+        public
+        pure
+        returns (PackedRewardsClaimVars memory vars)
+    {
+        // struct RewardsMerkleClaim {
+        //     uint32 rootIndex;
+        //     uint32 earnerIndex;
+        //     bytes earnerTreeProof;
+        //     EarnerTreeMerkleLeaf earnerLeaf;
+        //     uint32[] tokenIndices;
+        //     bytes[] tokenTreeProofs;
+        //     TokenTreeMerkleLeaf[] tokenLeaves;
+        // }
+        (
+            IRewardsCoordinator.RewardsMerkleClaim memory claim,
+            address recipient, // eigenAgent
+            // message signature
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        ) = decodeProcessClaimMsg(messageWithSignature);
+
+        return PackedRewardsClaimVars({
+            claim: claim,
+            recipient: recipient,
+            signer: signer,
+            expiry: expiry,
+            signature: signature
+        });
+    }
+
 
     /**
      * @param message CCIP message to Eigenlayer

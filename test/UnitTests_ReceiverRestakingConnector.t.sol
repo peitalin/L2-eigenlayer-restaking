@@ -7,6 +7,8 @@ import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
+import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
@@ -18,6 +20,7 @@ import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+import {RestakingConnectorUtils} from "../src/RestakingConnectorUtils.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
@@ -34,6 +37,12 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
     uint256 expiry;
     uint256 execNonce0;
+
+    // Mock tokens
+    IERC20 tokenA = IERC20(address(0x1aa));
+    IERC20 tokenB = IERC20(address(0x2bb));
+    IERC20 tokenC = IERC20(address(0x3cc));
+    IERC20 tokenD = IERC20(address(0x4dd));
 
     function setUp() public {
 
@@ -717,4 +726,259 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         vm.stopBroadcast();
     }
 
+
+    function test_GetUniqueTokens_AllUnique() public {
+
+        IERC20[] memory inputTokens = new IERC20[](4);
+        inputTokens[0] = IERC20(address(tokenA));
+        inputTokens[1] = IERC20(address(tokenB));
+        inputTokens[2] = IERC20(address(tokenC));
+        inputTokens[3] = IERC20(address(tokenD));
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(inputTokens);
+
+        assertEq(uniqueTokens.length, 4, "Should return 4 unique tokens");
+
+        // Verify all tokens are in the result
+        bool foundA = false;
+        bool foundB = false;
+        bool foundC = false;
+        bool foundD = false;
+
+        for (uint i = 0; i < uniqueTokens.length; i++) {
+            if (address(uniqueTokens[i]) == address(tokenA)) foundA = true;
+            if (address(uniqueTokens[i]) == address(tokenB)) foundB = true;
+            if (address(uniqueTokens[i]) == address(tokenC)) foundC = true;
+            if (address(uniqueTokens[i]) == address(tokenD)) foundD = true;
+        }
+
+        assertTrue(foundA, "Token A should be in result");
+        assertTrue(foundB, "Token B should be in result");
+        assertTrue(foundC, "Token C should be in result");
+        assertTrue(foundD, "Token D should be in result");
+    }
+
+    function test_GetUniqueTokens_IERC20_WithDuplicates() public {
+
+        IERC20[] memory inputTokens = new IERC20[](7);
+        inputTokens[0] = IERC20(address(tokenA));
+        inputTokens[1] = IERC20(address(tokenB));
+        inputTokens[2] = IERC20(address(tokenA)); // Duplicate
+        inputTokens[3] = IERC20(address(tokenC));
+        inputTokens[4] = IERC20(address(tokenB)); // Duplicate
+        inputTokens[5] = IERC20(address(tokenD));
+        inputTokens[6] = IERC20(address(tokenC)); // Duplicate
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(inputTokens);
+
+        assertEq(uniqueTokens.length, 4, "Should return 4 unique tokens, removing 3 duplicates");
+
+        // Verify all tokens are in the result exactly once
+        bool foundA = false;
+        bool foundB = false;
+        bool foundC = false;
+        bool foundD = false;
+        for (uint i = 0; i < uniqueTokens.length; i++) {
+            if (address(uniqueTokens[i]) == address(tokenA)) {
+                assertFalse(foundA, "Token A should only appear once");
+                foundA = true;
+            }
+            if (address(uniqueTokens[i]) == address(tokenB)) {
+                assertFalse(foundB, "Token B should only appear once");
+                foundB = true;
+            }
+            if (address(uniqueTokens[i]) == address(tokenC)) {
+                assertFalse(foundC, "Token C should only appear once");
+                foundC = true;
+            }
+            if (address(uniqueTokens[i]) == address(tokenD)) {
+                assertFalse(foundD, "Token D should only appear once");
+                foundD = true;
+            }
+        }
+        assertTrue(foundA, "Token A should be in result");
+        assertTrue(foundB, "Token B should be in result");
+        assertTrue(foundC, "Token C should be in result");
+        assertTrue(foundD, "Token D should be in result");
+    }
+
+    function test_GetUniqueTokens_IERC20_EmptyArray() public {
+        IERC20[] memory inputTokens = new IERC20[](0);
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(inputTokens);
+
+        assertEq(uniqueTokens.length, 0, "Should return empty array");
+    }
+
+    function test_GetUniqueTokens_IERC20_SingleToken() public {
+        IERC20[] memory inputTokens = new IERC20[](1);
+        inputTokens[0] = IERC20(address(tokenA));
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(inputTokens);
+
+        assertEq(uniqueTokens.length, 1, "Should return 1 token");
+        assertEq(address(uniqueTokens[0]), address(tokenA), "Should return Token A");
+    }
+
+    function test_GetUniqueTokens_IERC20_AllDuplicates() public {
+        IERC20[] memory inputTokens = new IERC20[](3);
+        inputTokens[0] = IERC20(address(tokenA));
+        inputTokens[1] = IERC20(address(tokenA));
+        inputTokens[2] = IERC20(address(tokenA));
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(inputTokens);
+
+        assertEq(uniqueTokens.length, 1, "Should return 1 unique token");
+        assertEq(address(uniqueTokens[0]), address(tokenA), "Should return Token A");
+    }
+
+    function test_GetUniqueTokens_TokenTreeMerkleLeaf_AllUnique() public {
+
+        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](4);
+        tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenA)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[1] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenB)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[2] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenC)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[3] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenD)),
+            cumulativeEarnings: 1
+        });
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(tokenLeaves);
+
+        assertEq(uniqueTokens.length, 4, "Should return 4 unique tokens");
+
+        // Verify all tokens are in the result
+        bool foundA = false;
+        bool foundB = false;
+        bool foundC = false;
+        bool foundD = false;
+
+        for (uint i = 0; i < uniqueTokens.length; i++) {
+            if (address(uniqueTokens[i]) == address(tokenA)) foundA = true;
+            if (address(uniqueTokens[i]) == address(tokenB)) foundB = true;
+            if (address(uniqueTokens[i]) == address(tokenC)) foundC = true;
+            if (address(uniqueTokens[i]) == address(tokenD)) foundD = true;
+        }
+
+        assertTrue(foundA, "Token A should be in result");
+        assertTrue(foundB, "Token B should be in result");
+        assertTrue(foundC, "Token C should be in result");
+        assertTrue(foundD, "Token D should be in result");
+    }
+
+    function test_GetUniqueTokens_TokenTreeMerkleLeaf_WithDuplicates() public {
+
+        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](7);
+        tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenA)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[1] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenB)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[2] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenA)), // Duplicate
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[3] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenC)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[4] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenB)), // Duplicate
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[5] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenD)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[6] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenC)), // Duplicate
+                cumulativeEarnings: 1
+        });
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(tokenLeaves);
+
+        assertEq(uniqueTokens.length, 4, "Should return 4 unique tokens, removing 3 duplicates");
+
+        // Verify all tokens are in the result exactly once
+        bool foundA = false;
+        bool foundB = false;
+        bool foundC = false;
+        bool foundD = false;
+        for (uint i = 0; i < uniqueTokens.length; i++) {
+            if (address(uniqueTokens[i]) == address(tokenA)) {
+                assertFalse(foundA, "Token A should only appear once");
+                foundA = true;
+            }
+            if (address(uniqueTokens[i]) == address(tokenB)) {
+                assertFalse(foundB, "Token B should only appear once");
+                foundB = true;
+            }
+            if (address(uniqueTokens[i]) == address(tokenC)) {
+                assertFalse(foundC, "Token C should only appear once");
+                foundC = true;
+            }
+            if (address(uniqueTokens[i]) == address(tokenD)) {
+                assertFalse(foundD, "Token D should only appear once");
+                foundD = true;
+            }
+        }
+        assertTrue(foundA, "Token A should be in result");
+        assertTrue(foundB, "Token B should be in result");
+        assertTrue(foundC, "Token C should be in result");
+        assertTrue(foundD, "Token D should be in result");
+    }
+
+    function test_GetUniqueTokens_TokenTreeMerkleLeaf_EmptyArray() public {
+        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](0);
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(tokenLeaves);
+
+        assertEq(uniqueTokens.length, 0, "Should return empty array");
+    }
+
+    function test_GetUniqueTokens_SingleToken() public {
+        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](1);
+        tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenA)),
+            cumulativeEarnings: 1
+        });
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(tokenLeaves);
+
+        assertEq(uniqueTokens.length, 1, "Should return 1 token");
+        assertEq(address(uniqueTokens[0]), address(tokenA), "Should return Token A");
+    }
+
+    function test_GetUniqueTokens_TokenTreeMerkleLeaf_AllDuplicates() public {
+        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](3);
+        tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenA)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[1] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenA)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[2] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenA)),
+            cumulativeEarnings: 1
+        });
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(tokenLeaves);
+
+        assertEq(uniqueTokens.length, 1, "Should return 1 unique token");
+        assertEq(address(uniqueTokens[0]), address(tokenA), "Should return Token A");
+    }
 }
