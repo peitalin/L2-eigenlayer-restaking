@@ -47,7 +47,6 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
     error AddressZero(string msg);
     error AlreadyRefunded(uint256 amount);
-    error AlreadyRefundedReason(uint256 amount, string reason);
 
     /// @param _router address of the router contract.
     constructor(address _router) BaseMessengerCCIP(_router) {
@@ -160,7 +159,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             any2EvmMessage.destTokenAmounts
         );
 
-        // Check if any tokens have already been refunded
+        // Check if any tokens have already been refunded for this messageId and return early
         for (uint32 i = 0; i < any2EvmMessage.destTokenAmounts.length; ++i) {
             address tokenAddress = any2EvmMessage.destTokenAmounts[i].token;
             if (amountRefundedToMessageIds[any2EvmMessage.messageId][tokenAddress] > 0) {
@@ -187,7 +186,6 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                         transferTokensInfo.transferRoot,
                         transferTokensInfo.tokenAmounts
                     );
-
                 } else if (transferTokensInfo.transferType == IRestakingConnector.TransferType.RewardsClaim) {
                     emit BridgingRewardsToL2(
                         transferTokensInfo.transferRoot,
@@ -200,17 +198,13 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
             bytes4 errorSelector = FunctionSelectorDecoder.decodeErrorSelector(customError);
             // Decode and try catch the EigenAgentExecutionError
-
             if (errorSelector == IRestakingConnector.EigenAgentExecutionError.selector) {
                 // If there were bridged tokens and the deposit has not been refunded yet...
                 // (there should only be 1 token for deposits, but handle input destTokenAmounts[] as an array)
                 // This makes it easier to track refunds for multiple tokens with amountRefundedToMessageIds.
-
                 for (uint32 i = 0; i < any2EvmMessage.destTokenAmounts.length; ++i) {
-
                     address tokenAddress = any2EvmMessage.destTokenAmounts[i].token;
                     uint256 tokenAmount = any2EvmMessage.destTokenAmounts[i].amount;
-
                     if (
                         tokenAmount > 0 &&
                         tokenAddress != address(0) &&
@@ -225,18 +219,6 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                             tokenAddress,
                             tokenAmount
                         );
-
-                    } else {
-                        // Transaction not refundable (or already refunded). Display original error instead
-                        (
-                            , // address signer
-                            , // uint256 expiry
-                            string memory errStr
-                        ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
-
-                        uint256 amountRefunded = amountRefundedToMessageIds[any2EvmMessage.messageId][tokenAddress];
-                        // revert(errStr);
-                        revert AlreadyRefundedReason(amountRefunded, errStr);
                     }
                 }
 

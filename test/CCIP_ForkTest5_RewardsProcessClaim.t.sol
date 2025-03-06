@@ -261,7 +261,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         IERC20_CCIPBnM(address(tokenL1)).drip(address(rewardsCoordinator));
 
 		// Fast forward to present time
-        vm.warp(timeNow);
+        vm.warp(timeNow + 7 days);
 
         return (proof, earnerIndex);
     }

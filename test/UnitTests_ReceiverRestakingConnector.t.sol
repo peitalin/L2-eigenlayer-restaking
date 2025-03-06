@@ -193,7 +193,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         vm.assertEq(tokenL1.balanceOf(bob), 0.1 ether);
 
         // after refund, show original error message instead
-        vm.expectRevert("Invalid signer, or incorrect digestHash parameters.");
+        vm.expectRevert(abi.encodeWithSelector(AlreadyRefunded.selector, 0.1 ether));
         receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 
