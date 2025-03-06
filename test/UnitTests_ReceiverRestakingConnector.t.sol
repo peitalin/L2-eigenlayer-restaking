@@ -37,6 +37,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
     uint256 expiry;
     uint256 execNonce0;
+    address sender = address(receiverContract);
 
     // Mock tokens
     IERC20 tokenA = IERC20(address(0x1aa));
@@ -175,11 +176,13 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
             amount: amount
         });
+
         bytes32 messageId1 = bytes32(abi.encode(0x123333444555));
+
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: messageId1,
             sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(deployer),
+            sender: abi.encode(sender),
             destTokenAmounts: destTokenAmounts,
             data: abi.encode(string(
                 messageWithSignature
@@ -235,7 +238,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: messageId1,
             sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(deployer),
+            sender: abi.encode(sender),
             destTokenAmounts: destTokenAmounts,
             data: abi.encode(string(
                 messageWithSignature
@@ -289,7 +292,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0x0),
             sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(deployer),
+            sender: abi.encode(sender),
             destTokenAmounts: destTokenAmounts,
             data: abi.encode(string(
                 messageWithSignature
@@ -346,7 +349,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0x0),
             sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(deployer),
+            sender: abi.encode(sender),
             destTokenAmounts: destTokenAmounts,
             data: abi.encode(string(
                 messageWithSignature
@@ -364,7 +367,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 
-    function test_ReceiverL1_MintEigenAgent() public {
+    function test_ReceiverL1_MintEigenAgent2() public {
 
         bytes memory mintEigenAgentMessageBob = encodeMintEigenAgentMsg(bob);
 
@@ -372,7 +375,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
                 sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-                sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
+                sender: abi.encode(sender),
                 data: abi.encode(string(
                     mintEigenAgentMessageBob
                 )), // CCIP abi.encodes a string message when sending
@@ -392,7 +395,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
                 sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-                sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
+                sender: abi.encode(sender),
                 data: abi.encode(string(
                     mintEigenAgentMessageAlice
                 )), // CCIP abi.encodes a string message when sending
@@ -581,7 +584,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
                 sourceChainSelector: BaseSepolia.ChainSelector,
-                sender: abi.encode(deployer),
+                sender: abi.encode(sender),
                 data: abi.encode(string(
                     encodeMintEigenAgentMsg(deployer)
                 )),
@@ -594,7 +597,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
                 sourceChainSelector: BaseSepolia.ChainSelector,
-                sender: abi.encode(deployer),
+                sender: abi.encode(sender),
                 data: abi.encode(string(
                     encodeMintEigenAgentMsg(deployer)
                 )),
@@ -727,7 +730,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
     }
 
 
-    function test_GetUniqueTokens_AllUnique() public {
+    function test_GetUniqueTokens_AllUnique() public view {
 
         IERC20[] memory inputTokens = new IERC20[](4);
         inputTokens[0] = IERC20(address(tokenA));
@@ -758,7 +761,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         assertTrue(foundD, "Token D should be in result");
     }
 
-    function test_GetUniqueTokens_IERC20_WithDuplicates() public {
+    function test_GetUniqueTokens_IERC20_WithDuplicates() public view {
 
         IERC20[] memory inputTokens = new IERC20[](7);
         inputTokens[0] = IERC20(address(tokenA));
@@ -802,7 +805,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         assertTrue(foundD, "Token D should be in result");
     }
 
-    function test_GetUniqueTokens_IERC20_EmptyArray() public {
+    function test_GetUniqueTokens_IERC20_EmptyArray() public pure {
         IERC20[] memory inputTokens = new IERC20[](0);
 
         IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(inputTokens);
@@ -810,7 +813,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         assertEq(uniqueTokens.length, 0, "Should return empty array");
     }
 
-    function test_GetUniqueTokens_IERC20_SingleToken() public {
+    function test_GetUniqueTokens_IERC20_SingleToken() public view {
         IERC20[] memory inputTokens = new IERC20[](1);
         inputTokens[0] = IERC20(address(tokenA));
 
@@ -820,7 +823,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         assertEq(address(uniqueTokens[0]), address(tokenA), "Should return Token A");
     }
 
-    function test_GetUniqueTokens_IERC20_AllDuplicates() public {
+    function test_GetUniqueTokens_IERC20_AllDuplicates() public view {
         IERC20[] memory inputTokens = new IERC20[](3);
         inputTokens[0] = IERC20(address(tokenA));
         inputTokens[1] = IERC20(address(tokenA));
@@ -832,7 +835,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         assertEq(address(uniqueTokens[0]), address(tokenA), "Should return Token A");
     }
 
-    function test_GetUniqueTokens_TokenTreeMerkleLeaf_AllUnique() public {
+    function test_GetUniqueTokens_TokenTreeMerkleLeaf_AllUnique() public view {
 
         IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](4);
         tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
@@ -875,7 +878,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         assertTrue(foundD, "Token D should be in result");
     }
 
-    function test_GetUniqueTokens_TokenTreeMerkleLeaf_WithDuplicates() public {
+    function test_GetUniqueTokens_TokenTreeMerkleLeaf_WithDuplicates() public view {
 
         IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](7);
         tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
@@ -940,7 +943,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         assertTrue(foundD, "Token D should be in result");
     }
 
-    function test_GetUniqueTokens_TokenTreeMerkleLeaf_EmptyArray() public {
+    function test_GetUniqueTokens_TokenTreeMerkleLeaf_EmptyArray() public pure {
         IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](0);
 
         IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(tokenLeaves);
@@ -948,7 +951,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         assertEq(uniqueTokens.length, 0, "Should return empty array");
     }
 
-    function test_GetUniqueTokens_SingleToken() public {
+    function test_GetUniqueTokens_SingleToken() public view {
         IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](1);
         tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenA)),
@@ -961,7 +964,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         assertEq(address(uniqueTokens[0]), address(tokenA), "Should return Token A");
     }
 
-    function test_GetUniqueTokens_TokenTreeMerkleLeaf_AllDuplicates() public {
+    function test_GetUniqueTokens_TokenTreeMerkleLeaf_AllDuplicates() public view {
         IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](3);
         tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenA)),

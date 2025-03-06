@@ -284,11 +284,7 @@ contract RestakingConnector is
      * @param messageWithSignature is the Eigenlayer processClaim message with
      * appended signature for EigenAgent to execute the message.
      * @return transferTokensInfo includes information on the following:
-     * - transferTokensInfo.transferToAgentOwnerMessage encodes a "transferToAgentOwner" message to L2 to transfer
-     *   withdrawn funds back to the EigenAgent's owner on L2.
-     * - transferTokensInfo.transferRoot refers to the withdrawalTransferRoot commitment set in L2 contract
-     *   when completeWithdrawal message was initially dispatched on L2. This ensures that the withdrawn
-     *   funds to L2 will be transferred to the EigenAgent's owner and cannot be tampered with.
+     * - transferTokensInfo.agentOwner is the address of the AgentOwner.
      * - transferTokensInfo.tokenAmounts is the token and amount withdrawn from Eigenlayer.
      */
     function _completeWithdrawalWithEigenAgent(bytes memory messageWithSignature)
@@ -354,13 +350,6 @@ contract RestakingConnector is
                 numBridgeableTokens(uniqueTokensToWithdraw)
             );
 
-            // If bridgeable, prepare a transferToAgentOwner message with transferRoots
-            // calculate outside loop
-            bytes32 withdrawalTransferRoot = EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(
-                delegationManager.calculateWithdrawalRoot(vars.withdrawal), // withdrawalRoot
-                agentOwner // AgentOwner
-            );
-
             for (uint256 i = 0; i < uniqueTokensToWithdraw.length; ++i) {
                 // (1) EigenAgent approves RestakingConnector to transfer tokens
                 eigenAgent.approveByWhitelistedContract(
@@ -404,10 +393,7 @@ contract RestakingConnector is
             }
 
             transferTokensInfo.transferType = IRestakingConnector.TransferType.Withdrawal;
-            transferTokensInfo.transferToAgentOwnerMessage = string(
-                EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(withdrawalTransferRoot)
-            );
-            transferTokensInfo.transferRoot = withdrawalTransferRoot;
+            transferTokensInfo.agentOwner = agentOwner;
             transferTokensInfo.tokenAmounts = transferTokensArray;
         }
     }
@@ -479,11 +465,7 @@ contract RestakingConnector is
      * @param messageWithSignature is the Eigenlayer processClaim message with
      * appended signature for EigenAgent to execute the message.
      * @return transferTokensInfo includes information on the following:
-     * - transferTokensInfo.transferToAgentOwnerMessage encodes a "transferToAgentOwner" message
-     *   to L2 to transfer rewards back to the EigenAgent's owner on L2.
-     * - transferTokensInfo.transferRoot refers to the rewardsTransferRoot commitment set in L2
-     *   contract when a processClaim message was initially sent on L2. This ensures that the rewards
-     *   bridged to L2 will be transferred to the EigenAgent's owner and cannot be tampered with.
+     * - transferTokensInfo.agentOwner is the address of the AgentOwner.
      * - transferTokensInfo.tokenAmounts is the token and amount of rewards claimed from Eigenlayer.
      */
     function _processClaimWithEigenAgent(bytes memory messageWithSignature)
@@ -528,12 +510,6 @@ contract RestakingConnector is
             }
         }
 
-        // The same rewardsRoot calculated on L2 in SenderHooks.sol
-        // calculate before loop
-        bytes32 rewardsTransferRoot = EigenlayerMsgEncoders.calculateRewardsTransferRoot(
-            EigenlayerMsgEncoders.calculateRewardsRoot(vars.claim),
-            agentOwner // AgentOwner
-        );
         uint32 n; // tracks index of transferTokensArray (bridgeableTokens only)
         Client.EVMTokenAmount[] memory transferTokensArray = new Client.EVMTokenAmount[](
             numBridgeableTokens(uniqueTokensToWithdraw)
@@ -573,10 +549,7 @@ contract RestakingConnector is
         }
 
         transferTokensInfo.transferType = IRestakingConnector.TransferType.RewardsClaim;
-        transferTokensInfo.transferToAgentOwnerMessage = string(
-            EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(rewardsTransferRoot)
-        );
-        transferTokensInfo.transferRoot = rewardsTransferRoot;
+        transferTokensInfo.agentOwner = agentOwner;
         transferTokensInfo.tokenAmounts = transferTokensArray;
     }
 

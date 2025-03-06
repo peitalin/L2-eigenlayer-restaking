@@ -126,8 +126,8 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
         gasLimits_R[0] = 270_000; // handleTransferToAgentOwner [gas: 261,029]
 
         bytes4[] memory functionSelectors_R = new bytes4[](1);
-        functionSelectors_R[0] = 0xd8a85b48;
-        // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
+        functionSelectors_R[0] = 0x43598c8c;
+        // cast sig "handleTransferToAgentOwner(address)" == 0x43598c8c
 
         restakingConnectorProxy.setGasLimitsForFunctionSelectors(
             functionSelectors_R,

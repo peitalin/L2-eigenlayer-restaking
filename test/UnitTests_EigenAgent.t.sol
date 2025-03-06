@@ -756,7 +756,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         // Check if there is no CreateCollision error
         // even after the EigenAgentOwner721 is transferred
         vm.prank(deployer);
-        IEigenAgent6551 eigenAgent2 = agentFactory.spawnEigenAgentOnlyOwner(bob);
+        agentFactory.spawnEigenAgentOnlyOwner(bob);
     }
 
     //////////////////////////////////////////////////////

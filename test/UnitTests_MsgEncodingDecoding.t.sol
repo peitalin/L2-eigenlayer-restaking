@@ -533,55 +533,23 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
     }
 
     function test_Decode_WithdrawalTransferToAgentOwnerMsg() public view {
-
-        bytes32 withdrawalRoot = 0x8c20d3a37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7d8ec77;
-
         address bob = vm.addr(8881);
-        bytes32 withdrawalTransferRoot = keccak256(abi.encode(
-            withdrawalRoot,
-            bob
-        ));
-
         TransferToAgentOwnerMsg memory tta_msg = eigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(
             abi.encode(string(
-                encodeTransferToAgentOwnerMsg(
-                    calculateWithdrawalTransferRoot(
-                        withdrawalRoot,
-                        bob
-                    )
-                )
+                encodeTransferToAgentOwnerMsg(bob)
             ))
         );
-
-        vm.assertEq(tta_msg.transferRoot, withdrawalTransferRoot);
+        vm.assertEq(tta_msg.agentOwner, bob);
     }
 
     function test_Decode_RewardTransferToAgentOwnerMsg() public view {
-
-        bytes32 mockRewardsRoot = 0x999eeee37feccd4dcb9fa5fbd299b37db00fde77cbb7540e2850999fc7eeeeee;
-
-        address bob = vm.addr(8881);
-        uint256 rewardAmount = 1.5 ether;
-        address rewardToken = address(tokenL1);
         address agentOwner = deployer;
-
-        bytes32 rewardsTransferRoot = EigenlayerMsgEncoders.calculateRewardsTransferRoot(
-            mockRewardsRoot,
-            agentOwner
-        );
-
         TransferToAgentOwnerMsg memory tta_msg = eigenlayerMsgDecoders.decodeTransferToAgentOwnerMsg(
             abi.encode(string(
-                encodeTransferToAgentOwnerMsg(
-                    calculateRewardsTransferRoot(
-                        mockRewardsRoot,
-                        agentOwner
-                    )
-                )
+                encodeTransferToAgentOwnerMsg(agentOwner)
             ))
         );
-
-        vm.assertEq(tta_msg.transferRoot, rewardsTransferRoot);
+        vm.assertEq(tta_msg.agentOwner, agentOwner);
     }
 
     /*
@@ -790,10 +758,10 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
         (
             IRewardsCoordinator.RewardsMerkleClaim memory _claim,
-            address _recipient,
+            , // address _recipient,
             address _signer,
             uint256 _expiry,
-            bytes memory _signature
+            // bytes memory _signature
         ) = eigenlayerMsgDecoders.decodeProcessClaimMsg(
             abi.encode(string(
                 messageWithSignature_PC
@@ -801,7 +769,9 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         );
 
         vm.assertEq(claim.rootIndex, 84);
+        vm.assertEq(claim.rootIndex, _claim.rootIndex);
         vm.assertEq(claim.earnerIndex, 66130);
+        vm.assertEq(claim.earnerIndex, _claim.earnerIndex);
         require(keccak256(claim.earnerTreeProof) ==  keccak256(earnerTreeProof), "incorrect earnerTreeProof");
         vm.assertEq(claim.earnerLeaf.earner, deployer);
         vm.assertEq(claim.earnerLeaf.earnerTokenRoot, earnerTokenRoot);

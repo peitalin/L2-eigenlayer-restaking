@@ -59,10 +59,8 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
     uint256 expiry;
     uint256 routerFees;
 
-    bytes32 rewardsRoot;
     uint256 rewardsAmount;
     address rewardsToken;
-    bytes32 rewardsTransferRoot;
 
     uint32 secondsInWeek;
     uint32 timeNow;
@@ -309,13 +307,8 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
             expiry
         );
 
-        rewardsRoot = calculateRewardsRoot(claim);
         rewardsAmount = amounts[0];
         rewardsToken = address(tokenL1);
-        rewardsTransferRoot = calculateRewardsTransferRoot(
-            rewardsRoot,
-            deployer // agentOwner
-        );
 
         ///////////////////////////////////////////////
         // L2: Send a rewards processClaim message and fundsTransfer commitment
@@ -332,11 +325,6 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
             // gasLimit
         );
 
-        vm.expectEmit(true, true, true, true);
-        emit RewardsTransferRootCommitted(
-            rewardsTransferRoot,
-            deployer // signer (agentOwner)
-        );
         senderContract.sendMessagePayNative{value: routerFees}(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
@@ -386,13 +374,13 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         });
 
         vm.expectEmit(true, true, true, false);
-        emit ReceiverCCIP.BridgingRewardsToL2(rewardsTransferRoot, rewardsTokenAmounts);
+        emit ReceiverCCIP.BridgingRewardsToL2(deployer, rewardsTokenAmounts);
 
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
                 sourceChainSelector: BaseSepolia.ChainSelector,
-                sender: abi.encode(deployer),
+                sender: abi.encode(address(senderContract)),
                 data: abi.encode(string(
                     messageWithSignature_ProcessClaim
                 )),
@@ -408,7 +396,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
             rewardsCoordinatorBalanceBefore - rewardsAmount
         );
 
-        ///////////////////////////////////////////////
+        ////////////////////////////////////////uuu///////
         // L2 Sender receives tokens from L1 and transfers to agentOwner
         ///////////////////////////////////////////////
         vm.selectFork(l2ForkId);
@@ -427,44 +415,10 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
                 sourceChainSelector: EthSepolia.ChainSelector,
                 sender: abi.encode(address(receiverContract)),
                 data: abi.encode(string(
-                    encodeTransferToAgentOwnerMsg(
-                        rewardsTransferRoot
-                    )
+                    encodeTransferToAgentOwnerMsg(deployer)
                 )),
                 destTokenAmounts: destTokenAmountsL2
             })
         );
-
-        // attempting to re-use a rewardsTransferRoot should fail
-        vm.expectRevert("SenderHooks.handleTransferToAgentOwner: TransferRoot already used");
-        senderContract.mockCCIPReceive(
-            Client.Any2EVMMessage({
-                messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
-                sender: abi.encode(address(receiverContract)),
-                data: abi.encode(string(
-                    encodeTransferToAgentOwnerMsg(rewardsTransferRoot)
-                )),
-                destTokenAmounts: destTokenAmountsL2
-            })
-        );
-
-        uint256 routerFees2 = getRouterFeesL2(
-            address(receiverContract),
-            string(messageWithSignature_ProcessClaim),
-            new Client.EVMTokenAmount[](0), // empty array
-            senderHooks.getGasLimitForFunctionSelector(IRewardsCoordinator.processClaim.selector)
-        );
-        // attempting to re-commit a spent claim should fail on L2
-        vm.expectRevert("SenderHooks._commitRewardsTransferRootInfo: TransferRoot already used");
-        senderContract.sendMessagePayNative{value: routerFees2}(
-            EthSepolia.ChainSelector, // destination chain
-            address(receiverContract),
-            string(messageWithSignature_ProcessClaim),
-            new Client.EVMTokenAmount[](0), // empty array
-            0 // use default gasLimit for this function
-        );
-
     }
-
 }

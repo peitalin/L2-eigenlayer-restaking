@@ -150,7 +150,6 @@ contract UndelegateScript is BaseScript {
             strategiesToWithdraw,
             sharesToWithdraw,
             bytes32(0x0), // withdrawalRoot is created later (requires startBlock)
-            bytes32(0x0), // withdrawalAgenOwnerRoot not used in delegations
             filePath
         );
     }

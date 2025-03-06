@@ -11,6 +11,7 @@ import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
+import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 
 
 /// @title ETH L1 Messenger Contract: receives messages from L2 and processes them
@@ -23,12 +24,12 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     mapping(bytes32 messageId => mapping(address token => uint256 amount)) public amountRefundedToMessageIds;
 
     event BridgingWithdrawalToL2(
-        bytes32 indexed withdrawalTransferRoot,
+        address indexed agentOwner,
         Client.EVMTokenAmount[] indexed withdrawalTokenAmounts
     );
 
     event BridgingRewardsToL2(
-        bytes32 indexed rewardsTransferRoot,
+        address indexed agentOwner,
         Client.EVMTokenAmount[] indexed rewardsTokenAmounts
     );
 
@@ -170,25 +171,33 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         try restakingConnector.dispatchMessageToEigenAgent(any2EvmMessage)
             returns (IRestakingConnector.TransferTokensInfo memory transferTokensInfo)
         {
-            // Only completeWithdrawals and rewardsClaims return a transferRoot
-            if (transferTokensInfo.transferRoot != bytes32(0)) {
-                // If transferRoot is returned, bridge to L2 then SenderCCIP transfers tokens to AgentOwner.
+            if (transferTokensInfo.transferType == IRestakingConnector.TransferType.NoTransfer) {
+                // Only Withdrawals and RewardsClaims bridge funds to L2
+            } else if (
+                transferTokensInfo.transferType == IRestakingConnector.TransferType.Withdrawal ||
+                transferTokensInfo.transferType == IRestakingConnector.TransferType.RewardsClaim
+            ) {
+
+                string memory transferToAgentOwnerMessage = string(
+                    EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(transferTokensInfo.agentOwner)
+                );
+
                 this.sendMessagePayNative(
                     any2EvmMessage.sourceChainSelector, // source chain is destination chain (send back to L2)
                     senderContractL2,
-                    transferTokensInfo.transferToAgentOwnerMessage,
+                    transferToAgentOwnerMessage,
                     transferTokensInfo.tokenAmounts,
                     0 // use default gasLimit
                 );
 
                 if (transferTokensInfo.transferType == IRestakingConnector.TransferType.Withdrawal) {
                     emit BridgingWithdrawalToL2(
-                        transferTokensInfo.transferRoot,
+                        transferTokensInfo.agentOwner,
                         transferTokensInfo.tokenAmounts
                     );
                 } else if (transferTokensInfo.transferType == IRestakingConnector.TransferType.RewardsClaim) {
                     emit BridgingRewardsToL2(
-                        transferTokensInfo.transferRoot,
+                        transferTokensInfo.agentOwner,
                         transferTokensInfo.tokenAmounts
                     );
                 }

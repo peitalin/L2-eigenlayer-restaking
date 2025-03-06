@@ -253,12 +253,6 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             amount: 0.1 ether
         });
 
-        bytes memory message2 = encodeDepositIntoStrategyMsg(
-            address(strategy),
-            tokenAmounts[0].token,
-            tokenAmounts[0].amount
-        );
-
         vm.startBroadcast(deployerKey);
         {
             uint256 fees = getRouterFeesL1(
@@ -628,12 +622,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         bytes memory messageWithSignature;
         {
             uint256 execNonce = 0;
-            bytes32 mockWithdrawalAgentOwnerRoot = bytes32(abi.encode(123));
-
-            message = encodeTransferToAgentOwnerMsg(
-                mockWithdrawalAgentOwnerRoot
-            );
-
+            message = encodeTransferToAgentOwnerMsg(bob);
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
@@ -693,12 +682,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         bytes memory messageWithSignature;
         {
             uint256 execNonce = 0;
-            bytes32 mockWithdrawalAgentOwnerRoot = bytes32(abi.encode(123));
-
-            message = encodeTransferToAgentOwnerMsg(
-                mockWithdrawalAgentOwnerRoot
-            );
-
+            message = encodeTransferToAgentOwnerMsg(bob);
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
@@ -726,8 +710,9 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         vm.prank(address(receiverContract));
         (
             bool _success,
-            bytes memory _result
+            // bytes memory _result
         ) = address(bob).call{value: address(receiverContract).balance}("");
+        require(_success, "bob should receive ETH");
 
         vm.expectRevert(abi.encodeWithSelector(BaseMessengerCCIP.NotEnoughBalance.selector, 0, fees));
         // don't send gas to receiver contract

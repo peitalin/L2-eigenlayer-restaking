@@ -31,12 +31,6 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
     uint256 amount;
     bytes32 messageId1;
 
-    // SenderHooks.WithdrawalTransferRootCommitted
-    event WithdrawalTransferRootCommitted(
-        bytes32 indexed withdrawalTransferRoot,
-        address signer
-    );
-
     function setUp() public {
         // setup forked environments for L2 and L1 contracts
         setUpForkedEnvironment();
@@ -289,22 +283,12 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             );
         }
 
-        bytes32 withdrawalTransferRoot = calculateWithdrawalTransferRoot(
-            withdrawalRoot,
-            bob
-        );
-
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
             IDelegationManager.completeQueuedWithdrawal.selector
         );
 
         Client.EVMTokenAmount[] memory tokenAmounts1 = new Client.EVMTokenAmount[](0);
 
-        vm.expectEmit(true, false, true, false);
-        emit WithdrawalTransferRootCommitted(
-            withdrawalTransferRoot,
-            bob // signer
-        );
         senderContract.sendMessagePayNative{
             value: getRouterFeesL2(
                 address(receiverContract),
@@ -343,7 +327,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         // sender contract is forked from testnet, addr will differ
         vm.expectEmit(false, true, true, false);
         emit ReceiverCCIP.BridgingWithdrawalToL2(
-            withdrawalTransferRoot,
+            deployer,
             withdrawalTokenAmounts
         );
         // Mock L1 bridge receiving CCIP message and calling CompleteWithdrawal on Eigenlayer
@@ -383,12 +367,6 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         /////////////////////////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
-        // transferRoot agentOwner info should be available
-        address agentOwner = senderHooks.getTransferRootAgentOwner(
-            withdrawalTransferRoot
-        );
-        vm.assertEq(agentOwner, bob);
-
         // Mock SenderContract on L2 receiving the tokens and TransferToAgentOwner CCIP message from L1
         Client.EVMTokenAmount[] memory destTokenAmountsL2 = new Client.EVMTokenAmount[](1);
         destTokenAmountsL2[0] = Client.EVMTokenAmount({
@@ -402,7 +380,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
                 sender: abi.encode(address(receiverContract)),
                 data: abi.encode(string(
                     encodeTransferToAgentOwnerMsg(
-                        withdrawalTransferRoot
+                        bob
                     )
                 )), // CCIP abi.encodes a string message when sending
                 destTokenAmounts: destTokenAmountsL2
@@ -418,43 +396,6 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             (stakerBalanceOnL2Before + amount) == stakerBalanceOnL2After,
             "balanceOf(bob) on L2 should increase by amount after L2 -> L2 withdrawal"
         );
-
-        /////////////////////////////////////////////////////////////////
-        //// Test Attempts to re-use WithdrawalAgentOwnerRoots
-        /////////////////////////////////////////////////////////////////
-
-        // attempting to commit a spent withdrawalTransferRoot should fail on L2
-        vm.expectRevert("SenderHooks._commitWithdrawalTransferRootInfo: TransferRoot already used");
-        senderContract.sendMessagePayNative(
-            EthSepolia.ChainSelector, // destination chain
-            address(receiverContract),
-            string(messageWithSignature_CW),
-            new Client.EVMTokenAmount[](0),
-            0 // use default gasLimit for this function
-        );
-
-        // attempting to re-use withdrawalTransferRoot from L1 should fail
-        bytes memory messageWithdrawalReuse = encodeTransferToAgentOwnerMsg(
-            calculateWithdrawalTransferRoot(
-                withdrawalRoot,
-                bob
-            )
-        );
-        vm.expectRevert("SenderHooks.handleTransferToAgentOwner: TransferRoot already used");
-        senderContract.mockCCIPReceive(
-            Client.Any2EVMMessage({
-                messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
-                sender: abi.encode(address(receiverContract)),
-                data: abi.encode(string(
-                    messageWithdrawalReuse
-                )),
-                destTokenAmounts: new Client.EVMTokenAmount[](0)
-            })
-        );
-
-        // withdrawalTransferRoot should be spent now
-        vm.assertEq(senderHooks.isTransferRootSpent(withdrawalTransferRoot), true);
     }
 
     /*
@@ -704,13 +645,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         uint256 bobBalanceBefore = token3.balanceOf(bob);
 
         vm.expectEmit(true, true, true, false);
-        emit ReceiverCCIP.BridgingWithdrawalToL2(
-            calculateWithdrawalTransferRoot(
-                delegationManager.calculateWithdrawalRoot(withdrawal),
-                bob
-            ),
-            withdrawalTokenAmounts
-        );
+        emit ReceiverCCIP.BridgingWithdrawalToL2(bob, withdrawalTokenAmounts);
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),

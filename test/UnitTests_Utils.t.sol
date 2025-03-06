@@ -59,8 +59,6 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
         fileReaderTest.readEigenAgent721AndRegistry();
         fileReaderTest.readBaseEigenAgent();
         fileReaderTest.readReceiverRestakingConnector();
-        fileReaderTest.readProxyAdminL1();
-        fileReaderTest.readProxyAdminL2();
         fileReaderTest.readSenderContract();
         fileReaderTest.readSenderHooks();
         {
@@ -105,7 +103,6 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
             strategies, // _strategies
             shares, // _shares
             bytes32(0x0), // _withdrawalRoot
-            bytes32(0x0), // _withdrawalTransferRoot
             "test/withdrawals-queued/" // _filePath
         );
 

@@ -124,36 +124,11 @@ contract ClientEncoders {
         return keccak256(abi.encode(withdrawal));
     }
 
-    function calculateWithdrawalTransferRoot(
-        bytes32 withdrawalRoot,
-        address agentOwner
-    ) public pure returns (bytes32) {
-        return keccak256(abi.encode(withdrawalRoot, agentOwner));
-    }
-
-    function calculateRewardsRoot(IRewardsCoordinator.RewardsMerkleClaim memory claim)
-        public
-        pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encode(claim));
-    }
-
-
-    function calculateRewardsTransferRoot(
-        bytes32 rewardsRoot,
-        address agentOwner
-    ) public pure returns (bytes32) {
-        return keccak256(abi.encode(rewardsRoot, agentOwner));
-    }
-
-    function encodeTransferToAgentOwnerMsg(
-        bytes32 transferRoot
-    ) public pure returns (bytes memory) {
+    function encodeTransferToAgentOwnerMsg(address agentOwner) public pure returns (bytes memory) {
         return abi.encodeWithSelector(
-            // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
+            // cast sig "handleTransferToAgentOwner(address)" == 0x43598c8c
             ISenderHooks.handleTransferToAgentOwner.selector,
-            transferRoot
+            agentOwner
         );
     }
 

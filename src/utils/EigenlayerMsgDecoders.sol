@@ -10,7 +10,7 @@ import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 
 
 struct TransferToAgentOwnerMsg {
-    bytes32 transferRoot; // can be either a withdrawalTransferRoot or rewardTransferRoot
+    address agentOwner;
 }
 
 library AgentOwnerSignature {
@@ -542,12 +542,8 @@ contract EigenlayerMsgDecoders {
 
     /**
      * @dev This message is dispatched from L1 to L2 by ReceiverCCIP.sol
-     * For Withdrawals: When sending a completeWithdrawal message, we first commit to a withdrawalTransferRoot
-     * on L2 so that when completeWithdrawal finishes on L1 and bridge the funds back to L2, the bridge knows
-     * who the original owner associated with that withdrawalTransferRoot is.
-     * For Rewards processClaims: we commit a rewardTransferRoot in the same way.
      * @param message CCIP message to Eigenlayer
-     * @return transferToAgentOwnerMsg contains the transferRoot which is sent back to L2
+     * @return transferToAgentOwnerMsg contains the agentOwner which is sent back to L2
      */
     function decodeTransferToAgentOwnerMsg(bytes memory message)
         public pure
@@ -557,19 +553,19 @@ contract EigenlayerMsgDecoders {
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
         // 0000000000000000000000000000000000000000000000000000000000000064 [64]
         // d8a85b48                                                         [96] function selector
-        // dd900ac4d233ec9d74ac5af4ce89f87c78781d8fd9ee2aad62d312bdfdf78a14 [100] transferRoot
+        // dd900ac4d233ec9d74ac5af4ce89f87c78781d8fd9ee2aad62d312bdfdf78a14 [100] agentOwner
         // 00000000000000000000000000000000000000000000000000000000
 
         bytes4 functionSelector;
-        bytes32 transferRoot;
+        address agentOwner;
 
         assembly {
             functionSelector := mload(add(message, 96))
-            transferRoot := mload(add(message, 100))
+            agentOwner := mload(add(message, 100))
         }
 
         return TransferToAgentOwnerMsg({
-            transferRoot: transferRoot
+            agentOwner: agentOwner
         });
     }
 

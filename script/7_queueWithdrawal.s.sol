@@ -180,7 +180,6 @@ contract QueueWithdrawalScript is BaseScript {
             strategiesToWithdraw,
             sharesToWithdraw,
             bytes32(0x0), // withdrawalRoot is created later when completeWithdrawal
-            bytes32(0x0), // withdrawalTransferRoot is created later
             filePath
         );
     }

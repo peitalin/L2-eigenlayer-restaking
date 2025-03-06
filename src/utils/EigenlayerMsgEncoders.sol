@@ -195,58 +195,14 @@ library EigenlayerMsgEncoders {
     */
 
     /**
-     * @dev withdrawalTransferRoot commits to a Eigenlayer withdrawalRoot, amount and agentOwner
-     * on L2 when first sending a completeWithdrawal() message so that when the withdrawn
-     * funds return from L2 later, the bridge can lookup the user to transfer funds to.
-     * @param withdrawalRoot is calculate by Eigenlayer during queueWithdrawals, needed to completeWithdrawal
-     * @param agentOwner is the owner of the EigenAgent who deposits and withdraws from Eigenlayer
+     * @dev encodes a message containing the AgentOwner when sending message from L1 to L2
      */
-    function calculateWithdrawalTransferRoot(
-        bytes32 withdrawalRoot,
-        address agentOwner // signer
-    ) public pure returns (bytes32) {
-        // encode signer into withdrawalTransferRoot
-        return keccak256(abi.encode(withdrawalRoot, agentOwner));
-    }
-
-    /**
-     * @dev Returns the same rewardsRoot calculated in RestakingConnector during processClaims on L1
-     * @param claim is the RewardsMerkleClaim struct used to processClaim in Eigenlayer.
-     */
-    function calculateRewardsRoot(IRewardsCoordinator.RewardsMerkleClaim memory claim)
-        public
-        pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encode(claim));
-    }
-
-    /**
-     * @dev Returns the same rewardsTransferRoot calculated in RestakingConnector.
-     * @param rewardsRoot keccak256(abi.encode(claim.rootIndex, claim.earnerIndex))
-     * @param agentOwner owner of the EigenAgent executing completeWithdrawals
-     */
-    function calculateRewardsTransferRoot(
-        bytes32 rewardsRoot,
-        address agentOwner
-    ) public pure returns (bytes32) {
-        return keccak256(abi.encode(rewardsRoot, agentOwner));
-    }
-
-    /**
-     * @dev encodes a message containing the transferRoot when sending message from L1 to L2
-     * @param transferRoot is a hash of:
-     * (1) for withdrawal transfers: withdrawalRoot, amount, and agentOwner.
-     * (2) for rewards transfers: rewardsRoot, rewardAmount, rewardToken, agentOwner.
-     */
-    function encodeTransferToAgentOwnerMsg(
-        bytes32 transferRoot
-    ) public pure returns (bytes memory) {
+    function encodeTransferToAgentOwnerMsg(address agentOwner) public pure returns (bytes memory) {
         // Note: use encodeWithSelector here as function selector differs from payload
         return abi.encodeWithSelector(
             // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
             ISenderHooks.handleTransferToAgentOwner.selector,
-            transferRoot
+            agentOwner
         );
     }
 

@@ -387,63 +387,13 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         );
     }
 
-    function test_ClientEncoder_calculateWithdrawalTransferRoot() public view {
-
-        IDelegationManager.Withdrawal memory withdrawal = makeMockWithdrawal();
-        bytes32 withdrawalRoot = clientEncodersTest.calculateWithdrawalRoot(withdrawal);
-
-        vm.assertEq(
-            keccak256(abi.encode(
-                clientEncodersTest.calculateWithdrawalTransferRoot(
-                    withdrawalRoot,
-                    deployer
-                )
-            )),
-            keccak256(abi.encode(
-                EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(
-                    withdrawalRoot,
-                    deployer
-                )
-            ))
-        );
-    }
-
-    function test_SenderHooks_calculateWithdrawalTransferRoot() public view {
-
-        IDelegationManager.Withdrawal memory withdrawal = makeMockWithdrawal();
-        bytes32 withdrawalRoot = clientEncodersTest.calculateWithdrawalRoot(withdrawal);
-
-        vm.assertEq(
-            keccak256(abi.encode(
-                senderHooks.calculateWithdrawalTransferRoot(
-                    withdrawalRoot,
-                    deployer
-                )
-            )),
-            keccak256(abi.encode(
-                EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(
-                    withdrawalRoot,
-                    deployer
-                )
-            ))
-        );
-    }
-
     function test_ClientEncoder_encodeTransferToAgentOwnerMsg() public view {
-
-        IDelegationManager.Withdrawal memory withdrawal = makeMockWithdrawal();
-        bytes32 withdrawalRoot = clientEncodersTest.calculateWithdrawalRoot(withdrawal);
-        bytes32 withdrawalTransferRoot = clientEncodersTest.calculateWithdrawalTransferRoot(
-            withdrawalRoot,
-            deployer
-        );
-
         vm.assertEq(
             keccak256(abi.encode(
-                clientEncodersTest.encodeTransferToAgentOwnerMsg(withdrawalTransferRoot)
+                clientEncodersTest.encodeTransferToAgentOwnerMsg(deployer)
             )),
             keccak256(abi.encode(
-                EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(withdrawalTransferRoot)
+                EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(deployer)
             ))
         );
     }
@@ -552,55 +502,16 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         return claim;
     }
 
-    function test_ClientEncoder_calculateRewardTransferRoot() public view {
-
-        IRewardsCoordinator.RewardsMerkleClaim memory claim = makeMockRewardsMerkleClaim();
-        bytes32 rewardsRoot = clientEncodersTest.calculateRewardsRoot(claim);
-        address agentOwner = deployer;
-
-        vm.assertEq(
-            keccak256(abi.encode(
-                clientEncodersTest.calculateRewardsTransferRoot(rewardsRoot, agentOwner)
-            )),
-            keccak256(abi.encode(
-                EigenlayerMsgEncoders.calculateRewardsTransferRoot(rewardsRoot, agentOwner)
-            ))
-        );
-    }
-
-    function test_SenderHooks_calculateRewardTransferRoot() public view {
-
-        IRewardsCoordinator.RewardsMerkleClaim memory claim = makeMockRewardsMerkleClaim();
-        bytes32 rewardsRoot = clientEncodersTest.calculateRewardsRoot(claim);
-        address agentOwner = deployer;
-
-        vm.assertEq(
-            keccak256(abi.encode(
-                senderHooks.calculateRewardsTransferRoot(rewardsRoot, agentOwner)
-            )),
-            keccak256(abi.encode(
-                EigenlayerMsgEncoders.calculateRewardsTransferRoot(rewardsRoot, agentOwner)
-            ))
-        );
-    }
-
     function test_ClientEncoder_encodeRewardsTransferToAgentOwnerMsg() public view {
 
-        IRewardsCoordinator.RewardsMerkleClaim memory claim = makeMockRewardsMerkleClaim();
-        bytes32 rewardsRoot = clientEncodersTest.calculateRewardsRoot(claim);
         address agentOwner = deployer;
-
-        bytes32 rewardsTransferRoot = EigenlayerMsgEncoders.calculateRewardsTransferRoot(
-            rewardsRoot,
-            agentOwner
-        );
 
         vm.assertEq(
             keccak256(abi.encode(
-                clientEncodersTest.encodeTransferToAgentOwnerMsg(rewardsTransferRoot)
+                clientEncodersTest.encodeTransferToAgentOwnerMsg(agentOwner)
             )),
             keccak256(abi.encode(
-                EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(rewardsTransferRoot)
+                EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(agentOwner)
             ))
         );
     }

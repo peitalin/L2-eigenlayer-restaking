@@ -27,20 +27,6 @@ interface ISenderHooks {
 
     function clearBridgeTokens(address _bridgeTokenL1) external;
 
-    function getTransferRootAgentOwner(bytes32 transferRoot) external returns (address);
-
-    function isTransferRootSpent(bytes32 transferRoot) external returns (bool);
-
-    function calculateWithdrawalTransferRoot(
-        bytes32 withdrawalRoot,
-        address agentOwner
-    ) external pure returns (bytes32);
-
-    function calculateRewardsTransferRoot(
-        bytes32 rewardsRoot,
-        address agentOwner
-    ) external pure returns (bytes32);
-
     function beforeSendCCIPMessage(
         bytes memory message,
         Client.EVMTokenAmount[] memory tokenAmounts

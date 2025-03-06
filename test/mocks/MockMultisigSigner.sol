@@ -47,7 +47,7 @@ contract MockMultisigSigner is Adminable, IERC721Receiver {
 
     function isValidSignature(
         bytes32 digestHash,
-        bytes memory signature
+        bytes memory _signature
     ) public view returns (bytes4 magicValue) {
 
         address[] memory signers = digestHashSigners[digestHash];

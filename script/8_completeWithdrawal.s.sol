@@ -83,13 +83,6 @@ contract CompleteWithdrawalScript is BaseScript {
             ));
 
             bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
-            // Create a withdrawalAgentOwnerRoot and commit to it on L2.
-            // So that when the withdrawal returns, we can
-            // verify which user (AgentOwner) to transfer withdrawals to
-            bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalTransferRoot(
-                withdrawalRoot,
-                deployer
-            );
 
             IERC20[] memory tokensToWithdraw = new IERC20[](1);
             tokensToWithdraw[0] = withdrawal.strategies[0].underlyingToken();
@@ -170,7 +163,6 @@ contract CompleteWithdrawalScript is BaseScript {
                 withdrawal.strategies,
                 withdrawal.shares,
                 withdrawalRoot,
-                withdrawalAgentOwnerRoot,
                 filePath
             );
 

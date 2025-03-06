@@ -42,8 +42,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
     /**
      * @dev _ccipReceiver is called when a CCIP bridge contract receives a CCIP message.
-     * This contract allows us to define custom logic to handle outboound Eigenlayer messages
-     * for instance, committing a withdrawalTransferRoot on outbound completeWithdrawal messages.
+     * This contract allows us to define custom logic to handle outbound Eigenlayer messages.
      * @param any2EvmMessage contains CCIP message info such as data (message) and bridged token amounts
      */
     function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage)
@@ -67,9 +66,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
     /**
      * @dev This function catches outbound completeWithdrawal messages to L1 Eigenlayer, and
-     * sets a withdrawalTransferRoot commitment that contains info on the agentOwner and amount.
-     * This is so when the SenderCCIP bridge receives the withdrawn funds from L1, it knows who to
-     * transfer the funds to.
+     * handles incoming TransferToAgentOwner messages containing the agentOwner to transfer funds to
      */
     function _afterCCIPReceiveMessage(Client.Any2EVMMessage memory any2EvmMessage) internal {
 
@@ -79,7 +76,9 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
 
         // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
         if (functionSelector == ISenderHooks.handleTransferToAgentOwner.selector) {
-            // Trust chainlink CCIP to not have modified the message
+
+            // any2EvmMessage.sender is the address of the ReceiverCCIP contract on L1.
+            // so we decode the TransferToAgentOwner message to get the agentOwner
             address agentOwner = senderHooks.handleTransferToAgentOwner(message);
 
             for (uint k = 0; k < destTokenAmounts.length; ++k) {

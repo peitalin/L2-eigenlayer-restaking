@@ -59,14 +59,14 @@ interface IRestakingConnector {
     */
 
     enum TransferType {
+        NoTransfer,
         Withdrawal,
         RewardsClaim
     }
 
     struct TransferTokensInfo {
         TransferType transferType;
-        string transferToAgentOwnerMessage;
-        bytes32 transferRoot;
+        address agentOwner;
         Client.EVMTokenAmount[] tokenAmounts;
     }
 

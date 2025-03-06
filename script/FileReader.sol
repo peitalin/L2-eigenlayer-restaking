@@ -193,7 +193,6 @@ contract FileReader is Script {
         IStrategy[] memory _strategies,
         uint256[] memory _shares,
         bytes32 _withdrawalRoot,
-        bytes32 _withdrawalTransferRoot,
         string memory _filePath
     ) public {
 
@@ -214,7 +213,6 @@ contract FileReader is Script {
         /////////////////////////////////////////////////
         // { "outputs": <outputs_data>}
         /////////////////////////////////////////////////
-        vm.serializeBytes32("outputs", "withdrawalTransferRoot", _withdrawalTransferRoot);
         string memory outputs_data = vm.serializeBytes32("outputs", "withdrawalRoot", _withdrawalRoot);
 
         /////////////////////////////////////////////////
@@ -281,7 +279,6 @@ contract FileReader is Script {
         ///// (startBlock is during withdrawal on L1), not when first sending message on L2
         uint32 _startBlock = uint32(stdJson.readUint(withdrawalData, ".inputs.startBlock"));
         // bytes32 _withdrawalRoot = stdJson.readBytes32(withdrawalData, ".outputs.withdrawalRoot");
-        // bytes32 _withdrawalTransferRoot = stdJson.readBytes32(withdrawalData, ".outputs.withdrawalTransferRoot");
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         uint256[] memory sharesToWithdraw = new uint256[](1);
