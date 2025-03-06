@@ -151,64 +151,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         );
     }
 
-    function test_HandleCustomErrorForDeposits_InvalidTargetContract() public {
-
-        uint256 execNonce = 0;
-        uint256 expiryShort = block.timestamp + 60 seconds;
-        uint256 amount = 0.1 ether;
-
-        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
-            bobKey,
-            address(eigenAgent),
-            block.chainid,
-            address(123123), // invalid targetContract to cause revert
-            encodeDepositIntoStrategyMsg(
-                address(strategy),
-                address(tokenL1),
-                amount
-            ),
-            execNonce,
-            expiryShort
-        );
-
-        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
-        destTokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
-            amount: amount
-        });
-
-        bytes32 messageId1 = bytes32(abi.encode(0x123333444555));
-
-        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: messageId1,
-            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(sender),
-            destTokenAmounts: destTokenAmounts,
-            data: abi.encode(string(
-                messageWithSignature
-            ))
-        });
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
-                "Invalid signer, or incorrect digestHash parameters.",
-                "Manually execute to refund after timestamp:",
-                expiryShort
-            )
-        );
-        receiverContract.mockCCIPReceive(any2EvmMessage);
-
-        vm.prank(deployer);
-        receiverContract.withdrawTokenForMessageId(messageId1, bob, address(tokenL1), 0.1 ether);
-
-        vm.assertEq(tokenL1.balanceOf(bob), 0.1 ether);
-
-        // after refund, show original error message instead
-        vm.expectRevert(abi.encodeWithSelector(AlreadyRefunded.selector, 0.1 ether));
-        receiverContract.mockCCIPReceive(any2EvmMessage);
-    }
-
     function test_HandleCustomError_CallerNotAllowed() public {
 
         uint256 execNonce = 0;
@@ -603,55 +545,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
                 )),
                 destTokenAmounts: new Client.EVMTokenAmount[](0)
             })
-        );
-    }
-
-    function test_ReceiverContractL1_WithdrawTokenForMessageId_BalanceMatches() public {
-
-        bytes32 messageId = bytes32(abi.encode(1,2,3));
-
-        vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(
-            OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-            bob
-        ));
-        receiverContract.withdrawTokenForMessageId(messageId, bob, address(tokenL1), 1 ether);
-
-        vm.expectRevert(abi.encodeWithSelector(WithdrawalExceedsBalance.selector, 2 ether, 1 ether));
-        vm.prank(deployer);
-        receiverContract.withdrawTokenForMessageId(messageId, bob, address(tokenL1), 2 ether);
-
-        vm.prank(deployer);
-        receiverContract.withdrawTokenForMessageId(messageId, bob, address(tokenL1), 0.3 ether);
-
-        vm.assertEq(
-            receiverContract.amountRefunded(messageId, address(tokenL1)),
-            0.3 ether
-        );
-        vm.assertEq(tokenL1.balanceOf(bob), 0.3 ether);
-
-    }
-
-    function test_ReceiverContractL1_WithdrawTokenForMessageId_AlreadyRefunded() public {
-
-        bytes32 messageId = bytes32(abi.encode(1,2,3));
-        uint256 refundAmount = 0.2 ether;
-
-        // refund
-        vm.prank(deployer);
-        receiverContract.withdrawTokenForMessageId(messageId, bob, address(tokenL1), refundAmount);
-
-        vm.assertEq(receiverContract.amountRefunded(messageId, address(tokenL1)), refundAmount);
-        vm.assertEq(tokenL1.balanceOf(bob), refundAmount);
-
-        // revert when trying to refund again
-        vm.prank(deployer);
-        vm.expectRevert(abi.encodeWithSelector(AlreadyRefunded.selector, refundAmount));
-        receiverContract.withdrawTokenForMessageId(
-            messageId,
-            bob,
-            address(tokenL1),
-            0.1 ether
         );
     }
 

@@ -105,32 +105,6 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     }
 
     /**
-     * @notice Lets admin withdraw tokens and mark that messageId as refunded, preventing further refunds.
-     * @param messageId is the CCIP messageId.
-     * @param beneficiary address to which the tokens will be sent.
-     * @param token contract address of the ERC20 token to be withdrawn.
-     * @param amount The amount to withdraw.
-     */
-    function withdrawTokenForMessageId(
-        bytes32 messageId,
-        address beneficiary,
-        address token,
-        uint256 amount
-    ) external onlyOwner {
-
-        uint256 amountBefore = amountRefundedToMessageIds[messageId][token];
-        uint256 tokenBalance = IERC20(token).balanceOf(address(this));
-
-        if (amountBefore > 0) revert AlreadyRefunded(amountBefore);
-        if (amount > tokenBalance) revert WithdrawalExceedsBalance(amount, tokenBalance);
-
-        amountRefundedToMessageIds[messageId][token] = amount;
-        emit UpdatedAmountRefunded(messageId, token, amountBefore, amount);
-
-        IERC20(token).safeTransfer(beneficiary, amount);
-    }
-
-    /**
      * @dev This function is called when receiving an inbound message.
      * @param any2EvmMessage contains CCIP message info such as data (message) and bridged token amounts
     */
@@ -222,7 +196,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                         // ...mark messageId as refunded
                         amountRefundedToMessageIds[any2EvmMessage.messageId][tokenAddress] = tokenAmount;
                         // ...then initiate a refund back to the signer on L2
-                        return _refundToSignerAfterExpiry(
+                        _refundToSignerAfterExpiry(
                             any2EvmMessage,
                             customError,
                             tokenAddress,
