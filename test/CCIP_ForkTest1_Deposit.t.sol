@@ -231,8 +231,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         }
 
         // warp ahead past the expiryShort timestamp:
-        vm.warp(block.timestamp + 3666); // 1 hour, 1 min, 6 seconds
-        vm.roll((block.timestamp + 3666) / 12); // 305 blocks on ETH
+        vm.warp(block.timestamp + 2 hours);
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
@@ -242,7 +241,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: messageId,
             sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(deployer),
+            sender: abi.encode(address(senderContract)),
             destTokenAmounts: destTokenAmounts,
             data: abi.encode(string(
                 messageWithSignature
@@ -254,19 +253,9 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         vm.expectEmit(true, true, true, false);
         emit ReceiverCCIP.RefundingDeposit(bob, address(tokenL1), amount);
         receiverContract.mockCCIPReceive(any2EvmMessage);
-
-        // Revert when trying to refund again
-        vm.prank(deployer);
-        vm.expectRevert(abi.encodeWithSelector(AlreadyRefunded.selector, amount));
-        receiverContract.withdrawTokenForMessageId(
-            messageId,
-            bob,
-            address(tokenL1),
-            0.1 ether
-        );
     }
 
-    function test_ReceiverL1_PreventRefundAfterManualRefund_PermanentError() public {
+    function test_ReceiverL1_PreventRefundAfterManualRefund() public {
 
         vm.selectFork(ethForkId);
 
@@ -310,129 +299,22 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: messageId,
             sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(deployer),
+            sender: abi.encode(address(senderContract)),
             destTokenAmounts: destTokenAmounts,
             data: abi.encode(string(
                 messageWithSignature
             ))
         });
 
-        // Manually refund the user first
-        vm.prank(deployer);
-        uint256 refundAmount = 0.1 ether;
-        receiverContract.withdrawTokenForMessageId(
-            messageId,
-            bob,
-            address(tokenL1),
-            refundAmount
-        );
+        receiverContract.mockCCIPReceive(any2EvmMessage);
 
         // attempt to trigger a refund after being manually refunded by admin.
         // Refund is no longer available, should revert with AlreadyRefunded
         vm.expectRevert(abi.encodeWithSelector(
             AlreadyRefunded.selector,
-            refundAmount
+            amount
         ));
         receiverContract.mockCCIPReceive(any2EvmMessage);
-    }
-
-
-    function test_ReceiverL1_PreventRefundAfterManualRefund_TemporaryError() public {
-        // This test is similar to the one above, but the strategy manager is paused
-        // temporarily, so the error is only temporary
-        // Bob can then trick the admin to manually refund him, and then continue with his original deposit
-        // effectively stealing the refund and keeping his deposit after the temporary error is resolved
-
-        vm.selectFork(ethForkId);
-
-        uint256 execNonce = 0;
-        uint256 expiryShort = block.timestamp + 60 seconds;
-        bytes32 messageId = bytes32(abi.encode(124));
-        uint256 amount11 = 0.11 ether;
-
-        // fund receiver contract with 1 ether
-        vm.prank(deployer);
-        IERC20(address(tokenL1)).transfer(address(receiverContract), 1 ether);
-        uint256 receiverBalanceBefore = IERC20(address(tokenL1)).balanceOf(address(receiverContract));
-
-        vm.prank(deployer);
-        IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
-
-        bytes memory messageWithSignature;
-        {
-            // sign the message for EigenAgent to execute Eigenlayer command
-            messageWithSignature = signMessageForEigenAgentExecution(
-                bobKey,
-                address(eigenAgentBob),
-                block.chainid, // destination chainid where EigenAgent lives
-                address(strategyManager), // StrategyManager to approve + deposit
-                encodeDepositIntoStrategyMsg(
-                    address(strategy),
-                    address(tokenL1),
-                    amount11
-                ),
-                execNonce,
-                expiryShort
-            );
-        }
-
-        // Pause Strategy and introduce a temporary deposit failure
-        vm.prank(deployer);
-        IPausable(address(strategyManager)).pause(1);
-
-        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
-        destTokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
-            amount: amount11
-        });
-        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: messageId,
-            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(deployer),
-            destTokenAmounts: destTokenAmounts,
-            data: abi.encode(string(
-                messageWithSignature
-            ))
-        });
-
-        // user triggers a revert as StrategyManager is paused
-        // but it is before expiry, so refunds are not yet available
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
-                "Pausable: index is paused",
-                "Manually execute to refund after timestamp:",
-                expiryShort
-            )
-        );
-        receiverContract.mockCCIPReceive(any2EvmMessage);
-
-        // user then tricks admin to manually refund the user
-        vm.prank(deployer);
-        receiverContract.withdrawTokenForMessageId(
-            messageId,
-            bob,
-            address(tokenL1),
-            amount11
-        );
-
-        // warp ahead past the expiryShort timestamp, now refunds are available
-        vm.warp(block.timestamp + 2 hours);
-
-        // unpause the StrategyManager, enabling the user's original deposit to succeed
-        vm.prank(deployer);
-        IPausable(address(strategyManager)).unpause(0);
-
-        // After unpausing the StrategyManager, the user attempts to continue with their original deposit
-        // which triggers a revert, preventing them from keeping both refund and the original deposit
-        vm.expectRevert(abi.encodeWithSelector(AlreadyRefunded.selector, amount11));
-        receiverContract.mockCCIPReceive(any2EvmMessage);
-
-        uint256 receiverBalanceAfter = IERC20(address(tokenL1)).balanceOf(address(receiverContract));
-        require(
-            (receiverBalanceBefore - receiverBalanceAfter) == amount11,
-            "receiver should not double refund the amount"
-        );
     }
 
     function test_RouterFees_OnL1AndL2() public {
@@ -452,7 +334,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             0 // gasLimit
         );
 
-        require(fees1 > 0, "RouterFees on L1 did not esimate bridging fees");
+        require(fees1 > 0, "RouterFees on L1 did not estimate bridging fees");
 
         vm.selectFork(l2ForkId);
         RouterFees routerFeesL2 = new RouterFees();

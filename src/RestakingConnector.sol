@@ -392,7 +392,9 @@ contract RestakingConnector is
                 }
             }
 
-            transferTokensInfo.transferType = IRestakingConnector.TransferType.Withdrawal;
+            transferTokensInfo.transferType = (n > 0)
+                ? IRestakingConnector.TransferType.Withdrawal
+                : IRestakingConnector.TransferType.NoTransfer;
             transferTokensInfo.agentOwner = agentOwner;
             transferTokensInfo.tokenAmounts = transferTokensArray;
         }
@@ -548,7 +550,9 @@ contract RestakingConnector is
             }
         }
 
-        transferTokensInfo.transferType = IRestakingConnector.TransferType.RewardsClaim;
+        transferTokensInfo.transferType = (n > 0)
+            ? IRestakingConnector.TransferType.RewardsClaim
+            : IRestakingConnector.TransferType.NoTransfer;
         transferTokensInfo.agentOwner = agentOwner;
         transferTokensInfo.tokenAmounts = transferTokensArray;
     }

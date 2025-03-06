@@ -17,11 +17,5 @@ interface IReceiverCCIP is IBaseMessengerCCIP {
 
     function amountRefunded(bytes32 messageId, address token) external view returns (uint256);
 
-    function withdrawTokenForMessageId(
-        bytes32 messageId,
-        address beneficiary,
-        address token,
-        uint256 amount
-    ) external;
 }
 

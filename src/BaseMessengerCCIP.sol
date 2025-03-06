@@ -93,7 +93,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         _;
     }
 
-    function validateGasFeesAndRefundExcess(uint256 fees) internal {
+    function validateGasFeesAndCalculateExcess(uint256 fees) internal returns (uint256 gasRefundAmount) {
         if (msg.sender != address(this)) {
             // user sends ETH to the router
             if (fees > msg.value) {
@@ -101,18 +101,18 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
                 revert NotEnoughEthGasFees(msg.value, fees);
             } else if (msg.value > fees) {
                 // User sent too much gas, refund the excess.
-                uint256 refundAmount = msg.value - fees;
-                (bool success, ) = msg.sender.call{value: refundAmount}("");
-                if (!success) {
-                    revert FailedToRefundExcessEth(msg.sender, refundAmount);
-                }
+                gasRefundAmount = msg.value - fees;
             } else {
-                // Do nothing. User sent just the right amount of gas.
+                gasRefundAmount = 0;
+                // User sent just the right amount of gas.
             }
         } else {
             // when contract initiates refund, or transfers withdrawals back to L1
-            if (fees > address(this).balance)
+            if (fees > address(this).balance) {
                 revert NotEnoughBalance(address(this).balance, fees);
+            } else {
+                gasRefundAmount = 0;
+            }
         }
     }
 
@@ -188,8 +188,8 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
             address(0),
             fees
         );
-        // validate gas fees after emitting event to follow Checks-effects-interactions pattern
-        validateGasFeesAndRefundExcess(fees);
+
+        uint256 gasRefundAmount = validateGasFeesAndCalculateExcess(fees);
 
         for (uint256 i = 0; i < _tokenAmounts.length; i++) {
             if (_tokenAmounts[i].amount > 0 && msg.sender != address(this)) {
@@ -211,6 +211,13 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
             _destinationChainSelector,
             evm2AnyMessage
         );
+
+        if (gasRefundAmount > 0) {
+            (bool success, ) = msg.sender.call{value: gasRefundAmount}("");
+            if (!success) {
+                revert FailedToRefundExcessEth(msg.sender, gasRefundAmount);
+            }
+        }
 
         return messageId;
     }

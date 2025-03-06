@@ -116,7 +116,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
                 Client.Any2EVMMessage({
                     messageId: bytes32(0x0),
                     sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-                    sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
+                    sender: abi.encode(address(senderContract)),
                     destTokenAmounts: destTokenAmounts, // Tokens and their amounts in their destination chain representation.
                     data: abi.encode(string(
                         messageWithSignature_D

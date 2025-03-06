@@ -208,7 +208,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
         vm.stopPrank();
 
-        console.log("111111 address(eigenAgentBob): ", address(eigenAgentBob));
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             bobKey, // sign with Bob's key
             address(eigenAgentBob),
@@ -223,8 +222,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             expiryShort
         );
         bytes32 domainSeparator = eigenAgentBob.domainSeparator(block.chainid);
-        console.log("222222 domainSeparator: ");
-        console.logBytes32(domainSeparator);
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
@@ -298,14 +295,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             ))
         });
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
-                "DepositIntoStrategy only handles one token at a time",
-                "Manually execute to refund after timestamp:",
-                expiryShort
-            )
-        );
+        vm.expectRevert("DepositIntoStrategy only handles one token at a time");
         receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 
