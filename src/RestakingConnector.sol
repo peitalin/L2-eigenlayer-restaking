@@ -319,8 +319,8 @@ contract RestakingConnector is
                 vars.tokensToWithdraw
             );
 
-            // (1) EigenAgent receives tokens from Eigenlayer
-            // then (2) approves RestakingConnector to (3) transfer tokens to ReceiverCCIP
+            // (1) EigenAgent receives tokens from Eigenlayer, then
+            // (2) approves RestakingConnector to (3) transfer tokens to ReceiverCCIP
             eigenAgent.executeWithSignature(
                 address(delegationManager),
                 0 ether,
@@ -334,8 +334,8 @@ contract RestakingConnector is
                 vars.signature
             );
 
-            // Should received tokens from StrategyManager now.
-            // It converts shares to tokens and sends them to EigenAgent's balance
+            // Should have received tokens from StrategyManager, which
+            // converts shares to tokens and transfers them to EigenAgent
             uint256[] memory balancesAfter = _getEigenAgentBalancesWithdrawals(
                 eigenAgent,
                 vars.tokensToWithdraw
@@ -362,6 +362,7 @@ contract RestakingConnector is
             );
 
             // If bridgeable, prepare a transferToAgentOwner message with transferRoots
+            // calculate outside loop
             bytes32 withdrawalTransferRoot = EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(
                 delegationManager.calculateWithdrawalRoot(vars.withdrawal), // withdrawalRoot
                 agentOwner // AgentOwner
@@ -535,7 +536,11 @@ contract RestakingConnector is
         }
 
         // The same rewardsRoot calculated on L2 in SenderHooks.sol
-        bytes32 rewardsRoot = EigenlayerMsgEncoders.calculateRewardsRoot(vars.claim);
+        // calculate before loop
+        bytes32 rewardsTransferRoot = EigenlayerMsgEncoders.calculateRewardsTransferRoot(
+            EigenlayerMsgEncoders.calculateRewardsRoot(vars.claim),
+            agentOwner // AgentOwner
+        );
         uint32 n; // tracks index of transferTokensArray (bridgeableTokens only)
         Client.EVMTokenAmount[] memory transferTokensArray = new Client.EVMTokenAmount[](
             _numBridgeableRewardsTokens(vars.claim.tokenLeaves)
@@ -573,11 +578,6 @@ contract RestakingConnector is
                 ++n; // increment index of transferTokensArray
             }
         }
-
-        bytes32 rewardsTransferRoot = EigenlayerMsgEncoders.calculateRewardsTransferRoot(
-            rewardsRoot,
-            agentOwner // AgentOwner
-        );
 
         transferTokensInfo.transferType = IRestakingConnector.TransferType.RewardsClaim;
         transferTokensInfo.transferToAgentOwnerMessage = string(
