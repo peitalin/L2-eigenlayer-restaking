@@ -348,7 +348,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         uint256 execNonce = 0;
         uint256 expiryShort = block.timestamp + 60 seconds;
         bytes32 messageId = bytes32(abi.encode(124));
-        uint256 amount = 0.11 ether;
+        uint256 amount11 = 0.11 ether;
 
         // fund receiver contract with 1 ether
         vm.prank(deployer);
@@ -369,7 +369,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
                 encodeDepositIntoStrategyMsg(
                     address(strategy),
                     address(tokenL1),
-                    amount
+                    amount11
                 ),
                 execNonce,
                 expiryShort
@@ -383,7 +383,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
             token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
-            amount: amount
+            amount: amount11
         });
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: messageId,
@@ -413,7 +413,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             messageId,
             bob,
             address(tokenL1),
-            amount
+            amount11
         );
 
         // warp ahead past the expiryShort timestamp, now refunds are available
@@ -425,12 +425,12 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
 
         // After unpausing the StrategyManager, the user attempts to continue with their original deposit
         // which triggers a revert, preventing them from keeping both refund and the original deposit
-        vm.expectRevert(abi.encodeWithSelector(AlreadyRefunded.selector, amount));
+        vm.expectRevert(abi.encodeWithSelector(AlreadyRefunded.selector, amount11));
         receiverContract.mockCCIPReceive(any2EvmMessage);
 
         uint256 receiverBalanceAfter = IERC20(address(tokenL1)).balanceOf(address(receiverContract));
         require(
-            (receiverBalanceBefore - receiverBalanceAfter) == amount,
+            (receiverBalanceBefore - receiverBalanceAfter) == amount11,
             "receiver should not double refund the amount"
         );
     }

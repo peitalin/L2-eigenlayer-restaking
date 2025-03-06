@@ -241,12 +241,9 @@ contract UnitTests_AgentFactory is BaseTestEnvironment {
         );
 
         vm.startPrank(deployer);
-        vm.expectRevert("Only owner can set RestakingConnector");
-        newAgent.setRestakingConnector(address(0x8881223));
-        vm.stopPrank();
-
-        vm.startPrank(deployer);
-        vm.expectRevert("EigenAgent6551: already initialized");
+        vm.expectRevert(abi.encodeWithSelector(
+            IEigenAgent6551.RestakingConnectorAlreadyInitialized.selector
+        ));
         newAgent.setInitialRestakingConnector(address(0x129381));
         vm.stopPrank();
     }

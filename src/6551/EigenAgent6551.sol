@@ -38,6 +38,8 @@ contract EigenAgent6551 is ERC6551 {
 
     error CallerNotWhitelisted(string reason);
     error SignatureInvalid(string reason);
+    error RestakingConnectorAlreadyInitialized();
+    error AddressZero(string reason);
 
     modifier onlyWhitelistedCallers() {
         // get the 721 NFT associated with 6551 account and check if caller is whitelisted
@@ -54,15 +56,8 @@ contract EigenAgent6551 is ERC6551 {
      */
     function setInitialRestakingConnector(address _restakingConnector) external {
         // Only allow initialization if restakingConnector is not set yet
-        require(restakingConnector == address(0), "EigenAgent6551: already initialized");
-        require(_restakingConnector != address(0), "EigenAgent6551: invalid RestakingConnector");
-
-        restakingConnector = _restakingConnector;
-    }
-
-    function setRestakingConnector(address _restakingConnector) external {
-        // Only the owner of the EigenAgent should be able to set this
-        require(msg.sender == owner(), "Only owner can set RestakingConnector");
+        if (restakingConnector != address(0)) revert RestakingConnectorAlreadyInitialized();
+        if (_restakingConnector == address(0)) revert AddressZero("EigenAgent6551: invalid RestakingConnector");
         restakingConnector = _restakingConnector;
     }
 
