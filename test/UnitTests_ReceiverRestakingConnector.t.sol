@@ -867,4 +867,32 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         assertEq(uniqueTokens.length, 1, "Should return 1 unique token");
         assertEq(address(uniqueTokens[0]), address(tokenA), "Should return Token A");
     }
+
+    function test_BuildCCIPMessage_SenderMustBeReceiverCCIPError() public {
+        // Set up test data
+        address invalidSender = address(0x123);
+        address l2Sender = receiverContract.getSenderContractL2();
+        Client.EVMTokenAmount[] memory tokens = new Client.EVMTokenAmount[](0);
+
+        // Attempt to build message from unauthorized sender
+        vm.prank(invalidSender);
+        vm.expectRevert(abi.encodeWithSelector(
+            ReceiverCCIP.SenderMustBeReceiverCCIP.selector
+        ));
+        // Trigger _buildCCIPMessage internal call by attempting to send message
+        receiverContract.sendMessagePayNative(
+            BaseSepolia.ChainSelector, // destination chain
+            l2Sender, // receiver must be L2 sender contract
+            string(encodeTransferToAgentOwnerMsg(deployer)), // test message
+            tokens,
+            0 // gas limit
+        );
+        // TransferToAgnetOwner messages should be sendable when
+        // msg.sender is the receiver contract.
+        // This is covered in fork tests such as
+        // CCIP_ForkTest3_CompleteWithdrawal.t.sol which has access
+        // to the Router.getFee function. Otherwise calling
+        // receiverContract.sendMessagePayNative() will fail with
+        // a Router.getFee error in local unit tests.
+    }
 }

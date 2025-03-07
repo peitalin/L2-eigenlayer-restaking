@@ -49,6 +49,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
     error AddressZero(string msg);
     error AlreadyRefunded(uint256 amount);
+    error SenderMustBeReceiverCCIP();
 
     /// @param _router address of the router contract.
     constructor(address _router) BaseMessengerCCIP(_router) {
@@ -233,6 +234,12 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
         address _feeTokenAddress,
         uint256 _overrideGasLimit
     ) cannotSendZeroTokens(_tokenAmounts) internal override returns (Client.EVM2AnyMessage memory) {
+
+        // Restrict sending of messages to L2 SenderCCIP to just this contract.
+        // msg.sender is address(this) when _receiver is the L2 SenderCCIP address.
+        if (_receiver == senderContractL2 && msg.sender != address(this)) {
+            revert SenderMustBeReceiverCCIP();
+        }
 
         bytes memory message = abi.encode(_text);
 
