@@ -9,6 +9,7 @@ import {IERC165} from "@openzeppelin-v5-contracts/utils/introspection/IERC165.so
 
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
+import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {
     IERC6551Executable,
     IERC6551Account as IERC6551
@@ -533,8 +534,32 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
             uint256 transferTokenId = agentFactory.getEigenAgentOwnerTokenId(bob);
             IEigenAgentOwner721 eigenAgentOwner721 = agentFactory.eigenAgentOwner721();
-            eigenAgentOwner721.approve(alice, transferTokenId);
 
+            // Bob sets rewardsClaimer for EigenAgentBob to himself
+            eigenAgentBob.execute(
+                address(rewardsCoordinator),
+                0,
+                abi.encodeWithSelector(IRewardsCoordinator.setClaimerFor.selector, bob),
+                0
+            );
+            require(
+                rewardsCoordinator.claimerFor(address(eigenAgentBob)) == address(bob),
+                "Bob should be the rewardsClaimer for EigenAgentBob now"
+            );
+
+            // Bob tries to sell his EigenAgent to Alice, but fails
+            vm.expectRevert("EigenAgent's rewards claimer must be reset to address(0) before transfer");
+            eigenAgentOwner721.safeTransferFrom(bob, alice, transferTokenId);
+
+            // Bob wipes the rewardsClaimer for EigenAgentBob
+            eigenAgentBob.execute(
+                address(rewardsCoordinator),
+                0,
+                abi.encodeWithSelector(IRewardsCoordinator.setClaimerFor.selector, address(0)),
+                0
+            );
+
+            // Now Bob is able to transfer his EigenAgentOwner NFT to Alice
             vm.expectEmit(true, true, true, true);
             emit IAgentFactory.EigenAgentOwnerUpdated(bob, alice, transferTokenId);
             eigenAgentOwner721.safeTransferFrom(bob, alice, transferTokenId);
@@ -544,6 +569,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 "Alice should now be owner of Bob's EigenAgentBobOwner NFT"
             );
 
+            // rewardsClaimer for EigenAgentBob (now owned by Alice) should be reset to address(0)
             require(
                 rewardsCoordinator.claimerFor(address(eigenAgentBob)) == address(0),
                 "Claimer should be reset to address(0) upon transfer"
