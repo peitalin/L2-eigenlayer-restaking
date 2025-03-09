@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Script} from "forge-std/Script.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
@@ -127,7 +127,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
 
         bytes4[] memory functionSelectors_R = new bytes4[](1);
         functionSelectors_R[0] = 0x43598c8c;
-        // cast sig "handleTransferToAgentOwner(bytes)" == 0x43598c8c
+        // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
 
         restakingConnectorProxy.setGasLimitsForFunctionSelectors(
             functionSelectors_R,

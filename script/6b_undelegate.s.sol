@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
@@ -49,7 +49,7 @@ contract UndelegateScript is BaseScript {
 
         require(address(eigenAgent) != address(0), "User must have an EigenAgent");
         require(
-            strategyManager.stakerStrategyShares(address(eigenAgent), strategy) >= 0,
+            strategyManager.stakerDepositShares(address(eigenAgent), strategy) >= 0,
             "EigenAgent has no deposit in Eigenlayer"
         );
 
@@ -78,7 +78,7 @@ contract UndelegateScript is BaseScript {
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
         uint256[] memory sharesToWithdraw = new uint256[](1);
         strategiesToWithdraw[0] = strategy;
-        sharesToWithdraw[0] = strategyManager.stakerStrategyShares(withdrawer, strategy);
+        sharesToWithdraw[0] = strategyManager.stakerDepositShares(withdrawer, strategy);
 
         address delegatedTo = delegationManager.delegatedTo(address(eigenAgent));
         vm.stopBroadcast();

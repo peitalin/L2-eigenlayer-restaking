@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Initializable} from "@openzeppelin-v5-contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin-v47-contracts/token/ERC20/utils/SafeERC20.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
-import {ISignatureUtils} from "@eigenlayer-contracts/interfaces/ISignatureUtils.sol";
+import {ISignatureUtilsMixinTypes} from "@eigenlayer-contracts/interfaces/ISignatureUtilsMixin.sol";
 
 import {RestakingConnectorStorage} from "./RestakingConnectorStorage.sol";
 import {RestakingConnectorUtils} from "./RestakingConnectorUtils.sol";
@@ -115,7 +116,7 @@ contract RestakingConnector is
             _queueWithdrawalsWithEigenAgent(message);
 
         } else if (functionSelector == IDelegationManager.completeQueuedWithdrawal.selector) {
-            /// completeWithdrawal - 0x60d7faed
+            /// completeWithdrawal - 0xe4cc3f90
             transferTokensInfo = _completeWithdrawalWithEigenAgent(message);
 
         } else if (functionSelector == IDelegationManager.delegateTo.selector) {
@@ -254,7 +255,7 @@ contract RestakingConnector is
     function _queueWithdrawalsWithEigenAgent(bytes memory messageWithSignature) private {
         (
             // original message
-            IDelegationManager.QueuedWithdrawalParams[] memory qwpArray,
+            IDelegationManagerTypes.QueuedWithdrawalParams[] memory qwpArray,
             // message signature
             , // address __signer
             uint256 expiry,
@@ -263,7 +264,7 @@ contract RestakingConnector is
 
         // withdrawers are identical for every element in qwpArray[] because Eigenlayer requires:
         // msg.sender == withdrawer == staker for withdrawals (EigenAgent is all three)
-        address withdrawer = qwpArray[0].withdrawer;
+        address withdrawer = qwpArray[0].__deprecated_withdrawer;
         IEigenAgent6551 eigenAgent = IEigenAgent6551(payable(withdrawer));
 
         uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(withdrawer);
@@ -316,7 +317,6 @@ contract RestakingConnector is
                 EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
                     vars.withdrawal,
                     vars.tokensToWithdraw,     // keep tokensToWithdraw instead of uniqueTokensToWithdraw
-                    vars.middlewareTimesIndex, // so that message is the same
                     vars.receiveAsTokens
                 ),
                 vars.expiry,
@@ -409,7 +409,7 @@ contract RestakingConnector is
         (
             // original message
             address operator,
-            ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
+            ISignatureUtilsMixinTypes.SignatureWithExpiry memory approverSignatureAndExpiry,
             bytes32 approverSalt,
             // message signature
             address signer,

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {console} from "forge-std/Test.sol";
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
@@ -11,6 +11,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/tran
 
 import {DelegationManager} from "@eigenlayer-contracts/core/DelegationManager.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 
 import {ERC20Minter} from "../test/mocks/ERC20Minter.sol";
@@ -136,7 +137,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             );
             console.log("balanceOf(receiverContract) after deposit:", tokenL1.balanceOf(address(receiverContract)));
             console.log("balanceOf(eigenAgent) after deposit:", tokenL1.balanceOf(address(eigenAgent)));
-            uint256 eigenAgentShares = strategyManager.stakerStrategyShares(address(eigenAgent), strategy);
+            uint256 eigenAgentShares = strategyManager.stakerDepositShares(address(eigenAgent), strategy);
             console.log("eigenAgent shares after deposit:", eigenAgentShares);
             require(eigenAgentShares > 0, "eigenAgent should have >0 shares after deposit");
         }
@@ -155,12 +156,12 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             strategiesToWithdraw[0] = strategy;
             sharesToWithdraw[0] = _amount;
 
-            IDelegationManager.QueuedWithdrawalParams[] memory QWPArray;
-            QWPArray = new IDelegationManager.QueuedWithdrawalParams[](1);
-            QWPArray[0] = IDelegationManager.QueuedWithdrawalParams({
+            IDelegationManagerTypes.QueuedWithdrawalParams[] memory QWPArray;
+            QWPArray = new IDelegationManagerTypes.QueuedWithdrawalParams[](1);
+            QWPArray[0] = IDelegationManagerTypes.QueuedWithdrawalParams({
                 strategies: strategiesToWithdraw,
-                shares: sharesToWithdraw,
-                withdrawer: address(eigenAgent)
+                depositShares: sharesToWithdraw,
+                __deprecated_withdrawer: address(eigenAgent)
             });
 
             // create the queueWithdrawal message for Eigenlayer
@@ -202,7 +203,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             console.log("balanceOf(receiver):", tokenL1.balanceOf(address(receiverContract)));
             console.log("balanceOf(eigenAgent):", tokenL1.balanceOf(address(eigenAgent)));
 
-            uint256 eigenAgentSharesQW = strategyManager.stakerStrategyShares(address(eigenAgent), strategy);
+            uint256 eigenAgentSharesQW = strategyManager.stakerDepositShares(address(eigenAgent), strategy);
             console.log("eigenAgent shares after queueWithdrawal:", eigenAgentSharesQW);
             require(eigenAgentSharesQW == 0, "eigenAgent should have 0 shares after queueWithdrawal");
         }
@@ -228,7 +229,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
 
         uint32 startBlock = uint32(block.number);
         uint256 execNonce2 = eigenAgent.execNonce();
-        IDelegationManager.Withdrawal memory withdrawal;
+        IDelegationManagerTypes.Withdrawal memory withdrawal;
         {
             uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(bob);
 
@@ -237,14 +238,14 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             strategiesToWithdraw[0] = strategy;
             sharesToWithdraw[0] = amount;
 
-            withdrawal = IDelegationManager.Withdrawal({
+            withdrawal = IDelegationManagerTypes.Withdrawal({
                 staker: address(eigenAgent),
                 delegatedTo: delegationManager.delegatedTo(address(eigenAgent)),
                 withdrawer: address(eigenAgent),
                 nonce: withdrawalNonce,
                 startBlock: startBlock,
                 strategies: strategiesToWithdraw,
-                shares: sharesToWithdraw
+                scaledShares: sharesToWithdraw
             });
 
         }
@@ -267,7 +268,6 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             bytes memory completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
                 withdrawal,
                 tokensToWithdraw,
-                0, //middlewareTimesIndex,
                 true // receiveAsTokens
             );
 
@@ -441,23 +441,14 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         {
             // deploy new strategy for token3
             strategy3 = strategyFactory.deployNewStrategy(token3);
-            // setStrategyWithdrawalDelayBlocks
             IStrategy[] memory strategies3 = new IStrategy[](1);
             strategies3[0] = strategy3;
-            uint256[] memory withdrawalDelayBlocks = new uint256[](1);
-            withdrawalDelayBlocks[0] = 1;
-
-            vm.prank(deployer);
-            DelegationManager(address(delegationManager)).setStrategyWithdrawalDelayBlocks(strategies3, withdrawalDelayBlocks);
 
             IStrategy[] memory strategiesToWhitelist = new IStrategy[](1);
-            bool[] memory thirdPartyTransfersForbiddenValues = new bool[](1);
-
             strategiesToWhitelist[0] = strategy3;
-            thirdPartyTransfersForbiddenValues[0] = false;
 
             vm.prank(deployer);
-            strategyFactory.whitelistStrategies(strategiesToWhitelist, thirdPartyTransfersForbiddenValues);
+            strategyFactory.whitelistStrategies(strategiesToWhitelist);
         }
 
         vm.prank(deployer);
@@ -553,12 +544,12 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             sharesToWithdraw[0] = amount;
             sharesToWithdraw[1] = amount;
 
-            IDelegationManager.QueuedWithdrawalParams[] memory QWPArray;
-            QWPArray = new IDelegationManager.QueuedWithdrawalParams[](1);
-            QWPArray[0] = IDelegationManager.QueuedWithdrawalParams({
+            IDelegationManagerTypes.QueuedWithdrawalParams[] memory QWPArray;
+            QWPArray = new IDelegationManagerTypes.QueuedWithdrawalParams[](1);
+            QWPArray[0] = IDelegationManagerTypes.QueuedWithdrawalParams({
                 strategies: strategiesToWithdraw,
-                shares: sharesToWithdraw,
-                withdrawer: address(eigenAgent)
+                depositShares: sharesToWithdraw,
+                __deprecated_withdrawer: address(eigenAgent)
             });
 
             messageWithSignature_QW = signMessageForEigenAgentExecution(
@@ -590,7 +581,7 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
         /////////////////////////////////////
         //// Complete Withdrawal - Multiple Tokens
         /////////////////////////////////////
-        IDelegationManager.Withdrawal memory withdrawal;
+        IDelegationManagerTypes.Withdrawal memory withdrawal;
         {
             uint256 withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(bob);
 
@@ -601,14 +592,14 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
             sharesToWithdraw[0] = amount;
             sharesToWithdraw[1] = amount;
 
-            withdrawal = IDelegationManager.Withdrawal({
+            withdrawal = IDelegationManagerTypes.Withdrawal({
                 staker: address(eigenAgent),
                 delegatedTo: delegationManager.delegatedTo(address(eigenAgent)),
                 withdrawer: address(eigenAgent),
                 nonce: withdrawalNonce,
                 startBlock: startBlock,
                 strategies: strategiesToWithdraw,
-                shares: sharesToWithdraw
+                scaledShares: sharesToWithdraw
             });
         }
 
@@ -628,7 +619,6 @@ contract CCIP_ForkTest_CompleteWithdrawal_Tests is BaseTestEnvironment, RouterFe
                 encodeCompleteWithdrawalMsg(
                     withdrawal,
                     tokensToWithdraw,
-                    0, //middlewareTimesIndex,
                     true // receiveAsTokens
                 ),
                 execNonce3,

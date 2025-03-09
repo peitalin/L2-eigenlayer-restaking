@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
@@ -11,6 +11,8 @@ import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {ERC20Minter} from "./mocks/ERC20Minter.sol";
 
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {IRewardsCoordinatorEvents} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {Merkle} from "@eigenlayer-contracts/libraries/Merkle.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 
@@ -118,13 +120,13 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
 
             bytes32 earnerTokenRoot = keccak256(abi.encode(
                 rewardsCoordinator.calculateTokenLeafHash(
-                    IRewardsCoordinator.TokenTreeMerkleLeaf({
+                    IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
                         token: tokenL1,
                         cumulativeEarnings: amounts[i]
                     })
                 ),
                 rewardsCoordinator.calculateTokenLeafHash(
-                    IRewardsCoordinator.TokenTreeMerkleLeaf({
+                    IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
                         token: memecoin,
                         cumulativeEarnings: amounts[i] * 2
                     })
@@ -132,7 +134,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
             ));
 
             leaves[i] = rewardsCoordinator.calculateEarnerLeafHash(
-                IRewardsCoordinator.EarnerTreeMerkleLeaf({
+                IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf({
                     earner: earners[i],
                     earnerTokenRoot: earnerTokenRoot
                 })
@@ -175,12 +177,12 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
     ) public view returns (IRewardsCoordinator.RewardsMerkleClaim memory claim) {
 
 		IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves;
-        tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](2);
-		tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](2);
+		tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: tokenL1,
             cumulativeEarnings: amount
         });
-		tokenLeaves[1] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+		tokenLeaves[1] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: memecoin,
             cumulativeEarnings: amount * 2
         });
@@ -188,8 +190,8 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         bytes32 leaf1 = rewardsCoordinator.calculateTokenLeafHash(tokenLeaves[0]);
         bytes32 leaf2 = rewardsCoordinator.calculateTokenLeafHash(tokenLeaves[1]);
 
-		IRewardsCoordinator.EarnerTreeMerkleLeaf memory earnerLeaf;
-        earnerLeaf = IRewardsCoordinator.EarnerTreeMerkleLeaf({
+		IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf memory earnerLeaf;
+        earnerLeaf = IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf({
 			earner: earner,
 			earnerTokenRoot: keccak256(abi.encode(
                 leaf1,
@@ -206,7 +208,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         tokenTreeProofs[0] = abi.encode(leaf2); // proof for leaf1 is the other leaf2
         tokenTreeProofs[1] = abi.encode(leaf1); // proof for leaf2 is the other leaf1
 
-		return IRewardsCoordinator.RewardsMerkleClaim({
+		return IRewardsCoordinatorTypes.RewardsMerkleClaim({
 			rootIndex: 0,
 			earnerIndex: earnerIndex,
 			earnerTreeProof: proof,
@@ -249,7 +251,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
 		/////////////////////////////////////////////////////////////////
         vm.prank(deployer);
         vm.expectEmit(true, true, true, false);
-        emit IRewardsCoordinator.DistributionRootSubmitted(earnerIndex, tree.root, rewardsCalculationEndTimestamp, 0);
+        emit IRewardsCoordinatorEvents.DistributionRootSubmitted(earnerIndex, tree.root, rewardsCalculationEndTimestamp, 0);
         rewardsCoordinator.submitRoot(tree.root, rewardsCalculationEndTimestamp);
 
         // There should be 1 DistributionRoot now.

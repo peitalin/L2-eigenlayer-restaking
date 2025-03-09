@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Script, stdJson} from "forge-std/Script.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
@@ -9,7 +9,7 @@ import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 
-import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {EthSepolia, BaseSepolia} from "./Addresses.sol";
 import {IEigenAgentOwner721} from "../src/6551/IEigenAgentOwner721.sol";
@@ -191,7 +191,7 @@ contract FileReader is Script {
         uint256 _nonce,
         uint256 _startBlock,
         IStrategy[] memory _strategies,
-        uint256[] memory _shares,
+        uint256[] memory _scaledShares,
         bytes32 _withdrawalRoot,
         string memory _filePath
     ) public {
@@ -208,7 +208,7 @@ contract FileReader is Script {
         vm.serializeUint("inputs" , "nonce", _nonce);
         vm.serializeUint("inputs" , "startBlock", _startBlock);
         vm.serializeAddress("inputs" , "strategy", address(_strategies[0]));
-        string memory inputs_data = vm.serializeUint("inputs" , "shares", _shares[0]);
+        string memory inputs_data = vm.serializeUint("inputs" , "scaledShares", _scaledShares[0]);
 
         /////////////////////////////////////////////////
         // { "outputs": <outputs_data>}
@@ -260,7 +260,7 @@ contract FileReader is Script {
     function readWithdrawalInfo(
         address stakerAddress,
         string memory filePath
-    ) public view returns (IDelegationManager.Withdrawal memory) {
+    ) public view returns (IDelegationManagerTypes.Withdrawal memory) {
 
         string memory withdrawalData = vm.readFile(
             string(abi.encodePacked(
@@ -270,7 +270,7 @@ contract FileReader is Script {
             ))
         );
         uint256 _nonce = stdJson.readUint(withdrawalData, ".inputs.nonce");
-        uint256 _shares = stdJson.readUint(withdrawalData, ".inputs.shares");
+        uint256 _scaledShares = stdJson.readUint(withdrawalData, ".inputs.scaledShares");
         address _staker = stdJson.readAddress(withdrawalData, ".inputs.staker");
         address _strategy = stdJson.readAddress(withdrawalData, ".inputs.strategy");
         address _withdrawer = stdJson.readAddress(withdrawalData, ".inputs.withdrawer");
@@ -284,17 +284,17 @@ contract FileReader is Script {
         uint256[] memory sharesToWithdraw = new uint256[](1);
 
         strategiesToWithdraw[0] = IStrategy(_strategy);
-        sharesToWithdraw[0] = _shares;
+        sharesToWithdraw[0] = _scaledShares;
 
         return (
-            IDelegationManager.Withdrawal({
+            IDelegationManagerTypes.Withdrawal({
                 staker: _staker,
                 delegatedTo: _delegatedTo,
                 withdrawer: _withdrawer,
                 nonce: _nonce,
                 startBlock: _startBlock,
                 strategies: strategiesToWithdraw,
-                shares: sharesToWithdraw
+                scaledShares: sharesToWithdraw
             })
         );
     }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
@@ -19,7 +19,6 @@ contract RedepositScript is BaseScript {
     address public withdrawer;
     uint256 public amount;
     uint256 public sigExpiry;
-    uint256 public middlewareTimesIndex; // not used yet, for slashing
     bool public receiveAsTokens;
 
     uint256 public execNonce; // EigenAgent execution nonce
@@ -86,7 +85,6 @@ contract RedepositScript is BaseScript {
                 "senderCCIP: must allowlistSender(receiverCCIP)"
             );
 
-            middlewareTimesIndex = 0; // not used yet, for slashing
             receiveAsTokens = false;
             // receiveAsTokens == false to redeposit queuedWithdrawal (from undelegating)
             // back into Eigenlayer.
@@ -105,7 +103,6 @@ contract RedepositScript is BaseScript {
                 encodeCompleteWithdrawalMsg(
                     withdrawal,
                     tokensToWithdraw,
-                    middlewareTimesIndex,
                     receiveAsTokens
                 ),
                 execNonce,
@@ -154,7 +151,7 @@ contract RedepositScript is BaseScript {
                 withdrawal.nonce,
                 withdrawal.startBlock,
                 withdrawal.strategies,
-                withdrawal.shares,
+                withdrawal.scaledShares,
                 withdrawalRootCalculated,
                 filePath
             );

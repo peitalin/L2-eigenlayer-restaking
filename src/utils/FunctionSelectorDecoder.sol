@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BytesLib} from "./BytesLib.sol";
 
@@ -104,6 +104,17 @@ library FunctionSelectorDecoder {
                 require(customError.length - innerErrorOffset >= innerErrorLength, "Invalid Error(string)");
                 reason = string(_decodeInnerError(customError, innerErrorOffset));
             }
+
+            /////////////////////////////
+            /// Eigenlayer Custom Errors
+            /////////////////////////////
+
+            // StrategyNotWhitelisted()
+            if (innerErrorSelector == 0x5dfb2ca2) {
+                reason = string("StrategyNotWhitelisted()");
+            }
+
+
             // Do not parse error messages of other exotic custom errors
         }
     }

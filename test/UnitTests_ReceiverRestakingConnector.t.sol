@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
@@ -13,6 +13,7 @@ import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationMa
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 
 import {TestERC20} from "./mocks/TestERC20.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
@@ -241,7 +242,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
-                "StrategyManager.onlyStrategiesWhitelistedForDeposit: strategy not whitelisted",
+                "StrategyNotWhitelisted()",
                 "Manually execute to refund after timestamp:",
                 expiryShort
             )
@@ -720,20 +721,20 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
     function test_GetUniqueTokens_TokenTreeMerkleLeaf_AllUnique() public view {
 
-        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](4);
-        tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](4);
+        tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenA)),
             cumulativeEarnings: 1
         });
-        tokenLeaves[1] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        tokenLeaves[1] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenB)),
             cumulativeEarnings: 1
         });
-        tokenLeaves[2] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        tokenLeaves[2] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenC)),
             cumulativeEarnings: 1
         });
-        tokenLeaves[3] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        tokenLeaves[3] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenD)),
             cumulativeEarnings: 1
         });
@@ -763,34 +764,34 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
     function test_GetUniqueTokens_TokenTreeMerkleLeaf_WithDuplicates() public view {
 
-        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](7);
-        tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](7);
+        tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenA)),
             cumulativeEarnings: 1
         });
-        tokenLeaves[1] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        tokenLeaves[1] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenB)),
             cumulativeEarnings: 1
         });
-        tokenLeaves[2] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        tokenLeaves[2] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenA)), // Duplicate
             cumulativeEarnings: 1
         });
-        tokenLeaves[3] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        tokenLeaves[3] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenC)),
             cumulativeEarnings: 1
         });
-        tokenLeaves[4] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        tokenLeaves[4] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenB)), // Duplicate
             cumulativeEarnings: 1
         });
-        tokenLeaves[5] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        tokenLeaves[5] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenD)),
             cumulativeEarnings: 1
         });
-        tokenLeaves[6] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        tokenLeaves[6] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenC)), // Duplicate
-                cumulativeEarnings: 1
+            cumulativeEarnings: 1
         });
 
         IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(tokenLeaves);
@@ -827,7 +828,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
     }
 
     function test_GetUniqueTokens_TokenTreeMerkleLeaf_EmptyArray() public pure {
-        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](0);
+        IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](0);
 
         IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(tokenLeaves);
 
@@ -835,8 +836,8 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
     }
 
     function test_GetUniqueTokens_SingleToken() public view {
-        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](1);
-        tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](1);
+        tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenA)),
             cumulativeEarnings: 1
         });
@@ -848,16 +849,16 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
     }
 
     function test_GetUniqueTokens_TokenTreeMerkleLeaf_AllDuplicates() public view {
-        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](3);
-        tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](3);
+        tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenA)),
             cumulativeEarnings: 1
         });
-        tokenLeaves[1] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        tokenLeaves[1] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenA)),
             cumulativeEarnings: 1
         });
-        tokenLeaves[2] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        tokenLeaves[2] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(address(tokenA)),
             cumulativeEarnings: 1
         });

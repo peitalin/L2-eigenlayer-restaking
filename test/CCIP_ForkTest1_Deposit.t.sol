@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
@@ -114,7 +114,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         uint256 valueOfShares = strategy.userUnderlying(address(eigenAgentBob));
         require(amount == valueOfShares, "valueofShares incorrect");
         require(
-            amount == strategyManager.stakerStrategyShares(address(eigenAgentBob), strategy),
+            amount == strategyManager.stakerDepositShares(address(eigenAgentBob), strategy),
             "Bob's EigenAgent stakerStrategyShares should equal deposited amount"
         );
     }

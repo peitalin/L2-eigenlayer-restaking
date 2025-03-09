@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
@@ -18,7 +18,6 @@ contract CompleteWithdrawalScript is BaseScript {
     address staker;
     address withdrawer;
     uint256 expiry;
-    uint256 middlewareTimesIndex; // not used yet, for slashing
     bool receiveAsTokens;
 
     address TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
@@ -97,14 +96,12 @@ contract CompleteWithdrawalScript is BaseScript {
                 "senderCCIP: must allowlistSender(receiverCCIP)"
             );
 
-            middlewareTimesIndex = 0; // not used yet, for slashing
             receiveAsTokens = true;
 
             {
                 bytes memory completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
                     withdrawal,
                     tokensToWithdraw,
-                    middlewareTimesIndex,
                     receiveAsTokens
                 );
 
@@ -161,7 +158,7 @@ contract CompleteWithdrawalScript is BaseScript {
                 withdrawal.nonce,
                 withdrawal.startBlock,
                 withdrawal.strategies,
-                withdrawal.shares,
+                withdrawal.scaledShares,
                 withdrawalRoot,
                 filePath
             );

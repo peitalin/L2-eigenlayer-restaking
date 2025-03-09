@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Initializable} from "@openzeppelin-v5-contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
@@ -78,7 +78,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
      * - depositIntoStrategy(address,address,uint256) == 0xe7a050aa
      * - mintEigenAgent(bytes) == 0xcc15a557
      * - queueWithdrawals((address[],uint256[],address)[]) == 0x0dd8dd02
-     * - completeQueuedWithdrawal(withdrawal,address[],uint256,bool) == 0x60d7faed
+     * - completeQueuedWithdrawal(withdrawal,address[],bool) == 0xe4cc3f90
      * - delegateTo(address,(bytes,uint256),bytes32) == 0xeea9064b
      * - undelegate(address) == 0xda8be864
      * @param functionSelector bytes4 functionSelector to get estimated gasLimits for.
