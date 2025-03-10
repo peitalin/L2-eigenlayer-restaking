@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
 import {IERC1271} from "@openzeppelin-v5-contracts/interfaces/IERC1271.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
@@ -11,6 +11,8 @@ import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegat
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {ISignatureUtilsMixinTypes} from "@eigenlayer-contracts/interfaces/ISignatureUtilsMixin.sol";
+import {EIP712_DOMAIN_TYPEHASH} from "@eigenlayer-contracts/mixins/SignatureUtilsMixin.sol";
+import {EIGENLAYER_VERSION} from "../script/1_deployMockEigenlayerContracts.s.sol";
 
 import {
     EigenlayerMsgDecoders,
@@ -126,11 +128,13 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
         address contractAddr = address(strategyManager);
         uint256 chainid = EthSepolia.ChainId;
-        bytes32 DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
+        bytes memory v = bytes(EIGENLAYER_VERSION);
+        string memory majorVerion = string(bytes.concat(v[0], v[1]));
 
         bytes32 domainSeparator1 = keccak256(abi.encode(
-            DOMAIN_TYPEHASH,
+            EIP712_DOMAIN_TYPEHASH,
             keccak256(bytes("EigenLayer")),
+            keccak256(bytes(majorVerion)),
             chainid,
             contractAddr
         ));

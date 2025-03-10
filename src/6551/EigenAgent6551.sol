@@ -4,8 +4,9 @@ pragma solidity 0.8.28;
 import {IERC1271} from "@openzeppelin-v5-contracts/interfaces/IERC1271.sol";
 import {IERC20} from "@openzeppelin-v5-contracts/token/ERC20/IERC20.sol";
 import {SignatureChecker} from "@openzeppelin-v5-contracts/utils/cryptography/SignatureChecker.sol";
-import {ERC6551Account as ERC6551} from "@6551/examples/simple/ERC6551Account.sol";
 import {SafeERC20} from "@openzeppelin-v5-contracts/token/ERC20/utils/SafeERC20.sol";
+
+import {ERC6551Account as ERC6551} from "@6551/examples/simple/ERC6551Account.sol";
 import {IEigenAgentOwner721} from "./IEigenAgentOwner721.sol";
 
 
@@ -19,7 +20,12 @@ contract EigenAgent6551 is ERC6551 {
     );
 
     /// @notice The EIP-712 typehash for the contract's domain
-    bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
+    bytes32 public constant EIP712_DOMAIN_TYPEHASH = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
+
+    /// @notice Eigenlayer Version
+    string public constant EIGENLAYER_VERSION = "v1.3.0";
 
     /// @notice Nonce for signing executeWithSignature calls
     uint256 public execNonce;
@@ -201,16 +207,28 @@ contract EigenAgent6551 is ERC6551 {
 
     /**
      * @param chainid is the chain Eigenlayer and EigenAgent are deployed on.
+     * @dev domainSeparator defined in eigenlayer-contracts/src/contracts/mixins/SignatureUtilsMixin.sol
      */
     function domainSeparator(
         uint256 chainid
     ) public view returns (bytes32) {
-        return keccak256(abi.encode(
-            DOMAIN_TYPEHASH,
-            keccak256(bytes("EigenLayer")),
-            chainid,
-            address(this)
-        ));
+        return keccak256(
+            abi.encode(
+                EIP712_DOMAIN_TYPEHASH,
+                keccak256(bytes("EigenLayer")),
+                keccak256(bytes(_majorVersion())),
+                chainid,
+                address(this)
+            )
+        );
+    }
+
+
+    /// @notice Returns the major version of the contract. See Eigenlayer SemVerMixin.sol
+    /// @return The major version string (e.g., "v1" for version "v1.2.3")
+    function _majorVersion() internal pure returns (string memory) {
+        bytes memory v = bytes(EIGENLAYER_VERSION);
+        return string(bytes.concat(v[0], v[1]));
     }
 }
 

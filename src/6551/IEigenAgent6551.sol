@@ -18,7 +18,7 @@ interface IEigenAgent6551 is IERC6551, IERC6551Executable {
 
     function EIGEN_AGENT_EXEC_TYPEHASH() external returns (bytes32);
 
-    function DOMAIN_TYPEHASH() external returns (bytes32);
+    function EIP712_DOMAIN_TYPEHASH() external returns (bytes32);
 
     function owner() external view returns (address);
 

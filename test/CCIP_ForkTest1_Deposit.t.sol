@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
 import {IPausable} from "@eigenlayer-contracts/interfaces/IPausable.sol";
 
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
@@ -170,7 +170,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
-                "StrategyManager.onlyStrategiesWhitelistedForDeposit: strategy not whitelisted",
+                "StrategyNotWhitelisted()",
                 "Manually execute to refund after timestamp:",
                 expiryShort
             )

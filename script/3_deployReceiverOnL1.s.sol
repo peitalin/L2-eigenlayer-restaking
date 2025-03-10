@@ -77,15 +77,13 @@ contract DeployReceiverOnL1Script is Script, FileReader {
 
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
-        (
-            strategy,
-            strategyManager,
-            , // strategyFactory
-            , // pauserRegistry
-            delegationManager,
-            rewardsCoordinator,
-            // token
-        ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+        DeployMockEigenlayerContractsScript.EigenlayerAddresses memory ea =
+            deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+
+        strategy = ea.strategy;
+        strategyManager = ea.strategyManager;
+        delegationManager = ea.delegationManager;
+        rewardsCoordinator = ea.rewardsCoordinator;
 
         senderContract = readSenderContract();
 

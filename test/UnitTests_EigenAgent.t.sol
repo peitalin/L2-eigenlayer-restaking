@@ -13,6 +13,8 @@ import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {EIP712_DOMAIN_TYPEHASH} from "@eigenlayer-contracts/mixins/SignatureUtilsMixin.sol";
+import {EIGENLAYER_VERSION} from "../script/1_deployMockEigenlayerContracts.s.sol";
+
 import {
     IERC6551Executable,
     IERC6551Account as IERC6551
@@ -67,7 +69,14 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
     function test_EigenAgent_DomainTypehash() public {
         vm.assertEq(
             EIP712_DOMAIN_TYPEHASH,
-            eigenAgent.DOMAIN_TYPEHASH()
+            eigenAgent.EIP712_DOMAIN_TYPEHASH()
+        );
+    }
+
+    function test_EigenAgent_EigenlayerVersionMatches() public {
+        vm.assertEq(
+            EIGENLAYER_VERSION,
+            EigenAgent6551(payable(address(eigenAgent))).EIGENLAYER_VERSION()
         );
     }
 
@@ -689,7 +698,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         // Bob transfers EigenAgent to Alice
         (,, uint256 tokenId1) = eigenAgent1.token();
         vm.prank(bob);
-        eigenAgentOwner721.transferFrom(bob, alice, tokenId1);
+        eigenAgentOwner721.safeTransferFrom(bob, alice, tokenId1);
 
         // Mint Bob another EigenAgent
         vm.prank(deployer);
