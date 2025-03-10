@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
@@ -130,14 +131,14 @@ contract ProcessClaimRewardsScript is BaseScript {
     ) public view returns (IRewardsCoordinator.RewardsMerkleClaim memory claim) {
 
 		IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves;
-        tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](1);
-		tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](1);
+		tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: tokenL1,
             cumulativeEarnings: amount
         });
 
-		IRewardsCoordinator.EarnerTreeMerkleLeaf memory earnerLeaf;
-        earnerLeaf = IRewardsCoordinator.EarnerTreeMerkleLeaf({
+		IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf memory earnerLeaf;
+        earnerLeaf = IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf({
 			earner: earner,
 			earnerTokenRoot: rewardsCoordinator.calculateTokenLeafHash(tokenLeaves[0])
 		});
@@ -148,7 +149,7 @@ contract ProcessClaimRewardsScript is BaseScript {
         bytes[] memory tokenTreeProofs = new bytes[](1);
         tokenTreeProofs[0] = hex"";
 
-		return IRewardsCoordinator.RewardsMerkleClaim({
+		return IRewardsCoordinatorTypes.RewardsMerkleClaim({
 			rootIndex: rootIndex,
 			earnerIndex: earnerIndex,
 			earnerTreeProof: proof,

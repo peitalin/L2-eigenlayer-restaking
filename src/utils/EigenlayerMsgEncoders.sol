@@ -1,13 +1,14 @@
 //SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
-import {ISignatureUtils} from "@eigenlayer-contracts/interfaces/ISignatureUtils.sol";
+import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {ISignatureUtilsMixinTypes} from "@eigenlayer-contracts/interfaces/ISignatureUtilsMixin.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
 import {ISenderHooks} from "../interfaces/ISenderHooks.sol";
 import {IRestakingConnector} from "../interfaces/IRestakingConnector.sol";
 
@@ -39,7 +40,7 @@ library EigenlayerMsgEncoders {
     /// @dev Encodes a queueWithdrawals() message for Eigenlayer's DelegationManager.sol contract
     /// @param queuedWithdrawalParams withdrawal parameters for queueWithdrawals() function call
     function encodeQueueWithdrawalsMsg(
-        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams
+        IDelegationManagerTypes.QueuedWithdrawalParams[] memory queuedWithdrawalParams
     ) public pure returns (bytes memory) {
         return abi.encodeCall(
             // cast sig "queueWithdrawals((address[],uint256[],address)[])"
@@ -52,21 +53,18 @@ library EigenlayerMsgEncoders {
      * @dev Encodes params for a completeWithdrawal() call to Eigenlayer's DelegationManager.sol
      * @param withdrawal withdrawal parameters for completeWithdrawals() function call
      * @param tokensToWithdraw tokens to withdraw.
-     * @param middlewareTimesIndex used for slashing. Not used yet.
      * @param receiveAsTokens determines whether to redeposit into Eigenlayer, or withdraw as tokens
      */
     function encodeCompleteWithdrawalMsg(
-        IDelegationManager.Withdrawal memory withdrawal,
+        IDelegationManagerTypes.Withdrawal memory withdrawal,
         IERC20[] memory tokensToWithdraw,
-        uint256 middlewareTimesIndex,
         bool receiveAsTokens
     ) public pure returns (bytes memory) {
 
         // Function Signature:
         //     completeQueuedWithdrawal(
-        //         IDelegationManager.Withdrawal withdrawal,
+        //         IDelegationManagerTypes.Withdrawal withdrawal,
         //         IERC20[] tokensToWithdraw,
-        //         uint256 middlewareTimesIndex,
         //         bool receiveAsTokens
         //     )
         // Where:
@@ -77,16 +75,15 @@ library EigenlayerMsgEncoders {
         //         uint256 nonce;
         //         uint32 startBlock;
         //         IStrategy[] strategies;
-        //         uint256[] shares;
+        //         uint256[] scaledShares;
         //     }
 
         return abi.encodeCall(
-            // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
+            // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],bool)" == 0xe4cc3f90
             IDelegationManager.completeQueuedWithdrawal,
             (
                 withdrawal,
                 tokensToWithdraw,
-                middlewareTimesIndex,
                 receiveAsTokens
             )
         );
@@ -94,9 +91,8 @@ library EigenlayerMsgEncoders {
 
     /// Array-ified version of completeWithdrawal
     function encodeCompleteWithdrawalsMsg(
-        IDelegationManager.Withdrawal[] calldata withdrawals,
+        IDelegationManagerTypes.Withdrawal[] calldata withdrawals,
         IERC20[][] calldata tokens,
-        uint256[] calldata middlewareTimesIndexes,
         bool[] calldata receiveAsTokens
     ) public pure returns (bytes memory) {
 
@@ -104,7 +100,6 @@ library EigenlayerMsgEncoders {
         //     completeQueuedWithdrawals(
         //         Withdrawal[] withdrawals,
         //         IERC20[][] tokens,
-        //         uint256[] middlewareTimesIndexes,
         //         bool[] receiveAsTokens
         //     )
         // Where:
@@ -124,7 +119,6 @@ library EigenlayerMsgEncoders {
             (
                 withdrawals,
                 tokens,
-                middlewareTimesIndexes,
                 receiveAsTokens
             )
         );
@@ -138,7 +132,7 @@ library EigenlayerMsgEncoders {
      */
     function encodeDelegateTo(
         address operator,
-        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
+        ISignatureUtilsMixinTypes.SignatureWithExpiry memory approverSignatureAndExpiry,
         bytes32 approverSalt
     ) public pure returns (bytes memory) {
 

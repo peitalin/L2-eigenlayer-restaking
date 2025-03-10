@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 contract GasLimits {
     function getGasLimits() public pure returns (
@@ -24,8 +24,8 @@ contract GasLimits {
         // cast sig "mintEigenAgent(bytes)" == 0xcc15a557
         functionSelectors[2] = 0x0dd8dd02;
         // cast sig "queueWithdrawals((address[],uint256[],address)[])" == 0x0dd8dd02
-        functionSelectors[3] = 0x60d7faed;
-        // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
+        functionSelectors[3] = 0xe4cc3f90;
+        // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],bool)" == 0xe4cc3f90
         functionSelectors[4] = 0xeea9064b;
         // cast sig "delegateTo(address,(bytes,uint256),bytes32)" == 0xeea9064b
         functionSelectors[5] = 0xda8be864;

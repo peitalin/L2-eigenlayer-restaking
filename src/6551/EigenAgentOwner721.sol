@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {ERC721URIStorageUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
 import {Initializable} from "@openzeppelin-v5-contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -131,10 +131,10 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
      * @return from the previous (EigenAgent Owner) who is transferring the NFT
      */
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
-        // Recipient must not already own an EigenAgentOwner721.
-        require(balanceOf(to) <= 1, "Cannot own more than one EigenAgentOwner721 at a time.");
         // Update the NFT owner
         address from = super._update(to, tokenId, auth);
+        // Recipient must not already own an EigenAgentOwner721.
+        require(balanceOf(to) <= 1, "Cannot own more than one EigenAgentOwner721 at a time.");
         // Previous EigenAgent owner must wipe the claimerFor for his EigenAgent if it is set,
         // to prevent him from claiming rewards of the EigenAgent after transfer
         address eigenAgent = address(agentFactory.getEigenAgent(from));

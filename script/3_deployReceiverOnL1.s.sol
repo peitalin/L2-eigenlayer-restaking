@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Script} from "forge-std/Script.sol";
 
@@ -77,15 +77,13 @@ contract DeployReceiverOnL1Script is Script, FileReader {
 
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
-        (
-            strategy,
-            strategyManager,
-            , // strategyFactory
-            , // pauserRegistry
-            delegationManager,
-            rewardsCoordinator,
-            // token
-        ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+        DeployMockEigenlayerContractsScript.EigenlayerAddresses memory ea =
+            deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+
+        strategy = ea.strategy;
+        strategyManager = ea.strategyManager;
+        delegationManager = ea.delegationManager;
+        rewardsCoordinator = ea.rewardsCoordinator;
 
         senderContract = readSenderContract();
 

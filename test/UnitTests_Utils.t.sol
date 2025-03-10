@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {TestErrorHandlers} from "./TestErrorHandlers.sol";
@@ -117,7 +117,7 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
         vm.assertEq(wt.nonce, 5);
         vm.assertEq(wt.startBlock, 100);
         vm.assertEq(address(wt.strategies[0]), address(strategies[0]));
-        vm.assertEq(wt.shares[0], shares[0]);
+        vm.assertEq(wt.scaledShares[0], shares[0]);
     }
 
     function test_ERC20Minter() public {

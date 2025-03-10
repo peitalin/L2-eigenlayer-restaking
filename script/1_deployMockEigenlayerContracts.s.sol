@@ -1,22 +1,27 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Script, stdJson} from "forge-std/Script.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin-v47-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin-v47-contracts/proxy/transparent/ProxyAdmin.sol";
-import {IBeacon} from "@openzeppelin-v47-contracts/proxy/beacon/IBeacon.sol";
-import {UpgradeableBeacon} from "@openzeppelin-v47-contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin-v4-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin-v4-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin-v4-contracts/proxy/transparent/ProxyAdmin.sol";
+import {IBeacon} from "@openzeppelin-v4-contracts/proxy/beacon/IBeacon.sol";
+import {UpgradeableBeacon} from "@openzeppelin-v4-contracts/proxy/beacon/UpgradeableBeacon.sol";
 
 import {IETHPOSDeposit} from "@eigenlayer-contracts/interfaces/IETHPOSDeposit.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IStrategyFactory} from "@eigenlayer-contracts/interfaces/IStrategyFactory.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {IPauserRegistry} from "@eigenlayer-contracts/interfaces/IPauserRegistry.sol";
-import {ISlasher} from "@eigenlayer-contracts/interfaces/ISlasher.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IEigenPodManager} from "@eigenlayer-contracts/interfaces/IEigenPodManager.sol";
+import {IAllocationManager} from "@eigenlayer-contracts/interfaces/IAllocationManager.sol";
+import {IPermissionController} from "@eigenlayer-contracts/interfaces/IPermissionController.sol";
 
+import {AllocationManager} from "@eigenlayer-contracts/core/AllocationManager.sol";
+import {PermissionController} from "@eigenlayer-contracts/permissions/PermissionController.sol";
 import {PauserRegistry} from "@eigenlayer-contracts/permissions/PauserRegistry.sol";
 import {StrategyManager} from  "@eigenlayer-contracts/core/StrategyManager.sol";
 import {DelegationManager} from "@eigenlayer-contracts/core/DelegationManager.sol";
@@ -28,9 +33,13 @@ import {StrategyFactory} from "@eigenlayer-contracts/strategies/StrategyFactory.
 import {StrategyBaseTVLLimits} from "@eigenlayer-contracts/strategies/StrategyBaseTVLLimits.sol";
 
 import {ERC20Minter} from "../test/mocks/ERC20Minter.sol";
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
 import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
 import {EthSepolia} from "./Addresses.sol";
+
+
+string constant EIGENLAYER_VERSION = "v1.3.0";
+// forge install git@github.com/Layr-Labs/eigenlayer-contracts@v1.3.0
 
 /// @dev This deploys mock Eigenlayer contracts from the `dev` branch for the purpose
 /// of testing deposits, withdrawals, and delegation with custom ERC20 strategies only.
@@ -44,11 +53,13 @@ contract DeployMockEigenlayerContractsScript is Script {
 
     IERC20 public tokenERC20;
     IStrategyManager public strategyManager;
-    ISlasher public slasher;
-    IEigenPodManager public eigenPodManager;
+    IStrategyManager public strategyManagerProxy;
     IPauserRegistry public pauserRegistry;
     IRewardsCoordinator public rewardsCoordinator;
     IDelegationManager public delegationManager;
+    AllocationManager public allocationManager;
+    IAllocationManager public allocationManagerProxy;
+    IPermissionController public permissionController;
     ProxyAdmin public proxyAdmin;
     EmptyContract public emptyContract;
 
@@ -61,6 +72,10 @@ contract DeployMockEigenlayerContractsScript is Script {
 
     uint256 public USER_DEPOSIT_LIMIT = 100_000 ether;  // uint256 _maxPerDeposit,
     uint256 public TOTAL_DEPOSIT_LIMIT = 10_000_000 ether; // uint256 _maxTotalDeposits,
+
+    uint32 public MIN_WITHDRAWAL_DELAY = 10;
+    uint32 public DEALLOCATION_DELAY= MIN_WITHDRAWAL_DELAY;
+    uint32 public ALLOCATION_CONFIGURATION_DELAY = 10;
 
     function run() public returns (
         IStrategy,
@@ -89,16 +104,18 @@ contract DeployMockEigenlayerContractsScript is Script {
 
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
-        proxyAdmin = deployProxyAdmin();
+
         vm.startBroadcast(deployer);
+        proxyAdmin = new ProxyAdmin();
         emptyContract = new EmptyContract();
         vm.stopBroadcast();
 
         (
             strategyManager,
             pauserRegistry,
-            rewardsCoordinator,
-            delegationManager
+            delegationManager,
+            allocationManagerProxy,
+            rewardsCoordinator
         ) = _deployEigenlayerCoreContracts(proxyAdmin);
 
         if (block.chainid != 11155111) {
@@ -109,7 +126,7 @@ contract DeployMockEigenlayerContractsScript is Script {
             tokenERC20 = IERC20(address(IERC20_CCIPBnM(EthSepolia.BridgeToken)));
         }
 
-        (StrategyFactory strategyFactory, UpgradeableBeacon strategyBeacon) = _deployStrategyFactory(
+        IStrategyFactory strategyFactory = _deployStrategyFactory(
             StrategyManager(address(strategyManager)),
             pauserRegistry,
             emptyContract,
@@ -126,8 +143,6 @@ contract DeployMockEigenlayerContractsScript is Script {
         uint256[] memory withdrawalDelayBlocks = new uint256[](1);
         withdrawalDelayBlocks[0] = 1;
 
-        DelegationManager(address(delegationManager)).setStrategyWithdrawalDelayBlocks(strategies, withdrawalDelayBlocks);
-
         vm.stopBroadcast();
 
         if (saveDeployedContracts) {
@@ -138,8 +153,8 @@ contract DeployMockEigenlayerContractsScript is Script {
                 address(strategyFactory),
                 address(pauserRegistry),
                 address(delegationManager),
+                address(allocationManagerProxy),
                 address(rewardsCoordinator),
-                address(strategyBeacon),
                 address(tokenERC20),
                 address(proxyAdmin)
             );
@@ -159,87 +174,140 @@ contract DeployMockEigenlayerContractsScript is Script {
     function _deployEigenlayerCoreContracts(ProxyAdmin _proxyAdmin) internal returns (
         IStrategyManager,
         IPauserRegistry,
-        IRewardsCoordinator,
-        IDelegationManager
+        IDelegationManager,
+        IAllocationManager,
+        IRewardsCoordinator
     ) {
-
         vm.startBroadcast(deployer);
-
         address[] memory pausers = new address[](1);
         pausers[0] = deployer;
-        PauserRegistry _pauserRegistry = new PauserRegistry(pausers, deployer);
+        pauserRegistry = new PauserRegistry(pausers, deployer);
 
         // deploy first to get address for delegationManager
-        strategyManager = StrategyManager(
-            address(new TransparentUpgradeableProxy(address(emptyContract), address(_proxyAdmin), ""))
-        );
+        strategyManagerProxy = StrategyManager(address(
+            new TransparentUpgradeableProxy(address(emptyContract), address(_proxyAdmin), "")
+        ));
+        // deploy first to get address for delegationManager
+        allocationManagerProxy = AllocationManager(address(
+            new TransparentUpgradeableProxy(address(emptyContract), address(_proxyAdmin), "")
+        ));
         vm.stopBroadcast();
+
+        permissionController = IPermissionController(address(new PermissionController(EIGENLAYER_VERSION)));
 
         delegationManager = IDelegationManager(address(
             _deployDelegationManager(
-                strategyManager,
-                slasher,
-                eigenPodManager,
-                _pauserRegistry,
+                strategyManagerProxy,
+                allocationManagerProxy,
+                pauserRegistry,
+                permissionController,
                 _proxyAdmin
             )
         ));
 
+        allocationManager = _deployAllocationManager(
+            allocationManagerProxy,
+            delegationManager,
+            pauserRegistry,
+            permissionController,
+            _proxyAdmin
+        );
+
+        // Check DelegationManager and AllocationManager have same withdrawal/deallocation delay
+        require(
+            delegationManager.minWithdrawalDelayBlocks() == allocationManager.DEALLOCATION_DELAY(),
+            "DelegationManager and AllocationManager have different withdrawal/deallocation delays"
+        );
+        // require(allocationManager.DEALLOCATION_DELAY() == 1 days);
+        // require(allocationManager.ALLOCATION_CONFIGURATION_DELAY() == 10 minutes);
+
+        bytes memory version = bytes(EIGENLAYER_VERSION);
+        bytes memory version2 = bytes(delegationManager.version());
+        require(version[0] == version2[0], "version mismatch");
+        require(version[1] == version2[1], "version mismatch");
+        // function _majorVersion() internal view returns (string memory) {
+        //     bytes memory v = bytes(_VERSION.toString());
+        //     return string(bytes.concat(v[0], v[1]));
+        // }
+
+
         vm.startBroadcast(deployer);
         StrategyManager strategyManagerImpl = new StrategyManager(
             delegationManager,
-            eigenPodManager,
-            slasher
+            pauserRegistry,
+            EIGENLAYER_VERSION
         );
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(strategyManager))),
+            ITransparentUpgradeableProxy(payable(address(strategyManagerProxy))),
             address(strategyManagerImpl),
             abi.encodeWithSelector(
                 StrategyManager.initialize.selector,
                 deployer, // initialOwner,
                 deployer, // initialStrategyWhitelister,
-                _pauserRegistry,
                 0 // initialPauseStaus
             )
         );
         vm.stopBroadcast();
 
         rewardsCoordinator = _deployRewardsCoordinator(
-            strategyManager,
+            strategyManagerProxy,
             delegationManager,
-            _pauserRegistry
+            pauserRegistry,
+            allocationManagerProxy,
+            permissionController
         );
 
         return (
-            IStrategyManager(address(strategyManager)),
-            IPauserRegistry(address(_pauserRegistry)),
-            IRewardsCoordinator(address(rewardsCoordinator)),
-            IDelegationManager(address(delegationManager))
+            IStrategyManager(address(strategyManagerProxy)),
+            IPauserRegistry(address(pauserRegistry)),
+            IDelegationManager(address(delegationManager)),
+            IAllocationManager(address(allocationManagerProxy)),
+            IRewardsCoordinator(address(rewardsCoordinator))
         );
-    }
-
-    function deployProxyAdmin() public returns (ProxyAdmin) {
-        vm.startBroadcast(deployer);
-        ProxyAdmin _proxyAdmin = new ProxyAdmin();
-        vm.stopBroadcast();
-        return _proxyAdmin;
     }
 
     function _deployRewardsCoordinator(
         IStrategyManager _strategyManager,
         IDelegationManager _delegationManager,
-        IPauserRegistry _pauserRegistry
+        IPauserRegistry _pauserRegistry,
+        IAllocationManager _allocationManager,
+        IPermissionController _permissionController
     ) internal returns (RewardsCoordinator) {
         vm.startBroadcast(deployer);
         // Eigenlayer disableInitialisers so they must be called via upgradeable proxy
+
+        /**
+         * @notice Parameters for the RewardsCoordinator constructor
+         * @param delegationManager The address of the DelegationManager contract
+         * @param strategyManager The address of the StrategyManager contract
+         * @param allocationManager The address of the AllocationManager contract
+         * @param pauserRegistry The address of the PauserRegistry contract
+         * @param permissionController The address of the PermissionController contract
+         * @param CALCULATION_INTERVAL_SECONDS The interval at which rewards are calculated
+         * @param MAX_REWARDS_DURATION The maximum duration of a rewards submission
+         * @param MAX_RETROACTIVE_LENGTH The maximum retroactive length of a rewards submission
+         * @param MAX_FUTURE_LENGTH The maximum future length of a rewards submission
+         * @param GENESIS_REWARDS_TIMESTAMP The timestamp at which rewards are first calculated
+         * @param version The semantic version of the contract (e.g. "v1.2.3")
+         * @dev Needed to avoid stack-too-deep errors
+         */
+        IRewardsCoordinatorTypes.RewardsCoordinatorConstructorParams memory rewardsCoordinatorConstructorParams =
+            IRewardsCoordinatorTypes.RewardsCoordinatorConstructorParams({
+                delegationManager: _delegationManager,
+                strategyManager: _strategyManager,
+                allocationManager: _allocationManager,
+                pauserRegistry: _pauserRegistry,
+                permissionController: _permissionController,
+                CALCULATION_INTERVAL_SECONDS: CALCULATION_INTERVAL_SECONDS,
+                MAX_REWARDS_DURATION: MAX_REWARDS_DURATION,
+                MAX_RETROACTIVE_LENGTH: MAX_RETROACTIVE_LENGTH,
+                MAX_FUTURE_LENGTH: MAX_FUTURE_LENGTH,
+                GENESIS_REWARDS_TIMESTAMP: GENESIS_REWARDS_TIMESTAMP,
+                version: EIGENLAYER_VERSION
+            });
+
         RewardsCoordinator _rewardsCoordinator = new RewardsCoordinator(
-            _delegationManager,
-            _strategyManager,
-            CALCULATION_INTERVAL_SECONDS ,
-            MAX_REWARDS_DURATION,
-            MAX_RETROACTIVE_LENGTH ,
-            MAX_FUTURE_LENGTH,
-            GENESIS_REWARDS_TIMESTAMP
+            rewardsCoordinatorConstructorParams
         );
 
         _rewardsCoordinator = RewardsCoordinator(
@@ -250,11 +318,10 @@ contract DeployMockEigenlayerContractsScript is Script {
                     abi.encodeWithSelector(
                         RewardsCoordinator.initialize.selector,
                         deployer, // initialOwner
-                        _pauserRegistry,
                         0, // initialPausedStatus
                         deployer, // rewardsUpdater
                         0, // activation delay
-                        0 // global commission Bips
+                        0 // defaul split of commission Bips
                     )
                 )
             )
@@ -264,11 +331,42 @@ contract DeployMockEigenlayerContractsScript is Script {
         return _rewardsCoordinator;
     }
 
+    function _deployAllocationManager(
+        IAllocationManager _allocationManagerProxy,
+        IDelegationManager _delegationManager,
+        IPauserRegistry _pauserRegistry,
+        IPermissionController _permissionController,
+        ProxyAdmin _proxyAdmin
+    ) internal returns (AllocationManager) {
+        vm.startBroadcast(deployer);
+
+        AllocationManager allocationManagerImpl = new AllocationManager(
+            _delegationManager,
+            _pauserRegistry,
+            _permissionController,
+            DEALLOCATION_DELAY, // uint32 _DEALLOCATION_DELAY,
+            ALLOCATION_CONFIGURATION_DELAY, // uint32 _ALLOCATION_CONFIGURATION_DELAY,
+            EIGENLAYER_VERSION
+        );
+        _proxyAdmin.upgradeAndCall(
+            ITransparentUpgradeableProxy(payable(address(_allocationManagerProxy))),
+            address(allocationManagerImpl),
+            abi.encodeWithSelector(
+                AllocationManager.initialize.selector,
+                deployer, // initialOwner
+                0 // initialPausedStatus
+            )
+        );
+
+        vm.stopBroadcast();
+        return AllocationManager(address(allocationManagerProxy));
+    }
+
     function _deployDelegationManager(
         IStrategyManager _strategyManager,
-        ISlasher _slasher,
-        IEigenPodManager _eigenPodManager,
+        IAllocationManager _allocationManager,
         IPauserRegistry _pauserRegistry,
+        IPermissionController _permissionController,
         ProxyAdmin _proxyAdmin
     ) internal returns (DelegationManager) {
         vm.startBroadcast(deployer);
@@ -278,32 +376,34 @@ contract DeployMockEigenlayerContractsScript is Script {
             address(new TransparentUpgradeableProxy(address(emptyContract), address(_proxyAdmin), ""))
         );
 
-        _eigenPodManager = new EigenPodManager(
-            IETHPOSDeposit(vm.addr(0xee01)),
-            IBeacon(vm.addr(0xee02)),
-            _strategyManager,
-            _slasher,
-            delegationManagerProxy
-        );
+        IEigenPodManager eigenPodManager = IEigenPodManager(address(
+            new EigenPodManager(
+                IETHPOSDeposit(vm.addr(0xee01)),
+                IBeacon(vm.addr(0xee02)),
+                delegationManagerProxy,
+                _pauserRegistry,
+                EIGENLAYER_VERSION
+            )
+        ));
 
         // Eigenlayer disableInitialisers so they must be called via upgradeable proxy
         DelegationManager delegationManagerImpl = new DelegationManager(
             _strategyManager,
-            _slasher,
-            _eigenPodManager
+            eigenPodManager,
+            _allocationManager,
+            _pauserRegistry,
+            _permissionController,
+            MIN_WITHDRAWAL_DELAY,
+            EIGENLAYER_VERSION
         );
 
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(delegationManagerProxy))),
+            ITransparentUpgradeableProxy(payable(address(delegationManagerProxy))),
             address(delegationManagerImpl),
             abi.encodeWithSelector(
                 DelegationManager.initialize.selector,
-                deployer,
-                _pauserRegistry,
-                0, // initialPausedStatus
-                4, // _minWithdrawalDelayBlocks: 4x15 seconds = 1 min
-                new IStrategy[](0), // _strategies
-                new uint256[](0) // _withdrawalDelayBlocks
+                deployer, // initialOwner
+                0 // initialPausedStatus
             )
         );
 
@@ -316,39 +416,44 @@ contract DeployMockEigenlayerContractsScript is Script {
         IPauserRegistry _pauserRegistry,
         EmptyContract _emptyContract,
         ProxyAdmin _proxyAdmin
-    ) internal returns (StrategyFactory, UpgradeableBeacon) {
+    ) internal returns (IStrategyFactory) {
         vm.startBroadcast(deployer);
 
         // Create base strategy implementation and deploy a few strategies
-        StrategyBase strategyImpl = new StrategyBase(_strategyManager);
+        StrategyBase strategyImpl = new StrategyBase(
+            _strategyManager,
+            _pauserRegistry,
+            EIGENLAYER_VERSION
+        );
 
-        // Create a proxy beacon for base strategy implementation
-        UpgradeableBeacon strategyBeacon = new UpgradeableBeacon(address(strategyImpl));
-
-        StrategyFactory strategyFactory = StrategyFactory(
+        IStrategyFactory strategyFactoryProxy = IStrategyFactory(
             address(new TransparentUpgradeableProxy(address(_emptyContract), address(_proxyAdmin), ""))
         );
 
-        StrategyFactory strategyFactoryImplementation = new StrategyFactory(strategyManager);
+        StrategyFactory strategyFactoryImpl = new StrategyFactory(
+            _strategyManager,
+            _pauserRegistry,
+            EIGENLAYER_VERSION
+        );
 
         // Strategy Factory, upgrade and initalized
         proxyAdmin.upgradeAndCall(
-            TransparentUpgradeableProxy(payable(address(strategyFactory))),
-            address(strategyFactoryImplementation),
+            ITransparentUpgradeableProxy(payable(address(strategyFactoryProxy))),
+            address(strategyFactoryImpl),
             abi.encodeWithSelector(
                 StrategyFactory.initialize.selector,
-                deployer,
-                _pauserRegistry,
+                deployer, // initialOwner
                 0, // initial paused status
-                IBeacon(strategyBeacon)
+                IBeacon(new UpgradeableBeacon(address(strategyImpl)))
+                // Create a proxy beacon for base strategy implementation
             )
         );
 
-        _strategyManager.setStrategyWhitelister(address(strategyFactory));
+        _strategyManager.setStrategyWhitelister(address(strategyFactoryProxy));
 
         vm.stopBroadcast();
 
-        return (strategyFactory, strategyBeacon);
+        return strategyFactoryProxy;
     }
 
     function deployERC20Minter(
@@ -388,7 +493,11 @@ contract DeployMockEigenlayerContractsScript is Script {
         require(address(_strategyManager) != address(0), "strategyManager missing");
         require(address(_pauserRegistry) != address(0), "pauserRegistry missing");
 
-        StrategyBaseTVLLimits strategyImpl = new StrategyBaseTVLLimits(_strategyManager);
+        StrategyBaseTVLLimits strategyImpl = new StrategyBaseTVLLimits(
+            _strategyManager,
+            _pauserRegistry,
+            EIGENLAYER_VERSION
+        );
 
         StrategyBaseTVLLimits strategyProxy = StrategyBaseTVLLimits(
             address(
@@ -399,8 +508,7 @@ contract DeployMockEigenlayerContractsScript is Script {
                         StrategyBaseTVLLimits.initialize.selector,
                         USER_DEPOSIT_LIMIT,  // uint256 _maxPerDeposit,
                         TOTAL_DEPOSIT_LIMIT, // uint256 _maxTotalDeposits,
-                        _tokenERC20,          // IERC20 _underlyingToken,
-                        _pauserRegistry      // IPauserRegistry _pauserRegistry
+                        _tokenERC20          // IERC20 _underlyingToken,
                     )
                 )
             )
@@ -415,25 +523,24 @@ contract DeployMockEigenlayerContractsScript is Script {
         IStrategy _strategy
     ) public {
         IStrategy[] memory strategiesToWhitelist = new IStrategy[](1);
-        bool[] memory thirdPartyTransfersForbiddenValues = new bool[](1);
-
         strategiesToWhitelist[0] = _strategy;
-        thirdPartyTransfersForbiddenValues[0] = false;
-
         vm.startBroadcast(deployer);
-        _strategyFactory.whitelistStrategies(strategiesToWhitelist, thirdPartyTransfersForbiddenValues);
+        _strategyFactory.whitelistStrategies(strategiesToWhitelist);
         vm.stopBroadcast();
     }
 
-    function readSavedEigenlayerAddresses() public returns (
-        IStrategy,
-        IStrategyManager,
-        IStrategyFactory,
-        IPauserRegistry,
-        IDelegationManager,
-        IRewardsCoordinator,
-        IERC20
-    ) {
+    struct EigenlayerAddresses {
+        IStrategy strategy;
+        IStrategyManager strategyManager;
+        IStrategyFactory strategyFactory;
+        IPauserRegistry pauserRegistry;
+        IDelegationManager delegationManager;
+        IAllocationManager allocationManager;
+        IRewardsCoordinator rewardsCoordinator;
+        IERC20 tokenERC20;
+    }
+
+    function readSavedEigenlayerAddresses() public returns (EigenlayerAddresses memory) {
 
         chains[31337] = "localhost";
         chains[17000] = "holesky";
@@ -449,31 +556,26 @@ contract DeployMockEigenlayerContractsScript is Script {
             ))
         );
 
-        address _strategy = stdJson.readAddress(deploymentData, ".addresses.strategies.CCIPStrategy");
-        address _strategyManager = stdJson.readAddress(deploymentData, ".addresses.StrategyManager");
-        address _strategyFactory = stdJson.readAddress(deploymentData, ".addresses.StrategyFactory");
-        address _pauserRegistry = stdJson.readAddress(deploymentData, ".addresses.PauserRegistry");
-        address _delegationManager = stdJson.readAddress(deploymentData, ".addresses.DelegationManager");
-        address _rewardsCoordinator = stdJson.readAddress(deploymentData, ".addresses.RewardsCoordinator");
-        address _tokenERC20 = stdJson.readAddress(deploymentData, ".addresses.TokenERC20");
+        EigenlayerAddresses memory ea;
+        ea.strategy = IStrategy(stdJson.readAddress(deploymentData, ".addresses.strategies.CCIPStrategy"));
+        ea.strategyManager = IStrategyManager(stdJson.readAddress(deploymentData, ".addresses.StrategyManager"));
+        ea.strategyFactory = IStrategyFactory(stdJson.readAddress(deploymentData, ".addresses.StrategyFactory"));
+        ea.pauserRegistry = IPauserRegistry(stdJson.readAddress(deploymentData, ".addresses.PauserRegistry"));
+        ea.delegationManager = IDelegationManager(stdJson.readAddress(deploymentData, ".addresses.DelegationManager"));
+        ea.allocationManager = IAllocationManager(stdJson.readAddress(deploymentData, ".addresses.AllocationManager"));
+        ea.rewardsCoordinator = IRewardsCoordinator(stdJson.readAddress(deploymentData, ".addresses.RewardsCoordinator"));
+        ea.tokenERC20 = IERC20(stdJson.readAddress(deploymentData, ".addresses.TokenERC20"));
 
-        require(_strategy != address(0), "readSavedEigenlayerAddresses: _strategy missing");
-        require(_strategyManager != address(0), "readSavedEigenlayerAddresses: _strategyManager missing");
-        require(_strategyFactory != address(0), "readSavedEigenlayerAddresses: _strategyFactory missing");
-        require(_delegationManager != address(0), "readSavedEigenlayerAddresses: _delegationManager missing");
-        require(_rewardsCoordinator != address(0), "readSavedEigenlayerAddresses: _rewardsCoordinator missing");
-        require(_pauserRegistry != address(0), "readSavedEigenlayerAddresses: _pauserRegistry missing");
-        require(_tokenERC20 != address(0), "readSavedEigenlayerAddresses: _tokenERC20 missing");
+        require(address(ea.strategy) != address(0), "readSavedEigenlayerAddresses: _strategy missing");
+        require(address(ea.strategyManager) != address(0), "readSavedEigenlayerAddresses: _strategyManager missing");
+        require(address(ea.strategyFactory) != address(0), "readSavedEigenlayerAddresses: _strategyFactory missing");
+        require(address(ea.pauserRegistry) != address(0), "readSavedEigenlayerAddresses: _pauserRegistry missing");
+        require(address(ea.delegationManager) != address(0), "readSavedEigenlayerAddresses: _delegationManager missing");
+        require(address(ea.allocationManager) != address(0), "readSavedEigenlayerAddresses: _allocationManager missing");
+        require(address(ea.rewardsCoordinator) != address(0), "readSavedEigenlayerAddresses: _rewardsCoordinator missing");
+        require(address(ea.tokenERC20) != address(0), "readSavedEigenlayerAddresses: _tokenERC20 missing");
 
-        return (
-            IStrategy(_strategy),
-            IStrategyManager(_strategyManager),
-            IStrategyFactory(_strategyFactory),
-            IPauserRegistry(_pauserRegistry),
-            IDelegationManager(_delegationManager),
-            IRewardsCoordinator(_rewardsCoordinator),
-            IERC20(_tokenERC20)
-        );
+        return ea;
     }
 
     function writeContractAddresses(
@@ -482,8 +584,8 @@ contract DeployMockEigenlayerContractsScript is Script {
         address _strategyFactory,
         address _pauserRegistry,
         address _delegationManager,
+        address _allocationManager,
         address _rewardsCoordinator,
-        address _strategyBeacon,
         address _tokenERC20,
         address _proxyAdmin
     ) public {
@@ -497,7 +599,7 @@ contract DeployMockEigenlayerContractsScript is Script {
         vm.serializeAddress(keyAddresses, "PauserRegistry", _pauserRegistry);
         vm.serializeAddress(keyAddresses, "RewardsCoordinator", _rewardsCoordinator);
         vm.serializeAddress(keyAddresses, "DelegationManager", _delegationManager);
-        vm.serializeAddress(keyAddresses, "StrategyBeacon", _strategyBeacon);
+        vm.serializeAddress(keyAddresses, "AllocationManager", _allocationManager);
         vm.serializeAddress(keyAddresses, "TokenERC20", _tokenERC20);
         vm.serializeAddress(keyAddresses, "ProxyAdmin", _proxyAdmin);
 

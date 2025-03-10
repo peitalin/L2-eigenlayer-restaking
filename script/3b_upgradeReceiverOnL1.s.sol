@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Script} from "forge-std/Script.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -63,15 +63,13 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
 
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
 
-        (
-            strategy,
-            strategyManager,
-            , // strategyFactory
-            , // pauserRegistry
-            delegationManager,
-            , // _rewardsCoordinator
-            // token
-        ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+        DeployMockEigenlayerContractsScript.EigenlayerAddresses memory ea =
+            deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+
+        strategy = ea.strategy;
+        strategyManager = ea.strategyManager;
+        delegationManager = ea.delegationManager;
+        rewardsCoordinator = ea.rewardsCoordinator;
 
         (
             IReceiverCCIP receiverProxy,

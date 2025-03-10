@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
@@ -7,10 +7,12 @@ import {Initializable} from "@openzeppelin-v5-contracts-upgradeable/proxy/utils/
 import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
@@ -185,21 +187,6 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         sHooks.initialize(address(1), address(2));
     }
 
-    function test_beforeSend_Commits_WithdrawalTransferRoot() public {
-
-        vm.startBroadcast(address(senderContract));
-
-        bytes memory messageWithSignature_CW = mockCompleteWithdrawalMessage(bobKey, amount);
-
-        // called by senderContract
-        senderHooks.beforeSendCCIPMessage(
-            abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-            new Client.EVMTokenAmount[](0)
-        );
-
-        vm.stopBroadcast();
-    }
-
     function test_beforeSendCCIPMessage_OnlyCalledBySenderCCIP(uint256 signerKey) public {
 
         vm.assume(signerKey < type(uint256).max / 2); // EIP-2: secp256k1 curve order / 2
@@ -280,17 +267,17 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         returns (bytes memory messageWithSignature_PC)
     {
 
-		IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves;
-        tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](1);
-		tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+		IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves;
+        tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](1);
+		tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: tokenL1,
             cumulativeEarnings: 1 ether
         });
 
         address signer = vm.addr(signerKey);
 
-		IRewardsCoordinator.EarnerTreeMerkleLeaf memory earnerLeaf;
-        earnerLeaf = IRewardsCoordinator.EarnerTreeMerkleLeaf({
+		IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf memory earnerLeaf;
+        earnerLeaf = IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf({
 			earner: signer,
 			earnerTokenRoot: rewardsCoordinator.calculateTokenLeafHash(tokenLeaves[0])
 		});
@@ -300,7 +287,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         tokenIndices[0] = 0;
         tokenTreeProofs[0] = abi.encode(bytes32(0x0));
 
-		IRewardsCoordinator.RewardsMerkleClaim memory claim = IRewardsCoordinator.RewardsMerkleClaim({
+		IRewardsCoordinatorTypes.RewardsMerkleClaim memory claim = IRewardsCoordinatorTypes.RewardsMerkleClaim({
 			rootIndex: 0,
 			earnerIndex: 0,
 			earnerTreeProof: hex"",
@@ -333,14 +320,14 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         strategiesToWithdraw[0] = strategy;
         sharesToWithdraw[0] = _amount;
 
-        IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
+        IDelegationManagerTypes.Withdrawal memory withdrawal = IDelegationManagerTypes.Withdrawal({
             staker: mockEigenAgent,
             delegatedTo: vm.addr(5656),
             withdrawer: mockEigenAgent,
             nonce: withdrawalNonce,
             startBlock: startBlock,
             strategies: strategiesToWithdraw,
-            shares: sharesToWithdraw
+            scaledShares: sharesToWithdraw
         });
 
         bytes memory completeWithdrawalMessage;
@@ -352,7 +339,6 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
                 withdrawal,
                 tokensToWithdraw,
-                0, //middlewareTimesIndex,
                 true // receiveAsTokens
             );
 

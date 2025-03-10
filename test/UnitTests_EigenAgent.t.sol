@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
@@ -8,8 +8,13 @@ import {IERC1271} from "@openzeppelin-v5-contracts/interfaces/IERC1271.sol";
 import {IERC165} from "@openzeppelin-v5-contracts/utils/introspection/IERC165.sol";
 
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {EIP712_DOMAIN_TYPEHASH} from "@eigenlayer-contracts/mixins/SignatureUtilsMixin.sol";
+import {EIGENLAYER_VERSION} from "../script/1_deployMockEigenlayerContracts.s.sol";
+
 import {
     IERC6551Executable,
     IERC6551Account as IERC6551
@@ -63,8 +68,15 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
     function test_EigenAgent_DomainTypehash() public {
         vm.assertEq(
-            delegationManager.DOMAIN_TYPEHASH(),
-            eigenAgent.DOMAIN_TYPEHASH()
+            EIP712_DOMAIN_TYPEHASH,
+            eigenAgent.EIP712_DOMAIN_TYPEHASH()
+        );
+    }
+
+    function test_EigenAgent_EigenlayerVersionMatches() public {
+        vm.assertEq(
+            EIGENLAYER_VERSION,
+            EigenAgent6551(payable(address(eigenAgent))).EIGENLAYER_VERSION()
         );
     }
 
@@ -539,9 +551,10 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             eigenAgentBob.execute(
                 address(rewardsCoordinator),
                 0,
-                abi.encodeWithSelector(IRewardsCoordinator.setClaimerFor.selector, bob),
+                abi.encodeWithSelector(bytes4(keccak256("setClaimerFor(address)")), bob),
                 0
             );
+
             require(
                 rewardsCoordinator.claimerFor(address(eigenAgentBob)) == address(bob),
                 "Bob should be the rewardsClaimer for EigenAgentBob now"
@@ -555,7 +568,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             eigenAgentBob.execute(
                 address(rewardsCoordinator),
                 0,
-                abi.encodeWithSelector(IRewardsCoordinator.setClaimerFor.selector, address(0)),
+                abi.encodeWithSelector(bytes4(keccak256("setClaimerFor(address)")), address(0)),
                 0
             );
 
@@ -584,7 +597,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         {
             vm.startBroadcast(address(restakingConnector));
 
-            IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams;
+            IDelegationManagerTypes.QueuedWithdrawalParams[] memory queuedWithdrawalParams;
 
             IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
             strategiesToWithdraw[0] = strategy;
@@ -592,14 +605,14 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             uint256[] memory sharesToWithdraw = new uint256[](1);
             sharesToWithdraw[0] = amount;
 
-            IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal =
-                IDelegationManager.QueuedWithdrawalParams({
+            IDelegationManagerTypes.QueuedWithdrawalParams memory queuedWithdrawal =
+                IDelegationManagerTypes.QueuedWithdrawalParams({
                     strategies: strategiesToWithdraw,
-                    shares: sharesToWithdraw,
-                    withdrawer: address(eigenAgentBob)
+                    depositShares: sharesToWithdraw,
+                    __deprecated_withdrawer: address(eigenAgentBob)
                 });
 
-            queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](1);
+            queuedWithdrawalParams = new IDelegationManagerTypes.QueuedWithdrawalParams[](1);
             queuedWithdrawalParams[0] = queuedWithdrawal;
 
             uint256 execNonce2 = eigenAgentBob.execNonce();
@@ -685,7 +698,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         // Bob transfers EigenAgent to Alice
         (,, uint256 tokenId1) = eigenAgent1.token();
         vm.prank(bob);
-        eigenAgentOwner721.transferFrom(bob, alice, tokenId1);
+        eigenAgentOwner721.safeTransferFrom(bob, alice, tokenId1);
 
         // Mint Bob another EigenAgent
         vm.prank(deployer);

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {console} from "forge-std/Test.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
-import {ISignatureUtils} from "@eigenlayer-contracts/interfaces/ISignatureUtils.sol";
+import {ISignatureUtilsMixinTypes} from "@eigenlayer-contracts/interfaces/ISignatureUtilsMixin.sol";
 
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {BaseScript} from "./BaseScript.sol";
@@ -49,15 +49,13 @@ contract DelegateToScript is BaseScript {
 
             vm.startBroadcast(operatorKey);
             {
-                IDelegationManager.OperatorDetails memory registeringOperatorDetails =
-                    IDelegationManager.OperatorDetails({
-                        __deprecated_earningsReceiver: operator,
-                        delegationApprover: operator,
-                        stakerOptOutWindowBlocks: 4
-                    });
-
                 string memory metadataURI = "some operator";
-                try delegationManager.registerAsOperator(registeringOperatorDetails, metadataURI) {
+                try delegationManager.registerAsOperator(operator, 100, metadataURI) {
+                    // function registerAsOperator(
+                    //     address initDelegationApprover,
+                    //     uint32 allocationDelay,
+                    //     string calldata metadataURI
+                    // ) external;
 
                 } catch Error(string memory reason) {
                     console.log(reason); // registerAsOperator: caller is already actively delegated
@@ -69,9 +67,10 @@ contract DelegateToScript is BaseScript {
         //// Get User's EigenAgent
         IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(deployer);
         require(
-            strategyManager.stakerStrategyShares(address(eigenAgent), strategy) > 0,
+            strategyManager.stakerDepositShares(address(eigenAgent), strategy) > 0,
             "EigenAgent has no deposit in Eigenlayer"
         );
+
         // if already delegated, must undelegate and wait 7 days first.
         require(!delegationManager.isDelegated(address(eigenAgent)), "EigenAgent is already actively delegated");
 
@@ -87,7 +86,7 @@ contract DelegateToScript is BaseScript {
         uint256 randomSalt = vm.randomUint();
         bytes32 approverSalt = bytes32(randomSalt);
 
-        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
+        ISignatureUtilsMixinTypes.SignatureWithExpiry memory approverSignatureAndExpiry;
         {
             bytes32 digestHash1 = calculateDelegationApprovalDigestHash(
                 address(eigenAgent), // staker == msg.sender == eigenAgent from Eigenlayer's perspective
@@ -102,7 +101,7 @@ contract DelegateToScript is BaseScript {
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(operatorKey, digestHash1);
             bytes memory signature1 = abi.encodePacked(r, s, v);
 
-            approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+            approverSignatureAndExpiry = ISignatureUtilsMixinTypes.SignatureWithExpiry({
                 signature: signature1,
                 expiry: sigExpiry
             });
