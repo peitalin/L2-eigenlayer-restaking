@@ -24,7 +24,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
     error DestinationChainNotAllowed(uint64 destinationChainSelector);
     error SourceChainNotAllowed(uint64 sourceChainSelector);
 
-    error SenderNotAllowed(address sender);
+    error SenderNotAllowed(uint64 sourceChainSelector, address sender);
     error InvalidReceiverAddress();
 
     uint256 expiry;
@@ -151,7 +151,11 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         for (uint32 i = 0; i < usersL1.length; ++i) {
             address user = usersL1[i];
 
-            vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, user));
+            vm.expectRevert(abi.encodeWithSelector(
+                SenderNotAllowed.selector,
+                BaseSepolia.ChainSelector,
+                user
+            ));
             receiverContract.mockCCIPReceive(
                 Client.Any2EVMMessage({
                     messageId: bytes32(0x0),
@@ -202,7 +206,11 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         for (uint32 i = 0; i < usersL2.length; ++i) {
             address user = usersL2[i];
 
-            vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, user));
+            vm.expectRevert(abi.encodeWithSelector(
+                SenderNotAllowed.selector,
+                EthSepolia.ChainSelector,
+                user
+            ));
             senderContract.mockCCIPReceive(
                 Client.Any2EVMMessage({
                     messageId: bytes32(0x0),

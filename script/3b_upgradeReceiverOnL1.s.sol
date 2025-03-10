@@ -142,6 +142,10 @@ contract UpgradeReceiverOnL1Script is Script, FileReader {
         agentFactoryProxy.setEigenAgentOwner721(eigenAgentOwner721Proxy);
 
         require(
+            receiverProxy.allowlistedSenders(BaseSepolia.ChainSelector, address(senderProxy)),
+            "receiverProxy: must allowlistSender(senderProxy) on BaseSepolia"
+        );
+        require(
             address(receiverProxy.getRestakingConnector()) != address(0),
             "upgrade receiverProxy: missing restakingConnector"
         );

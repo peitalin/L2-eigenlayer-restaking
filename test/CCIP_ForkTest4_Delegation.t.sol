@@ -390,7 +390,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: BaseSepolia.ChainSelector,
                 sender: abi.encode(deployer),
                 data: abi.encode(string(
                     messageWithSignature_CW
@@ -565,7 +565,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: BaseSepolia.ChainSelector,
                 sender: abi.encode(deployer),
                 data: abi.encode(string(
                     messageWithSignature_CW

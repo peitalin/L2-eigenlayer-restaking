@@ -15,7 +15,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
     mapping(uint64 => bool) public allowlistedDestinationChains;
     mapping(uint64 => bool) public allowlistedSourceChains;
-    mapping(address => bool) public allowlistedSenders;
+    mapping(uint64 sourceChainSelector => mapping(address sender => bool)) public allowlistedSenders;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -43,14 +43,14 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
     event AllowlistDestinationChain(uint64 indexed destinationChainSelector, bool allowed);
     event AllowlistSourceChain(uint64 indexed sourceChainSelector, bool allowed);
-    event AllowlistSender(address indexed sender, bool allowed);
+    event AllowlistSender(uint64 indexed sourceChainSelector, address indexed sender, bool allowed);
 
     error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees);
     error WithdrawalExceedsBalance(uint256 amount, uint256 currentBalance);
     error FailedToWithdrawEth(address owner, address target, uint256 value);
     error DestinationChainNotAllowed(uint64 destinationChainSelector);
     error SourceChainNotAllowed(uint64 sourceChainSelector);
-    error SenderNotAllowed(address sender);
+    error SenderNotAllowed(uint64 sourceChainSelector, address sender);
     error InvalidReceiverAddress();
     error NotEnoughEthGasFees(uint256 setGasFees, uint256 requiredGasFees);
     error FailedToRefundExcessEth(address sender, uint256 refundAmount);
@@ -80,7 +80,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     modifier onlyAllowlisted(uint64 _sourceChainSelector, address _sender) {
         if (!allowlistedSourceChains[_sourceChainSelector])
             revert SourceChainNotAllowed(_sourceChainSelector);
-        if (!allowlistedSenders[_sender]) revert SenderNotAllowed(_sender);
+        if (!allowlistedSenders[_sourceChainSelector][_sender]) revert SenderNotAllowed(_sourceChainSelector, _sender);
         _;
     }
 
@@ -138,9 +138,9 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
     /// @param _sender address of the sender to be updated.
     /// @param allowed allowlist status to be set for the sender.
-    function allowlistSender(address _sender, bool allowed) external onlyOwner {
-        allowlistedSenders[_sender] = allowed;
-        emit AllowlistSender(_sender, allowed);
+    function allowlistSender(uint64 _sourceChainSelector, address _sender, bool allowed) external onlyOwner {
+        allowlistedSenders[_sourceChainSelector][_sender] = allowed;
+        emit AllowlistSender(_sourceChainSelector, _sender, allowed);
     }
 
     /// TODO: do a multi-token version of sendMessagePayNative

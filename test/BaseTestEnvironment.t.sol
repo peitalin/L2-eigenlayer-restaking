@@ -187,8 +187,8 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             receiverContract.allowlistSourceChain(BaseSepolia.ChainSelector, true);
             receiverContract.allowlistDestinationChain(EthSepolia.ChainSelector, true);
 
-            receiverContract.allowlistSender(deployer, true);
-            receiverContract.allowlistSender(address(senderContract), true);
+            receiverContract.allowlistSender(BaseSepolia.ChainSelector, deployer, true);
+            receiverContract.allowlistSender(BaseSepolia.ChainSelector, address(senderContract), true);
             // set eigenlayer contracts
             restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, rewardsCoordinator);
             eigenAgentOwner721.setRewardsCoordinator(rewardsCoordinator);
@@ -210,8 +210,8 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             senderContract.allowlistSourceChain(EthSepolia.ChainSelector, true);
             senderContract.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
 
-            senderContract.allowlistSender(address(receiverContract), true);
-            senderContract.allowlistSender(deployer, true);
+            senderContract.allowlistSender(EthSepolia.ChainSelector, address(receiverContract), true);
+            senderContract.allowlistSender(EthSepolia.ChainSelector, deployer, true);
 
             IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(senderContract));
             IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(deployer));
@@ -271,8 +271,8 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             receiverContract.allowlistSourceChain(BaseSepolia.ChainSelector, true);
             receiverContract.allowlistDestinationChain(EthSepolia.ChainSelector, true);
 
-            receiverContract.allowlistSender(deployer, true);
-            receiverContract.allowlistSender(address(senderContract), true);
+            receiverContract.allowlistSender(BaseSepolia.ChainSelector, deployer, true);
+            receiverContract.allowlistSender(BaseSepolia.ChainSelector, address(senderContract), true);
             // set eigenlayer contracts
             restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, rewardsCoordinator);
 
@@ -301,8 +301,8 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             senderContract.allowlistSourceChain(EthSepolia.ChainSelector, true);
             senderContract.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
 
-            senderContract.allowlistSender(address(receiverContract), true);
-            senderContract.allowlistSender(deployer, true);
+            senderContract.allowlistSender(EthSepolia.ChainSelector, address(receiverContract), true);
+            senderContract.allowlistSender(EthSepolia.ChainSelector, deployer, true);
 
             // for mock testing only
             senderHooks.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);

@@ -71,7 +71,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
         vm.startBroadcast(deployerKey);
 
         // allow L2 sender contract to send tokens to L1
-        senderProxy.allowlistSender(address(receiverProxy), true);
+        senderProxy.allowlistSender(EthSepolia.ChainSelector, address(receiverProxy), true);
         senderProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
 
@@ -96,8 +96,8 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
             "senderProxy: missing senderHooks"
         );
         require(
-            senderProxy.allowlistedSenders(address(receiverProxy)),
-            "senderProxy: must allowlistSender(receiverProxy)"
+            senderProxy.allowlistedSenders(EthSepolia.ChainSelector, address(receiverProxy)),
+            "senderProxy: must allowlistSender(receiverProxy) on EthSepolia"
         );
         require(
             senderProxy.allowlistedSourceChains(EthSepolia.ChainSelector),
@@ -116,7 +116,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployerKey);
 
-        receiverProxy.allowlistSender(address(senderProxy), true);
+        receiverProxy.allowlistSender(BaseSepolia.ChainSelector, address(senderProxy), true);
         receiverProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
         receiverProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         receiverProxy.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
@@ -133,7 +133,10 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
             functionSelectors_R,
             gasLimits_R
         );
-
+        require(
+            receiverProxy.allowlistedSenders(BaseSepolia.ChainSelector, address(senderProxy)),
+            "receiverProxy: must allowlistSender(senderProxy) on BaseSepolia"
+        );
         require(
             address(agentFactoryProxy.getRestakingConnector()) == address(restakingConnectorProxy),
             "agentFactoryProxy: missing restakingConnector"

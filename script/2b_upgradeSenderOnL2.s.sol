@@ -61,7 +61,7 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
         /// whitelist destination chain
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
-        senderProxy.allowlistSender(address(receiverProxy), true);
+        senderProxy.allowlistSender(EthSepolia.ChainSelector, address(receiverProxy), true);
         senderProxy.setSenderHooks(senderHooksProxy);
 
         senderHooksProxy.setSenderCCIP(address(senderProxy));
@@ -79,8 +79,8 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
             "senderHooksProxy: missing senderCCIP"
         );
         require(
-            senderProxy.allowlistedSenders(address(receiverProxy)),
-            "senderProxy: must allowlistSender(receiverProxy)"
+            senderProxy.allowlistedSenders(EthSepolia.ChainSelector, address(receiverProxy)),
+            "senderProxy: must allowlistSender(receiverProxy) on EthSepolia"
         );
         require(
             senderProxy.allowlistedSourceChains(EthSepolia.ChainSelector),

@@ -81,8 +81,8 @@ contract RedepositScript is BaseScript {
             vm.selectFork(l2ForkId);
 
             require(
-                senderContract.allowlistedSenders(address(receiverContract)),
-                "senderCCIP: must allowlistSender(receiverCCIP)"
+                senderContract.allowlistedSenders(EthSepolia.ChainSelector, address(receiverContract)),
+                "senderCCIP: must allowlistSender(receiverCCIP) on EthSepolia"
             );
 
             receiveAsTokens = false;
