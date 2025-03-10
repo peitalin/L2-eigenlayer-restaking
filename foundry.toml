@@ -27,11 +27,11 @@ remappings = [
   "@openzeppelin-v5-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts",
   "@eigenlayer-contracts=lib/eigenlayer-contracts/src/contracts",
     # Note: We use OpenZeppelin v4.7 to deploy EigenLayer contracts (as EigenLayer does)
-  "@openzeppelin-v47-contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/contracts/",
+  "@openzeppelin-v4-contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/contracts/",
     # Context dependent remappings to avoid conflicts
   "lib/openzeppelin-contracts-upgradeable:@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts",
   "lib/openzeppelin-contracts-upgradeable:@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts",
-  "lib/eigenlayer-contracts:@openzeppelin/contracts-upgradeable/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable",
+  "lib/eigenlayer-contracts:@openzeppelin/contracts-upgradeable/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable-v4.9.0",
   "lib/eigenlayer-contracts:@openzeppelin/contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/contracts"
 ]
 
@@ -40,7 +40,8 @@ localhost = "http://localhost:8545"
 holesky = "https://holesky.drpc.org"
 # Note: Free RPCs may sometimes fail
 # ethsepolia = "https://sepolia.drpc.org"
-ethsepolia = "https://sepolia.infura.io/v3/${INFURA_API_KEY}"
+ethsepolia = "https://sepolia.gateway.tenderly.co"
+# ethsepolia = "https://sepolia.infura.io/v3/${INFURA_API_KEY}"
 basesepolia = "https://sepolia.base.org"
 
 [etherscan]
