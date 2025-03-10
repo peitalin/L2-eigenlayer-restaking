@@ -2,9 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Script} from "forge-std/Script.sol";
-
 import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
 
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
@@ -39,7 +37,6 @@ contract DeployReceiverOnL1Script is Script, FileReader {
     RestakingConnector public restakingProxy;
     ReceiverCCIP public receiverProxy;
     ISenderCCIP public senderContract;
-    ProxyAdmin public proxyAdmin;
     IERC6551Registry public registry6551;
     IEigenAgentOwner721 public eigenAgentOwner721;
     IAgentFactory public agentFactoryProxy;
@@ -93,18 +90,27 @@ contract DeployReceiverOnL1Script is Script, FileReader {
 
         vm.startBroadcast(deployerKey);
 
-        proxyAdmin = new ProxyAdmin(address(this));
-        // deploy 6551 Registry
         registry6551 = IERC6551Registry(address(new ERC6551Registry()));
+        // if (isMockRun) {
+        //     // deploy 6551 Registry -- only for testing
+        //     registry6551 = IERC6551Registry(address(new ERC6551Registry()));
+        // } else {
+        //     // on mainnet use the proper registry
+        //     // https://holesky.etherscan.io/address/0x000000006551c19487814612e58FE06813775758#code
+        //     registry6551 = IERC6551Registry(address(0x000000006551c19487814612e58FE06813775758));
+        // }
+
         // deploy 6551 EigenAgentOwner NFT
         eigenAgentOwner721 = IEigenAgentOwner721(
-            address(new TransparentUpgradeableProxy(
-                address(new EigenAgentOwner721()),
-                address(proxyAdmin),
-                abi.encodeWithSelector(
-                    EigenAgentOwner721.initialize.selector,
-                    "EigenAgentOwner",
-                    "EAO"
+            payable(address(
+                new TransparentUpgradeableProxy(
+                    address(new EigenAgentOwner721()),
+                    address(deployer),
+                    abi.encodeWithSelector(
+                        EigenAgentOwner721.initialize.selector,
+                        "EigenAgentOwner",
+                        "EAO"
+                    )
                 )
             ))
         );
@@ -116,7 +122,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
             payable(address(
                 new TransparentUpgradeableProxy(
                     address(new AgentFactory()),
-                    address(proxyAdmin),
+                    address(deployer),
                     abi.encodeWithSelector(
                         AgentFactory.initialize.selector,
                         registry6551,
@@ -132,7 +138,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
             payable(address(
                 new TransparentUpgradeableProxy(
                     address(new RestakingConnector()),
-                    address(proxyAdmin),
+                    address(deployer),
                     abi.encodeWithSelector(
                         RestakingConnector.initialize.selector,
                         agentFactoryProxy,
@@ -161,7 +167,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
             payable(address(
                 new TransparentUpgradeableProxy(
                     address(receiverImpl),
-                    address(proxyAdmin),
+                    address(deployer),
                     abi.encodeWithSelector(
                         ReceiverCCIP.initialize.selector,
                         IRestakingConnector(address(restakingProxy)),
@@ -172,10 +178,8 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         );
 
         // Receiver both receives and sends messages back to L2 Sender
-        receiverProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         receiverProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
         receiverProxy.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
-        receiverProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
 
         receiverProxy.allowlistSender(BaseSepolia.ChainSelector, address(senderContract), true);
         receiverProxy.setSenderContractL2(address(senderContract));
@@ -189,8 +193,8 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         restakingProxy.setReceiverCCIP(address(receiverProxy));
 
         // seed the receiver contract with a bit of ETH
-        if (address(receiverProxy).balance < 0.02 ether) {
-            (bool sent, ) = address(receiverProxy).call{value: 0.05 ether}("");
+        if (address(receiverProxy).balance < 0.01 ether) {
+            (bool sent, ) = address(receiverProxy).call{value: 0.02 ether}("");
             require(sent, "Failed to send Ether");
         }
 
@@ -241,7 +245,6 @@ contract DeployReceiverOnL1Script is Script, FileReader {
                 address(registry6551),
                 address(eigenAgentOwner721),
                 address(baseEigenAgent),
-                address(proxyAdmin),
                 FILEPATH_BRIDGE_CONTRACTS_L1
             );
         }

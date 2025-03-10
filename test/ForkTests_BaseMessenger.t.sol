@@ -5,8 +5,9 @@ import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
+import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
 import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
+
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
@@ -54,7 +55,9 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         // L1 Receiver
         vm.selectFork(ethForkId);
 
-        IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
+        vm.prank(deployer);
+        IBurnMintERC20(address(tokenL1)).mint(address(receiverContract), 1 ether);
+
         uint256 totalWithdraw = tokenL1.balanceOf(address(receiverContract));
         uint256 halfWithdraw = totalWithdraw / 2;
 

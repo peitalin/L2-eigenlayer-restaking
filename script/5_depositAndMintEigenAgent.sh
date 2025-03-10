@@ -6,7 +6,7 @@ echo forge script script/5_depositAndMintEigenAgent.s.sol:DepositAndMintEigenAge
 forge script script/5_depositAndMintEigenAgent.s.sol:DepositAndMintEigenAgentScript  \
     --rpc-url basesepolia \
     --broadcast \
-    --verify \
+    --priority-gas-price 100 \
     --private-key $DEPLOYER_KEY \
     -vvvv
 

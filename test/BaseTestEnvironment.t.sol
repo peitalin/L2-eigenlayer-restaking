@@ -2,9 +2,9 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-// eigenlayer RewardsCoordinator is expecting v4.7 erc20
+// Eigenlayer RewardsCoordinator is expecting v4.9 erc20
 import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
+import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
@@ -126,6 +126,9 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             tokenL1
         ) = deployMockEigenlayerContractsScript.deployEigenlayerContracts(false);
 
+        require(address(tokenL1) != address(0), "TokenL1 not deployed");
+        require(address(strategy) != address(0), "Strategy not deployed");
+
         //// Setup L1 CCIP contracts and 6551 EigenAgent
         (
             receiverContract,
@@ -136,8 +139,25 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
         eigenAgentOwner721 = agentFactory.eigenAgentOwner721();
 
         // only for tests
-        vm.prank(deployer);
+        vm.startBroadcast(deployer);
         restakingConnector.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
+
+        // set GasLimits for L1 -> L2 calls (rewards claims)
+        uint256[] memory gasLimitsL2 = new uint256[](1);
+        gasLimitsL2[0] = 300_000;
+
+        bytes4[] memory functionSelectorsL2 = new bytes4[](1);
+        functionSelectorsL2[0] = ISenderHooks.handleTransferToAgentOwner.selector;
+
+        restakingConnector.setGasLimitsForFunctionSelectors(
+            functionSelectorsL2,
+            gasLimitsL2
+        );
+
+        IBurnMintERC20(address(tokenL1)).mint(deployer, 10 ether);
+        IBurnMintERC20(address(tokenL1)).mint(address(this), 10 ether);
+
+        vm.stopBroadcast();
 
         vm.deal(address(receiverContract), 1 ether);
         vm.deal(address(restakingConnector), 1 ether);
@@ -193,10 +213,8 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             restakingConnector.setEigenlayerContracts(delegationManager, strategyManager, rewardsCoordinator);
             eigenAgentOwner721.setRewardsCoordinator(rewardsCoordinator);
 
-            IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
-            IERC20_CCIPBnM(address(tokenL1)).drip(address(restakingConnector));
-            IERC20_CCIPBnM(address(tokenL1)).drip(address(deployer));
-            IERC20_CCIPBnM(address(tokenL1)).drip(address(deployer));
+            IERC20Minter(address(tokenL1)).mint(address(receiverContract), 5 ether);
+            IERC20Minter(address(tokenL1)).mint(address(restakingConnector), 5 ether);
         }
         vm.stopBroadcast();
 
@@ -213,9 +231,8 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             senderContract.allowlistSender(EthSepolia.ChainSelector, address(receiverContract), true);
             senderContract.allowlistSender(EthSepolia.ChainSelector, deployer, true);
 
-            IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(senderContract));
-            IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(deployer));
-            IERC20_CCIPBnM(BaseSepolia.BridgeToken).drip(address(deployer));
+            IERC20Minter(BaseSepolia.BridgeToken).mint(address(senderContract), 5 ether);
+            IERC20Minter(BaseSepolia.BridgeToken).mint(address(deployer), 5 ether);
         }
         vm.stopBroadcast();
     }
@@ -282,6 +299,18 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
 
             // for mock testing only
             restakingConnector.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
+
+            // set GasLimits for L1 -> L2 calls (rewards claims)
+            uint256[] memory gasLimitsL2 = new uint256[](1);
+            gasLimitsL2[0] = 300_000;
+
+            bytes4[] memory functionSelectorsL2 = new bytes4[](1);
+            functionSelectorsL2[0] = ISenderHooks.handleTransferToAgentOwner.selector;
+
+            restakingConnector.setGasLimitsForFunctionSelectors(
+                functionSelectorsL2,
+                gasLimitsL2
+            );
         }
         vm.stopBroadcast();
 

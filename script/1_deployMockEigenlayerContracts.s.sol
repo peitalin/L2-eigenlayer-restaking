@@ -34,7 +34,7 @@ import {StrategyBaseTVLLimits} from "@eigenlayer-contracts/strategies/StrategyBa
 
 import {ERC20Minter} from "../test/mocks/ERC20Minter.sol";
 import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
+import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
 import {EthSepolia} from "./Addresses.sol";
 
 
@@ -118,12 +118,12 @@ contract DeployMockEigenlayerContractsScript is Script {
             rewardsCoordinator
         ) = _deployEigenlayerCoreContracts(proxyAdmin);
 
-        if (block.chainid != 11155111) {
-            // can mint in localhost tests
-            tokenERC20 = IERC20(address(deployERC20Minter("Mock MAGIC", "MMAGIC", proxyAdmin)));
+        if (
+            block.chainid != 11155111 // EthSepolia
+        ) {
+            tokenERC20 = IERC20(address(deployERC20Minter("Local MAGIC", "LMAGIC", proxyAdmin)));
         } else {
-            // can't mint, you need to transfer CCIP-BnM tokens to receiver contract
-            tokenERC20 = IERC20(address(IERC20_CCIPBnM(EthSepolia.BridgeToken)));
+            tokenERC20 = IERC20(EthSepolia.BridgeToken);
         }
 
         IStrategyFactory strategyFactory = _deployStrategyFactory(
@@ -230,7 +230,6 @@ contract DeployMockEigenlayerContractsScript is Script {
         //     return string(bytes.concat(v[0], v[1]));
         // }
 
-
         vm.startBroadcast(deployer);
         StrategyManager strategyManagerImpl = new StrategyManager(
             delegationManager,
@@ -272,7 +271,7 @@ contract DeployMockEigenlayerContractsScript is Script {
         IPauserRegistry _pauserRegistry,
         IAllocationManager _allocationManager,
         IPermissionController _permissionController
-    ) internal returns (RewardsCoordinator) {
+    ) internal returns (IRewardsCoordinator) {
         vm.startBroadcast(deployer);
         // Eigenlayer disableInitialisers so they must be called via upgradeable proxy
 
@@ -306,15 +305,15 @@ contract DeployMockEigenlayerContractsScript is Script {
                 version: EIGENLAYER_VERSION
             });
 
-        RewardsCoordinator _rewardsCoordinator = new RewardsCoordinator(
+        RewardsCoordinator rewardsCoordinatorImpl = new RewardsCoordinator(
             rewardsCoordinatorConstructorParams
         );
 
-        _rewardsCoordinator = RewardsCoordinator(
+        IRewardsCoordinator _rewardsCoordinator = IRewardsCoordinator(
             address(
                 new TransparentUpgradeableProxy(
-                    address(_rewardsCoordinator),
-                    address(proxyAdmin),
+                    address(rewardsCoordinatorImpl),
+                    address(proxyAdmin), // OZv4 uses ProxyAdmin
                     abi.encodeWithSelector(
                         RewardsCoordinator.initialize.selector,
                         deployer, // initialOwner

@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {BytesLib} from "./BytesLib.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 
 library FunctionSelectorDecoder {
@@ -77,7 +78,7 @@ library FunctionSelectorDecoder {
             expiry := mload(add(customError, 68))
         }
 
-        if (customError.length >= 136) {
+        if (customError.length > 164) {
 
             uint32 innerErrorSelector; // uint32 = 4 bytes
             assembly {
@@ -103,20 +104,26 @@ library FunctionSelectorDecoder {
                 // so that we are safe to parse (memory safe).
                 require(customError.length - innerErrorOffset >= innerErrorLength, "Invalid Error(string)");
                 reason = string(_decodeInnerError(customError, innerErrorOffset));
+            } else {
+                // Return error selector for other custom errors
+                reason = Strings.toHexString(uint256(uint32(innerErrorSelector)), 4);
             }
-
-            /////////////////////////////
-            /// Eigenlayer Custom Errors
-            /////////////////////////////
-
-            // StrategyNotWhitelisted()
-            if (innerErrorSelector == 0x5dfb2ca2) {
-                reason = string("StrategyNotWhitelisted()");
-            }
-
-
-            // Do not parse error messages of other exotic custom errors
         }
+
+        /////////////////////////////
+        /// Eigenlayer Custom Errors
+        /////////////////////////////
+        if (customError.length == 164) {
+
+            uint32 innerErrorSelector; // uint32 = 4 bytes
+            assembly {
+                innerErrorSelector := mload(add(customError, 136))
+                // alternatively, use bytes4 from offset 164
+            }
+
+            reason = parseEigenlayerError(innerErrorSelector);
+        }
+
     }
 
     /// @dev Decodes the inner Error(string) in EigenAgentExecutionError(signer, expiry, Error(string))
@@ -163,4 +170,148 @@ library FunctionSelectorDecoder {
         // bytes memory errPacked = abi.encodePacked(errStringArray);
         // errBytes = BytesLib.slice(errPacked, 0, errLength);
     }
+
+    function parseEigenlayerError(uint32 errorSelector) private pure returns (string memory reason) {
+        // IStrategyManagerErrors
+        if (errorSelector == 0x5dfb2ca2) {
+            reason = "StrategyNotWhitelisted()";
+
+        } else if (errorSelector == 0x0d0a21c8) {
+            reason = "MaxStrategiesExceeded()";
+
+        } else if (errorSelector == 0xf739589b) {
+            reason = "OnlyDelegationManager()";
+
+        } else if (errorSelector == 0x82e8ffe4) {
+            reason = "OnlyStrategyWhitelister()";
+
+        } else if (errorSelector == 0x4b18b193) {
+            reason = "SharesAmountTooHigh()";
+
+        } else if (errorSelector == 0x840c364a) {
+            reason = "SharesAmountZero()";
+
+        } else if (errorSelector == 0x16f2ccc9) {
+            reason = "StakerAddressZero()";
+
+        } else if (errorSelector == 0x5be2b482) {
+            reason = "StrategyNotFound()";
+
+        // DelegationManager errors
+        } else if (errorSelector == 0x11481a94) {
+            reason = "OnlyStrategyManagerOrEigenPodManager()";
+
+        } else if (errorSelector == 0xc84e9984) {
+            reason = "OnlyEigenPodManager()";
+
+        } else if (errorSelector == 0x23d871a5) {
+            reason = "OnlyAllocationManager()";
+
+        } else if (errorSelector == 0x8e5199a8) {
+            reason = "OperatorsCannotUndelegate()";
+
+        } else if (errorSelector == 0x77e56a06) {
+            reason = "ActivelyDelegated()";
+
+        } else if (errorSelector == 0xa5c7c445) {
+            reason = "NotActivelyDelegated()";
+
+        } else if (errorSelector == 0x25ec6c1f) {
+            reason = "OperatorNotRegistered()";
+
+        } else if (errorSelector == 0x87c9d219) {
+            reason = "WithdrawalNotQueued()";
+
+        } else if (errorSelector == 0x3c933446) {
+            reason = "CallerCannotUndelegate()";
+
+        } else if (errorSelector == 0x43714afd) {
+            reason = "InputArrayLengthMismatch()";
+
+        } else if (errorSelector == 0x796cc525) {
+            reason = "InputArrayLengthZero()";
+
+        } else if (errorSelector == 0x28cef1a4) {
+            reason = "FullySlashed()";
+
+        } else if (errorSelector == 0x35313244) {
+            reason = "SaltSpent()";
+
+        } else if (errorSelector == 0xf1ecf5c2) {
+            reason = "WithdrawalDelayNotElapsed()";
+
+        } else if (errorSelector == 0x584434d4) {
+            reason = "WithdrawerNotCaller()";
+
+        // RewardsCoordinator errors (not comprehensive)
+        } else if (errorSelector == 0x5c427cd9) {
+            reason = "UnauthorizedCaller()";
+
+        } else if (errorSelector == 0xfb494ea1) {
+            reason = "InvalidEarner()";
+
+        } else if (errorSelector == 0x10c748a6) {
+            reason = "InvalidAddressZero()";
+
+        } else if (errorSelector == 0x504570e3) {
+            reason = "InvalidRoot()";
+
+        } else if (errorSelector == 0x94a8d389) {
+            reason = "InvalidRootIndex()";
+
+        } else if (errorSelector == 0x796cc525) {
+            reason = "InputArrayLengthZero()";
+
+        } else if (errorSelector == 0x43714afd) {
+            reason = "InputArrayLengthMismatch()";
+
+        } else if (errorSelector == 0x729f942c) {
+            reason = "NewRootMustBeForNewCalculatedPeriod()";
+
+        } else if (errorSelector == 0x0d2af922) {
+            reason = "RewardsEndTimestampNotElapsed()";
+
+        } else if (errorSelector == 0x7ec5c154) {
+            reason = "InvalidOperatorSet()";
+
+        } else if (errorSelector == 0x43ad20fc) {
+            reason = "AmountIsZero()";
+
+        } else if (errorSelector == 0x1c2d69bc) {
+            reason = "AmountExceedsMax()";
+
+        } else if (errorSelector == 0x891c63df) {
+            reason = "SplitExceedsMax()";
+
+        } else if (errorSelector == 0x7b1e25c5) {
+            reason = "PreviousSplitPending()";
+
+        } else if (errorSelector == 0x3742e7d4) {
+            reason = "DurationExceedsMax()";
+
+        } else if (errorSelector == 0xcb3f434d) {
+            reason = "DurationIsZero()";
+
+        } else if (errorSelector == 0xee664705) {
+            reason = "InvalidDurationRemainder()";
+
+        } else if (errorSelector == 0x0e06bd31) {
+            reason = "InvalidGenesisRewardsTimestampRemainder()";
+
+        } else if (errorSelector == 0x4478f672) {
+            reason = "InvalidCalculationIntervalSecondsRemainder()";
+
+        } else if (errorSelector == 0xf06a53c4) {
+            reason = "InvalidStartTimestampRemainder()";
+
+        } else if (errorSelector == 0x7ee2b443) {
+            reason = "StartTimestampTooFarInFuture()";
+
+        } else {
+            reason = Strings.toHexString(uint256(uint32(errorSelector)), 4);
+        }
+    }
 }
+
+
+

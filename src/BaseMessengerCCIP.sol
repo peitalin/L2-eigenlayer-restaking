@@ -52,7 +52,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     error SourceChainNotAllowed(uint64 sourceChainSelector);
     error SenderNotAllowed(uint64 sourceChainSelector, address sender);
     error InvalidReceiverAddress();
-    error NotEnoughEthGasFees(uint256 setGasFees, uint256 requiredGasFees);
+    error NotEnoughEthGasFees(uint256 sentGasFees, uint256 requiredGasFees);
     error FailedToRefundExcessEth(address sender, uint256 refundAmount);
     error CannotSendZeroTokens(address token);
 

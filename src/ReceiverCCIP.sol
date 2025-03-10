@@ -11,6 +11,7 @@ import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 import {IRestakingConnector} from "./interfaces/IRestakingConnector.sol";
 import {ISenderCCIP} from "./interfaces/ISenderCCIP.sol";
+import {ISenderHooks} from "./interfaces/ISenderHooks.sol";
 import {BaseMessengerCCIP} from "./BaseMessengerCCIP.sol";
 import {EigenlayerMsgEncoders} from "./utils/EigenlayerMsgEncoders.sol";
 
@@ -245,7 +246,11 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
-        uint256 gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(functionSelector);
+        uint256 gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(
+            functionSelector,
+            _tokenAmounts.length
+        );
+
         if (_overrideGasLimit > 0) {
             gasLimit = _overrideGasLimit;
         }

@@ -72,7 +72,7 @@ contract ClientSigners is Script {
     function domainSeparator(
         address contractAddr,
         uint256 destinationChainid
-    ) public view returns (bytes32) {
+    ) public pure returns (bytes32) {
         uint256 chainid = destinationChainid;
         return keccak256(
             abi.encode(
@@ -92,7 +92,7 @@ contract ClientSigners is Script {
 
     /// @notice Returns the major version of the contract. See Eigenlayer SemVerMixin.sol
     /// @return The major version string (e.g., "v1" for version "v1.2.3")
-    function _majorVersion() internal view returns (string memory) {
+    function _majorVersion() internal pure returns (string memory) {
         bytes memory v = bytes(EIGENLAYER_VERSION);
         return string(bytes.concat(v[0], v[1]));
     }
@@ -105,7 +105,7 @@ contract ClientSigners is Script {
         uint256 expiry,
         address delegationManagerAddr,
         uint256 destinationChainid
-    ) public view returns (bytes32) {
+    ) public pure returns (bytes32) {
 
         /// @notice The EIP-712 typehash for the `DelegationApproval` struct used by the contract
         bytes32 DELEGATION_APPROVAL_TYPEHASH = keccak256(
@@ -133,7 +133,7 @@ contract ClientSigners is Script {
         uint256 _nonce,
         uint256 _chainid,
         uint256 _expiry
-    ) public view returns (bytes32) {
+    ) public pure returns (bytes32) {
 
         bytes32 structHash = keccak256(abi.encode(
             EIGEN_AGENT_EXEC_TYPEHASH,
@@ -221,12 +221,12 @@ contract ClientSigners is Script {
         uint256 expiry
     ) private pure {
         console.log("===== EigenAgent Signature =====");
-        console.log("chainid:", chainid);
+        console.log("chainid:", uint256(chainid));
         console.log("targetContractAddr:", targetContractAddr);
         console.log("messageToEigenlayer:");
         console.logBytes(messageToEigenlayer);
-        console.log("execNonce:", execNonce);
-        console.log("expiry:", expiry);
+        console.log("execNonce:", uint256(execNonce));
+        console.log("expiry:", uint256(expiry));
         console.log("--------------------------------");
     }
 

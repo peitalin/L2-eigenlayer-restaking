@@ -131,10 +131,10 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
      * @return from the previous (EigenAgent Owner) who is transferring the NFT
      */
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
-        // Update the NFT owner
-        address from = super._update(to, tokenId, auth);
         // Recipient must not already own an EigenAgentOwner721.
-        require(balanceOf(to) <= 1, "Cannot own more than one EigenAgentOwner721 at a time.");
+        require(balanceOf(to) == 0, "Cannot own more than one EigenAgentOwner721 at a time.");
+        // Update the NFT tokenId owner
+        address from = super._update(to, tokenId, auth);
         // Previous EigenAgent owner must wipe the claimerFor for his EigenAgent if it is set,
         // to prevent him from claiming rewards of the EigenAgent after transfer
         address eigenAgent = address(agentFactory.getEigenAgent(from));
@@ -142,6 +142,8 @@ contract EigenAgentOwner721 is Initializable, ERC721URIStorageUpgradeable, Admin
             rewardsCoordinator.claimerFor(eigenAgent) == address(0),
             "EigenAgent's rewards claimer must be reset to address(0) before transfer"
         );
+        // Update the AgentFactory to match the new owner, this must happen after getEigenAgent()
+        // or it will return adress(0) trivially
         agentFactory.updateEigenAgentOwnerTokenId(from, to, tokenId);
         return from;
     }

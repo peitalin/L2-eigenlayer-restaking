@@ -5,9 +5,9 @@ import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
-import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
+import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
+import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {ERC20Minter} from "./mocks/ERC20Minter.sol";
 
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
@@ -78,23 +78,32 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
 
         // Create a second memecoin ERC20 token for multi-token rewards claims
-        memecoin = IERC20(address(new TransparentUpgradeableProxy(
-            address(new ERC20Minter()),
-            address(new ProxyAdmin(address(this))),
-            abi.encodeWithSelector(
-                ERC20Minter.initialize.selector,
-                "token2",
-                "TKN2"
-            )
-        )));
+        memecoin = IERC20(payable(address(
+            new TransparentUpgradeableProxy(
+                address(new ERC20Minter()),
+                address(deployer),
+                abi.encodeWithSelector(
+                    ERC20Minter.initialize.selector,
+                    "token2",
+                    "TKN2"
+                )
+            )))
+        );
         // Send RewardsCoordinator some tokens for rewards claims
         ERC20Minter(address(memecoin)).mint(address(rewardsCoordinator), 1 ether);
         vm.stopBroadcast();
 
+       // let timeNow be 2 weeks from now for local tests
+        vm.warp(block.timestamp + 1 weeks);
         secondsInWeek = 604800;
-        timeNow = uint32(block.timestamp);
+        // start of the rewards week
         startOfTheWeek = uint32(block.timestamp) - (uint32(block.timestamp) % secondsInWeek);
-        startOfLastWeek = startOfTheWeek - secondsInWeek;
+        startOfLastWeek = startOfTheWeek - 1 weeks;
+        // timeNow should be more than 1 week from startOfTheWeek
+        timeNow = startOfTheWeek + 1 days;
+
+        require(startOfTheWeek % secondsInWeek == 0, "startOfTheWeek is not a multiple of secondsInWeek");
+        require(startOfLastWeek % secondsInWeek == 0, "startOfLastWeek is not a multiple of secondsInWeek");
     }
 
     /*
@@ -258,7 +267,8 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         vm.assertTrue(rewardsCoordinator.getDistributionRootsLength() == 1);
 
         // Send RewardsCoordinator some tokens for rewards claims
-        IERC20_CCIPBnM(address(tokenL1)).drip(address(rewardsCoordinator));
+        vm.prank(deployer);
+        IERC20(address(tokenL1)).transfer(address(rewardsCoordinator), 1 ether);
 
 		// Fast forward to present time
         vm.warp(timeNow + 7 days);
@@ -317,12 +327,10 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         ///////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
-
         routerFees = getRouterFeesL2(
             address(receiverContract),
             string(messageWithSignature_ProcessClaim),
-            tokenAmounts,
+            new Client.EVMTokenAmount[](0),
             senderHooks.getGasLimitForFunctionSelector(IRewardsCoordinator.processClaim.selector)
             // gasLimit
         );
@@ -331,7 +339,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_ProcessClaim),
-            tokenAmounts,
+            new Client.EVMTokenAmount[](0),
             0 // use default gasLimit for this function
         );
 
@@ -369,14 +377,15 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
             rewardsAmount
         );
 
-        Client.EVMTokenAmount[] memory rewardsTokenAmounts = new Client.EVMTokenAmount[](1);
-        rewardsTokenAmounts[0] = Client.EVMTokenAmount({
+        // only for testing rewards event
+        Client.EVMTokenAmount[] memory rewardsEventTokenAmounts = new Client.EVMTokenAmount[](1);
+        rewardsEventTokenAmounts[0] = Client.EVMTokenAmount({
             token: rewardsToken,
             amount: rewardsAmount
         });
 
         vm.expectEmit(true, true, true, false);
-        emit ReceiverCCIP.BridgingRewardsToL2(deployer, rewardsTokenAmounts);
+        emit ReceiverCCIP.BridgingRewardsToL2(deployer, rewardsEventTokenAmounts);
 
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
@@ -386,7 +395,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
                 data: abi.encode(string(
                     messageWithSignature_ProcessClaim
                 )),
-                destTokenAmounts: new Client.EVMTokenAmount[](0)
+                destTokenAmounts: new Client.EVMTokenAmount[](0) // should be empty
             })
         );
 

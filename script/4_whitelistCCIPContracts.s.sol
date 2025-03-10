@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Script} from "forge-std/Script.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
+import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
 import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {ISenderCCIP} from "../src/interfaces/ISenderCCIP.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
@@ -70,7 +70,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
         vm.selectFork(l2ForkId);
         vm.startBroadcast(deployerKey);
 
-        // allow L2 sender contract to send tokens to L1
+        // allow L1 receiver contract to send tokens back to L2 for withdrawals and reward claims
         senderProxy.allowlistSender(EthSepolia.ChainSelector, address(receiverProxy), true);
         senderProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
@@ -88,7 +88,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
         senderHooksProxy.setSenderCCIP(address(senderProxy));
 
         if (isTest) {
-            IERC20_CCIPBnM(tokenL2).drip(deployer);
+            IBurnMintERC20(tokenL2).mint(deployer, 1 ether);
         }
 
         require(
@@ -116,23 +116,28 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
         vm.selectFork(ethForkId);
         vm.startBroadcast(deployerKey);
 
+        // allow L2 sender contract to send tokens to L1 for deposits
         receiverProxy.allowlistSender(BaseSepolia.ChainSelector, address(senderProxy), true);
         receiverProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
         receiverProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         receiverProxy.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
+        // allow L1 receiver to send tokens back to L2 for withdrawals and reward claims
         // Remember to fund L1 receiver with gas and tokens in production.
 
         uint256[] memory gasLimits_R = new uint256[](1);
         gasLimits_R[0] = 270_000; // handleTransferToAgentOwner [gas: 261,029]
 
         bytes4[] memory functionSelectors_R = new bytes4[](1);
-        functionSelectors_R[0] = 0x43598c8c;
+        functionSelectors_R[0] = 0xd8a85b48;
         // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
 
         restakingConnectorProxy.setGasLimitsForFunctionSelectors(
             functionSelectors_R,
             gasLimits_R
         );
+
+        vm.stopBroadcast();
+
         require(
             receiverProxy.allowlistedSenders(BaseSepolia.ChainSelector, address(senderProxy)),
             "receiverProxy: must allowlistSender(senderProxy) on BaseSepolia"
@@ -165,8 +170,6 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
             address(agentFactoryProxy.erc6551Registry()) == address(registry6551),
             "agentFactory: missing erc6551registry"
         );
-
-        vm.stopBroadcast();
     }
 }
 

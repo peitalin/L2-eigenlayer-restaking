@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {console} from "forge-std/Test.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
+import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
 
 import {EthSepolia} from "./Addresses.sol";
 import {BaseScript} from "./BaseScript.sol";
@@ -66,7 +66,7 @@ contract DepositAndMintEigenAgentScript is BaseScript {
                 (bool success, ) = staker.call{value: 0.03 ether}("");
             }
         }
-        IERC20_CCIPBnM(address(tokenL2)).drip(staker);
+        IBurnMintERC20(address(tokenL2)).mint(staker, 1 ether);
         vm.stopBroadcast();
 
         //////////////////////////////////////////////////////

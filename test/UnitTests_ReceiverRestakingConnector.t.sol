@@ -22,6 +22,7 @@ import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {RestakingConnectorUtils} from "../src/RestakingConnectorUtils.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
@@ -495,13 +496,36 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         );
 
         // Return default gasLimit of 400_000 for undefined function selectors
-        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(0xffeeaabb), 200_000);
+        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(0xffeeaabb, 0), 200_000);
 
         // gas limits should be set
-        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(functionSelectors[0]), 1_000_000);
-        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(functionSelectors[1]), 800_000);
+        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(functionSelectors[0], 0), 1_000_000);
+        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(functionSelectors[1], 0), 800_000);
 
         vm.stopBroadcast();
+    }
+
+    function test_RestakingConnector_increaseGasLimitForEachExtraToken() public {
+
+        bytes4 handleTransferToAgentOwner = ISenderHooks.handleTransferToAgentOwner.selector;
+
+        uint256 gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(handleTransferToAgentOwner, 0);
+        vm.assertEq(gasLimit, 300_000);
+
+        gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(handleTransferToAgentOwner, 1);
+        vm.assertEq(gasLimit, 300_000 + 100_000 * 0);
+
+        gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(handleTransferToAgentOwner, 2);
+        vm.assertEq(gasLimit, 300_000 + 100_000 * 1);
+
+        gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(handleTransferToAgentOwner, 3);
+        vm.assertEq(gasLimit, 300_000 + 100_000 * 2);
+
+        gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(handleTransferToAgentOwner, 4);
+        vm.assertEq(gasLimit, 300_000 + 100_000 * 3);
+
+        gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(handleTransferToAgentOwner, 5);
+        vm.assertEq(gasLimit, 300_000 + 100_000 * 4);
     }
 
     function test_ReceiverL1_dispatchMessageToEigenAgent_InternalCallsOnly(address user) public {

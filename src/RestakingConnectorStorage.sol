@@ -175,13 +175,19 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
      * @return gasLimit a default gasLimit of 200_000 functionSelector parame
 ter finds no matches.
      */
-    function getGasLimitForFunctionSelectorL1(bytes4 functionSelector)
+    function getGasLimitForFunctionSelectorL1(bytes4 functionSelector, uint256 tokenAmountsLength)
         external
         view
         returns (uint256)
     {
         uint256 gasLimit = _gasLimitsForFunctionSelectors[functionSelector];
-        return (gasLimit > 0) ? gasLimit : 200_000;
+        gasLimit = (gasLimit > 0) ? gasLimit : 200_000;
+        // When claiming rewards to send to L1 using the handleTransferToAgentOwner function,
+        // we need to increase gas limit for each extra token bridging back to L2
+        for (uint256 i = 1; i < tokenAmountsLength; ++i) {
+            gasLimit += 100_000;
+        }
+        return gasLimit;
     }
 
     /**
