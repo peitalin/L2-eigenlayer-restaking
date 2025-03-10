@@ -136,8 +136,22 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
         eigenAgentOwner721 = agentFactory.eigenAgentOwner721();
 
         // only for tests
-        vm.prank(deployer);
+        vm.startBroadcast(deployer);
         restakingConnector.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
+
+        // set GasLimits for L1 -> L2 calls (rewards claims)
+        uint256[] memory gasLimitsL2 = new uint256[](1);
+        gasLimitsL2[0] = 300_000;
+
+        bytes4[] memory functionSelectorsL2 = new bytes4[](1);
+        functionSelectorsL2[0] = ISenderHooks.handleTransferToAgentOwner.selector;
+
+        restakingConnector.setGasLimitsForFunctionSelectors(
+            functionSelectorsL2,
+            gasLimitsL2
+        );
+
+        vm.stopBroadcast();
 
         vm.deal(address(receiverContract), 1 ether);
         vm.deal(address(restakingConnector), 1 ether);
@@ -282,6 +296,18 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
 
             // for mock testing only
             restakingConnector.setBridgeTokens(address(tokenL1), BaseSepolia.BridgeToken);
+
+            // set GasLimits for L1 -> L2 calls (rewards claims)
+            uint256[] memory gasLimitsL2 = new uint256[](1);
+            gasLimitsL2[0] = 300_000;
+
+            bytes4[] memory functionSelectorsL2 = new bytes4[](1);
+            functionSelectorsL2[0] = ISenderHooks.handleTransferToAgentOwner.selector;
+
+            restakingConnector.setGasLimitsForFunctionSelectors(
+                functionSelectorsL2,
+                gasLimitsL2
+            );
         }
         vm.stopBroadcast();
 

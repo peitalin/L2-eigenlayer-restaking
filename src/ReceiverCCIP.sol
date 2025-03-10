@@ -245,7 +245,11 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
 
         bytes4 functionSelector = FunctionSelectorDecoder.decodeFunctionSelector(message);
 
-        uint256 gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(functionSelector);
+        uint256 gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(
+            functionSelector,
+            _tokenAmounts.length
+        );
+
         if (_overrideGasLimit > 0) {
             gasLimit = _overrideGasLimit;
         }
