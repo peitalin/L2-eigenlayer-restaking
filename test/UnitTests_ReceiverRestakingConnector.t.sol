@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
@@ -7,10 +7,13 @@ import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
+
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 
 import {TestERC20} from "./mocks/TestERC20.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
@@ -18,7 +21,10 @@ import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {RestakingConnector} from "../src/RestakingConnector.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
+import {RestakingConnectorUtils} from "../src/RestakingConnectorUtils.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 import {console} from "forge-std/Script.sol";
@@ -34,6 +40,13 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
 
     uint256 expiry;
     uint256 execNonce0;
+    address sender = address(receiverContract);
+
+    // Mock tokens
+    IERC20 tokenA = IERC20(address(0x1aa));
+    IERC20 tokenB = IERC20(address(0x2bb));
+    IERC20 tokenC = IERC20(address(0x3cc));
+    IERC20 tokenD = IERC20(address(0x4dd));
 
     function setUp() public {
 
@@ -141,62 +154,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         );
     }
 
-    function test_HandleCustomErrorForDeposits_InvalidTargetContract() public {
-
-        uint256 execNonce = 0;
-        uint256 expiryShort = block.timestamp + 60 seconds;
-        uint256 amount = 0.1 ether;
-
-        bytes memory messageWithSignature = signMessageForEigenAgentExecution(
-            bobKey,
-            address(eigenAgent),
-            block.chainid,
-            address(123123), // invalid targetContract to cause revert
-            encodeDepositIntoStrategyMsg(
-                address(strategy),
-                address(tokenL1),
-                amount
-            ),
-            execNonce,
-            expiryShort
-        );
-
-        Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
-        destTokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL1), // CCIP-BnM token address on Eth Sepolia.
-            amount: amount
-        });
-        bytes32 messageId1 = bytes32(abi.encode(0x123333444555));
-        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: messageId1,
-            sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(deployer),
-            destTokenAmounts: destTokenAmounts,
-            data: abi.encode(string(
-                messageWithSignature
-            ))
-        });
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
-                "Invalid signer, or incorrect digestHash parameters.",
-                "Manually execute to refund after timestamp:",
-                expiryShort
-            )
-        );
-        receiverContract.mockCCIPReceive(any2EvmMessage);
-
-        vm.prank(deployer);
-        receiverContract.withdrawTokenForMessageId(messageId1, bob, address(tokenL1), 0.1 ether);
-
-        vm.assertEq(tokenL1.balanceOf(bob), 0.1 ether);
-
-        // after refund, show original error message instead
-        vm.expectRevert("Invalid signer, or incorrect digestHash parameters.");
-        receiverContract.mockCCIPReceive(any2EvmMessage);
-    }
-
     function test_HandleCustomError_CallerNotAllowed() public {
 
         uint256 execNonce = 0;
@@ -226,7 +183,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: messageId1,
             sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(deployer),
+            sender: abi.encode(sender),
             destTokenAmounts: destTokenAmounts,
             data: abi.encode(string(
                 messageWithSignature
@@ -254,7 +211,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         IEigenAgent6551 eigenAgentBob = agentFactory.spawnEigenAgentOnlyOwner(bob);
         vm.stopPrank();
 
-        console.log("111111 address(eigenAgentBob): ", address(eigenAgentBob));
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             bobKey, // sign with Bob's key
             address(eigenAgentBob),
@@ -268,9 +224,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             execNonce,
             expiryShort
         );
-        bytes32 domainSeparator = eigenAgentBob.domainSeparator(block.chainid);
-        console.log("222222 domainSeparator: ");
-        console.logBytes32(domainSeparator);
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
@@ -280,7 +233,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0x0),
             sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(deployer),
+            sender: abi.encode(sender),
             destTokenAmounts: destTokenAmounts,
             data: abi.encode(string(
                 messageWithSignature
@@ -290,7 +243,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
-                "StrategyManager.onlyStrategiesWhitelistedForDeposit: strategy not whitelisted",
+                "StrategyNotWhitelisted()",
                 "Manually execute to refund after timestamp:",
                 expiryShort
             )
@@ -337,25 +290,18 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: bytes32(0x0),
             sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(deployer),
+            sender: abi.encode(sender),
             destTokenAmounts: destTokenAmounts,
             data: abi.encode(string(
                 messageWithSignature
             ))
         });
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
-                "DepositIntoStrategy only handles one token at a time",
-                "Manually execute to refund after timestamp:",
-                expiryShort
-            )
-        );
+        vm.expectRevert("DepositIntoStrategy only handles one token at a time");
         receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 
-    function test_ReceiverL1_MintEigenAgent() public {
+    function test_ReceiverL1_MintEigenAgent2() public {
 
         bytes memory mintEigenAgentMessageBob = encodeMintEigenAgentMsg(bob);
 
@@ -363,7 +309,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
                 sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-                sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
+                sender: abi.encode(sender),
                 data: abi.encode(string(
                     mintEigenAgentMessageBob
                 )), // CCIP abi.encodes a string message when sending
@@ -383,7 +329,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
                 sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-                sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
+                sender: abi.encode(sender),
                 data: abi.encode(string(
                     mintEigenAgentMessageAlice
                 )), // CCIP abi.encodes a string message when sending
@@ -466,7 +412,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         restakingConnector.setEigenlayerContracts(
             delegationManager,
             strategyManager,
-            strategy,
             rewardsCoordinator
         );
 
@@ -478,7 +423,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             restakingConnector.setEigenlayerContracts(
                 IDelegationManager(address(0)),
                 strategyManager,
-                strategy,
                 rewardsCoordinator
             );
 
@@ -488,17 +432,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             restakingConnector.setEigenlayerContracts(
                 delegationManager,
                 IStrategyManager(address(0)),
-                strategy,
-                rewardsCoordinator
-            );
-
-            vm.expectRevert(
-                abi.encodeWithSelector(AddressZero.selector, "_strategy cannot be address(0)")
-            );
-            restakingConnector.setEigenlayerContracts(
-                delegationManager,
-                strategyManager,
-                IStrategy(address(0)),
                 rewardsCoordinator
             );
 
@@ -508,7 +441,6 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             restakingConnector.setEigenlayerContracts(
                 delegationManager,
                 strategyManager,
-                strategy,
                 IRewardsCoordinator(address(0))
             );
 
@@ -516,20 +448,17 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             restakingConnector.setEigenlayerContracts(
                 delegationManager,
                 strategyManager,
-                strategy,
                 rewardsCoordinator
             );
 
             (
                 IDelegationManager _delegationManager,
                 IStrategyManager _strategyManager,
-                IStrategy _strategy,
                 IRewardsCoordinator _rewardsCoordinator
             ) = restakingConnector.getEigenlayerContracts();
 
             vm.assertEq(address(delegationManager), address(_delegationManager));
             vm.assertEq(address(strategyManager), address(_strategyManager));
-            vm.assertEq(address(strategy), address(_strategy));
             vm.assertEq(address(rewardsCoordinator), address(_rewardsCoordinator));
         }
         vm.stopBroadcast();
@@ -568,13 +497,36 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         );
 
         // Return default gasLimit of 400_000 for undefined function selectors
-        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(0xffeeaabb), 200_000);
+        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(0xffeeaabb, 0), 200_000);
 
         // gas limits should be set
-        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(functionSelectors[0]), 1_000_000);
-        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(functionSelectors[1]), 800_000);
+        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(functionSelectors[0], 0), 1_000_000);
+        vm.assertEq(restakingConnector.getGasLimitForFunctionSelectorL1(functionSelectors[1], 0), 800_000);
 
         vm.stopBroadcast();
+    }
+
+    function test_RestakingConnector_increaseGasLimitForEachExtraToken() public {
+
+        bytes4 handleTransferToAgentOwner = ISenderHooks.handleTransferToAgentOwner.selector;
+
+        uint256 gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(handleTransferToAgentOwner, 0);
+        vm.assertEq(gasLimit, 300_000);
+
+        gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(handleTransferToAgentOwner, 1);
+        vm.assertEq(gasLimit, 300_000 + 100_000 * 0);
+
+        gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(handleTransferToAgentOwner, 2);
+        vm.assertEq(gasLimit, 300_000 + 100_000 * 1);
+
+        gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(handleTransferToAgentOwner, 3);
+        vm.assertEq(gasLimit, 300_000 + 100_000 * 2);
+
+        gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(handleTransferToAgentOwner, 4);
+        vm.assertEq(gasLimit, 300_000 + 100_000 * 3);
+
+        gasLimit = restakingConnector.getGasLimitForFunctionSelectorL1(handleTransferToAgentOwner, 5);
+        vm.assertEq(gasLimit, 300_000 + 100_000 * 4);
     }
 
     function test_ReceiverL1_dispatchMessageToEigenAgent_InternalCallsOnly(address user) public {
@@ -589,7 +541,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
                 sourceChainSelector: BaseSepolia.ChainSelector,
-                sender: abi.encode(deployer),
+                sender: abi.encode(sender),
                 data: abi.encode(string(
                     encodeMintEigenAgentMsg(deployer)
                 )),
@@ -602,61 +554,12 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
             Client.Any2EVMMessage({
                 messageId: bytes32(0x0),
                 sourceChainSelector: BaseSepolia.ChainSelector,
-                sender: abi.encode(deployer),
+                sender: abi.encode(sender),
                 data: abi.encode(string(
                     encodeMintEigenAgentMsg(deployer)
                 )),
                 destTokenAmounts: new Client.EVMTokenAmount[](0)
             })
-        );
-    }
-
-    function test_ReceiverContractL1_WithdrawTokenForMessageId_BalanceMatches() public {
-
-        bytes32 messageId = bytes32(abi.encode(1,2,3));
-
-        vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(
-            OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-            bob
-        ));
-        receiverContract.withdrawTokenForMessageId(messageId, bob, address(tokenL1), 1 ether);
-
-        vm.expectRevert(abi.encodeWithSelector(WithdrawalExceedsBalance.selector, 2 ether, 1 ether));
-        vm.prank(deployer);
-        receiverContract.withdrawTokenForMessageId(messageId, bob, address(tokenL1), 2 ether);
-
-        vm.prank(deployer);
-        receiverContract.withdrawTokenForMessageId(messageId, bob, address(tokenL1), 0.3 ether);
-
-        vm.assertEq(
-            receiverContract.amountRefunded(messageId, address(tokenL1)),
-            0.3 ether
-        );
-        vm.assertEq(tokenL1.balanceOf(bob), 0.3 ether);
-
-    }
-
-    function test_ReceiverContractL1_WithdrawTokenForMessageId_AlreadyRefunded() public {
-
-        bytes32 messageId = bytes32(abi.encode(1,2,3));
-        uint256 refundAmount = 0.2 ether;
-
-        // refund
-        vm.prank(deployer);
-        receiverContract.withdrawTokenForMessageId(messageId, bob, address(tokenL1), refundAmount);
-
-        vm.assertEq(receiverContract.amountRefunded(messageId, address(tokenL1)), refundAmount);
-        vm.assertEq(tokenL1.balanceOf(bob), refundAmount);
-
-        // revert when trying to refund again
-        vm.prank(deployer);
-        vm.expectRevert(abi.encodeWithSelector(AlreadyRefunded.selector, refundAmount));
-        receiverContract.withdrawTokenForMessageId(
-            messageId,
-            bob,
-            address(tokenL1),
-            0.1 ether
         );
     }
 
@@ -734,4 +637,287 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
         vm.stopBroadcast();
     }
 
+
+    function test_GetUniqueTokens_AllUnique() public view {
+
+        IERC20[] memory inputTokens = new IERC20[](4);
+        inputTokens[0] = IERC20(address(tokenA));
+        inputTokens[1] = IERC20(address(tokenB));
+        inputTokens[2] = IERC20(address(tokenC));
+        inputTokens[3] = IERC20(address(tokenD));
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(inputTokens);
+
+        assertEq(uniqueTokens.length, 4, "Should return 4 unique tokens");
+
+        // Verify all tokens are in the result
+        bool foundA = false;
+        bool foundB = false;
+        bool foundC = false;
+        bool foundD = false;
+
+        for (uint i = 0; i < uniqueTokens.length; i++) {
+            if (address(uniqueTokens[i]) == address(tokenA)) foundA = true;
+            if (address(uniqueTokens[i]) == address(tokenB)) foundB = true;
+            if (address(uniqueTokens[i]) == address(tokenC)) foundC = true;
+            if (address(uniqueTokens[i]) == address(tokenD)) foundD = true;
+        }
+
+        assertTrue(foundA, "Token A should be in result");
+        assertTrue(foundB, "Token B should be in result");
+        assertTrue(foundC, "Token C should be in result");
+        assertTrue(foundD, "Token D should be in result");
+    }
+
+    function test_GetUniqueTokens_IERC20_WithDuplicates() public view {
+
+        IERC20[] memory inputTokens = new IERC20[](7);
+        inputTokens[0] = IERC20(address(tokenA));
+        inputTokens[1] = IERC20(address(tokenB));
+        inputTokens[2] = IERC20(address(tokenA)); // Duplicate
+        inputTokens[3] = IERC20(address(tokenC));
+        inputTokens[4] = IERC20(address(tokenB)); // Duplicate
+        inputTokens[5] = IERC20(address(tokenD));
+        inputTokens[6] = IERC20(address(tokenC)); // Duplicate
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(inputTokens);
+
+        assertEq(uniqueTokens.length, 4, "Should return 4 unique tokens, removing 3 duplicates");
+
+        // Verify all tokens are in the result exactly once
+        bool foundA = false;
+        bool foundB = false;
+        bool foundC = false;
+        bool foundD = false;
+        for (uint i = 0; i < uniqueTokens.length; i++) {
+            if (address(uniqueTokens[i]) == address(tokenA)) {
+                assertFalse(foundA, "Token A should only appear once");
+                foundA = true;
+            }
+            if (address(uniqueTokens[i]) == address(tokenB)) {
+                assertFalse(foundB, "Token B should only appear once");
+                foundB = true;
+            }
+            if (address(uniqueTokens[i]) == address(tokenC)) {
+                assertFalse(foundC, "Token C should only appear once");
+                foundC = true;
+            }
+            if (address(uniqueTokens[i]) == address(tokenD)) {
+                assertFalse(foundD, "Token D should only appear once");
+                foundD = true;
+            }
+        }
+        assertTrue(foundA, "Token A should be in result");
+        assertTrue(foundB, "Token B should be in result");
+        assertTrue(foundC, "Token C should be in result");
+        assertTrue(foundD, "Token D should be in result");
+    }
+
+    function test_GetUniqueTokens_IERC20_EmptyArray() public pure {
+        IERC20[] memory inputTokens = new IERC20[](0);
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(inputTokens);
+
+        assertEq(uniqueTokens.length, 0, "Should return empty array");
+    }
+
+    function test_GetUniqueTokens_IERC20_SingleToken() public view {
+        IERC20[] memory inputTokens = new IERC20[](1);
+        inputTokens[0] = IERC20(address(tokenA));
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(inputTokens);
+
+        assertEq(uniqueTokens.length, 1, "Should return 1 token");
+        assertEq(address(uniqueTokens[0]), address(tokenA), "Should return Token A");
+    }
+
+    function test_GetUniqueTokens_IERC20_AllDuplicates() public view {
+        IERC20[] memory inputTokens = new IERC20[](3);
+        inputTokens[0] = IERC20(address(tokenA));
+        inputTokens[1] = IERC20(address(tokenA));
+        inputTokens[2] = IERC20(address(tokenA));
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(inputTokens);
+
+        assertEq(uniqueTokens.length, 1, "Should return 1 unique token");
+        assertEq(address(uniqueTokens[0]), address(tokenA), "Should return Token A");
+    }
+
+    function test_GetUniqueTokens_TokenTreeMerkleLeaf_AllUnique() public view {
+
+        IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](4);
+        tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenA)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[1] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenB)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[2] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenC)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[3] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenD)),
+            cumulativeEarnings: 1
+        });
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(tokenLeaves);
+
+        assertEq(uniqueTokens.length, 4, "Should return 4 unique tokens");
+
+        // Verify all tokens are in the result
+        bool foundA = false;
+        bool foundB = false;
+        bool foundC = false;
+        bool foundD = false;
+
+        for (uint i = 0; i < uniqueTokens.length; i++) {
+            if (address(uniqueTokens[i]) == address(tokenA)) foundA = true;
+            if (address(uniqueTokens[i]) == address(tokenB)) foundB = true;
+            if (address(uniqueTokens[i]) == address(tokenC)) foundC = true;
+            if (address(uniqueTokens[i]) == address(tokenD)) foundD = true;
+        }
+
+        assertTrue(foundA, "Token A should be in result");
+        assertTrue(foundB, "Token B should be in result");
+        assertTrue(foundC, "Token C should be in result");
+        assertTrue(foundD, "Token D should be in result");
+    }
+
+    function test_GetUniqueTokens_TokenTreeMerkleLeaf_WithDuplicates() public view {
+
+        IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](7);
+        tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenA)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[1] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenB)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[2] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenA)), // Duplicate
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[3] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenC)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[4] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenB)), // Duplicate
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[5] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenD)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[6] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenC)), // Duplicate
+            cumulativeEarnings: 1
+        });
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(tokenLeaves);
+
+        assertEq(uniqueTokens.length, 4, "Should return 4 unique tokens, removing 3 duplicates");
+
+        // Verify all tokens are in the result exactly once
+        bool foundA = false;
+        bool foundB = false;
+        bool foundC = false;
+        bool foundD = false;
+        for (uint i = 0; i < uniqueTokens.length; i++) {
+            if (address(uniqueTokens[i]) == address(tokenA)) {
+                assertFalse(foundA, "Token A should only appear once");
+                foundA = true;
+            }
+            if (address(uniqueTokens[i]) == address(tokenB)) {
+                assertFalse(foundB, "Token B should only appear once");
+                foundB = true;
+            }
+            if (address(uniqueTokens[i]) == address(tokenC)) {
+                assertFalse(foundC, "Token C should only appear once");
+                foundC = true;
+            }
+            if (address(uniqueTokens[i]) == address(tokenD)) {
+                assertFalse(foundD, "Token D should only appear once");
+                foundD = true;
+            }
+        }
+        assertTrue(foundA, "Token A should be in result");
+        assertTrue(foundB, "Token B should be in result");
+        assertTrue(foundC, "Token C should be in result");
+        assertTrue(foundD, "Token D should be in result");
+    }
+
+    function test_GetUniqueTokens_TokenTreeMerkleLeaf_EmptyArray() public pure {
+        IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](0);
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(tokenLeaves);
+
+        assertEq(uniqueTokens.length, 0, "Should return empty array");
+    }
+
+    function test_GetUniqueTokens_SingleToken() public view {
+        IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](1);
+        tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenA)),
+            cumulativeEarnings: 1
+        });
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(tokenLeaves);
+
+        assertEq(uniqueTokens.length, 1, "Should return 1 token");
+        assertEq(address(uniqueTokens[0]), address(tokenA), "Should return Token A");
+    }
+
+    function test_GetUniqueTokens_TokenTreeMerkleLeaf_AllDuplicates() public view {
+        IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](3);
+        tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenA)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[1] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenA)),
+            cumulativeEarnings: 1
+        });
+        tokenLeaves[2] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
+            token: IERC20(address(tokenA)),
+            cumulativeEarnings: 1
+        });
+
+        IERC20[] memory uniqueTokens = RestakingConnectorUtils.getUniqueTokens(tokenLeaves);
+
+        assertEq(uniqueTokens.length, 1, "Should return 1 unique token");
+        assertEq(address(uniqueTokens[0]), address(tokenA), "Should return Token A");
+    }
+
+    function test_BuildCCIPMessage_SenderMustBeReceiverCCIPError() public {
+        // Set up test data
+        address invalidSender = address(0x123);
+        address l2Sender = receiverContract.getSenderContractL2();
+        Client.EVMTokenAmount[] memory tokens = new Client.EVMTokenAmount[](0);
+
+        // Attempt to build message from unauthorized sender
+        vm.prank(invalidSender);
+        vm.expectRevert(abi.encodeWithSelector(
+            ReceiverCCIP.SenderMustBeReceiverCCIP.selector
+        ));
+        // Trigger _buildCCIPMessage internal call by attempting to send message
+        receiverContract.sendMessagePayNative(
+            BaseSepolia.ChainSelector, // destination chain
+            l2Sender, // receiver must be L2 sender contract
+            string(encodeTransferToAgentOwnerMsg(deployer)), // test message
+            tokens,
+            0 // gas limit
+        );
+        // TransferToAgnetOwner messages should be sendable when
+        // msg.sender is the receiver contract.
+        // This is covered in fork tests such as
+        // CCIP_ForkTest3_CompleteWithdrawal.t.sol which has access
+        // to the Router.getFee function. Otherwise calling
+        // receiverContract.sendMessagePayNative() will fail with
+        // a Router.getFee error in local unit tests.
+    }
 }

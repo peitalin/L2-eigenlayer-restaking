@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {IRouterClient} from "@chainlink/ccip/interfaces/IRouterClient.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
@@ -15,7 +15,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
     mapping(uint64 => bool) public allowlistedDestinationChains;
     mapping(uint64 => bool) public allowlistedSourceChains;
-    mapping(address => bool) public allowlistedSenders;
+    mapping(uint64 sourceChainSelector => mapping(address sender => bool)) public allowlistedSenders;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -43,16 +43,16 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
     event AllowlistDestinationChain(uint64 indexed destinationChainSelector, bool allowed);
     event AllowlistSourceChain(uint64 indexed sourceChainSelector, bool allowed);
-    event AllowlistSender(address indexed sender, bool allowed);
+    event AllowlistSender(uint64 indexed sourceChainSelector, address indexed sender, bool allowed);
 
     error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees);
     error WithdrawalExceedsBalance(uint256 amount, uint256 currentBalance);
     error FailedToWithdrawEth(address owner, address target, uint256 value);
     error DestinationChainNotAllowed(uint64 destinationChainSelector);
     error SourceChainNotAllowed(uint64 sourceChainSelector);
-    error SenderNotAllowed(address sender);
+    error SenderNotAllowed(uint64 sourceChainSelector, address sender);
     error InvalidReceiverAddress();
-    error NotEnoughEthGasFees(uint256 setGasFees, uint256 requiredGasFees);
+    error NotEnoughEthGasFees(uint256 sentGasFees, uint256 requiredGasFees);
     error FailedToRefundExcessEth(address sender, uint256 refundAmount);
     error CannotSendZeroTokens(address token);
 
@@ -80,7 +80,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
     modifier onlyAllowlisted(uint64 _sourceChainSelector, address _sender) {
         if (!allowlistedSourceChains[_sourceChainSelector])
             revert SourceChainNotAllowed(_sourceChainSelector);
-        if (!allowlistedSenders[_sender]) revert SenderNotAllowed(_sender);
+        if (!allowlistedSenders[_sourceChainSelector][_sender]) revert SenderNotAllowed(_sourceChainSelector, _sender);
         _;
     }
 
@@ -93,7 +93,7 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         _;
     }
 
-    function validateGasFees(uint256 fees) internal {
+    function validateGasFeesAndCalculateExcess(uint256 fees) internal returns (uint256 gasRefundAmount) {
         if (msg.sender != address(this)) {
             // user sends ETH to the router
             if (fees > msg.value) {
@@ -101,18 +101,18 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
                 revert NotEnoughEthGasFees(msg.value, fees);
             } else if (msg.value > fees) {
                 // User sent too much gas, refund the excess.
-                uint256 refundAmount = msg.value - fees;
-                (bool success, ) = msg.sender.call{value: refundAmount}("");
-                if (!success) {
-                    revert FailedToRefundExcessEth(msg.sender, refundAmount);
-                }
+                gasRefundAmount = msg.value - fees;
             } else {
-                // Do nothing. User sent just the right amount of gas.
+                gasRefundAmount = 0;
+                // User sent just the right amount of gas.
             }
         } else {
             // when contract initiates refund, or transfers withdrawals back to L1
-            if (fees > address(this).balance)
+            if (fees > address(this).balance) {
                 revert NotEnoughBalance(address(this).balance, fees);
+            } else {
+                gasRefundAmount = 0;
+            }
         }
     }
 
@@ -138,9 +138,9 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
     /// @param _sender address of the sender to be updated.
     /// @param allowed allowlist status to be set for the sender.
-    function allowlistSender(address _sender, bool allowed) external onlyOwner {
-        allowlistedSenders[_sender] = allowed;
-        emit AllowlistSender(_sender, allowed);
+    function allowlistSender(uint64 _sourceChainSelector, address _sender, bool allowed) external onlyOwner {
+        allowlistedSenders[_sourceChainSelector][_sender] = allowed;
+        emit AllowlistSender(_sourceChainSelector, _sender, allowed);
     }
 
     /// TODO: do a multi-token version of sendMessagePayNative
@@ -179,19 +179,29 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         IRouterClient router = IRouterClient(this.getRouter());
 
         uint256 fees = router.getFee(_destinationChainSelector, evm2AnyMessage);
-        validateGasFees(fees);
+
+        emit MessageSent(
+            messageId,
+            _destinationChainSelector,
+            _receiver,
+            _tokenAmounts,
+            address(0),
+            fees
+        );
+
+        uint256 gasRefundAmount = validateGasFeesAndCalculateExcess(fees);
 
         for (uint256 i = 0; i < _tokenAmounts.length; i++) {
             if (_tokenAmounts[i].amount > 0 && msg.sender != address(this)) {
                 // transfer tokens from user to this contract
-                IERC20(_tokenAmounts[i].token).transferFrom(
+                IERC20(_tokenAmounts[i].token).safeTransferFrom(
                     msg.sender,
                     address(this),
                     _tokenAmounts[i].amount
                 );
             }
             // then approve router to move tokens from this contract
-            IERC20(_tokenAmounts[i].token).approve(
+            IERC20(_tokenAmounts[i].token).forceApprove(
                 address(router),
                 _tokenAmounts[i].amount
             );
@@ -202,14 +212,12 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
             evm2AnyMessage
         );
 
-        emit MessageSent(
-            messageId,
-            _destinationChainSelector,
-            _receiver,
-            _tokenAmounts,
-            address(0),
-            fees
-        );
+        if (gasRefundAmount > 0) {
+            (bool success, ) = msg.sender.call{value: gasRefundAmount}("");
+            if (!success) {
+                revert FailedToRefundExcessEth(msg.sender, gasRefundAmount);
+            }
+        }
 
         return messageId;
     }

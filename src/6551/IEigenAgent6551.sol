@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {
     IERC6551Executable,
@@ -9,11 +9,16 @@ import {
 
 interface IEigenAgent6551 is IERC6551, IERC6551Executable {
 
+    error CallerNotWhitelisted(string reason);
+    error SignatureInvalid(string reason);
+    error RestakingConnectorAlreadyInitialized();
+    error AddressZero(string reason);
+
     function execNonce() external view returns (uint256);
 
     function EIGEN_AGENT_EXEC_TYPEHASH() external returns (bytes32);
 
-    function DOMAIN_TYPEHASH() external returns (bytes32);
+    function EIP712_DOMAIN_TYPEHASH() external returns (bytes32);
 
     function owner() external view returns (address);
 
@@ -56,8 +61,6 @@ interface IEigenAgent6551 is IERC6551, IERC6551Executable {
     function supportsInterface(bytes4 interfaceId) external pure returns (bool);
 
     function restakingConnector() external view returns (address);
-
-    function setRestakingConnector(address _restakingConnector) external;
 
     function setInitialRestakingConnector(address _restakingConnector) external;
 }

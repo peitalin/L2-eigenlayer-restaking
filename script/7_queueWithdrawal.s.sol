@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 
 import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
@@ -91,7 +92,7 @@ contract QueueWithdrawalScript is BaseScript {
         strategiesToWithdraw[0] = strategy;
 
         uint256[] memory sharesToWithdraw = new uint256[](1);
-        sharesToWithdraw[0] = strategyManager.stakerStrategyShares(withdrawer, strategy);
+        sharesToWithdraw[0] = strategyManager.stakerDepositShares(withdrawer, strategy);
 
         withdrawalNonce = delegationManager.cumulativeWithdrawalsQueued(withdrawer);
         address delegatedTo = delegationManager.delegatedTo(withdrawer);
@@ -103,14 +104,14 @@ contract QueueWithdrawalScript is BaseScript {
         bytes memory withdrawalMessage;
         bytes memory messageWithSignature;
 
-        IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal;
-        queuedWithdrawal = IDelegationManager.QueuedWithdrawalParams({
+        IDelegationManagerTypes.QueuedWithdrawalParams memory queuedWithdrawal;
+        queuedWithdrawal = IDelegationManagerTypes.QueuedWithdrawalParams({
             strategies: strategiesToWithdraw,
-            shares: sharesToWithdraw,
-            withdrawer: withdrawer
+            depositShares: sharesToWithdraw,
+            __deprecated_withdrawer: withdrawer
         });
-        IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalArray;
-        queuedWithdrawalArray = new IDelegationManager.QueuedWithdrawalParams[](1);
+        IDelegationManagerTypes.QueuedWithdrawalParams[] memory queuedWithdrawalArray;
+        queuedWithdrawalArray = new IDelegationManagerTypes.QueuedWithdrawalParams[](1);
         queuedWithdrawalArray[0] = queuedWithdrawal;
 
         // create the queueWithdrawal message for Eigenlayer
@@ -180,7 +181,6 @@ contract QueueWithdrawalScript is BaseScript {
             strategiesToWithdraw,
             sharesToWithdraw,
             bytes32(0x0), // withdrawalRoot is created later when completeWithdrawal
-            bytes32(0x0), // withdrawalTransferRoot is created later
             filePath
         );
     }

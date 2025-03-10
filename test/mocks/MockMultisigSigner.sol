@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {IERC1271} from "@openzeppelin-v5-contracts/interfaces/IERC1271.sol";
 import {IERC721Receiver} from "@openzeppelin-v5-contracts/interfaces/IERC721Receiver.sol";
@@ -47,7 +47,7 @@ contract MockMultisigSigner is Adminable, IERC721Receiver {
 
     function isValidSignature(
         bytes32 digestHash,
-        bytes memory signature
+        bytes memory _signature
     ) public view returns (bytes4 magicValue) {
 
         address[] memory signers = digestHashSigners[digestHash];

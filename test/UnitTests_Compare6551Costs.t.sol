@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
 import {Clones} from "@openzeppelin-v5-contracts/proxy/Clones.sol";
@@ -35,9 +35,11 @@ contract UnitTests_Compare6551Costs is BaseTestEnvironment {
     function test_Compare6551DeploymentCosts() public {
 
         EigenAgent6551 defaultAgent = new EigenAgent6551();
-        ERC6551Account defaultagentBob = new ERC6551Account();
+        ERC6551Account _defaultAgentBob = new ERC6551Account();
+        require(address(_defaultAgentBob) != address(0), "defaultAgentBob should be deployed");
 
-        IEigenAgent6551 testAgentGasCost = IEigenAgent6551(payable(Clones.clone(address(defaultAgent))));
+        // test agent clone gas cost
+        IEigenAgent6551(payable(Clones.clone(address(defaultAgent))));
 
         vm.prank(deployer);
         IEigenAgent6551 agentAlice = agentFactory.spawnEigenAgentOnlyOwner(alice);
@@ -54,7 +56,7 @@ contract UnitTests_Compare6551Costs is BaseTestEnvironment {
 
         console.log("Signing message for agentAlice: ", address(agentAlice));
         // simulate agents executing messages
-        bytes memory sig1 = signMessage(
+        bytes memory sig1 = getSignature(
             aliceKey,
             address(agentAlice),
             targetContract,
@@ -66,7 +68,7 @@ contract UnitTests_Compare6551Costs is BaseTestEnvironment {
         agentAlice.executeWithSignature(targetContract, 0, testMessage, expiry, sig1);
         vm.stopBroadcast();
 
-        bytes memory sig2 = signMessage(
+        bytes memory sig2 = getSignature(
             aliceKey,
             address(agentAlice),
             targetContract,
@@ -78,7 +80,7 @@ contract UnitTests_Compare6551Costs is BaseTestEnvironment {
         agentAlice.executeWithSignature(targetContract, 0, testMessage, expiry, sig2);
         vm.stopBroadcast();
 
-        bytes memory sig3 = signMessage(
+        bytes memory sig3 = getSignature(
             bobKey,
             address(agentBob),
             targetContract,
@@ -94,7 +96,7 @@ contract UnitTests_Compare6551Costs is BaseTestEnvironment {
         vm.assertEq(defaultAgent.execNonce(), 0);
     }
 
-    function signMessage(
+    function getSignature(
         uint256 signerKey,
         address eigenAgentAddr,
         address targetContractAddr,
@@ -115,14 +117,6 @@ contract UnitTests_Compare6551Costs is BaseTestEnvironment {
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
         bytes memory signature = abi.encodePacked(r, s, v);
-        address signer = vm.addr(signerKey);
-
-        bytes memory messageWithSignature = abi.encodePacked(
-            message,
-            bytes32(abi.encode(signer)), // pad signer to 32byte word
-            expiry,
-            signature
-        );
 
         return signature;
     }

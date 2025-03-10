@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {IRestakingConnector} from "./IRestakingConnector.sol";
 import {IBaseMessengerCCIP} from "./IBaseMessengerCCIP.sol";
@@ -17,11 +17,5 @@ interface IReceiverCCIP is IBaseMessengerCCIP {
 
     function amountRefunded(bytes32 messageId, address token) external view returns (uint256);
 
-    function withdrawTokenForMessageId(
-        bytes32 messageId,
-        address beneficiary,
-        address token,
-        uint256 amount
-    ) external;
 }
 

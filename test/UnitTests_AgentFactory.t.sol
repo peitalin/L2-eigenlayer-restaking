@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
@@ -174,14 +174,14 @@ contract UnitTests_AgentFactory is BaseTestEnvironment {
         vm.expectRevert("AgentFactory.updateEigenAgentOwnerTokenId: caller not EigenAgentOwner721 contract");
         agentFactory.updateEigenAgentOwnerTokenId(deployer, bob, tokenId);
 
-        // transer to bob
+        // transfer to bob
         vm.prank(address(eigenAgentOwner721));
         agentFactory.updateEigenAgentOwnerTokenId(deployer, bob, tokenId);
 
         uint256 tokenId2 = agentFactory.getEigenAgentOwnerTokenId(bob);
         vm.assertEq(tokenId, tokenId2);
 
-        // transer back to deployer
+        // transfer back to deployer
         vm.prank(address(eigenAgentOwner721));
         agentFactory.updateEigenAgentOwnerTokenId(bob, deployer, tokenId);
 
@@ -241,12 +241,9 @@ contract UnitTests_AgentFactory is BaseTestEnvironment {
         );
 
         vm.startPrank(deployer);
-        vm.expectRevert("Only owner can set RestakingConnector");
-        newAgent.setRestakingConnector(address(0x8881223));
-        vm.stopPrank();
-
-        vm.startPrank(deployer);
-        vm.expectRevert("EigenAgent6551: already initialized");
+        vm.expectRevert(abi.encodeWithSelector(
+            IEigenAgent6551.RestakingConnectorAlreadyInitialized.selector
+        ));
         newAgent.setInitialRestakingConnector(address(0x129381));
         vm.stopPrank();
     }

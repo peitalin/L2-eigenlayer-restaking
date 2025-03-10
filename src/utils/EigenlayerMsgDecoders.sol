@@ -1,16 +1,17 @@
 //SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
-import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
-import {ISignatureUtils} from "@eigenlayer-contracts/interfaces/ISignatureUtils.sol";
+import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {ISignatureUtilsMixinTypes} from "@eigenlayer-contracts/interfaces/ISignatureUtilsMixin.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
 
 
 
 struct TransferToAgentOwnerMsg {
-    bytes32 transferRoot; // can be either a withdrawalTransferRoot or rewardTransferRoot
+    address agentOwner;
 }
 
 library AgentOwnerSignature {
@@ -143,7 +144,7 @@ contract EigenlayerMsgDecoders {
         public
         pure
         returns (
-            IDelegationManager.QueuedWithdrawalParams[] memory arrayQueuedWithdrawalParams,
+            IDelegationManagerTypes.QueuedWithdrawalParams[] memory arrayQueuedWithdrawalParams,
             address signer,
             uint256 expiry,
             bytes memory signature
@@ -172,10 +173,10 @@ contract EigenlayerMsgDecoders {
 
         require(arrayLength >= 1, "decodeQueueWithdrawalsMsg: arrayLength must be at least 1");
 
-        arrayQueuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](arrayLength);
+        arrayQueuedWithdrawalParams = new IDelegationManagerTypes.QueuedWithdrawalParams[](arrayLength);
 
         for (uint256 i; i < arrayLength; i++) {
-            IDelegationManager.QueuedWithdrawalParams memory wp;
+            IDelegationManagerTypes.QueuedWithdrawalParams memory wp;
             wp = _decodeSingleQueueWithdrawalMsg(message, i);
             arrayQueuedWithdrawalParams[i] = wp;
         }
@@ -198,7 +199,7 @@ contract EigenlayerMsgDecoders {
     function _decodeSingleQueueWithdrawalMsg(bytes memory message, uint256 i)
         private
         pure
-        returns (IDelegationManager.QueuedWithdrawalParams memory)
+        returns (IDelegationManagerTypes.QueuedWithdrawalParams memory)
     {
         // Function Selector signature:
         //     bytes4(keccak256("queueWithdrawals((address[],uint256[],address)[])")),
@@ -302,10 +303,10 @@ contract EigenlayerMsgDecoders {
             }
         }
 
-        return IDelegationManager.QueuedWithdrawalParams({
+        return IDelegationManagerTypes.QueuedWithdrawalParams({
             strategies: strategies,
-            shares: shares,
-            withdrawer: withdrawer
+            depositShares: shares,
+            __deprecated_withdrawer: withdrawer
         });
     }
 
@@ -317,11 +318,45 @@ contract EigenlayerMsgDecoders {
      *
     */
 
+    struct PackedCompleteWithdrawalVars {
+        IDelegationManagerTypes.Withdrawal withdrawal;
+        IERC20[] tokensToWithdraw;
+        bool receiveAsTokens;
+        address signer;
+        uint256 expiry;
+        bytes signature;
+    }
+
+    function decodeCompleteWithdrawalVarsPacked(bytes memory messageWithSignature)
+        public
+        pure
+        returns (PackedCompleteWithdrawalVars memory vars)
+    {
+        (
+            // original message
+            IDelegationManagerTypes.Withdrawal memory withdrawal,
+            IERC20[] memory tokensToWithdraw,
+            bool receiveAsTokens,
+            // message signature
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        ) = decodeCompleteWithdrawalMsg(messageWithSignature);
+
+        return PackedCompleteWithdrawalVars({
+            withdrawal: withdrawal,
+            tokensToWithdraw: tokensToWithdraw,
+            receiveAsTokens: receiveAsTokens,
+            signer: signer,
+            expiry: expiry,
+            signature: signature
+        });
+    }
+
     /**
      * @param message CCIP message to Eigenlayer
      * @return withdrawal is the message sent to Eigenlayer to call completeWithdrawal()
      * @return tokensToWithdraw Eigenlayer parameter when calling completeWithdrawal()
-     * @return middlewareTimesIndex Eigenlayer parameter, used for slashing later.
      * @return receiveAsTokens determines whether to redeposit into Eigenlayer or receive as tokens.
      * @return signer Owner of the EigenAgent
      * @return expiry Expiry of the signature (does not revert)
@@ -331,9 +366,8 @@ contract EigenlayerMsgDecoders {
         public
         pure
         returns (
-            IDelegationManager.Withdrawal memory withdrawal,
+            IDelegationManagerTypes.Withdrawal memory withdrawal,
             IERC20[] memory tokensToWithdraw,
-            uint256 middlewareTimesIndex,
             bool receiveAsTokens,
             address signer,
             uint256 expiry,
@@ -341,7 +375,7 @@ contract EigenlayerMsgDecoders {
         )
     {
         // Function Selector signature:
-        //     cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
+        //     cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],bool)" == 0xe4cc3f90
         // Params:
         //     struct Withdrawal {
         //         address staker;
@@ -350,7 +384,7 @@ contract EigenlayerMsgDecoders {
         //         uint256 nonce;
         //         uint32 startBlock;
         //         IStrategy[] strategies;
-        //         uint256[] shares;
+        //         uint256[] scaledShares;
         //     }
         //
         //////////////////////// Message offsets //////////////////////////
@@ -359,36 +393,34 @@ contract EigenlayerMsgDecoders {
         // 60d7faed                                                         [96]
         // 0000000000000000000000000000000000000000000000000000000000000080 [100] withdrawal struct offset (100 + 128 = 228)
         // 0000000000000000000000000000000000000000000000000000000000000220 [132] tokens[] offset (100 + 544 = 644)
-        // 0000000000000000000000000000000000000000000000000000000000000000 [164] middlewareTimesIndex
-        // 0000000000000000000000000000000000000000000000000000000000000001 [196] receiveAsTokens
-        // 000000000000000000000000acf9a3539b856e752fe1568d12b501180ad53e78 [228] withdrawal.staker
-        // 0000000000000000000000000000000000000000000000000000000000000000 [260] withdrawal.delegatedTo
-        // 000000000000000000000000acf9a3539b856e752fe1568d12b501180ad53e78 [292] withdrawal.withdrawer
-        // 0000000000000000000000000000000000000000000000000000000000000000 [324] withdrawal.nonce
-        // 0000000000000000000000000000000000000000000000000000000000000001 [356] withdrawal.startBlock
-        // 00000000000000000000000000000000000000000000000000000000000000e0 [388] withdrawal.strategies[] offset (228 + 224 = 452)
-        // 0000000000000000000000000000000000000000000000000000000000000140 [420] withdrawal.shares[] offset (260 + 320 = 548)
-        // 0000000000000000000000000000000000000000000000000000000000000002 [452] withdrawal.strategies[] length = 2
-        // 00000000000000000000000041306849382357029ab3081fc1e02241f28aa9e0 [484] withdrawal.strategies[0] value
-        // 00000000000000000000000082455de76aa228977e11247f05790a80576468ab [516] withdrawal.strategies[1] value
-        // 0000000000000000000000000000000000000000000000000000000000000002 [548] withdrawal.shares[] length = 2
-        // 000000000000000000000000000000000000000000000000016345785d8a0000 [580] withdrawal.shares[0] value
-        // 000000000000000000000000000000000000000000000000016345785d8a0000 [612] withdrawal.shares[1] value
-        // 0000000000000000000000000000000000000000000000000000000000000002 [644] tokens[] length = 2
-        // 0000000000000000000000008fdfb0d901de9055c110569cdc08f54bd4af7128 [676] tokens[0] value
-        // 000000000000000000000000a0cb889707d426a7a386870a03bc70d1b0697598 [708] tokens[1] value
-        // 000000000000000000000000a6ab3a612722d5126b160eef5b337b8a04a76dd8 [740] signer
-        // 0000000000000000000000000000000000000000000000000000000000000e11 [768] expiry
-        // 65bd0ed9d964e9415ebc19303873f672eeb9b1709e957ce49b0224747fb92378 [800] sig r
-        // 55ce98314bbe28891c925ff62cc66e35ed9cf11dc03b774813aafa2eec0dedd2 [832] sig s
-        // 1c000000000000000000000000000000000000000000000000000000         [864] sig v
+        // 0000000000000000000000000000000000000000000000000000000000000001 [164] receiveAsTokens
+        // 000000000000000000000000acf9a3539b856e752fe1568d12b501180ad53e78 [196] withdrawal.staker
+        // 0000000000000000000000000000000000000000000000000000000000000000 [228] withdrawal.delegatedTo
+        // 000000000000000000000000acf9a3539b856e752fe1568d12b501180ad53e78 [260] withdrawal.withdrawer
+        // 0000000000000000000000000000000000000000000000000000000000000000 [292] withdrawal.nonce
+        // 0000000000000000000000000000000000000000000000000000000000000001 [324] withdrawal.startBlock
+        // 00000000000000000000000000000000000000000000000000000000000000e0 [356] withdrawal.strategies[] offset (228 + 224 = 452)
+        // 0000000000000000000000000000000000000000000000000000000000000140 [388] withdrawal.shares[] offset (260 + 320 = 548)
+        // 0000000000000000000000000000000000000000000000000000000000000002 [420] withdrawal.strategies[] length = 2
+        // 00000000000000000000000041306849382357029ab3081fc1e02241f28aa9e0 [452] withdrawal.strategies[0] value
+        // 00000000000000000000000082455de76aa228977e11247f05790a80576468ab [484] withdrawal.strategies[1] value
+        // 0000000000000000000000000000000000000000000000000000000000000002 [516] withdrawal.shares[] length = 2
+        // 000000000000000000000000000000000000000000000000016345785d8a0000 [548] withdrawal.shares[0] value
+        // 000000000000000000000000000000000000000000000000016345785d8a0000 [580] withdrawal.shares[1] value
+        // 0000000000000000000000000000000000000000000000000000000000000002 [612] tokens[] length = 2
+        // 0000000000000000000000008fdfb0d901de9055c110569cdc08f54bd4af7128 [644] tokens[0] value
+        // 000000000000000000000000a0cb889707d426a7a386870a03bc70d1b0697598 [676] tokens[1] value
+        // 000000000000000000000000a6ab3a612722d5126b160eef5b337b8a04a76dd8 [708] signer
+        // 0000000000000000000000000000000000000000000000000000000000000e11 [740] expiry
+        // 65bd0ed9d964e9415ebc19303873f672eeb9b1709e957ce49b0224747fb92378 [768] sig r
+        // 55ce98314bbe28891c925ff62cc66e35ed9cf11dc03b774813aafa2eec0dedd2 [800] sig s
+        // 1c000000000000000000000000000000000000000000000000000000         [832] sig v
 
-        // withdrawal struct always starts on offset 228
-        withdrawal = _decodeCompleteWithdrawalMsgPart1(message, 228);
+        // withdrawal struct always starts on offset 196
+        withdrawal = _decodeCompleteWithdrawalMsgPart1(message, 196);
 
         (
             tokensToWithdraw,
-            middlewareTimesIndex,
             receiveAsTokens
         ) = _decodeCompleteWithdrawalMsgPart2(message);
 
@@ -404,7 +436,7 @@ contract EigenlayerMsgDecoders {
     function _decodeCompleteWithdrawalMsgPart1(bytes memory message, uint256 woffset)
         internal
         pure
-        returns (IDelegationManager.Withdrawal memory withdrawal)
+        returns (IDelegationManagerTypes.Withdrawal memory withdrawal)
     {
         /// Decodes the first half of the CompleteWithdrawalMsg as we run into
         /// a "stack too deep" error with more than 16 variables in the function.
@@ -461,7 +493,7 @@ contract EigenlayerMsgDecoders {
             }
 
             withdrawal.strategies = strategies;
-            withdrawal.shares = shares;
+            withdrawal.scaledShares = shares;
         }
     }
 
@@ -469,7 +501,6 @@ contract EigenlayerMsgDecoders {
         private pure
         returns (
             IERC20[] memory tokensToWithdraw,
-            uint256 middlewareTimesIndex,
             bool receiveAsTokens
         )
     {
@@ -479,8 +510,7 @@ contract EigenlayerMsgDecoders {
 
         assembly {
             tokensOffset := mload(add(add(message, basePosition), 0x20)) // 1 line after withdrawal offset
-            middlewareTimesIndex := mload(add(message, 164))
-            receiveAsTokens := mload(add(message, 196))
+            receiveAsTokens := mload(add(message, 164))
             // 100 + 544 = 644
             tokensLength := mload(add(add(message, basePosition), tokensOffset))
         }
@@ -497,19 +527,14 @@ contract EigenlayerMsgDecoders {
 
         return (
             tokensToWithdraw,
-            middlewareTimesIndex,
             receiveAsTokens
         );
     }
 
     /**
      * @dev This message is dispatched from L1 to L2 by ReceiverCCIP.sol
-     * For Withdrawals: When sending a completeWithdrawal message, we first commit to a withdrawalTransferRoot
-     * on L2 so that when completeWithdrawal finishes on L1 and bridge the funds back to L2, the bridge knows
-     * who the original owner associated with that withdrawalTransferRoot is.
-     * For Rewards processClaims: we commit a rewardTransferRoot in the same way.
      * @param message CCIP message to Eigenlayer
-     * @return transferToAgentOwnerMsg contains the transferRoot which is sent back to L2
+     * @return transferToAgentOwnerMsg contains the agentOwner which is sent back to L2
      */
     function decodeTransferToAgentOwnerMsg(bytes memory message)
         public pure
@@ -519,21 +544,62 @@ contract EigenlayerMsgDecoders {
         // 0000000000000000000000000000000000000000000000000000000000000020 [32]
         // 0000000000000000000000000000000000000000000000000000000000000064 [64]
         // d8a85b48                                                         [96] function selector
-        // dd900ac4d233ec9d74ac5af4ce89f87c78781d8fd9ee2aad62d312bdfdf78a14 [100] transferRoot
+        // dd900ac4d233ec9d74ac5af4ce89f87c78781d8fd9ee2aad62d312bdfdf78a14 [100] agentOwner
         // 00000000000000000000000000000000000000000000000000000000
 
         bytes4 functionSelector;
-        bytes32 transferRoot;
+        address agentOwner;
 
         assembly {
             functionSelector := mload(add(message, 96))
-            transferRoot := mload(add(message, 100))
+            agentOwner := mload(add(message, 100))
         }
 
         return TransferToAgentOwnerMsg({
-            transferRoot: transferRoot
+            agentOwner: agentOwner
         });
     }
+
+    struct PackedRewardsClaimVars {
+        IRewardsCoordinatorTypes.RewardsMerkleClaim claim;
+        address recipient; // eigenAgent
+        address signer;
+        uint256 expiry;
+        bytes signature;
+    }
+
+    function decodeRewardsClaimVarsPacked(bytes memory messageWithSignature)
+        public
+        pure
+        returns (PackedRewardsClaimVars memory vars)
+    {
+        // struct RewardsMerkleClaim {
+        //     uint32 rootIndex;
+        //     uint32 earnerIndex;
+        //     bytes earnerTreeProof;
+        //     EarnerTreeMerkleLeaf earnerLeaf;
+        //     uint32[] tokenIndices;
+        //     bytes[] tokenTreeProofs;
+        //     TokenTreeMerkleLeaf[] tokenLeaves;
+        // }
+        (
+            IRewardsCoordinatorTypes.RewardsMerkleClaim memory claim,
+            address recipient, // eigenAgent
+            // message signature
+            address signer,
+            uint256 expiry,
+            bytes memory signature
+        ) = decodeProcessClaimMsg(messageWithSignature);
+
+        return PackedRewardsClaimVars({
+            claim: claim,
+            recipient: recipient,
+            signer: signer,
+            expiry: expiry,
+            signature: signature
+        });
+    }
+
 
     /**
      * @param message CCIP message to Eigenlayer
@@ -548,7 +614,7 @@ contract EigenlayerMsgDecoders {
         public
         pure
         returns (
-            IRewardsCoordinator.RewardsMerkleClaim memory claim,
+            IRewardsCoordinatorTypes.RewardsMerkleClaim memory claim,
             address recipient,
             address signer,
             uint256 expiry,
@@ -612,7 +678,7 @@ contract EigenlayerMsgDecoders {
         uint32 earnerIndex;
         uint32[] memory tokenIndices;
         bytes[] memory tokenTreeProofs;
-        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves;
+        IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves;
 
         uint32 tokenLeavesOffset;
         {
@@ -637,7 +703,7 @@ contract EigenlayerMsgDecoders {
             );
         }
 
-        claim = IRewardsCoordinator.RewardsMerkleClaim({
+        claim = IRewardsCoordinatorTypes.RewardsMerkleClaim({
             rootIndex: rootIndex,
             earnerIndex: earnerIndex,
             earnerTreeProof: _decodeProcessClaimMsg_Part2(message),
@@ -677,7 +743,7 @@ contract EigenlayerMsgDecoders {
     ) private pure returns (
         uint32[] memory tokenIndices,
         bytes[] memory tokenTreeProofs,
-        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves
+        IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves
     ) {
 
         uint32 tokenIndicesLength;
@@ -692,7 +758,7 @@ contract EigenlayerMsgDecoders {
 
         tokenIndices = new uint32[](tokenIndicesLength);
         tokenTreeProofs = new bytes[](tokenTreeProofsLength);
-        tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](tokenLeavesLength);
+        tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](tokenLeavesLength);
 
         {
             for (uint32 i = 0; i < tokenIndicesLength; ++i) {
@@ -734,7 +800,7 @@ contract EigenlayerMsgDecoders {
                     _tokenLeafToken := mload(add(message, add(tokenLeavesOffset, _offset0)))
                     _cumulativeEarnings := mload(add(message, add(tokenLeavesOffset, _offset1)))
                 }
-                tokenLeaves[i] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+                tokenLeaves[i] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
                     token: IERC20(_tokenLeafToken),
                     cumulativeEarnings: _cumulativeEarnings
                 });
@@ -849,7 +915,7 @@ contract EigenlayerMsgDecoders {
         private
         pure
         returns (
-            IRewardsCoordinator.EarnerTreeMerkleLeaf memory earnerLeaf
+            IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf memory earnerLeaf
         )
     {
         address earner;
@@ -862,7 +928,7 @@ contract EigenlayerMsgDecoders {
             earnerTokenRoot := mload(add(message, 292))
         }
 
-        earnerLeaf = IRewardsCoordinator.EarnerTreeMerkleLeaf({
+        earnerLeaf = IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf({
             earner: earner,
             earnerTokenRoot: earnerTokenRoot
         });
@@ -884,9 +950,8 @@ library CompleteWithdrawalsArrayDecoder {
         public
         pure
         returns (
-            IDelegationManager.Withdrawal[] memory withdrawals,
+            IDelegationManagerTypes.Withdrawal[] memory withdrawals,
             IERC20[][] memory tokens,
-            uint256[] memory middlewareTimesIndexes,
             bool[] memory receiveAsTokens,
             address signer,
             uint256 expiry,
@@ -912,72 +977,71 @@ library CompleteWithdrawalsArrayDecoder {
         // 33404396
         // 0000000000000000000000000000000000000000000000000000000000000080 [100] withdrawals[] offset (100 + 128 = 228)[4 lines]
         // 00000000000000000000000000000000000000000000000000000000000003a0 [132] tokens[][] offset (100 + 928 = 1028)[29 lines]
-        // 0000000000000000000000000000000000000000000000000000000000000480 [164] middlewareTimesIndexes[] offset (100 + 1152 = 1252)
-        // 00000000000000000000000000000000000000000000000000000000000004e0 [196] receiveAsTokens[] offset (100 + 1248 = 1348)
-        // 0000000000000000000000000000000000000000000000000000000000000002 [228] withdrawals[] length = 2
-        // 0000000000000000000000000000000000000000000000000000000000000040 [260] withdrawals[0] struct offset (260 + 64 = 324)
-        // 00000000000000000000000000000000000000000000000000000000000001a0 [292] withdrawals[1] struct offset (260 + 416 = 676)
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [324] withdrawals[0].staker
-        // 0000000000000000000000000000000000000000000000000000000000000000 [356] withdrawals[0].delegatedTo
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [388] withdrawals[0].withdrawer
-        // 0000000000000000000000000000000000000000000000000000000000000000 [420] withdrawals[0].nonce
-        // 0000000000000000000000000000000000000000000000000000000000000001 [452] withdrawals[0].startBlock
-        // 00000000000000000000000000000000000000000000000000000000000000e0 [484] withdrawals[0].strategies offset (324 + 224 = 548)
-        // 0000000000000000000000000000000000000000000000000000000000000120 [516] withdrawals[0].shares offset (324 + 288 = 612)
-        // 0000000000000000000000000000000000000000000000000000000000000001 [548] withdrawals[0].strategies length
-        // 00000000000000000000000041306849382357029ab3081fc1e02241f28aa9e0 [580] withdrawals[0].strategies[0] value
-        // 0000000000000000000000000000000000000000000000000000000000000001 [612] withdrawals[0].shares length
-        // 000000000000000000000000000000000000000000000000000b677a5dbaa000 [644] withdrawals[0].shares[0] value
-        // 000000000000000000000000a6Ab3a612722D5126b160eEf5B337B8A04A76Dd8 [676] withdrawals[1].staker
-        // 0000000000000000000000000000000000000000000000000000000000000000 [708] withdrawals[1].delegatedTo
-        // 000000000000000000000000a6Ab3a612722D5126b160eEf5B337B8A04A76Dd8 [740] withdrawals[1].withdrawer
-        // 0000000000000000000000000000000000000000000000000000000000000001 [772] withdrawals[1].nonce
-        // 0000000000000000000000000000000000000000000000000000000000000001 [804] withdrawals[1].startBlock
-        // 00000000000000000000000000000000000000000000000000000000000000e0 [836] withdrawals[1].strategies offset (676 + 224 = 900)
-        // 0000000000000000000000000000000000000000000000000000000000000120 [868] withdrawals[1].shares offset (676 + 288 = 964)
-        // 0000000000000000000000000000000000000000000000000000000000000001 [900] withdrawals[1].strategies length = 1
-        // 00000000000000000000000041306849382357029ab3081fc1e02241f28aa9e0 [932] withdrawals[1].strategies[0] value
-        // 0000000000000000000000000000000000000000000000000000000000000001 [964] withdrawals[1].shares length = 1
-        // 000000000000000000000000000000000000000000000000000b677a5dbaa000 [996] withdrawals[1].shares[0] value
-        // 0000000000000000000000000000000000000000000000000000000000000002 [1028] tokens[][] length = 2
-        // 0000000000000000000000000000000000000000000000000000000000000040 [1060] tokens[0][] offset (1060 + 64 = 1124)
-        // 00000000000000000000000000000000000000000000000000000000000000a0 [1092] tokens[1][] offset (1060 + 160 = 1220)
-        // 0000000000000000000000000000000000000000000000000000000000000002 [1124] tokens[0][] length = 2
-        // 0000000000000000000000000000000000000000000000000000000000000006 [1156] tokens[0][0] value
-        // 0000000000000000000000000000000000000000000000000000000000000007 [1188] tokens[0][1] value
-        // 0000000000000000000000000000000000000000000000000000000000000003 [1220] tokens[1][] length = 3
-        // 0000000000000000000000000000000000000000000000000000000000000008 [1252] tokens[1][0] value
-        // 0000000000000000000000000000000000000000000000000000000000000009 [1284] tokens[1][1] value
-        // 0000000000000000000000000000000000000000000000000000000000000005 [1316] tokens[1][2] value
-        // 0000000000000000000000000000000000000000000000000000000000000002 [1348] middlewareSharesIndexes[] length = 2
-        // 0000000000000000000000000000000000000000000000000000000000000000 [1380] middlewareSharesIndexes[0] value
-        // 0000000000000000000000000000000000000000000000000000000000000001 [1412] middlewareSharesIndexes[1] value
-        // 0000000000000000000000000000000000000000000000000000000000000002 [1444] receiveAsTokens[] length = 2
-        // 0000000000000000000000000000000000000000000000000000000000000001 [1476] receiveAsTokens[0] value
-        // 0000000000000000000000000000000000000000000000000000000000000000 [1508] receiveAsTokens[1] value
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [1540] signer
-        // 0000000000000000000000000000000000000000000000000000000000015195 [1572] expiry
-        // d75fd557096ca23f683d964df7fdfce79f3295c8e19a4da4811beab582eaa95a [1604] sig r
-        // 3891eaf0232a18a5ba93cc0aa801e966be7427f249c4d3c07727dfc4d29971e8 [1636] sig s
-        // 1c000000000000000000000000000000000000000000000000000000         [1664] sig v
+        // 00000000000000000000000000000000000000000000000000000000000004e0 [164] receiveAsTokens[] offset (100 + 1248 = 1348)
+        // 0000000000000000000000000000000000000000000000000000000000000002 [196] withdrawals[] length = 2
+        // 0000000000000000000000000000000000000000000000000000000000000040 [228] withdrawals[0] struct offset (260 + 64 = 324)
+        // 00000000000000000000000000000000000000000000000000000000000001a0 [260] withdrawals[1] struct offset (260 + 416 = 676)
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [292] withdrawals[0].staker
+        // 0000000000000000000000000000000000000000000000000000000000000000 [324] withdrawals[0].delegatedTo
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [356] withdrawals[0].withdrawer
+        // 0000000000000000000000000000000000000000000000000000000000000000 [388] withdrawals[0].nonce
+        // 0000000000000000000000000000000000000000000000000000000000000001 [420] withdrawals[0].startBlock
+        // 00000000000000000000000000000000000000000000000000000000000000e0 [452] withdrawals[0].strategies offset (324 + 224 = 548)
+        // 0000000000000000000000000000000000000000000000000000000000000120 [484] withdrawals[0].shares offset (324 + 288 = 612)
+        // 0000000000000000000000000000000000000000000000000000000000000001 [516] withdrawals[0].strategies length
+        // 00000000000000000000000041306849382357029ab3081fc1e02241f28aa9e0 [548] withdrawals[0].strategies[0] value
+        // 0000000000000000000000000000000000000000000000000000000000000001 [580] withdrawals[0].shares length
+        // 000000000000000000000000000000000000000000000000000b677a5dbaa000 [612] withdrawals[0].shares[0] value
+        // 000000000000000000000000a6Ab3a612722D5126b160eEf5B337B8A04A76Dd8 [644] withdrawals[1].staker
+        // 0000000000000000000000000000000000000000000000000000000000000000 [676] withdrawals[1].delegatedTo
+        // 000000000000000000000000a6Ab3a612722D5126b160eEf5B337B8A04A76Dd8 [708] withdrawals[1].withdrawer
+        // 0000000000000000000000000000000000000000000000000000000000000001 [740] withdrawals[1].nonce
+        // 0000000000000000000000000000000000000000000000000000000000000001 [772] withdrawals[1].startBlock
+        // 00000000000000000000000000000000000000000000000000000000000000e0 [804] withdrawals[1].strategies offset (676 + 224 = 900)
+        // 0000000000000000000000000000000000000000000000000000000000000120 [836] withdrawals[1].shares offset (676 + 288 = 964)
+        // 0000000000000000000000000000000000000000000000000000000000000001 [868] withdrawals[1].strategies length = 1
+        // 00000000000000000000000041306849382357029ab3081fc1e02241f28aa9e0 [900] withdrawals[1].strategies[0] value
+        // 0000000000000000000000000000000000000000000000000000000000000001 [932] withdrawals[1].shares length = 1
+        // 000000000000000000000000000000000000000000000000000b677a5dbaa000 [964] withdrawals[1].shares[0] value
+        // 0000000000000000000000000000000000000000000000000000000000000002 [996] tokens[][] length = 2
+        // 0000000000000000000000000000000000000000000000000000000000000040 [1028] tokens[0][] offset (1060 + 64 = 1124)
+        // 00000000000000000000000000000000000000000000000000000000000000a0 [1060] tokens[1][] offset (1060 + 160 = 1220)
+        // 0000000000000000000000000000000000000000000000000000000000000002 [1092] tokens[0][] length = 2
+        // 0000000000000000000000000000000000000000000000000000000000000006 [1124] tokens[0][0] value
+        // 0000000000000000000000000000000000000000000000000000000000000007 [1156] tokens[0][1] value
+        // 0000000000000000000000000000000000000000000000000000000000000003 [1188] tokens[1][] length = 3
+        // 0000000000000000000000000000000000000000000000000000000000000008 [1220] tokens[1][0] value
+        // 0000000000000000000000000000000000000000000000000000000000000009 [1252] tokens[1][1] value
+        // 0000000000000000000000000000000000000000000000000000000000000005 [1284] tokens[1][2] value
+        // 0000000000000000000000000000000000000000000000000000000000000002 [1316] middlewareSharesIndexes[] length = 2
+        // 0000000000000000000000000000000000000000000000000000000000000000 [1348] middlewareSharesIndexes[0] value
+        // 0000000000000000000000000000000000000000000000000000000000000001 [1380] middlewareSharesIndexes[1] value
+        // 0000000000000000000000000000000000000000000000000000000000000002 [1412] receiveAsTokens[] length = 2
+        // 0000000000000000000000000000000000000000000000000000000000000001 [1444] receiveAsTokens[0] value
+        // 0000000000000000000000000000000000000000000000000000000000000000 [1476] receiveAsTokens[1] value
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [1508] signer
+        // 0000000000000000000000000000000000000000000000000000000000015195 [1540] expiry
+        // d75fd557096ca23f683d964df7fdfce79f3295c8e19a4da4811beab582eaa95a [1572] sig r
+        // 3891eaf0232a18a5ba93cc0aa801e966be7427f249c4d3c07727dfc4d29971e8 [1604] sig s
+        // 1c000000000000000000000000000000000000000000000000000000         [1636] sig v
 
         // withdrawals
         {
             uint256 withdrawals_length;
             assembly {
-                withdrawals_length := mload(add(message, 0xe4)) // [byte location: 228]
+                withdrawals_length := mload(add(message, 196)) // [byte location: 196]
             }
 
-            withdrawals = new IDelegationManager.Withdrawal[](withdrawals_length);
+            withdrawals = new IDelegationManagerTypes.Withdrawal[](withdrawals_length);
 
             for (uint256 i = 0; i < withdrawals_length; ++i) {
                 // for each element in withdrawals[] array
                 uint256 withdrawal_elem_offset;
                 uint256 j = i + 1;
                 assembly {
-                    withdrawal_elem_offset := mload(add(add(message, 0xe4), mul(j, 0x20)))
+                    withdrawal_elem_offset := mload(add(add(message, 196), mul(j, 0x20)))
                 }
-                withdrawal_elem_offset += 260; // offset_1 = 260
+                withdrawal_elem_offset += 228; // offset_1 = 228
                 withdrawals[i] = _decodeCompleteWithdrawalsMsg_A(message, withdrawal_elem_offset);
             }
         }
@@ -993,21 +1057,12 @@ library CompleteWithdrawalsArrayDecoder {
             tokens = _decodeCompleteWithdrawalsMsg_B(message, 100+tokensOffset, tokensLength);
         }
 
-        // middlewareTimesIndexes
-        {
-            uint256 middlewareOffset;
-            assembly {
-                middlewareOffset := mload(add(message, 164))
-            }
-            middlewareTimesIndexes = _decodeCompleteWithdrawalsMsg_C(message, 100+middlewareOffset);
-        }
-
         // receiveAsTokens
         uint256 receiveAsTokensOffset;
         uint256 receiveAsTokensLength;
         {
             assembly {
-                receiveAsTokensOffset := mload(add(message, 196))
+                receiveAsTokensOffset := mload(add(message, 164))
                 receiveAsTokensLength := mload(add(add(message, 100), receiveAsTokensOffset))
             }
             receiveAsTokens = _decodeCompleteWithdrawalsMsg_D(message, 100+receiveAsTokensOffset);
@@ -1025,7 +1080,7 @@ library CompleteWithdrawalsArrayDecoder {
     function _decodeCompleteWithdrawalsMsg_A(bytes memory message, uint256 woffset)
         private
         pure
-        returns (IDelegationManager.Withdrawal memory withdrawal)
+        returns (IDelegationManagerTypes.Withdrawal memory withdrawal)
     {
         {
             address staker;
@@ -1080,7 +1135,7 @@ library CompleteWithdrawalsArrayDecoder {
             }
 
             withdrawal.strategies = strategies;
-            withdrawal.shares = shares;
+            withdrawal.scaledShares = shares;
         }
     }
 
@@ -1116,26 +1171,6 @@ library CompleteWithdrawalsArrayDecoder {
             }
 
             tokens[i] = tokensInner;
-        }
-    }
-
-    function _decodeCompleteWithdrawalsMsg_C(bytes memory message, uint256 offset)
-        private
-        pure
-        returns (uint256[] memory middlewareTimesIndexes)
-    {
-        uint256 middlewareTimesIndexesLength;
-        assembly {
-            middlewareTimesIndexesLength := mload(add(message, offset))
-        }
-        middlewareTimesIndexes = new uint256[](middlewareTimesIndexesLength);
-
-        for (uint256 i = 0; i < middlewareTimesIndexesLength; ++i) {
-            uint256 elem;
-            assembly {
-                elem := mload(add(add(message, offset), mul(add(1, i), 0x20)))
-            }
-            middlewareTimesIndexes[i] = elem;
         }
     }
 
@@ -1182,7 +1217,7 @@ library DelegationDecoders {
         pure
         returns (
             address operator,
-            ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
+            ISignatureUtilsMixinTypes.SignatureWithExpiry memory approverSignatureAndExpiry,
             bytes32 approverSalt,
             address signer,
             uint256 expiryEigenAgent,
@@ -1232,7 +1267,7 @@ library DelegationDecoders {
 
         bytes memory signatureOperatorApprover = abi.encodePacked(r, s, v);
 
-        approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+        approverSignatureAndExpiry = ISignatureUtilsMixinTypes.SignatureWithExpiry({
             signature: signatureOperatorApprover,
             expiry: sigExpiry
         });
