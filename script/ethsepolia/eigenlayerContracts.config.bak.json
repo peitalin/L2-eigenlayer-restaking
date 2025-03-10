@@ -1,20 +1,20 @@
 {
   "addresses": {
-    "AllocationManager": "0x0Ed380bC2395F455792973ddE2238ad6F748B180",
-    "DelegationManager": "0x7D82F6cb05C549eB907Ee09E1d82AA38708d14dd",
-    "PauserRegistry": "0xeCE40cF898498573191a4a5e0e54112640385813",
-    "ProxyAdmin": "0x5814A23eBb71f8261E54A6EeB12a8dEde150a0E1",
-    "RewardsCoordinator": "0x1a7FFdED5c9A5906D5108008E43FBb225b26cA27",
-    "StrategyFactory": "0xaC6BaBf1347A544892758387F8B80e20B5CEd885",
-    "StrategyManager": "0x8E54F02Ed5b5AdEE0Ace55e54EeC1E34Ac2B52a4",
-    "TokenERC20": "0xFd57b4ddBf88a4e07fF4e34C487b99af2Fe82a05",
+    "AllocationManager": "0x0bED5e11726Eb0A32d4568DBdf74E5437754555F",
+    "DelegationManager": "0x74FdAa6dfAdedB0818BE6dC2C04d031AD425E5C7",
+    "PauserRegistry": "0xC9441A5E5CE7dE3a2E91ad35f7A40fc92c6d949e",
+    "ProxyAdmin": "0x1A6D239bdbe76b4f4651Db9b4c7a27F87c8A23bC",
+    "RewardsCoordinator": "0xfF38e9134F88D51cC09EdBc53c28251167274083",
+    "StrategyFactory": "0xf99460C8E06800D61f125E341aF1979FE5dF81b2",
+    "StrategyManager": "0x4bA8461d49F31Fa5f1779DD327dd4C07C832736B",
+    "TokenERC20": "0xAf03f2a302A2C4867d622dE44b213b8F870c0f1a",
     "strategies": {
-      "CCIPStrategy": "0x20BD30F02c7F68E9c83fB72D1A71A9B28682bb58"
+      "CCIPStrategy": "0x62cFd3D3cA257aF308c61dbE7bc044051e4A16D3"
     }
   },
   "chainInfo": {
     "chainId": 11155111,
-    "deploymentBlock": 7870460
+    "deploymentBlock": 7874738
   },
   "parameters": {
     "deployer": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c"

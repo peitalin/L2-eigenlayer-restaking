@@ -24,6 +24,7 @@ import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {RestakingConnectorUtils} from "../src/RestakingConnectorUtils.sol";
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
+import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 import {console} from "forge-std/Script.sol";

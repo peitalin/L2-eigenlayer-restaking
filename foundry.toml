@@ -6,7 +6,7 @@ ffi = true
 fs_permissions = [
   { access = "read-write", path = "./"},
 ]
-evm_version = "Prague"
+evm_version = "Cancun"
 # optimizer is enabled by default, can produce different bytecode and mess with contract verification
 # optimizer = false
 optimizer_runs = 200

@@ -6,9 +6,8 @@ echo forge script script/1_deployMockEigenlayerContracts.s.sol:DeployMockEigenla
 forge script script/1_deployMockEigenlayerContracts.s.sol:DeployMockEigenlayerContractsScript \
     --rpc-url ethsepolia \
     --broadcast \
-    --verify  \
+    --verify \
     --private-key $DEPLOYER_KEY \
-    --priority-gas-price 250 \
     -vvvv
 
 

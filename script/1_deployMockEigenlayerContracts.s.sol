@@ -135,14 +135,6 @@ contract DeployMockEigenlayerContractsScript is Script {
 
         vm.startBroadcast(deployer);
         IStrategy strategy = strategyFactory.deployNewStrategy(tokenERC20);
-
-        // setStrategyWithdrawalDelayBlocks
-        IStrategy[] memory strategies = new IStrategy[](1);
-        strategies[0] = strategy;
-
-        uint256[] memory withdrawalDelayBlocks = new uint256[](1);
-        withdrawalDelayBlocks[0] = 1;
-
         vm.stopBroadcast();
 
         if (saveDeployedContracts) {
@@ -478,54 +470,6 @@ contract DeployMockEigenlayerContractsScript is Script {
 
         vm.stopBroadcast();
         return erc20proxy;
-    }
-
-    function deployStrategyTVLLimits(
-        IStrategyManager _strategyManager,
-        IPauserRegistry _pauserRegistry,
-        IERC20 _tokenERC20,
-        ProxyAdmin _proxyAdmin
-    ) public returns (StrategyBaseTVLLimits) {
-        vm.startBroadcast(deployer);
-
-        require(address(_tokenERC20) != address(0), "tokenERC20 missing");
-        require(address(_strategyManager) != address(0), "strategyManager missing");
-        require(address(_pauserRegistry) != address(0), "pauserRegistry missing");
-
-        StrategyBaseTVLLimits strategyImpl = new StrategyBaseTVLLimits(
-            _strategyManager,
-            _pauserRegistry,
-            EIGENLAYER_VERSION
-        );
-
-        StrategyBaseTVLLimits strategyProxy = StrategyBaseTVLLimits(
-            address(
-                new TransparentUpgradeableProxy(
-                    address(strategyImpl),
-                    address(_proxyAdmin),
-                    abi.encodeWithSelector(
-                        StrategyBaseTVLLimits.initialize.selector,
-                        USER_DEPOSIT_LIMIT,  // uint256 _maxPerDeposit,
-                        TOTAL_DEPOSIT_LIMIT, // uint256 _maxTotalDeposits,
-                        _tokenERC20          // IERC20 _underlyingToken,
-                    )
-                )
-            )
-        );
-
-        vm.stopBroadcast();
-        return strategyProxy;
-    }
-
-    function whitelistStrategy(
-        IStrategyFactory _strategyFactory,
-        IStrategy _strategy
-    ) public {
-        IStrategy[] memory strategiesToWhitelist = new IStrategy[](1);
-        strategiesToWhitelist[0] = _strategy;
-        vm.startBroadcast(deployer);
-        _strategyFactory.whitelistStrategies(strategiesToWhitelist);
-        vm.stopBroadcast();
     }
 
     struct EigenlayerAddresses {
