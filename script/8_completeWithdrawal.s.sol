@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
 
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {EthSepolia} from "./Addresses.sol";
@@ -18,7 +18,6 @@ contract CompleteWithdrawalScript is BaseScript {
     address staker;
     address withdrawer;
     uint256 expiry;
-    uint256 middlewareTimesIndex; // not used yet, for slashing
     bool receiveAsTokens;
 
     address TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
@@ -83,13 +82,6 @@ contract CompleteWithdrawalScript is BaseScript {
             ));
 
             bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
-            // Create a withdrawalAgentOwnerRoot and commit to it on L2.
-            // So that when the withdrawal returns, we can
-            // verify which user (AgentOwner) to transfer withdrawals to
-            bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalTransferRoot(
-                withdrawalRoot,
-                deployer
-            );
 
             IERC20[] memory tokensToWithdraw = new IERC20[](1);
             tokensToWithdraw[0] = withdrawal.strategies[0].underlyingToken();
@@ -100,18 +92,16 @@ contract CompleteWithdrawalScript is BaseScript {
             vm.selectFork(l2ForkId);
 
             require(
-                senderContract.allowlistedSenders(address(receiverContract)),
-                "senderCCIP: must allowlistSender(receiverCCIP)"
+                senderContract.allowlistedSenders(EthSepolia.ChainSelector, address(receiverContract)),
+                "senderCCIP: must allowlistSender(receiverCCIP) on EthSepolia"
             );
 
-            middlewareTimesIndex = 0; // not used yet, for slashing
             receiveAsTokens = true;
 
             {
                 bytes memory completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
                     withdrawal,
                     tokensToWithdraw,
-                    middlewareTimesIndex,
                     receiveAsTokens
                 );
 
@@ -168,9 +158,8 @@ contract CompleteWithdrawalScript is BaseScript {
                 withdrawal.nonce,
                 withdrawal.startBlock,
                 withdrawal.strategies,
-                withdrawal.shares,
+                withdrawal.scaledShares,
                 withdrawalRoot,
-                withdrawalAgentOwnerRoot,
                 filePath
             );
 

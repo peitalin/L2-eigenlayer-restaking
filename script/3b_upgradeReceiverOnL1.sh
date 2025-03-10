@@ -44,10 +44,3 @@ forge script script/3b_upgradeReceiverOnL1.s.sol:UpgradeReceiverOnL1Script \
 #     0xA0E52EAAb41FdC898675452fAF6F01B7b63Cab9d \
 #     src/utils/EigenlayerMsgEncoders.sol:EigenlayerMsgEncoders
 
-# forge verify-contract \
-#     --watch \
-#     --rpc-url ethsepolia \
-#     --etherscan-api-key $ETHERSCAN_API_KEY \
-#     --compiler-version v0.8.25 \
-#     0x2FA8c04CcBdd90E6042b43F547dEdfD932681F6C \
-#     src/utils/EigenlayerMsgDecoders.sol:DelegationDecoders

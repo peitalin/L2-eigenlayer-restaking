@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
@@ -7,10 +7,12 @@ import {Initializable} from "@openzeppelin-v5-contracts-upgradeable/proxy/utils/
 import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 
 import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
@@ -164,8 +166,12 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             gasLimits
         );
 
-        // Return default gasLimit of 400_000 for undefined function selectors
-        vm.assertEq(senderHooks.getGasLimitForFunctionSelector(0xffeeaabb), 199_998);
+        // revert for unsupported function selectors with no set gasLimit
+        vm.expectRevert(abi.encodeWithSelector(
+            SenderHooks.UnsupportedFunctionCall.selector,
+            bytes4(0xffeeaabb)
+        ));
+        senderHooks.getGasLimitForFunctionSelector(0xffeeaabb);
 
         // gas limits should be set
         vm.assertEq(senderHooks.getGasLimitForFunctionSelector(functionSelectors[0]), 1_000_000);
@@ -181,74 +187,6 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         sHooks.initialize(address(1), address(2));
     }
 
-    function test_beforeSend_Commits_WithdrawalTransferRoot() public {
-
-        vm.startBroadcast(address(senderContract));
-
-        (
-            bytes32 withdrawalRoot,
-            bytes memory messageWithSignature_CW
-        ) = mockCompleteWithdrawalMessage(bobKey, amount);
-
-        bytes32 withdrawalAgentOwnerRoot = calculateWithdrawalTransferRoot(
-            withdrawalRoot,
-            bob
-        );
-
-        vm.expectEmit(false, false, false, false);
-        emit SenderHooks.WithdrawalTransferRootCommitted(
-            withdrawalAgentOwnerRoot,
-            bob
-        );
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-        tokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL1),
-            amount: 0 ether
-        });
-        // called by senderContract
-        senderHooks.beforeSendCCIPMessage(
-            abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-            tokenAmounts
-        );
-
-        vm.stopBroadcast();
-    }
-
-    function test_CommitsAndGets_WithdrawalTransferRoot() public {
-
-        vm.startBroadcast(address(senderContract));
-
-        (
-            bytes32 withdrawalRoot,
-            bytes memory messageWithSignature_CW
-        ) = mockCompleteWithdrawalMessage(bobKey, amount);
-
-        bytes32 withdrawalTransferRoot = calculateWithdrawalTransferRoot(
-            withdrawalRoot,
-            bob
-        );
-
-        vm.expectEmit(false, false, false, false);
-        emit SenderHooks.WithdrawalTransferRootCommitted(
-            withdrawalTransferRoot,
-            bob
-        );
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-        tokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL1),
-            amount: 0 ether
-        });
-        // called by senderContract
-        senderHooks.beforeSendCCIPMessage(
-            abi.encode(string(messageWithSignature_CW)), // CCIP string encodes when messaging
-            tokenAmounts
-        );
-
-        address agentOwner = senderHooks.getTransferRootAgentOwner(withdrawalTransferRoot);
-        vm.stopBroadcast();
-        vm.assertEq(agentOwner, bob);
-    }
-
     function test_beforeSendCCIPMessage_OnlyCalledBySenderCCIP(uint256 signerKey) public {
 
         vm.assume(signerKey < type(uint256).max / 2); // EIP-2: secp256k1 curve order / 2
@@ -257,10 +195,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
 
         vm.startBroadcast(alice);
         {
-            (
-                , // bytes32 withdrawalRoot,
-                bytes memory messageWithSignature_CW
-            ) = mockCompleteWithdrawalMessage(bobKey, amount);
+            bytes memory messageWithSignature_CW = mockCompleteWithdrawalMessage(bobKey, amount);
 
             Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
             tokenAmounts[0] = Client.EVMTokenAmount({
@@ -282,12 +217,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
 
         vm.startBroadcast(address(senderContract));
 
-        (
-            bytes32 rewardsRoot,
-            bytes memory messageWithSignature_PC
-        ) = mockRewardsClaimMessage(bobKey);
-
-        require(rewardsRoot != bytes32(abi.encode(0)), "rewardsRoot cannot be 0x0");
+        bytes memory messageWithSignature_PC = mockRewardsClaimMessage(bobKey);
 
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
         tokenAmounts[0] = Client.EVMTokenAmount({
@@ -312,12 +242,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
 
         vm.assume(mock_address != address(senderContract));
 
-        (
-            bytes32 rewardsRoot,
-            bytes memory messageWithSignature_PC
-        ) = mockRewardsClaimMessage(bobKey);
-
-        require(rewardsRoot != bytes32(abi.encode(0)), "rewardsRoot cannot be 0x0");
+        bytes memory messageWithSignature_PC = mockRewardsClaimMessage(bobKey);
 
         bytes memory message = abi.encode(string(messageWithSignature_PC));
 
@@ -336,22 +261,23 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         vm.assertTrue(success);
     }
 
-    function mockRewardsClaimMessage(uint256 signerKey) public view returns (
-        bytes32 rewardsRoot,
-        bytes memory messageWithSignature_PC
-    ) {
+    function mockRewardsClaimMessage(uint256 signerKey)
+        public
+        view
+        returns (bytes memory messageWithSignature_PC)
+    {
 
-		IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves;
-        tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](1);
-		tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+		IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves;
+        tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](1);
+		tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: tokenL1,
             cumulativeEarnings: 1 ether
         });
 
         address signer = vm.addr(signerKey);
 
-		IRewardsCoordinator.EarnerTreeMerkleLeaf memory earnerLeaf;
-        earnerLeaf = IRewardsCoordinator.EarnerTreeMerkleLeaf({
+		IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf memory earnerLeaf;
+        earnerLeaf = IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf({
 			earner: signer,
 			earnerTokenRoot: rewardsCoordinator.calculateTokenLeafHash(tokenLeaves[0])
 		});
@@ -361,7 +287,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         tokenIndices[0] = 0;
         tokenTreeProofs[0] = abi.encode(bytes32(0x0));
 
-		IRewardsCoordinator.RewardsMerkleClaim memory claim = IRewardsCoordinator.RewardsMerkleClaim({
+		IRewardsCoordinatorTypes.RewardsMerkleClaim memory claim = IRewardsCoordinatorTypes.RewardsMerkleClaim({
 			rootIndex: 0,
 			earnerIndex: 0,
 			earnerTreeProof: hex"",
@@ -381,15 +307,12 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             execNonce,
             expiry
         );
-
-        rewardsRoot = calculateRewardsRoot(claim);
     }
 
-    function mockCompleteWithdrawalMessage(uint256 signerKey, uint256 _amount) public view
-        returns (
-            bytes32 withdrawalRoot,
-            bytes memory messageWithSignature_CW
-        )
+    function mockCompleteWithdrawalMessage(uint256 signerKey, uint256 _amount)
+        public
+        view
+        returns (bytes memory messageWithSignature_CW)
     {
 
         IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
@@ -397,17 +320,15 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
         strategiesToWithdraw[0] = strategy;
         sharesToWithdraw[0] = _amount;
 
-        IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
+        IDelegationManagerTypes.Withdrawal memory withdrawal = IDelegationManagerTypes.Withdrawal({
             staker: mockEigenAgent,
             delegatedTo: vm.addr(5656),
             withdrawer: mockEigenAgent,
             nonce: withdrawalNonce,
             startBlock: startBlock,
             strategies: strategiesToWithdraw,
-            shares: sharesToWithdraw
+            scaledShares: sharesToWithdraw
         });
-
-        withdrawalRoot = calculateWithdrawalRoot(withdrawal);
 
         bytes memory completeWithdrawalMessage;
         {
@@ -418,7 +339,6 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
                 withdrawal,
                 tokensToWithdraw,
-                0, //middlewareTimesIndex,
                 true // receiveAsTokens
             );
 
@@ -434,10 +354,7 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
             );
         }
 
-        return (
-            withdrawalRoot,
-            messageWithSignature_CW
-        );
+        return messageWithSignature_CW;
     }
 
 }

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {OwnableUpgradeable} from "@openzeppelin-v5-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
+
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
@@ -24,7 +25,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
     error DestinationChainNotAllowed(uint64 destinationChainSelector);
     error SourceChainNotAllowed(uint64 sourceChainSelector);
 
-    error SenderNotAllowed(address sender);
+    error SenderNotAllowed(uint64 sourceChainSelector, address sender);
     error InvalidReceiverAddress();
 
     uint256 expiry;
@@ -54,7 +55,9 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         // L1 Receiver
         vm.selectFork(ethForkId);
 
-        IERC20_CCIPBnM(address(tokenL1)).drip(address(receiverContract));
+        vm.prank(deployer);
+        IBurnMintERC20(address(tokenL1)).mint(address(receiverContract), 1 ether);
+
         uint256 totalWithdraw = tokenL1.balanceOf(address(receiverContract));
         uint256 halfWithdraw = totalWithdraw / 2;
 
@@ -151,7 +154,11 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         for (uint32 i = 0; i < usersL1.length; ++i) {
             address user = usersL1[i];
 
-            vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, user));
+            vm.expectRevert(abi.encodeWithSelector(
+                SenderNotAllowed.selector,
+                BaseSepolia.ChainSelector,
+                user
+            ));
             receiverContract.mockCCIPReceive(
                 Client.Any2EVMMessage({
                     messageId: bytes32(0x0),
@@ -202,7 +209,11 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         for (uint32 i = 0; i < usersL2.length; ++i) {
             address user = usersL2[i];
 
-            vm.expectRevert(abi.encodeWithSelector(SenderNotAllowed.selector, user));
+            vm.expectRevert(abi.encodeWithSelector(
+                SenderNotAllowed.selector,
+                EthSepolia.ChainSelector,
+                user
+            ));
             senderContract.mockCCIPReceive(
                 Client.Any2EVMMessage({
                     messageId: bytes32(0x0),
@@ -252,12 +263,6 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             token: address(tokenL1),
             amount: 0.1 ether
         });
-
-        bytes memory message2 = encodeDepositIntoStrategyMsg(
-            address(strategy),
-            tokenAmounts[0].token,
-            tokenAmounts[0].amount
-        );
 
         vm.startBroadcast(deployerKey);
         {
@@ -628,12 +633,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         bytes memory messageWithSignature;
         {
             uint256 execNonce = 0;
-            bytes32 mockWithdrawalAgentOwnerRoot = bytes32(abi.encode(123));
-
-            message = encodeTransferToAgentOwnerMsg(
-                mockWithdrawalAgentOwnerRoot
-            );
-
+            message = encodeTransferToAgentOwnerMsg(bob);
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
@@ -693,12 +693,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         bytes memory messageWithSignature;
         {
             uint256 execNonce = 0;
-            bytes32 mockWithdrawalAgentOwnerRoot = bytes32(abi.encode(123));
-
-            message = encodeTransferToAgentOwnerMsg(
-                mockWithdrawalAgentOwnerRoot
-            );
-
+            message = encodeTransferToAgentOwnerMsg(bob);
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
@@ -726,8 +721,9 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         vm.prank(address(receiverContract));
         (
             bool _success,
-            bytes memory _result
+            // bytes memory _result
         ) = address(bob).call{value: address(receiverContract).balance}("");
+        require(_success, "bob should receive ETH");
 
         vm.expectRevert(abi.encodeWithSelector(BaseMessengerCCIP.NotEnoughBalance.selector, 0, fees));
         // don't send gas to receiver contract

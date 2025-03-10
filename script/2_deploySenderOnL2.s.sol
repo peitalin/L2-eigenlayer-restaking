@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
@@ -40,14 +40,12 @@ contract DeploySenderOnL2Script is Script, FileReader {
 
         vm.startBroadcast(deployerKey);
 
-        ProxyAdmin proxyAdmin = new ProxyAdmin(deployer);
-
         // deploy sender utils proxy
         SenderHooks senderHooksProxy = SenderHooks(
             payable(address(
                 new TransparentUpgradeableProxy(
                     address(new SenderHooks()),
-                    address(proxyAdmin),
+                    address(deployer),
                     abi.encodeWithSelector(
                         SenderHooks.initialize.selector,
                         EthSepolia.BridgeToken,
@@ -65,11 +63,13 @@ contract DeploySenderOnL2Script is Script, FileReader {
             senderImpl = new SenderCCIP(BaseSepolia.Router);
         }
 
+        // Deployer, not ProxyAdmin for 2nd argument in TransparentUpgradeableProxy constructor
+        // https://forum.openzeppelin.com/t/5-0-transparentupgradeableproxy-upgradeandcall-error/41540/2
         SenderCCIP senderProxy = SenderCCIP(
             payable(address(
                 new TransparentUpgradeableProxy(
                     address(senderImpl),
-                    address(proxyAdmin),
+                    address(deployer),
                     abi.encodeWithSelector(SenderCCIP.initialize.selector)
                 )
             ))
@@ -102,7 +102,6 @@ contract DeploySenderOnL2Script is Script, FileReader {
             saveSenderBridgeContracts(
                 address(senderProxy),
                 address(senderHooksProxy),
-                address(proxyAdmin),
                 FILEPATH_BRIDGE_CONTRACTS_L2
             );
         }

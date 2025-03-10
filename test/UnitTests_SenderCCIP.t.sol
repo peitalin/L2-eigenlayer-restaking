@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
@@ -72,10 +72,11 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
                 amount: amount
             });
 
+            address sender = address(receiverContract);
             Client.Any2EVMMessage memory ccipMessage = Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
                 sourceChainSelector: EthSepolia.ChainSelector,
-                sender: abi.encode(address(deployer)),
+                sender: abi.encode(sender),
                 data: abi.encode(string(
                     randomMessage
                 )),
@@ -93,7 +94,7 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
             emit BaseMessengerCCIP.MessageReceived(
                 ccipMessage.messageId,
                 ccipMessage.sourceChainSelector,
-                address(deployer),
+                sender,
                 destTokenAmounts
             );
             vm.expectEmit(true, true, true, true);
@@ -112,11 +113,12 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
         vm.startBroadcast(address(senderContract));
         {
             Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](0);
+            address sender = address(receiverContract);
 
             Client.Any2EVMMessage memory ccipMessage = Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
                 sourceChainSelector: EthSepolia.ChainSelector,
-                sender: abi.encode(address(deployer)),
+                sender: abi.encode(sender),
                 data: abi.encode(string(
                     randomMessage
                 )),
@@ -135,7 +137,7 @@ contract UnitTests_SenderCCIP is BaseTestEnvironment {
             emit BaseMessengerCCIP.MessageReceived(
                 ccipMessage.messageId,
                 ccipMessage.sourceChainSelector,
-                address(deployer),
+                sender,
                 tokenAmounts
             );
             vm.expectEmit(true, true, true, true);

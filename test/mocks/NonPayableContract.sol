@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 contract NonPayableContract {
     /// @notice Congtract with no receiver() or fallbacks() to test call{value: x ether}() failures

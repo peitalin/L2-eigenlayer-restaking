@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin-v5-contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin-v5-contracts/proxy/transparent/ProxyAdmin.sol";
@@ -13,9 +13,10 @@ import {ISenderHooks} from "../src/interfaces/ISenderHooks.sol";
 
 import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
+import {UpgradesOZ5} from "./UpgradesOZ5.sol";
 
 
-contract UpgradeSenderOnL2Script is Script, FileReader {
+contract UpgradeSenderOnL2Script is Script, FileReader, UpgradesOZ5 {
 
     uint256 deployerKey = vm.envUint("DEPLOYER_KEY");
     address deployer = vm.addr(deployerKey);
@@ -31,8 +32,6 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
 
     function _run() private {
 
-        ProxyAdmin proxyAdmin = ProxyAdmin(readProxyAdminL2());
-
         (
             IReceiverCCIP receiverProxy,
             // restakingConnectorProxy
@@ -46,22 +45,24 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
         /////////////////////////////
         vm.startBroadcast(deployerKey);
 
-        proxyAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(payable(address(senderProxy))),
-            address(new SenderCCIP(BaseSepolia.Router)),
-            ""
-        );
+        ProxyAdmin(getProxyAdminOZ5(address(senderProxy)))
+            .upgradeAndCall(
+                ITransparentUpgradeableProxy(payable(address(senderProxy))),
+                address(new SenderCCIP(BaseSepolia.Router)),
+                ""
+            );
 
-        proxyAdmin.upgradeAndCall(
-            ITransparentUpgradeableProxy(payable(address(senderHooksProxy))),
-            address(new SenderHooks()),
-            ""
-        );
+        ProxyAdmin(getProxyAdminOZ5(address(senderHooksProxy)))
+            .upgradeAndCall(
+                ITransparentUpgradeableProxy(payable(address(senderProxy))),
+                address(new SenderHooks()),
+                "" // empty data, don't need to initialize
+            );
 
         /// whitelist destination chain
         senderProxy.allowlistDestinationChain(EthSepolia.ChainSelector, true);
         senderProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
-        senderProxy.allowlistSender(address(receiverProxy), true);
+        senderProxy.allowlistSender(EthSepolia.ChainSelector, address(receiverProxy), true);
         senderProxy.setSenderHooks(senderHooksProxy);
 
         senderHooksProxy.setSenderCCIP(address(senderProxy));
@@ -79,8 +80,8 @@ contract UpgradeSenderOnL2Script is Script, FileReader {
             "senderHooksProxy: missing senderCCIP"
         );
         require(
-            senderProxy.allowlistedSenders(address(receiverProxy)),
-            "senderProxy: must allowlistSender(receiverProxy)"
+            senderProxy.allowlistedSenders(EthSepolia.ChainSelector, address(receiverProxy)),
+            "senderProxy: must allowlistSender(receiverProxy) on EthSepolia"
         );
         require(
             senderProxy.allowlistedSourceChains(EthSepolia.ChainSelector),

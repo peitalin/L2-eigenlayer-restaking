@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
@@ -8,7 +8,13 @@ import {IERC1271} from "@openzeppelin-v5-contracts/interfaces/IERC1271.sol";
 import {IERC165} from "@openzeppelin-v5-contracts/utils/introspection/IERC165.sol";
 
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
+import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {EIP712_DOMAIN_TYPEHASH} from "@eigenlayer-contracts/mixins/SignatureUtilsMixin.sol";
+import {EIGENLAYER_VERSION} from "../script/1_deployMockEigenlayerContracts.s.sol";
+
 import {
     IERC6551Executable,
     IERC6551Account as IERC6551
@@ -62,8 +68,15 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
     function test_EigenAgent_DomainTypehash() public {
         vm.assertEq(
-            delegationManager.DOMAIN_TYPEHASH(),
-            eigenAgent.DOMAIN_TYPEHASH()
+            EIP712_DOMAIN_TYPEHASH,
+            eigenAgent.EIP712_DOMAIN_TYPEHASH()
+        );
+    }
+
+    function test_EigenAgent_EigenlayerVersionMatches() public {
+        vm.assertEq(
+            EIGENLAYER_VERSION,
+            EigenAgent6551(payable(address(eigenAgent))).EIGENLAYER_VERSION()
         );
     }
 
@@ -465,7 +478,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         {
             vm.startBroadcast(address(restakingConnector));
 
-            bytes memory data0 = abi.encodeWithSelector(
+            bytes memory message0 = abi.encodeWithSelector(
                 // bytes4(keccak256("approve(address,uint256)")),
                 IERC20.approve.selector,
                 address(strategyManager),
@@ -479,7 +492,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 bobKey,
                 address(eigenAgentBob),
                 address(tokenL1),
-                data0,
+                message0,
                 execNonce0
             );
             checkSignature_EIP1271(bob, digestHash0, signature0);
@@ -487,7 +500,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             eigenAgentBob.executeWithSignature(
                 address(tokenL1), // CCIP-BnM token
                 0 ether, // value
-                data0,
+                message0,
                 expiry,
                 signature0
             );
@@ -504,7 +517,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         {
             vm.startBroadcast(address(restakingConnector));
             (
-                bytes memory data1,
+                bytes memory message1,
                 bytes32 digestHash1,
                 bytes memory signature1
             ) = createEigenAgentDepositSignature(
@@ -518,7 +531,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             eigenAgentBob.executeWithSignature(
                 address(strategyManager), // strategyManager
                 0,
-                data1, // encodeDepositIntoStrategyMsg
+                message1, // encodeDepositIntoStrategyMsg
                 expiry,
                 signature1
             );
@@ -533,8 +546,33 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
             uint256 transferTokenId = agentFactory.getEigenAgentOwnerTokenId(bob);
             IEigenAgentOwner721 eigenAgentOwner721 = agentFactory.eigenAgentOwner721();
-            eigenAgentOwner721.approve(alice, transferTokenId);
 
+            // Bob sets rewardsClaimer for EigenAgentBob to himself
+            eigenAgentBob.execute(
+                address(rewardsCoordinator),
+                0,
+                abi.encodeWithSelector(bytes4(keccak256("setClaimerFor(address)")), bob),
+                0
+            );
+
+            require(
+                rewardsCoordinator.claimerFor(address(eigenAgentBob)) == address(bob),
+                "Bob should be the rewardsClaimer for EigenAgentBob now"
+            );
+
+            // Bob tries to sell his EigenAgent to Alice, but fails
+            vm.expectRevert("EigenAgent's rewards claimer must be reset to address(0) before transfer");
+            eigenAgentOwner721.safeTransferFrom(bob, alice, transferTokenId);
+
+            // Bob wipes the rewardsClaimer for EigenAgentBob
+            eigenAgentBob.execute(
+                address(rewardsCoordinator),
+                0,
+                abi.encodeWithSelector(bytes4(keccak256("setClaimerFor(address)")), address(0)),
+                0
+            );
+
+            // Now Bob is able to transfer his EigenAgentOwner NFT to Alice
             vm.expectEmit(true, true, true, true);
             emit IAgentFactory.EigenAgentOwnerUpdated(bob, alice, transferTokenId);
             eigenAgentOwner721.safeTransferFrom(bob, alice, transferTokenId);
@@ -543,6 +581,13 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 eigenAgentOwner721.ownerOf(transferTokenId) == alice,
                 "Alice should now be owner of Bob's EigenAgentBobOwner NFT"
             );
+
+            // rewardsClaimer for EigenAgentBob (now owned by Alice) should be reset to address(0)
+            require(
+                rewardsCoordinator.claimerFor(address(eigenAgentBob)) == address(0),
+                "Claimer should be reset to address(0) upon transfer"
+            );
+
             vm.stopBroadcast();
         }
 
@@ -552,7 +597,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         {
             vm.startBroadcast(address(restakingConnector));
 
-            IDelegationManager.QueuedWithdrawalParams[] memory queuedWithdrawalParams;
+            IDelegationManagerTypes.QueuedWithdrawalParams[] memory queuedWithdrawalParams;
 
             IStrategy[] memory strategiesToWithdraw = new IStrategy[](1);
             strategiesToWithdraw[0] = strategy;
@@ -560,19 +605,19 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             uint256[] memory sharesToWithdraw = new uint256[](1);
             sharesToWithdraw[0] = amount;
 
-            IDelegationManager.QueuedWithdrawalParams memory queuedWithdrawal =
-                IDelegationManager.QueuedWithdrawalParams({
+            IDelegationManagerTypes.QueuedWithdrawalParams memory queuedWithdrawal =
+                IDelegationManagerTypes.QueuedWithdrawalParams({
                     strategies: strategiesToWithdraw,
-                    shares: sharesToWithdraw,
-                    withdrawer: address(eigenAgentBob)
+                    depositShares: sharesToWithdraw,
+                    __deprecated_withdrawer: address(eigenAgentBob)
                 });
 
-            queuedWithdrawalParams = new IDelegationManager.QueuedWithdrawalParams[](1);
+            queuedWithdrawalParams = new IDelegationManagerTypes.QueuedWithdrawalParams[](1);
             queuedWithdrawalParams[0] = queuedWithdrawal;
 
             uint256 execNonce2 = eigenAgentBob.execNonce();
             (
-                bytes memory data2,
+                bytes memory message2,
                 bytes32 digestHash2,
                 bytes memory signature2
             ) = createEigenAgentQueueWithdrawalsSignature(
@@ -586,7 +631,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             bytes memory result = eigenAgentBob.executeWithSignature(
                 address(delegationManager), // delegationManager
                 0,
-                data2, // encodeQueueWithdrawals
+                message2, // encodeQueueWithdrawals
                 expiry,
                 signature2
             );
@@ -597,6 +642,44 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 "no withdrawalRoot returned by EigenAgent queueWithdrawals"
             );
 
+            vm.stopBroadcast();
+        }
+        {
+            vm.startBroadcast(address(restakingConnector));
+            // Suppose BoB pre-approved message for EigenAgentBob.
+            // Check this message cannot be used after EigenAgentBob is transferred to Alice
+            bytes memory message3 = abi.encodeWithSelector(
+                // bytes4(keccak256("approve(address,uint256)")),
+                IERC20.approve.selector,
+                address(strategyManager),
+                amount
+            );
+            uint256 execNonce3 = 3;
+            bytes32 digestHash3;
+            bytes memory signature3;
+            (
+                digestHash3,
+                signature3
+            ) = createEigenAgentERC20ApproveSignature(
+                bobKey,
+                address(eigenAgentBob),
+                address(tokenL1),
+                message3,
+                execNonce3
+            );
+            checkSignature_EIP1271(bob, digestHash3, signature3);
+
+            vm.expectRevert(abi.encodeWithSelector(
+                SignatureInvalid.selector,
+                "Invalid signer, or incorrect digestHash parameters."
+            ));
+            eigenAgentBob.executeWithSignature(
+                address(strategyManager), // strategyManager
+                0,
+                message3, // encodeDepositIntoStrategyMsg
+                expiry,
+                signature3
+            );
             vm.stopBroadcast();
         }
     }
@@ -615,7 +698,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         // Bob transfers EigenAgent to Alice
         (,, uint256 tokenId1) = eigenAgent1.token();
         vm.prank(bob);
-        eigenAgentOwner721.transferFrom(bob, alice, tokenId1);
+        eigenAgentOwner721.safeTransferFrom(bob, alice, tokenId1);
 
         // Mint Bob another EigenAgent
         vm.prank(deployer);
@@ -712,7 +795,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         // Check if there is no CreateCollision error
         // even after the EigenAgentOwner721 is transferred
         vm.prank(deployer);
-        IEigenAgent6551 eigenAgent2 = agentFactory.spawnEigenAgentOnlyOwner(bob);
+        agentFactory.spawnEigenAgentOnlyOwner(bob);
     }
 
     //////////////////////////////////////////////////////

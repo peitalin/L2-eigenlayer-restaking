@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
 import {IERC1271} from "@openzeppelin-v5-contracts/interfaces/IERC1271.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
-import {ISignatureUtils} from "@eigenlayer-contracts/interfaces/ISignatureUtils.sol";
+import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {ISignatureUtilsMixinTypes} from "@eigenlayer-contracts/interfaces/ISignatureUtilsMixin.sol";
+import {EIP712_DOMAIN_TYPEHASH} from "@eigenlayer-contracts/mixins/SignatureUtilsMixin.sol";
+import {EIGENLAYER_VERSION} from "../script/1_deployMockEigenlayerContracts.s.sol";
 
 import {
     EigenlayerMsgDecoders,
@@ -124,11 +128,13 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
         address contractAddr = address(strategyManager);
         uint256 chainid = EthSepolia.ChainId;
-        bytes32 DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
+        bytes memory v = bytes(EIGENLAYER_VERSION);
+        string memory majorVerion = string(bytes.concat(v[0], v[1]));
 
         bytes32 domainSeparator1 = keccak256(abi.encode(
-            DOMAIN_TYPEHASH,
+            EIP712_DOMAIN_TYPEHASH,
             keccak256(bytes("EigenLayer")),
+            keccak256(bytes(majorVerion)),
             chainid,
             contractAddr
         ));
@@ -284,12 +290,12 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         strategiesToWithdraw[0] = strategy;
         sharesToWithdraw[0] = amount;
 
-        IDelegationManager.QueuedWithdrawalParams[] memory QWPArray;
-        QWPArray = new IDelegationManager.QueuedWithdrawalParams[](1);
-        QWPArray[0] = IDelegationManager.QueuedWithdrawalParams({
+        IDelegationManagerTypes.QueuedWithdrawalParams[] memory QWPArray;
+        QWPArray = new IDelegationManagerTypes.QueuedWithdrawalParams[](1);
+        QWPArray[0] = IDelegationManagerTypes.QueuedWithdrawalParams({
             strategies: strategiesToWithdraw,
-            shares: sharesToWithdraw,
-            withdrawer: address(eigenAgent)
+            depositShares: sharesToWithdraw,
+            __deprecated_withdrawer: address(eigenAgent)
         });
 
         vm.assertEq(
@@ -299,7 +305,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
     }
 
     function makeMockWithdrawal() public view returns (
-        IDelegationManager.Withdrawal memory
+        IDelegationManagerTypes.Withdrawal memory
     ) {
 
         uint32 startBlock = uint32(block.number);
@@ -309,14 +315,14 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         strategiesToWithdraw[0] = strategy;
         sharesToWithdraw[0] = amount;
 
-        IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
+        IDelegationManagerTypes.Withdrawal memory withdrawal = IDelegationManagerTypes.Withdrawal({
             staker: address(eigenAgent),
             delegatedTo: vm.addr(1222),
             withdrawer: address(eigenAgent),
             nonce: 0,
             startBlock: startBlock,
             strategies: strategiesToWithdraw,
-            shares: sharesToWithdraw
+            scaledShares: sharesToWithdraw
         });
 
         return withdrawal;
@@ -324,11 +330,10 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
     function test_ClientEncoder_encodeCompleteWithdrawalMsg() public view {
 
-        IDelegationManager.Withdrawal memory withdrawal = makeMockWithdrawal();
+        IDelegationManagerTypes.Withdrawal memory withdrawal = makeMockWithdrawal();
 
         IERC20[] memory tokensToWithdraw = new IERC20[](1);
         tokensToWithdraw[0] = tokenL1;
-        uint256 middlewareTimesIndex = 0;
         bool receiveAsTokens = true;
 
         vm.assertEq(
@@ -336,7 +341,6 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
                 clientEncodersTest.encodeCompleteWithdrawalMsg(
                     withdrawal,
                     tokensToWithdraw,
-                    middlewareTimesIndex,
                     receiveAsTokens
                 )
             )),
@@ -344,7 +348,6 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
                 EigenlayerMsgEncoders.encodeCompleteWithdrawalMsg(
                     withdrawal,
                     tokensToWithdraw,
-                    middlewareTimesIndex,
                     receiveAsTokens
                 )
             ))
@@ -353,7 +356,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
     function test_ClientEncoder_encodeCompleteWithdrawals_ArrayMsg() public view {
 
-        IDelegationManager.Withdrawal[] memory withdrawals = new IDelegationManager.Withdrawal[](1);
+        IDelegationManagerTypes.Withdrawal[] memory withdrawals = new IDelegationManagerTypes.Withdrawal[](1);
         withdrawals[0] = makeMockWithdrawal();
 
         IERC20[][] memory tokensToWithdraw = new IERC20[][](1);
@@ -361,10 +364,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         tokens1[0] = IERC20(address(1));
         tokensToWithdraw[0] = tokens1;
 
-        uint256[] memory middlewareTimesIndexes = new uint256[](1) ;
         bool[] memory receiveAsTokens = new bool[](1);
-
-        middlewareTimesIndexes[0] = 0;
         receiveAsTokens[0] = false;
 
         vm.assertEq(
@@ -372,7 +372,6 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
                 clientEncodersTest.encodeCompleteWithdrawalsMsg(
                     withdrawals,
                     tokensToWithdraw,
-                    middlewareTimesIndexes,
                     receiveAsTokens
                 )
             )),
@@ -380,70 +379,19 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
                 EigenlayerMsgEncoders.encodeCompleteWithdrawalsMsg(
                     withdrawals,
                     tokensToWithdraw,
-                    middlewareTimesIndexes,
                     receiveAsTokens
                 )
             ))
         );
     }
 
-    function test_ClientEncoder_calculateWithdrawalTransferRoot() public view {
-
-        IDelegationManager.Withdrawal memory withdrawal = makeMockWithdrawal();
-        bytes32 withdrawalRoot = clientEncodersTest.calculateWithdrawalRoot(withdrawal);
-
-        vm.assertEq(
-            keccak256(abi.encode(
-                clientEncodersTest.calculateWithdrawalTransferRoot(
-                    withdrawalRoot,
-                    deployer
-                )
-            )),
-            keccak256(abi.encode(
-                EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(
-                    withdrawalRoot,
-                    deployer
-                )
-            ))
-        );
-    }
-
-    function test_SenderHooks_calculateWithdrawalTransferRoot() public view {
-
-        IDelegationManager.Withdrawal memory withdrawal = makeMockWithdrawal();
-        bytes32 withdrawalRoot = clientEncodersTest.calculateWithdrawalRoot(withdrawal);
-
-        vm.assertEq(
-            keccak256(abi.encode(
-                senderHooks.calculateWithdrawalTransferRoot(
-                    withdrawalRoot,
-                    deployer
-                )
-            )),
-            keccak256(abi.encode(
-                EigenlayerMsgEncoders.calculateWithdrawalTransferRoot(
-                    withdrawalRoot,
-                    deployer
-                )
-            ))
-        );
-    }
-
     function test_ClientEncoder_encodeTransferToAgentOwnerMsg() public view {
-
-        IDelegationManager.Withdrawal memory withdrawal = makeMockWithdrawal();
-        bytes32 withdrawalRoot = clientEncodersTest.calculateWithdrawalRoot(withdrawal);
-        bytes32 withdrawalTransferRoot = clientEncodersTest.calculateWithdrawalTransferRoot(
-            withdrawalRoot,
-            deployer
-        );
-
         vm.assertEq(
             keccak256(abi.encode(
-                clientEncodersTest.encodeTransferToAgentOwnerMsg(withdrawalTransferRoot)
+                clientEncodersTest.encodeTransferToAgentOwnerMsg(deployer)
             )),
             keccak256(abi.encode(
-                EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(withdrawalTransferRoot)
+                EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(deployer)
             ))
         );
     }
@@ -454,7 +402,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         bytes32 approverSalt = 0x0000000000000000000000000000000000000000000000000000000000002346;
         uint256 sig1_expiry = block.timestamp + 50 minutes;
 
-        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
+        ISignatureUtilsMixinTypes.SignatureWithExpiry memory approverSignatureAndExpiry;
         {
 
             bytes32 digestHash1 = calculateDelegationApprovalDigestHash(
@@ -470,7 +418,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash1);
             bytes memory signature1 = abi.encodePacked(r, s, v);
 
-            approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+            approverSignatureAndExpiry = ISignatureUtilsMixinTypes.SignatureWithExpiry({
                 signature: signature1,
                 expiry: sig1_expiry
             });
@@ -515,7 +463,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         bytes memory earnerTreeProof = hex"32c3756cc20bcbdb7f8b25dcb3b904ea271776626d79cf1797932298c3bc5c628a09335bd33183649a1338e1ce19dcc11b6e7500659b71ddeb3680855b6eeffdd879bbbe67f12fc80b7df9df2966012d54b23b2c1265c708cc64b12d38acf88a82277145d984d6a9dc5bdfa13cee09e543b810cef077330bd5828b746b8c92bb622731e95bf8721578fa6c5e1ceaf2e023edb2b9c989c7106af8455ceae4aaad1891758b2b17b58a3de5a98d61349658dd8b58bc3bfa5b08ec98ecf6bb45447bc45497275645c6cc432bf191633578079fc8787b0ee849e5af9c9a60375da395a8f7fbb5bc80c876748e5e000aedc8de1e163bbb930f5f05f49eafdfe43407e1daa8be3a9a68d8aeb17e55e562ae2d9efc90e3ced7e9992663a98c4309703e68728dfe1ec72d08c5516592581f81e8f2d8b703331bfd313ad2e343f9c7a3548821ed079b6f019319b2f7c82937cb24e1a2fde130b23d72b7451a152f71e8576abddb9b0b135ad963dba00860e04a76e8930a74a5513734e50c724b5bd550aa3f06e9d61d236796e70e35026ab17007b95d82293a2aecb1f77af8ee6b448abddb2ddce73dbc52aab08791998257aa5e0736d60e8f2d7ae5b50ef48971836435fd81a8556e13ffad0889903995260194d5330f98205b61e5c6555d8404f97d9fba8c1b83ea7669c5df034056ce24efba683a1303a3a0596997fa29a5028c5c2c39d6e9f04e75babdc9087f61891173e05d73f05da01c36d28e73c3b5594b61c107";
 
         bytes32 earnerTokenRoot = 0x899e3bde2c009bda46a51ecacd5b3f6df0af2833168cc21cac5f75e8c610ce0d;
-        IRewardsCoordinator.EarnerTreeMerkleLeaf memory earnerLeaf = IRewardsCoordinator.EarnerTreeMerkleLeaf({
+        IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf memory earnerLeaf = IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf({
             earner: deployer,
             earnerTokenRoot: earnerTokenRoot
         });
@@ -528,18 +476,18 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         tokenTreeProofs[0] = hex"30c06778aea3c632bc61f3a0ffa0b57bd9ce9c2cf76f9ad2369f1b46081bc90b";
         tokenTreeProofs[1] = hex"c82aa805d0910fc0a12610e7b59a440050529cf2a5b9e5478642bfa7f785fc79";
 
-        IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves;
-        tokenLeaves = new IRewardsCoordinator.TokenTreeMerkleLeaf[](2);
-        tokenLeaves[0] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[] memory tokenLeaves;
+        tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](2);
+        tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(0x4Bd30dAf919a3f74ec57f0557716Bcc660251Ec0),
             cumulativeEarnings: 3919643917052950253556
         });
-        tokenLeaves[1] = IRewardsCoordinator.TokenTreeMerkleLeaf({
+        tokenLeaves[1] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: IERC20(0xdeeeeE2b48C121e6728ed95c860e296177849932),
             cumulativeEarnings: 897463507533062629000000
         });
 
-        IRewardsCoordinator.RewardsMerkleClaim memory claim = IRewardsCoordinator.RewardsMerkleClaim({
+        IRewardsCoordinatorTypes.RewardsMerkleClaim memory claim = IRewardsCoordinatorTypes.RewardsMerkleClaim({
             rootIndex: 84, // uint32 rootIndex;
             earnerIndex: 66130, // uint32 earnerIndex;
             earnerTreeProof: earnerTreeProof, // bytes earnerTreeProof;
@@ -552,55 +500,16 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         return claim;
     }
 
-    function test_ClientEncoder_calculateRewardTransferRoot() public view {
-
-        IRewardsCoordinator.RewardsMerkleClaim memory claim = makeMockRewardsMerkleClaim();
-        bytes32 rewardsRoot = clientEncodersTest.calculateRewardsRoot(claim);
-        address agentOwner = deployer;
-
-        vm.assertEq(
-            keccak256(abi.encode(
-                clientEncodersTest.calculateRewardsTransferRoot(rewardsRoot, agentOwner)
-            )),
-            keccak256(abi.encode(
-                EigenlayerMsgEncoders.calculateRewardsTransferRoot(rewardsRoot, agentOwner)
-            ))
-        );
-    }
-
-    function test_SenderHooks_calculateRewardTransferRoot() public view {
-
-        IRewardsCoordinator.RewardsMerkleClaim memory claim = makeMockRewardsMerkleClaim();
-        bytes32 rewardsRoot = clientEncodersTest.calculateRewardsRoot(claim);
-        address agentOwner = deployer;
-
-        vm.assertEq(
-            keccak256(abi.encode(
-                senderHooks.calculateRewardsTransferRoot(rewardsRoot, agentOwner)
-            )),
-            keccak256(abi.encode(
-                EigenlayerMsgEncoders.calculateRewardsTransferRoot(rewardsRoot, agentOwner)
-            ))
-        );
-    }
-
     function test_ClientEncoder_encodeRewardsTransferToAgentOwnerMsg() public view {
 
-        IRewardsCoordinator.RewardsMerkleClaim memory claim = makeMockRewardsMerkleClaim();
-        bytes32 rewardsRoot = clientEncodersTest.calculateRewardsRoot(claim);
         address agentOwner = deployer;
-
-        bytes32 rewardsTransferRoot = EigenlayerMsgEncoders.calculateRewardsTransferRoot(
-            rewardsRoot,
-            agentOwner
-        );
 
         vm.assertEq(
             keccak256(abi.encode(
-                clientEncodersTest.encodeTransferToAgentOwnerMsg(rewardsTransferRoot)
+                clientEncodersTest.encodeTransferToAgentOwnerMsg(agentOwner)
             )),
             keccak256(abi.encode(
-                EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(rewardsTransferRoot)
+                EigenlayerMsgEncoders.encodeTransferToAgentOwnerMsg(agentOwner)
             ))
         );
     }

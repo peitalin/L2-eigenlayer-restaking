@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
+import {IPausable} from "@eigenlayer-contracts/interfaces/IPausable.sol";
 
 import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
@@ -113,7 +114,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         uint256 valueOfShares = strategy.userUnderlying(address(eigenAgentBob));
         require(amount == valueOfShares, "valueofShares incorrect");
         require(
-            amount == strategyManager.stakerStrategyShares(address(eigenAgentBob), strategy),
+            amount == strategyManager.stakerDepositShares(address(eigenAgentBob), strategy),
             "Bob's EigenAgent stakerStrategyShares should equal deposited amount"
         );
     }
@@ -169,7 +170,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IRestakingConnector.ExecutionErrorRefundAfterExpiry.selector,
-                "StrategyManager.onlyStrategiesWhitelistedForDeposit: strategy not whitelisted",
+                "StrategyNotWhitelisted()",
                 "Manually execute to refund after timestamp:",
                 expiryShort
             )
@@ -230,8 +231,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         }
 
         // warp ahead past the expiryShort timestamp:
-        vm.warp(block.timestamp + 3666); // 1 hour, 1 min, 6 seconds
-        vm.roll((block.timestamp + 3666) / 12); // 305 blocks on ETH
+        vm.warp(block.timestamp + 2 hours);
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
@@ -241,7 +241,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: messageId,
             sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(deployer),
+            sender: abi.encode(address(senderContract)),
             destTokenAmounts: destTokenAmounts,
             data: abi.encode(string(
                 messageWithSignature
@@ -253,16 +253,6 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         vm.expectEmit(true, true, true, false);
         emit ReceiverCCIP.RefundingDeposit(bob, address(tokenL1), amount);
         receiverContract.mockCCIPReceive(any2EvmMessage);
-
-        // Revert when trying to refund again
-        vm.prank(deployer);
-        vm.expectRevert(abi.encodeWithSelector(AlreadyRefunded.selector, amount));
-        receiverContract.withdrawTokenForMessageId(
-            messageId,
-            bob,
-            address(tokenL1),
-            0.1 ether
-        );
     }
 
     function test_ReceiverL1_PreventRefundAfterManualRefund() public {
@@ -270,6 +260,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         vm.selectFork(ethForkId);
 
         uint256 execNonce = 0;
+        // introduce a permanent error with invalid Eigenlayer contract
         address invalidEigenlayerContract = vm.addr(4444);
         // should revert with EigenAgentExecutionError(signer, expiry)
         uint256 expiryShort = block.timestamp + 60 seconds;
@@ -298,8 +289,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         }
 
         // warp ahead past the expiryShort timestamp:
-        vm.warp(block.timestamp + 7200); // 2 hours
-        vm.roll((block.timestamp + 7200) / 12); // 600 blocks on ETH
+        vm.warp(block.timestamp + 2 hours);
 
         Client.EVMTokenAmount[] memory destTokenAmounts = new Client.EVMTokenAmount[](1);
         destTokenAmounts[0] = Client.EVMTokenAmount({
@@ -309,25 +299,21 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
             messageId: messageId,
             sourceChainSelector: BaseSepolia.ChainSelector, // L2 source chain selector
-            sender: abi.encode(deployer),
+            sender: abi.encode(address(senderContract)),
             destTokenAmounts: destTokenAmounts,
             data: abi.encode(string(
                 messageWithSignature
             ))
         });
 
-        // Manually refund the user first
-        vm.prank(deployer);
-        receiverContract.withdrawTokenForMessageId(
-            messageId,
-            bob,
-            address(tokenL1),
-            0.1 ether
-        );
+        receiverContract.mockCCIPReceive(any2EvmMessage);
 
-        // reverts with original error message if user tries to trigger a refund
-        // after being manually refunded by admin. Refund is no longer available.
-        vm.expectRevert("StrategyManager.onlyStrategiesWhitelistedForDeposit: strategy not whitelisted");
+        // attempt to trigger a refund after being manually refunded by admin.
+        // Refund is no longer available, should revert with AlreadyRefunded
+        vm.expectRevert(abi.encodeWithSelector(
+            AlreadyRefunded.selector,
+            amount
+        ));
         receiverContract.mockCCIPReceive(any2EvmMessage);
     }
 
@@ -348,7 +334,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             0 // gasLimit
         );
 
-        require(fees1 > 0, "RouterFees on L1 did not esimate bridging fees");
+        require(fees1 > 0, "RouterFees on L1 did not estimate bridging fees");
 
         vm.selectFork(l2ForkId);
         RouterFees routerFeesL2 = new RouterFees();

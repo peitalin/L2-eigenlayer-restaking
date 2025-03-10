@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 
 
@@ -122,11 +123,11 @@ contract CCIP_ForkTest_QueueWithdrawal_Tests is BaseTestEnvironment {
             sharesToWithdraw[0] = amount;
 
             IDelegationManager.QueuedWithdrawalParams[] memory QWPArray;
-            QWPArray = new IDelegationManager.QueuedWithdrawalParams[](1);
-            QWPArray[0] = IDelegationManager.QueuedWithdrawalParams({
+            QWPArray = new IDelegationManagerTypes.QueuedWithdrawalParams[](1);
+            QWPArray[0] = IDelegationManagerTypes.QueuedWithdrawalParams({
                 strategies: strategiesToWithdraw,
-                shares: sharesToWithdraw,
-                withdrawer: address(eigenAgent)
+                depositShares: sharesToWithdraw,
+                __deprecated_withdrawer: address(eigenAgent)
             });
 
             // create the queueWithdrawal message for Eigenlayer

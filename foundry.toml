@@ -9,6 +9,8 @@ fs_permissions = [
 evm_version = "Cancun"
 # optimizer is enabled by default, can produce different bytecode and mess with contract verification
 # optimizer = false
+optimizer_runs = 200
+# reduces contract size
 
 # Note: If DeployScripts tests run into OutofGas errors, could be a memory issue:
 # https://github.com/foundry-rs/foundry/issues/3971
@@ -21,25 +23,26 @@ allow_internal_expect_revert = true
 remappings = [
   "@chainlink/ccip/=lib/ccip/contracts/src/v0.8/ccip/",
   "@chainlink/ccip-vendor/=lib/ccip/contracts/src/v0.8/vendor/",
+  "@chainlink/shared/=lib/ccip/contracts/src/v0.8/shared/",
   "forge-std/=lib/forge-std/src/",
   "@6551/=lib/reference/src/",
   "@openzeppelin-v5-contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts",
   "@openzeppelin-v5-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts",
   "@eigenlayer-contracts=lib/eigenlayer-contracts/src/contracts",
     # Note: We use OpenZeppelin v4.7 to deploy EigenLayer contracts (as EigenLayer does)
-  "@openzeppelin-v47-contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts/",
+  "@openzeppelin-v4-contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/contracts/",
     # Context dependent remappings to avoid conflicts
   "lib/openzeppelin-contracts-upgradeable:@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts",
   "lib/openzeppelin-contracts-upgradeable:@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts",
-  "lib/eigenlayer-contracts:@openzeppelin/contracts-upgradeable/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable",
-  "lib/eigenlayer-contracts:@openzeppelin/contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts/contracts"
+  "lib/eigenlayer-contracts:@openzeppelin/contracts-upgradeable/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-upgradeable-v4.9.0",
+  "lib/eigenlayer-contracts:@openzeppelin/contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/contracts"
 ]
 
 [rpc_endpoints]
 localhost = "http://localhost:8545"
-holesky = "https://holesky.drpc.org"
 # Note: Free RPCs may sometimes fail
-ethsepolia = "https://sepolia.drpc.org"
+# ethsepolia = "https://sepolia.drpc.org"
+ethsepolia = "https://sepolia.gateway.tenderly.co"
 # ethsepolia = "https://sepolia.infura.io/v3/${INFURA_API_KEY}"
 basesepolia = "https://sepolia.base.org"
 

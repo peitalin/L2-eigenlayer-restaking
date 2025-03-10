@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
@@ -25,18 +25,19 @@ interface IRestakingConnector {
     function getEigenlayerContracts() external returns (
         IDelegationManager,
         IStrategyManager,
-        IStrategy,
         IRewardsCoordinator
     );
 
     function setEigenlayerContracts(
         IDelegationManager _delegationManager,
         IStrategyManager _strategyManager,
-        IStrategy _strategy,
         IRewardsCoordinator _rewardsCoordinator
     ) external;
 
-    function getGasLimitForFunctionSelectorL1(bytes4 functionSelector) external returns (uint256);
+    function getGasLimitForFunctionSelectorL1(
+        bytes4 functionSelector,
+        uint256 tokenAmountsLength
+    ) external returns (uint256);
 
     function setGasLimitsForFunctionSelectors(
         bytes4[] memory functionSelectors,
@@ -61,14 +62,14 @@ interface IRestakingConnector {
     */
 
     enum TransferType {
+        NoTransfer,
         Withdrawal,
         RewardsClaim
     }
 
     struct TransferTokensInfo {
         TransferType transferType;
-        string transferToAgentOwnerMessage;
-        bytes32 transferRoot;
+        address agentOwner;
         Client.EVMTokenAmount[] tokenAmounts;
     }
 

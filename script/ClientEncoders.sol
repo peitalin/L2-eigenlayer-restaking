@@ -1,10 +1,10 @@
 //SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
-import {ISignatureUtils} from "@eigenlayer-contracts/interfaces/ISignatureUtils.sol";
+import {ISignatureUtilsMixinTypes} from "@eigenlayer-contracts/interfaces/ISignatureUtilsMixin.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
@@ -50,7 +50,6 @@ contract ClientEncoders {
     function encodeCompleteWithdrawalMsg(
         IDelegationManager.Withdrawal memory withdrawal,
         IERC20[] memory tokensToWithdraw,
-        uint256 middlewareTimesIndex,
         bool receiveAsTokens
     ) public pure returns (bytes memory) {
 
@@ -58,7 +57,6 @@ contract ClientEncoders {
         //     completeQueuedWithdrawal(
         //         IDelegationManager.Withdrawal withdrawal,
         //         IERC20[] tokensToWithdraw,
-        //         uint256 middlewareTimesIndex,
         //         bool receiveAsTokens
         //     )
         // Where:
@@ -69,15 +67,14 @@ contract ClientEncoders {
         //         uint256 nonce;
         //         uint32 startBlock;
         //         IStrategy[] strategies;
-        //         uint256[] shares;
+        //         uint256[] scaledShares;
         //     }
 
         return abi.encodeWithSelector(
-            // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],uint256,bool)" == 0x60d7faed
+            // cast sig "completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],bool)" == 0xe4cc3f90
             IDelegationManager.completeQueuedWithdrawal.selector,
             withdrawal,
             tokensToWithdraw,
-            middlewareTimesIndex,
             receiveAsTokens
         );
     }
@@ -85,7 +82,6 @@ contract ClientEncoders {
     function encodeCompleteWithdrawalsMsg(
         IDelegationManager.Withdrawal[] memory withdrawals,
         IERC20[][] memory tokens,
-        uint256[] memory middlewareTimesIndexes,
         bool[] memory receiveAsTokens
     ) public pure returns (bytes memory) {
 
@@ -93,7 +89,6 @@ contract ClientEncoders {
         //     completeQueuedWithdrawals(
         //         Withdrawal[] withdrawals,
         //         IERC20[][] tokens,
-        //         uint256[] middlewareTimesIndexes,
         //         bool[] receiveAsTokens
         //     )
         // Where:
@@ -112,7 +107,6 @@ contract ClientEncoders {
             IDelegationManager.completeQueuedWithdrawals.selector,
             withdrawals,
             tokens,
-            middlewareTimesIndexes,
             receiveAsTokens
         );
     }
@@ -124,42 +118,17 @@ contract ClientEncoders {
         return keccak256(abi.encode(withdrawal));
     }
 
-    function calculateWithdrawalTransferRoot(
-        bytes32 withdrawalRoot,
-        address agentOwner
-    ) public pure returns (bytes32) {
-        return keccak256(abi.encode(withdrawalRoot, agentOwner));
-    }
-
-    function calculateRewardsRoot(IRewardsCoordinator.RewardsMerkleClaim memory claim)
-        public
-        pure
-        returns (bytes32)
-    {
-        return keccak256(abi.encode(claim));
-    }
-
-
-    function calculateRewardsTransferRoot(
-        bytes32 rewardsRoot,
-        address agentOwner
-    ) public pure returns (bytes32) {
-        return keccak256(abi.encode(rewardsRoot, agentOwner));
-    }
-
-    function encodeTransferToAgentOwnerMsg(
-        bytes32 transferRoot
-    ) public pure returns (bytes memory) {
+    function encodeTransferToAgentOwnerMsg(address agentOwner) public pure returns (bytes memory) {
         return abi.encodeWithSelector(
-            // cast sig "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
+            // cast sig "handleTransferToAgentOwner(address)" == 0x43598c8c
             ISenderHooks.handleTransferToAgentOwner.selector,
-            transferRoot
+            agentOwner
         );
     }
 
     function encodeDelegateTo(
         address operator,
-        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry,
+        ISignatureUtilsMixinTypes.SignatureWithExpiry memory approverSignatureAndExpiry,
         bytes32 approverSalt
     ) public pure returns (bytes memory) {
 

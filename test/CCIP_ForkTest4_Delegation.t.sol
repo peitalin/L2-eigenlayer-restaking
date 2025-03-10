@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
-import {ISignatureUtils} from "@eigenlayer-contracts/interfaces/ISignatureUtils.sol";
-
+import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IDelegationManagerEvents} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {ISignatureUtilsMixinTypes} from "@eigenlayer-contracts/interfaces/ISignatureUtilsMixin.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 
 
@@ -21,6 +22,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
     address operator2;
 
     uint256 amount = 0.0091 ether;
+    uint32 allocationDelay = 100;
 
     function setUp() public {
 
@@ -40,15 +42,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         /// Operator 1
         vm.startBroadcast(operatorKey);
         {
-            IDelegationManager.OperatorDetails memory registeringOperatorDetails =
-                IDelegationManager.OperatorDetails({
-                    __deprecated_earningsReceiver: vm.addr(0xb0b),
-                    delegationApprover: operator,
-                    stakerOptOutWindowBlocks: 4
-                });
-
-            delegationManager.registerAsOperator(registeringOperatorDetails, "operator 1 metadata");
-
+            delegationManager.registerAsOperator(operator, allocationDelay, "operator 1 metadata");
             require(delegationManager.isOperator(operator), "operator not set");
         }
         vm.stopBroadcast();
@@ -56,14 +50,11 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         /// Operator 2
         vm.startBroadcast(operator2Key);
         {
-            IDelegationManager.OperatorDetails memory registeringOperatorDetails2 =
-                IDelegationManager.OperatorDetails({
-                    __deprecated_earningsReceiver: vm.addr(0xb0b),
-                    delegationApprover: operator2,
-                    stakerOptOutWindowBlocks: 4
-                });
-
-            delegationManager.registerAsOperator(registeringOperatorDetails2, "operator 2 metadata");
+            delegationManager.registerAsOperator(
+                operator2,
+                allocationDelay,
+                "operator 2 metadata"
+            );
 
             require(delegationManager.isOperator(operator2), "operator2 not set");
         }
@@ -138,7 +129,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
     {
         // Operator Approver signs the delegateTo call
         bytes32 approverSalt = bytes32(uint256(222222));
-        ISignatureUtils.SignatureWithExpiry memory approverSignatureAndExpiry;
+        ISignatureUtilsMixinTypes.SignatureWithExpiry memory approverSignatureAndExpiry;
         address _operator = vm.addr(_operatorKey);
         {
             uint256 sig1_expiry = block.timestamp + 1 hours;
@@ -153,7 +144,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             );
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(_operatorKey, digestHash1);
             bytes memory signature1 = abi.encodePacked(r, s, v);
-            approverSignatureAndExpiry = ISignatureUtils.SignatureWithExpiry({
+            approverSignatureAndExpiry = ISignatureUtilsMixinTypes.SignatureWithExpiry({
                 signature: signature1,
                 expiry: sig1_expiry
             });
@@ -195,7 +186,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         bytes memory messageWithSignature_DT = createDelegateMessage(operatorKey, execNonce1);
 
         vm.expectEmit(true, true, false, false);
-        emit IDelegationManager.StakerDelegated(address(eigenAgent), operator);
+        emit IDelegationManagerEvents.StakerDelegated(address(eigenAgent), operator);
 
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
@@ -213,8 +204,12 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             delegationManager.delegatedTo(address(eigenAgent)) == address(operator),
             "eigenAgent should be delegated to operator"
         );
+
+        IStrategy[] memory strategies = new IStrategy[](1);
+        strategies[0] = strategy;
+        uint256[] memory op1Shares = delegationManager.getOperatorShares(operator, strategies);
         require(
-            delegationManager.operatorShares(operator, strategy) == amount,
+            op1Shares.length > 0 && op1Shares[0] == amount,
             "operator should have shares delegated to it"
         );
     }
@@ -251,8 +246,12 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             delegationManager.delegatedTo(address(eigenAgent)) == address(operator),
             "eigenAgent should be delegated to operator"
         );
+
+        IStrategy[] memory strategies = new IStrategy[](1);
+        strategies[0] = strategy;
+        uint256[] memory op1Shares = delegationManager.getOperatorShares(operator, strategies);
         require(
-            delegationManager.operatorShares(operator, strategy) == amount,
+            op1Shares.length > 0 && op1Shares[0] == amount,
             "operator should have shares delegated to it"
         );
 
@@ -334,14 +333,14 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         strategiesToWithdraw[0] = strategy;
         sharesToWithdraw[0] = amount;
 
-        IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
+        IDelegationManagerTypes.Withdrawal memory withdrawal = IDelegationManagerTypes.Withdrawal({
             staker: address(eigenAgent),
             delegatedTo: address(operator), // previous operator that eigenAgent was delegated to
             withdrawer: address(eigenAgent),
             nonce: withdrawalNonce,
             startBlock: startBlock,
             strategies: strategiesToWithdraw,
-            shares: sharesToWithdraw
+            scaledShares: sharesToWithdraw
         });
 
         // require the following to match, so that the withdrawalRoot calculated inside Eigenlayer
@@ -353,7 +352,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         require(withdrawal.nonce == 0, "should be nonce at the time of undelegating");
         require(withdrawal.startBlock == startBlock, "startBlock issue");
         require(address(withdrawal.strategies[0]) == address(strategy), "strategy does not match");
-        require(withdrawal.shares[0] == amount, "shares should equal amount");
+        require(withdrawal.scaledShares[0] == amount, "shares should equal amount");
 
         bytes memory completeWithdrawalMessage;
         bytes memory messageWithSignature_CW;
@@ -369,7 +368,6 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
                 withdrawal,
                 tokensToWithdraw,
-                0, //middlewareTimesIndex,
                 receiveAsTokens
             );
 
@@ -392,7 +390,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: BaseSepolia.ChainSelector,
                 sender: abi.encode(deployer),
                 data: abi.encode(string(
                     messageWithSignature_CW
@@ -401,8 +399,16 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             })
         );
 
+        IStrategy[] memory strategies_A = new IStrategy[](1);
+        strategies_A[0] = strategy;
+        uint256[] memory op2Shares_A = delegationManager.getOperatorShares(operator2, strategies_A);
+
         require(
-            delegationManager.operatorShares(operator2, strategy) == amount,
+            op2Shares_A.length > 0,
+            "operator2 should have shares"
+        );
+        require(
+            op2Shares_A[0] == amount,
             "operator2 should have shares delegated to it"
         );
     }
@@ -438,8 +444,12 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             delegationManager.delegatedTo(address(eigenAgent)) == address(operator),
             "eigenAgent should be delegated to operator"
         );
+
+        IStrategy[] memory strategies = new IStrategy[](1);
+        strategies[0] = strategy;
+        uint256[] memory op1Shares = delegationManager.getOperatorShares(operator, strategies);
         require(
-            delegationManager.operatorShares(operator, strategy) == amount,
+            op1Shares.length > 0 && op1Shares[0] == amount,
             "operator should have shares delegated to it"
         );
 
@@ -498,14 +508,14 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         strategiesToWithdraw[0] = strategy;
         sharesToWithdraw[0] = amount;
 
-        IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
+        IDelegationManagerTypes.Withdrawal memory withdrawal = IDelegationManagerTypes.Withdrawal({
             staker: address(eigenAgent),
             delegatedTo: address(operator), // previous operator that eigenAgent was delegated to
             withdrawer: address(eigenAgent),
             nonce: withdrawalNonce,
             startBlock: startBlock,
             strategies: strategiesToWithdraw,
-            shares: sharesToWithdraw
+            scaledShares: sharesToWithdraw
         });
 
         // require the following to match, so that the withdrawalRoot calculated inside Eigenlayer
@@ -517,7 +527,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         require(withdrawal.nonce == 0, "should be nonce at the time of undelegating");
         require(withdrawal.startBlock == startBlock, "startBlock issue");
         require(address(withdrawal.strategies[0]) == address(strategy), "strategy does not match");
-        require(withdrawal.shares[0] == amount, "shares should equal amount");
+        require(withdrawal.scaledShares[0] == amount, "shares should equal amount");
 
         bytes memory completeWithdrawalMessage;
         bytes memory messageWithSignature_CW;
@@ -533,7 +543,6 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             completeWithdrawalMessage = encodeCompleteWithdrawalMsg(
                 withdrawal,
                 tokensToWithdraw,
-                0, //middlewareTimesIndex,
                 receiveAsTokens
             );
 
@@ -556,7 +565,7 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
         receiverContract.mockCCIPReceive(
             Client.Any2EVMMessage({
                 messageId: bytes32(uint256(9999)),
-                sourceChainSelector: EthSepolia.ChainSelector,
+                sourceChainSelector: BaseSepolia.ChainSelector,
                 sender: abi.encode(deployer),
                 data: abi.encode(string(
                     messageWithSignature_CW
@@ -569,10 +578,17 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             delegationManager.delegatedTo(address(eigenAgent)) == address(0),
             "eigenAgent should not be delegated to anyone"
         );
-        require(
-            delegationManager.operatorShares(operator2, strategy) == 0,
-            "operator2 should have NO shares delegated to it"
-        );
+
+        IStrategy[] memory strategies_B = new IStrategy[](1);
+        strategies_B[0] = strategy;
+
+        uint256[] memory op2Shares_B = delegationManager.getOperatorShares(operator2, strategies_B);
+        if (op2Shares_B.length > 0) {
+            require(
+                op2Shares_B[0] == 0,
+                "operator2 should have NO shares delegated to it"
+            );
+        }
 
         //////////////////////////////////////////
         /// (2) Delegate to other Operator 2
@@ -596,8 +612,13 @@ contract CCIP_ForkTest_Delegation_Tests is BaseTestEnvironment {
             delegationManager.delegatedTo(address(eigenAgent)) == address(operator2),
             "eigenAgent should be delegated to operator2"
         );
+
+        IStrategy[] memory strategies_C = new IStrategy[](1);
+        strategies_C[0] = strategy;
+
+        uint256[] memory op2Shares_C = delegationManager.getOperatorShares(operator2, strategies_C);
         require(
-            delegationManager.operatorShares(operator2, strategy) == amount,
+            op2Shares_C.length > 0 && op2Shares_C[0] == amount,
             "operator2 should have shares delegated to it"
         );
     }

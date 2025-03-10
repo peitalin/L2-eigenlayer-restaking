@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
 
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 import {EthSepolia} from "./Addresses.sol";
@@ -19,7 +19,6 @@ contract RedepositScript is BaseScript {
     address public withdrawer;
     uint256 public amount;
     uint256 public sigExpiry;
-    uint256 public middlewareTimesIndex; // not used yet, for slashing
     bool public receiveAsTokens;
 
     uint256 public execNonce; // EigenAgent execution nonce
@@ -82,11 +81,10 @@ contract RedepositScript is BaseScript {
             vm.selectFork(l2ForkId);
 
             require(
-                senderContract.allowlistedSenders(address(receiverContract)),
-                "senderCCIP: must allowlistSender(receiverCCIP)"
+                senderContract.allowlistedSenders(EthSepolia.ChainSelector, address(receiverContract)),
+                "senderCCIP: must allowlistSender(receiverCCIP) on EthSepolia"
             );
 
-            middlewareTimesIndex = 0; // not used yet, for slashing
             receiveAsTokens = false;
             // receiveAsTokens == false to redeposit queuedWithdrawal (from undelegating)
             // back into Eigenlayer.
@@ -105,7 +103,6 @@ contract RedepositScript is BaseScript {
                 encodeCompleteWithdrawalMsg(
                     withdrawal,
                     tokensToWithdraw,
-                    middlewareTimesIndex,
                     receiveAsTokens
                 ),
                 execNonce,
@@ -154,9 +151,8 @@ contract RedepositScript is BaseScript {
                 withdrawal.nonce,
                 withdrawal.startBlock,
                 withdrawal.strategies,
-                withdrawal.shares,
+                withdrawal.scaledShares,
                 withdrawalRootCalculated,
-                bytes32(0x0), // withdrawalAgenOwnerRoot not used in delegations
                 filePath
             );
 

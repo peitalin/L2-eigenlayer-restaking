@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Script} from "forge-std/Script.sol";
 // CCIP interfaces
 import {IRouterClient} from "@chainlink/ccip/interfaces/IRouterClient.sol";
-import {IERC20} from "@openzeppelin-v47-contracts/token/ERC20/IERC20.sol";
-import {IERC20_CCIPBnM} from "../src/interfaces/IERC20_CCIPBnM.sol";
+import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
+import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
 // Eigenlayer interfaecs
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
+import {IAllocationManager} from "@eigenlayer-contracts/interfaces/IAllocationManager.sol";
 import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManager.sol";
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
@@ -54,6 +55,7 @@ contract BaseScript is
 
     IStrategyManager public strategyManager;
     IDelegationManager public delegationManager;
+    IAllocationManager public allocationManager;
     IStrategy public strategy;
     IRewardsCoordinator public rewardsCoordinator;
 
@@ -80,15 +82,13 @@ contract BaseScript is
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
         deployReceiverOnL1Script = new DeployReceiverOnL1Script();
 
-        (
-            strategy,
-            strategyManager,
-            , // strategyFactory
-            , // pauserRegistry
-            delegationManager,
-            rewardsCoordinator,
-            // tokenL1
-        ) = deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+        DeployMockEigenlayerContractsScript.EigenlayerAddresses memory ea =
+            deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();
+
+        strategy = ea.strategy;
+        strategyManager = ea.strategyManager;
+        delegationManager = ea.delegationManager;
+        rewardsCoordinator = ea.rewardsCoordinator;
 
         (
             receiverContract,
@@ -113,7 +113,7 @@ contract BaseScript is
         tokenL2 = IERC20(address(BaseSepolia.BridgeToken)); // CCIP-BnM on L2
 
         if (isTest) {
-            IERC20_CCIPBnM(address(tokenL2)).drip(deployer);
+            IBurnMintERC20(address(tokenL2)).mint(deployer, 1 ether);
             vm.deal(deployer, 1 ether); // fund L2 balance
         }
     }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
@@ -17,7 +17,6 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
 
     IDelegationManager public delegationManager;
     IStrategyManager public strategyManager;
-    IStrategy public strategy;
     IRewardsCoordinator public rewardsCoordinator;
 
     IAgentFactory public agentFactory;
@@ -34,7 +33,7 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     event SetGasLimitForFunctionSelector(bytes4 indexed, uint256 indexed);
     event SetReceiverCCIP(address indexed);
     event SetAgentFactory(address indexed);
-    event SetEigenlayerContracts(address, address, address, address);
+    event SetEigenlayerContracts(address, address, address);
     event SetBridgeTokens(address indexed, address indexed);
     event ClearBridgeTokens(address indexed);
 
@@ -110,16 +109,14 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
     function getEigenlayerContracts() external view returns (
         IDelegationManager,
         IStrategyManager,
-        IStrategy,
         IRewardsCoordinator
     ) {
-        return (delegationManager, strategyManager, strategy, rewardsCoordinator);
+        return (delegationManager, strategyManager, rewardsCoordinator);
     }
 
     function setEigenlayerContracts(
         IDelegationManager _delegationManager,
         IStrategyManager _strategyManager,
-        IStrategy _strategy,
         IRewardsCoordinator _rewardsCoordinator
     ) external onlyOwner {
 
@@ -129,21 +126,16 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
         if (address(_strategyManager) == address(0))
             revert AddressZero("_strategyManager cannot be address(0)");
 
-        if (address(_strategy) == address(0))
-            revert AddressZero("_strategy cannot be address(0)");
-
         if (address(_rewardsCoordinator) == address(0))
             revert AddressZero("_rewardsCoordinator cannot be address(0)");
 
         delegationManager = _delegationManager;
         strategyManager = _strategyManager;
-        strategy = _strategy;
         rewardsCoordinator = _rewardsCoordinator;
 
         emit SetEigenlayerContracts(
             address(_delegationManager),
             address(_strategyManager),
-            address(_strategy),
             address(_rewardsCoordinator)
         );
     }
@@ -180,17 +172,24 @@ abstract contract RestakingConnectorStorage is Adminable, IRestakingConnector {
      * @dev Retrieves estimated gasLimits for different L2 restaking functions, e.g:
      * "handleTransferToAgentOwner(bytes)" == 0xd8a85b48
      * @param functionSelector bytes4 functionSelector to get estimated gasLimits for.
-     * @return gasLimit a default gasLimit of 200_000 functionSelector parame
-ter finds no matches.
+     * @param tokenAmountsLength number of tokens bridging back to L2
+     * @return gasLimit a default gasLimit of 200_000 functionSelector parameter finds no matches.
      */
-    function getGasLimitForFunctionSelectorL1(bytes4 functionSelector)
+    function getGasLimitForFunctionSelectorL1(bytes4 functionSelector, uint256 tokenAmountsLength)
         external
         view
         returns (uint256)
     {
         uint256 gasLimit = _gasLimitsForFunctionSelectors[functionSelector];
-        return (gasLimit > 0) ? gasLimit : 200_000;
+        gasLimit = (gasLimit > 0) ? gasLimit : 200_000;
+        // When claiming rewards to send to L1 using the handleTransferToAgentOwner function,
+        // we need to increase gas limit for each extra token bridging back to L2
+        for (uint256 i = 1; i < tokenAmountsLength; ++i) {
+            gasLimit += 100_000;
+        }
+        return gasLimit;
     }
+
 
     /**
      * @dev Sets gas limits for various functions. Requires an array of bytes4 function selectors and

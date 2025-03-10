@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
+import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {Merkle} from "@eigenlayer-contracts/libraries/Merkle.sol";
 
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
@@ -84,10 +85,10 @@ contract SubmitRewardsScript is BaseScript {
 
         // See CCIP_ForkTest5_RewardsProcessClaim.t.sol for multi-user + multi-token example.
         bytes32 root = rewardsCoordinator.calculateEarnerLeafHash(
-            IRewardsCoordinator.EarnerTreeMerkleLeaf({
+            IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf({
                 earner: _earner,
                 earnerTokenRoot: rewardsCoordinator.calculateTokenLeafHash(
-                    IRewardsCoordinator.TokenTreeMerkleLeaf({
+                    IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
                         token: tokenL1,
                         cumulativeEarnings: amount
                     })

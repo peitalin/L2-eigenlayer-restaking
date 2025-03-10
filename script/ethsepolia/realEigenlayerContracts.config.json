@@ -1,0 +1,22 @@
+{
+  "addresses": {
+    "AllocationManager": "",
+    "DelegationManager": "",
+    "PauserRegistry": "",
+    "ProxyAdmin": "",
+    "RewardsCoordinator": "",
+    "StrategyFactory": "",
+    "StrategyManager": "",
+    "TokenERC20": "",
+    "strategies": {
+      "Strategy": ""
+    }
+  },
+  "chainInfo": {
+    "chainId": 11155111,
+    "deploymentBlock": 7873299
+  },
+  "parameters": {
+    "deployer": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c"
+  }
+}

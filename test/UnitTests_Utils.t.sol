@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {TestErrorHandlers} from "./TestErrorHandlers.sol";
@@ -59,8 +59,6 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
         fileReaderTest.readEigenAgent721AndRegistry();
         fileReaderTest.readBaseEigenAgent();
         fileReaderTest.readReceiverRestakingConnector();
-        fileReaderTest.readProxyAdminL1();
-        fileReaderTest.readProxyAdminL2();
         fileReaderTest.readSenderContract();
         fileReaderTest.readSenderHooks();
         {
@@ -78,13 +76,11 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
             vm.addr(4),
             vm.addr(5),
             vm.addr(6),
-            vm.addr(7),
             "test/temp-files/bridgeContractsL1.config.json"
         );
         fileReaderTest.saveSenderBridgeContracts(
             vm.addr(1),
             vm.addr(2),
-            vm.addr(3),
             "test/temp-files/bridgeContractsL2.config.json"
         );
     }
@@ -105,7 +101,6 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
             strategies, // _strategies
             shares, // _shares
             bytes32(0x0), // _withdrawalRoot
-            bytes32(0x0), // _withdrawalTransferRoot
             "test/withdrawals-queued/" // _filePath
         );
 
@@ -120,7 +115,7 @@ contract UnitTests_Utils is Test, TestErrorHandlers {
         vm.assertEq(wt.nonce, 5);
         vm.assertEq(wt.startBlock, 100);
         vm.assertEq(address(wt.strategies[0]), address(strategies[0]));
-        vm.assertEq(wt.shares[0], shares[0]);
+        vm.assertEq(wt.scaledShares[0], shares[0]);
     }
 
     function test_ERC20Minter() public {
