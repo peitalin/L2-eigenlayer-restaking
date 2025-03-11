@@ -42,6 +42,9 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         staker = deployer;
         expiry = 86421;
         execNonce = 0;
+
+        vm.prank(deployer);
+        eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
     }
 
     /*
@@ -95,7 +98,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             address _token,
             uint256 _amount,
             // message signature
-            address _signer,
+            address _agentOwner,
             uint256 _expiry,
             bytes memory _signature
         ) = eigenlayerMsgDecoders.decodeDepositIntoStrategyMsg(
@@ -104,7 +107,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         );
 
         (
-            address _signer2,
+            address _agentOwner2,
             uint256 _expiry2,
             bytes memory _signature2
         ) = AgentOwnerSignature.decodeAgentOwnerSignature(
@@ -113,14 +116,14 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         ); // for depositIntoStrategy
 
         // compare vs original inputs
-        vm.assertEq(_signer, vm.addr(deployerKey));
+        vm.assertEq(_agentOwner, vm.addr(deployerKey));
         vm.assertEq(_expiry, expiry);
         vm.assertEq(_amount, amount);
         vm.assertEq(_token, address(tokenL1));
         vm.assertEq(_strategy, address(strategy));
 
         // compare decodeAgentOwner vs decodeDepositIntoStrategy
-        vm.assertEq(_signer, _signer2);
+        vm.assertEq(_agentOwner, _agentOwner2);
         vm.assertEq(_expiry, _expiry2);
         vm.assertEq(keccak256(_signature), keccak256(_signature2));
     }
@@ -172,7 +175,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             address _token,
             uint256 _amount,
             // message signature
-            address _signer,
+            address _agentOwner,
             uint256 _expiry,
             bytes memory _signature
         ) = eigenlayerMsgDecoders.decodeDepositIntoStrategyMsg(messageWithSignatureCCIP);
@@ -182,7 +185,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         vm.assertEq(amount, _amount);
 
         vm.assertEq(_signature.length, 65);
-        vm.assertEq(_signer, staker);
+        vm.assertEq(_agentOwner, staker);
         vm.assertEq(expiry, _expiry);
     }
 
@@ -266,7 +269,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
         (
             IDelegationManager.QueuedWithdrawalParams[] memory decodedQW,
-            address signer,
+            address agentOwner,
             uint256 expiry2,
             bytes memory _signature
         ) = eigenlayerMsgDecoders.decodeQueueWithdrawalsMsg(
@@ -278,7 +281,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
         // signature
         vm.assertEq(_signature.length, 65);
-        vm.assertEq(signer, deployer);
+        vm.assertEq(agentOwner, deployer);
         vm.assertEq(expiry, expiry2);
         // strategies
         vm.assertEq(address(decodedQW[0].strategies[0]), address(strategiesToWithdraw0[0]));
@@ -388,7 +391,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             IDelegationManager.Withdrawal memory _withdrawal,
             IERC20[] memory _tokensToWithdraw,
             bool _receiveAsTokens,
-            address _signer,
+            address _agentOwner,
             uint256 _expiry,
             bytes memory _signature
         ) = eigenlayerMsgDecoders.decodeCompleteWithdrawalMsg(
@@ -399,7 +402,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         );
 
         vm.assertEq(_signature.length, 65);
-        vm.assertEq(_signer, deployer);
+        vm.assertEq(_agentOwner, deployer);
         vm.assertEq(_expiry, expiry);
 
         vm.assertEq(_withdrawal.scaledShares[0], withdrawal.scaledShares[0]);
@@ -484,7 +487,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             IDelegationManager.Withdrawal[] memory _withdrawals,
             IERC20[][] memory _tokensToWithdraw,
             bool[] memory _receiveAsTokens,
-            address _signer,
+            address _agentOwner,
             uint256 _expiry,
             bytes memory _signature
         ) = CompleteWithdrawalsArrayDecoder.decodeCompleteWithdrawalsMsg(
@@ -494,7 +497,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         );
 
         vm.assertEq(_signature.length, 65);
-        vm.assertEq(_signer, deployer);
+        vm.assertEq(_agentOwner, deployer);
         vm.assertEq(_expiry, expiry);
 
         vm.assertEq(_withdrawals[0].staker, withdrawals[0].staker);
@@ -612,13 +615,13 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
             address _operator,
             ISignatureUtilsMixinTypes.SignatureWithExpiry memory _approverSignatureAndExpiry,
             bytes32 _approverSalt,
-            address _signer,
+            address _agentOwner,
             , // uint256 _expiryEigenAgent
             // bytes memory _signatureEigenAgent
         ) = DelegationDecoders.decodeDelegateToMsg(message);
 
         vm.assertEq(operator, _operator);
-        vm.assertEq(deployer, _signer);
+        vm.assertEq(deployer, _agentOwner);
         vm.assertEq(approverSalt, _approverSalt);
 
         vm.assertEq(approverSignatureAndExpiry.expiry, _approverSignatureAndExpiry.expiry);
@@ -652,7 +655,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
 
         (
             address _staker1,
-            address signer,
+            address agentOwner,
             uint256 expiryEigenAgent,
             // bytes memory signatureEigenAgent
         ) = DelegationDecoders.decodeUndelegateMsg(
@@ -662,7 +665,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         );
 
         vm.assertEq(staker1, _staker1);
-        vm.assertEq(signer, deployer);
+        vm.assertEq(agentOwner, deployer);
         vm.assertEq(expiry, expiryEigenAgent);
     }
 
@@ -749,7 +752,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         (
             IRewardsCoordinatorTypes.RewardsMerkleClaim memory _claim,
             , // address _recipient,
-            address _signer,
+            address _agentOwner,
             uint256 _expiry,
             // bytes memory _signature
         ) = eigenlayerMsgDecoders.decodeProcessClaimMsg(
@@ -776,7 +779,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
         vm.assertEq(address(claim.tokenLeaves[1].token), address(tokenLeaves[1].token));
         vm.assertEq(claim.tokenLeaves[1].cumulativeEarnings, tokenLeaves[1].cumulativeEarnings);
 
-        vm.assertEq(_signer, deployer);
+        vm.assertEq(_agentOwner, deployer);
         vm.assertEq(_expiry, expiry);
     }
 

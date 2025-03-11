@@ -14,6 +14,7 @@ import {BaseMessengerCCIP} from "../src/BaseMessengerCCIP.sol";
 import {NonPayableContract} from "./mocks/NonPayableContract.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {SenderHooks} from "../src/SenderHooks.sol";
+import {ClientSigners} from "./UnitTests_ClientSignersEncoders.t.sol";
 
 
 contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
@@ -30,7 +31,10 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
     uint256 expiry;
     uint256 amount;
-    bytes message;
+    uint256 execNonceEigenAgent;
+    bytes messageWithSig;
+
+    ClientSigners public clientSignersTest;
 
     function setUp() public {
         // setup forked environments for L2 and L1 contracts
@@ -38,8 +42,25 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         // call params
         amount = 0.0028 ether;
         expiry = block.timestamp + 1 days;
-        message = encodeMintEigenAgentMsg(bob);
+        execNonceEigenAgent = 0;
 
+        // L1 fork
+        vm.selectFork(ethForkId);
+        vm.prank(deployer);
+        eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
+
+        // L2 fork
+        vm.selectFork(l2ForkId);
+        clientSignersTest = new ClientSigners();
+        messageWithSig = clientSignersTest.signMessageForEigenAgentExecution(
+            deployerKey,
+            address(eigenAgent),
+            block.chainid,
+            address(agentFactory),
+            encodeMintEigenAgentMsg(bob),
+            execNonceEigenAgent,
+            expiry
+        );
     }
 
     /*
@@ -166,7 +187,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                     sender: abi.encode(user), // bytes: abi.decode(sender) if coming from an EVM chain.
                     destTokenAmounts: new Client.EVMTokenAmount[](0),
                     data: abi.encode(string(
-                        message
+                        messageWithSig
                     ))
                 })
             );
@@ -179,7 +200,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 sender: abi.encode(address(senderContract)), // bytes: abi.decode(sender) if coming from an EVM chain.
                 destTokenAmounts: new Client.EVMTokenAmount[](0),
                 data: abi.encode(string(
-                    message
+                    messageWithSig
                 ))
             })
         );
@@ -190,7 +211,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 sender: abi.encode(deployer),
                 destTokenAmounts: new Client.EVMTokenAmount[](0),
                 data: abi.encode(string(
-                    message
+                    messageWithSig
                 ))
             })
         );
@@ -221,7 +242,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                     sender: abi.encode(user),
                     destTokenAmounts: new Client.EVMTokenAmount[](0),
                     data: abi.encode(string(
-                        message
+                        messageWithSig
                     ))
                 })
             );
@@ -234,7 +255,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 sender: abi.encode(address(receiverContract)),
                 destTokenAmounts: new Client.EVMTokenAmount[](0),
                 data: abi.encode(string(
-                    message
+                    messageWithSig
                 ))
             })
         );
@@ -245,7 +266,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 sender: abi.encode(deployer),
                 destTokenAmounts: new Client.EVMTokenAmount[](0),
                 data: abi.encode(string(
-                    message
+                    messageWithSig
                 ))
             })
         );
@@ -268,7 +289,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         {
             uint256 fees = getRouterFeesL1(
                 address(senderContract),
-                string(message),
+                string(messageWithSig),
                 tokenAmounts,
                 _gasLimit
             );
@@ -282,7 +303,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             receiverContract.sendMessagePayNative{value: fees}(
                 randomChainSelector, // _destinationChainSelector,
                 address(senderContract), // _receiver,
-                string(message),
+                string(messageWithSig),
                 tokenAmounts,
                 _gasLimit
             );
@@ -290,7 +311,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             receiverContract.sendMessagePayNative{value: fees}(
                 BaseSepolia.ChainSelector, // _destinationChainSelector,
                 address(senderContract), // _receiver,
-                string(message),
+                string(messageWithSig),
                 tokenAmounts,
                 _gasLimit
             );
@@ -312,7 +333,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         {
             uint256 fees = getRouterFeesL2(
                 address(receiverContract),
-                string(message),
+                string(messageWithSig),
                 new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
@@ -324,7 +345,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             senderContract.sendMessagePayNative{value: fees}(
                 randomChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
-                string(message),
+                string(messageWithSig),
                 new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
@@ -332,7 +353,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             senderContract.sendMessagePayNative{value: fees}(
                 EthSepolia.ChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
-                string(message),
+                string(messageWithSig),
                 new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
@@ -353,16 +374,26 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
         IERC20(tokenL2).approve(address(senderContract), tokenAmounts[0].amount);
 
+        bytes memory messageWithSignature = clientSignersTest.signMessageForEigenAgentExecution(
+            deployerKey,
+            address(eigenAgent),
+            block.chainid,
+            address(agentFactory),
+            encodeDepositIntoStrategyMsg(
+                address(strategy),
+                tokenAmounts[0].token,
+                tokenAmounts[0].amount
+            ),
+            execNonceEigenAgent,
+            expiry
+        );
+
         vm.startBroadcast(deployerKey);
         {
             uint256 fees = 0 ether;
             uint256 feesExpected = getRouterFeesL2(
                 address(receiverContract), // _receiver,
-                string(encodeDepositIntoStrategyMsg(
-                    address(strategy),
-                    tokenAmounts[0].token,
-                    tokenAmounts[0].amount
-                )),
+                string(messageWithSignature),
                 tokenAmounts,
                 _gasLimit
             );
@@ -377,11 +408,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             senderContract.sendMessagePayNative{value: fees}(
                 EthSepolia.ChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
-                string(encodeDepositIntoStrategyMsg(
-                    address(strategy),
-                    tokenAmounts[0].token,
-                    tokenAmounts[0].amount
-                )),
+                string(messageWithSignature),
                 tokenAmounts,
                 _gasLimit
             );
@@ -402,7 +429,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             uint256 fees = 1 ether;
             uint256 feesExpected = getRouterFeesL2(
                 address(receiverContract), // _receiver,
-                string(message),
+                string(messageWithSig),
                 new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
@@ -411,7 +438,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
             senderContract.sendMessagePayNative{value: fees}(
                 EthSepolia.ChainSelector, // _destinationChainSelector,
                 address(receiverContract), // _receiver,
-                string(message),
+                string(messageWithSig),
                 new Client.EVMTokenAmount[](0),
                 _gasLimit
             );
@@ -440,7 +467,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
                 destTokenAmounts: new Client.EVMTokenAmount[](0),
                 data: abi.encode(string(
-                    message
+                    messageWithSig
                 ))
             })
         );
@@ -452,7 +479,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
                 destTokenAmounts: new Client.EVMTokenAmount[](0),
                 data: abi.encode(string(
-                    message
+                    messageWithSig
                 ))
             })
         );
@@ -476,7 +503,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 sender: abi.encode(deployer), // bytes: abi.decode(sender) if coming from an EVM chain.
                 destTokenAmounts: new Client.EVMTokenAmount[](0),
                 data: abi.encode(string(
-                    message
+                    messageWithSig
                 ))
             })
         );
@@ -488,7 +515,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
                 sender: abi.encode(deployer),
                 destTokenAmounts: new Client.EVMTokenAmount[](0),
                 data: abi.encode(string(
-                    message
+                    messageWithSig
                 ))
             })
         );
@@ -509,7 +536,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         receiverContract.sendMessagePayNative(
             BaseSepolia.ChainSelector, // _destinationChainSelector,
             address(0), // _receiver,
-            string(message),
+            string(messageWithSig),
             tokenAmounts,
             800_000
         );
@@ -529,7 +556,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         senderContract.sendMessagePayNative(
             EthSepolia.ChainSelector, // _destinationChainSelector,
             address(0), // _receiver,
-            string(message),
+            string(messageWithSig),
             tokenAmounts,
             800_000
         );
@@ -546,7 +573,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
 
         uint256 expectedFees = getRouterFeesL2(
             address(receiverContract),
-            string(message),
+            string(messageWithSig),
             new Client.EVMTokenAmount[](0), // empty array
             _gasLimit
         );
@@ -561,7 +588,7 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         senderContract.sendMessagePayNative{value: stingyFees}(
             EthSepolia.ChainSelector, // _destinationChainSelector,
             address(receiverContract), // _receiver,
-            string(message),
+            string(messageWithSig),
             new Client.EVMTokenAmount[](0),
             _gasLimit
         );
@@ -633,14 +660,13 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         bytes memory messageWithSignature;
         {
             uint256 execNonce = 0;
-            message = encodeTransferToAgentOwnerMsg(bob);
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
                 address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager to approve + deposit
-                message,
+                encodeTransferToAgentOwnerMsg(bob),
                 execNonce,
                 expiry
             );
@@ -693,14 +719,13 @@ contract ForkTests_BaseMessenger is BaseTestEnvironment, RouterFees {
         bytes memory messageWithSignature;
         {
             uint256 execNonce = 0;
-            message = encodeTransferToAgentOwnerMsg(bob);
             // sign the message for EigenAgent to execute Eigenlayer command
             messageWithSignature = signMessageForEigenAgentExecution(
                 bobKey,
                 address(eigenAgent),
                 block.chainid, // destination chainid where EigenAgent lives
                 address(strategyManager), // StrategyManager to approve + deposit
-                message,
+                encodeTransferToAgentOwnerMsg(bob),
                 execNonce,
                 expiry
             );

@@ -8,14 +8,14 @@ contract GasLimits {
     ) {
         // set GasLimits
         uint256[] memory gasLimits = new uint256[](7);
-        gasLimits[0] = 410_000; // deposit                           [gas: 399,689]
-        // note: set manual gasLimit for deposit + mint EigenAgent:  [gas: 724,044] ~300k mint + 400k deposit
-        gasLimits[1] = 290_000; // mintEigenAgent                    [gas: 284,571]
-        gasLimits[2] = 315_000; // queueWithdrawals                  [gas: 308,462]
-        gasLimits[3] = 560_000; // completeWithdrawal + transferToL2 [gas: 554,421]
-        gasLimits[4] = 350_000; // delegateTo                        [gas: 344,050]
-        gasLimits[5] = 340_000; // undelegate                        [gas: 336,421]
-        gasLimits[6] = 540_000; // processClaim + transferToL2       [gas: 536,908]
+        gasLimits[0] = 560_000; // deposit                           [gas: 543,362]
+        // note: set manual gasLimit for deposit + mint EigenAgent:  [gas: 851,384] ~400k mint + 450k deposit
+        gasLimits[1] = 300_000; // mintEigenAgent                    [gas: 284,571]
+        gasLimits[2] = 580_000; // queueWithdrawals                  [gas: 556,767]
+        gasLimits[3] = 630_000; // completeWithdrawal + transferToL2 [gas: 607,404]
+        gasLimits[4] = 400_000; // delegateTo                        [gas: 372,427]
+        gasLimits[5] = 650_000; // undelegate                        [gas: 632,561]
+        gasLimits[6] = 590_000; // processClaim + transferToL2       [gas: 561,726]
 
         bytes4[] memory functionSelectors = new bytes4[](7);
         functionSelectors[0] = 0xe7a050aa;

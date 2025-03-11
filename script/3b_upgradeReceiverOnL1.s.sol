@@ -137,6 +137,7 @@ contract UpgradeReceiverOnL1Script is Script, FileReader, UpgradesOZ5 {
         );
 
         eigenAgentOwner721Proxy.setAgentFactory(agentFactoryProxy);
+        eigenAgentOwner721Proxy.setRewardsCoordinator(rewardsCoordinator);
 
         agentFactoryProxy.setRestakingConnector(address(restakingConnectorProxy));
         agentFactoryProxy.set6551Registry(registry6551);

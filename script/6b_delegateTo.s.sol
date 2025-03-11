@@ -38,31 +38,12 @@ contract DelegateToScript is BaseScript {
         TARGET_CONTRACT = address(delegationManager);
 
         //////////////////////////////////////////////////////////
-        // L1: Register Operator
+        // L1: Get Operator
         //////////////////////////////////////////////////////////
         vm.selectFork(ethForkId);
 
         operatorKey = vm.envUint("OPERATOR_KEY");
         operator = vm.addr(operatorKey);
-
-        if (!delegationManager.isOperator(operator) || isTest) {
-
-            vm.startBroadcast(operatorKey);
-            {
-                string memory metadataURI = "some operator";
-                try delegationManager.registerAsOperator(operator, 100, metadataURI) {
-                    // function registerAsOperator(
-                    //     address initDelegationApprover,
-                    //     uint32 allocationDelay,
-                    //     string calldata metadataURI
-                    // ) external;
-
-                } catch Error(string memory reason) {
-                    console.log(reason); // registerAsOperator: caller is already actively delegated
-                }
-            }
-            vm.stopBroadcast();
-        }
 
         //// Get User's EigenAgent
         IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(deployer);
@@ -122,11 +103,7 @@ contract DelegateToScript is BaseScript {
             sigExpiry
         );
 
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-        tokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL2),
-            amount: 0 ether
-        });
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
             IDelegationManager.delegateTo.selector

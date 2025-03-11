@@ -1,9 +1,9 @@
 #!/bin/bash
 source .env
 
-echo forge script script/6b_undelegate.s.sol:UndelegateScript --rpc-url basesepolia --broadcast -vvvv
+echo forge script script/6c_undelegate.s.sol:UndelegateScript --rpc-url basesepolia --broadcast -vvvv
 
-forge script script/6b_undelegate.s.sol:UndelegateScript  \
+forge script script/6c_undelegate.s.sol:UndelegateScript  \
     --rpc-url basesepolia \
     --broadcast \
     --private-key $DEPLOYER_KEY \

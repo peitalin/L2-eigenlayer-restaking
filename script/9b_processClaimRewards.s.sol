@@ -6,6 +6,7 @@ import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IReward
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
+import {REWARDS_AMOUNT} from "./9_submitRewards.s.sol";
 import {BaseScript} from "./BaseScript.sol";
 import {EthSepolia} from "./Addresses.sol";
 
@@ -55,7 +56,7 @@ contract ProcessClaimRewardsScript is BaseScript {
         IRewardsCoordinator.RewardsMerkleClaim memory claim = createClaim(
             currentDistRootIndex,
             address(eigenAgent),
-            0.1 ether, // amount to claim
+            REWARDS_AMOUNT, // amount to claim
             hex"", // proof is empty as theres only 1 claim (root)
             0 // earnerIndex
         );
@@ -85,11 +86,8 @@ contract ProcessClaimRewardsScript is BaseScript {
         // L2: Send a rewards processClaim message
         ///////////////////////////////////////////////
         vm.selectFork(l2ForkId);
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-        tokenAmounts[0] = Client.EVMTokenAmount({
-            token: address(tokenL2),
-            amount: 0 ether
-        });
+
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
         uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
             IRewardsCoordinator.processClaim.selector
@@ -125,7 +123,7 @@ contract ProcessClaimRewardsScript is BaseScript {
 	function createClaim(
         uint32 rootIndex,
         address earner,
-        uint256 amount,
+        uint256 _amount,
         bytes memory proof,
         uint32 earnerIndex
     ) public view returns (IRewardsCoordinator.RewardsMerkleClaim memory claim) {
@@ -134,7 +132,7 @@ contract ProcessClaimRewardsScript is BaseScript {
         tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](1);
 		tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
             token: tokenL1,
-            cumulativeEarnings: amount
+            cumulativeEarnings: _amount
         });
 
 		IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf memory earnerLeaf;
