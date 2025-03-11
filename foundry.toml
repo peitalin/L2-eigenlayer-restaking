@@ -7,8 +7,9 @@ fs_permissions = [
   { access = "read-write", path = "./"},
 ]
 evm_version = "Cancun"
-# optimizer is enabled by default, can produce different bytecode and mess with contract verification
-# optimizer = false
+# optimizer is disabled by default
+# it can produce different bytecode and mess with contract verification
+optimizer = true
 optimizer_runs = 200
 # reduces contract size
 
@@ -29,7 +30,7 @@ remappings = [
   "@openzeppelin-v5-contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts",
   "@openzeppelin-v5-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts",
   "@eigenlayer-contracts=lib/eigenlayer-contracts/src/contracts",
-    # Note: We use OpenZeppelin v4.7 to deploy EigenLayer contracts (as EigenLayer does)
+    # Note: We use OpenZeppelin v4.9 to deploy EigenLayer contracts (as EigenLayer does)
   "@openzeppelin-v4-contracts/=lib/eigenlayer-contracts/lib/openzeppelin-contracts-v4.9.0/contracts/",
     # Context dependent remappings to avoid conflicts
   "lib/openzeppelin-contracts-upgradeable:@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts",

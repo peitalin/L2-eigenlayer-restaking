@@ -37,22 +37,22 @@ library FunctionSelectorDecoder {
     }
 
     /**
-     * @dev Decodes a nested error message from EigenAgent: EigenAgentExecutionError(signer, expiry, Error(string))
+     * @dev Decodes a nested error message from EigenAgent: EigenAgentExecutionError(agentOwner, expiry, Error(string))
      * and bubbles them up the callstack for better UX.
-     * @return signer the original signer of the message
+     * @return agentOwner the owner of the EigenAgent, usually the signer of the message
      * @return expiry signature expiry
      */
     function decodeEigenAgentExecutionError(bytes memory customError)
         public
         pure
-        returns (address signer, uint256 expiry, string memory reason)
+        returns (address agentOwner, uint256 expiry, string memory reason)
     {
         //////////////////////// Message offsets //////////////////////////
         // (A) When EigenAgent throws a custom Error(string) like SignatureInvalid(string)
         // or from require(bool, string) or revert(string) statements from Eigenlayer:
         //
         // 2fe80af8                                                         [32] outer error selector (EigenAgentExecutionError)
-        // 000000000000000000000000ba068c4d5a557417f50482b29e50699ac5fa25af [36] signer
+        // 000000000000000000000000ba068c4d5a557417f50482b29e50699ac5fa25af [36] agentOwner
         // 0000000000000000000000000000000000000000000000000000000066ea28d4 [68] expiry
         // 0000000000000000000000000000000000000000000000000000000000000060 [100] string offset
         // 00000000000000000000000000000000000000000000000000000000000000a4 [132] string length
@@ -74,7 +74,7 @@ library FunctionSelectorDecoder {
         // 00000000000000000000000000000000000000000000000000000000         [164]
 
         assembly {
-            signer := mload(add(customError, 36))
+            agentOwner := mload(add(customError, 36))
             expiry := mload(add(customError, 68))
         }
 
@@ -126,7 +126,7 @@ library FunctionSelectorDecoder {
 
     }
 
-    /// @dev Decodes the inner Error(string) in EigenAgentExecutionError(signer, expiry, Error(string))
+    /// @dev Decodes the inner Error(string) in EigenAgentExecutionError(agentOwner, expiry, Error(string))
     function _decodeInnerError(bytes memory customError, uint32 errMessageOffset)
         private
         pure

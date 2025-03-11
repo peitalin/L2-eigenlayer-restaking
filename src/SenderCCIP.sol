@@ -87,7 +87,7 @@ contract SenderCCIP is Initializable, BaseMessengerCCIP {
                         agentOwner,
                         destTokenAmounts[k].amount
                     );
-                    // agentOwner is the signer, first committed when sending completeWithdrawal
+                    // agentOwner is the signer when sending completeWithdrawal
                     IERC20(destTokenAmounts[k].token).safeTransfer(
                         agentOwner,
                         destTokenAmounts[k].amount

@@ -20,7 +20,6 @@ import {SenderHooks} from "../src/SenderHooks.sol";
 import {BaseSepolia, EthSepolia} from "../script/Addresses.sol";
 
 
-
 contract UnitTests_SenderHooks is BaseTestEnvironment {
 
     uint256 amount = 0.003 ether;
@@ -34,7 +33,11 @@ contract UnitTests_SenderHooks is BaseTestEnvironment {
     error OnlySendFundsForDeposits(bytes4 functionSelector, string msg);
 
     function setUp() public {
+
         setUpLocalEnvironment();
+
+        vm.prank(deployer);
+        eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
     }
 
     /*

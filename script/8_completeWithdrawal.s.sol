@@ -75,13 +75,11 @@ contract CompleteWithdrawalScript is BaseScript {
                 );
             }
 
-            // Fetch the correct withdrawal.startBlock and withdrawalRoot
+            // Fetch the correct withdrawal.startBlock
             withdrawal.startBlock = uint32(restakingConnector.getQueueWithdrawalBlock(
                 withdrawal.staker,
                 withdrawal.nonce
             ));
-
-            bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
 
             IERC20[] memory tokensToWithdraw = new IERC20[](1);
             tokensToWithdraw[0] = withdrawal.strategies[0].underlyingToken();
@@ -116,11 +114,7 @@ contract CompleteWithdrawalScript is BaseScript {
                     expiry
                 );
 
-                Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-                tokenAmounts[0] = Client.EVMTokenAmount({
-                    token: address(tokenL2),
-                    amount: 0
-                });
+                Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
                 uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
                     IDelegationManager.completeQueuedWithdrawal.selector
@@ -148,8 +142,10 @@ contract CompleteWithdrawalScript is BaseScript {
             vm.selectFork(ethForkId);
             string memory filePath = "script/withdrawals-completed/";
             if (isTest) {
-            filePath = "test/withdrawals-completed/";
+                filePath = "test/withdrawals-completed/";
             }
+
+            bytes32 withdrawalRoot = calculateWithdrawalRoot(withdrawal);
 
             saveWithdrawalInfo(
                 withdrawal.staker,

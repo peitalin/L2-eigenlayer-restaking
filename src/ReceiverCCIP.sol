@@ -36,7 +36,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
     );
 
     event RefundingDeposit(
-        address indexed signer,
+        address indexed agentOwner,
         address indexed token,
         uint256 indexed amount
     );
@@ -192,7 +192,7 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
             if (errorSelector == IRestakingConnector.EigenAgentExecutionError.selector) {
 
                 (
-                    address signer,
+                    address agentOwner,
                     uint256 expiry,
                     string memory errStr
                 ) = FunctionSelectorDecoder.decodeEigenAgentExecutionError(customError);
@@ -204,8 +204,8 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
                     if (amountRefundedToMessageIds[any2EvmMessage.messageId][tokenAddress] <= 0) {
                         // ...mark messageId as refunded
                         amountRefundedToMessageIds[any2EvmMessage.messageId][tokenAddress] = tokenAmount;
-                        // ...then initiate a refund back to the signer on L2
-                        _refundToSignerAfterExpiry(any2EvmMessage, signer, expiry, errStr);
+                        // ...then initiate a refund back to the agentOwner on L2
+                        _refundToSignerAfterExpiry(any2EvmMessage, agentOwner, expiry, errStr);
                     }
                 } else {
                     revert(string(errStr));
@@ -277,23 +277,23 @@ contract ReceiverCCIP is Initializable, BaseMessengerCCIP {
      */
     function _refundToSignerAfterExpiry(
         Client.Any2EVMMessage memory any2EvmMessage,
-        address signer,
+        address agentOwner,
         uint256 expiry,
         string memory errStr
     ) private {
 
         if (block.timestamp > expiry) {
-            // If message has expired, trigger CCIP call to bridge funds back to L2 signer
+            // If message has expired, trigger CCIP call to bridge funds back to L2 agentOwner
             this.sendMessagePayNative(
                 any2EvmMessage.sourceChainSelector, // source chain is destination chain (send back to L2)
-                signer, // receiver on L2
-                string.concat(errStr, ": refunding to L2 signer"),
+                agentOwner, // receiver on L2
+                string.concat(errStr, ": refunding to L2 agentOwner"),
                 any2EvmMessage.destTokenAmounts,
                 0 // use default gasLimit
             );
 
             emit RefundingDeposit(
-                signer,
+                agentOwner,
                 any2EvmMessage.destTokenAmounts[0].token,
                 any2EvmMessage.destTokenAmounts[0].amount
             );

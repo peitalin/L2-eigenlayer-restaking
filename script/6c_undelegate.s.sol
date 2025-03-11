@@ -100,11 +100,7 @@ contract UndelegateScript is BaseScript {
                 sigExpiry
             );
 
-            Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-            tokenAmounts[0] = Client.EVMTokenAmount({
-                token: address(tokenL2),
-                amount: 0 ether
-            });
+            Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
             uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
                 IDelegationManager.undelegate.selector

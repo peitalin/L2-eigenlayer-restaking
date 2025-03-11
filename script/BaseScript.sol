@@ -19,10 +19,12 @@ import {IReceiverCCIP} from "../src/interfaces/IReceiverCCIP.sol";
 import {IRestakingConnector} from "../src/interfaces/IRestakingConnector.sol";
 import {IAgentFactory} from "../src/6551/IAgentFactory.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
-// Script utils
+// Eigenlayer Contracts
 import {DeployMockEigenlayerContractsScript} from "./1_deployMockEigenlayerContracts.s.sol";
 import {DeployReceiverOnL1Script} from "../script/3_deployReceiverOnL1.s.sol";
 import {DeploySenderOnL2Script} from "../script/2_deploySenderOnL2.s.sol";
+import {SetupRealEigenlayerContractsScript} from "./1_setupRealEigenlayerContracts.s.sol";
+// Script utils
 import {EthSepolia, BaseSepolia} from "./Addresses.sol";
 import {FileReader} from "./FileReader.sol";
 import {ClientEncoders} from "./ClientEncoders.sol";
@@ -44,7 +46,7 @@ contract BaseScript is
     DeployMockEigenlayerContractsScript public deployMockEigenlayerContractsScript;
     DeployReceiverOnL1Script public deployReceiverOnL1Script;
     DeploySenderOnL2Script public deploySenderOnL2Script;
-
+    SetupRealEigenlayerContractsScript public setupRealEigenlayerContractsScript;
     IReceiverCCIP public receiverContract;
     ISenderCCIP public senderContract;
     ISenderHooks public senderHooks;
@@ -80,7 +82,12 @@ contract BaseScript is
         vm.selectFork(ethForkId);
 
         deployMockEigenlayerContractsScript = new DeployMockEigenlayerContractsScript();
+        setupRealEigenlayerContractsScript = new SetupRealEigenlayerContractsScript();
         deployReceiverOnL1Script = new DeployReceiverOnL1Script();
+
+        /// NOTE: When switching to Eigenlayer's contracts:
+        // SetupRealEigenlayerContractsScript.EigenlayerAddresses memory ea =
+        //     setupRealEigenlayerContractsScript.readRealEigenlayerAddresses();
 
         DeployMockEigenlayerContractsScript.EigenlayerAddresses memory ea =
             deployMockEigenlayerContractsScript.readSavedEigenlayerAddresses();

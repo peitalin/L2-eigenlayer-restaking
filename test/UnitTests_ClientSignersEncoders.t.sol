@@ -252,7 +252,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
             messageWithSignature1 = abi.encodePacked(
                 messageToEigenlayer,
-                bytes32(abi.encode(signer)), // pad signer to 32byte word
+                bytes32(abi.encode(signer)), // AgentOwner. Pad signer to 32byte word
                 expiry,
                 signatureEigenAgent1
             );

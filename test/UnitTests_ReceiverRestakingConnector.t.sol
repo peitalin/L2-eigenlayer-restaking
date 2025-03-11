@@ -201,7 +201,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
     function test_ReceiverL1_HandleCustomDepositError_BubbleErrorsUp() public {
 
         uint256 execNonce = 0;
-        // should revert with EigenAgentExecutionError(signer, expiry)
+        // should revert with EigenAgentExecutionError(agentOwner, expiry)
         address invalidEigenlayerStrategy = vm.addr(4444);
         // make expiryShort to test refund on expiry feature
         uint256 expiryShort = block.timestamp + 60 seconds;
@@ -254,7 +254,7 @@ contract UnitTests_ReceiverRestakingConnector is BaseTestEnvironment {
     function test_ReceiverL1_HandleCustomDepositError_DepositOnlyOneToken() public {
 
         uint256 execNonce = 0;
-        // should revert with EigenAgentExecutionError(signer, expiry)
+        // should revert with EigenAgentExecutionError(agentOwner, expiry)
         address invalidEigenlayerStrategy = vm.addr(4444);
         // make expiryShort to test refund on expiry feature
         uint256 expiryShort = block.timestamp + 60 seconds;

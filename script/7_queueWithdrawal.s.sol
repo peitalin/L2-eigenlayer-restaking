@@ -134,20 +134,13 @@ contract QueueWithdrawalScript is BaseScript {
 
         vm.selectFork(l2ForkId);
         {
-
-            Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-            tokenAmounts[0] = Client.EVMTokenAmount({
-                token: address(tokenL2),
-                amount: amount // 0, not bridging tokens
-            });
-
             uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
                 IDelegationManager.queueWithdrawals.selector
             );
             uint256 routerFees = getRouterFeesL2(
                 address(receiverContract),
                 string(messageWithSignature),
-                tokenAmounts,
+                new Client.EVMTokenAmount[](0), // not bridging tokens
                 gasLimit
             );
             // gas: 315,798
@@ -158,7 +151,7 @@ contract QueueWithdrawalScript is BaseScript {
                 EthSepolia.ChainSelector, // destination chain
                 address(receiverContract),
                 string(messageWithSignature),
-                tokenAmounts,
+                new Client.EVMTokenAmount[](0), // not bridging tokens
                 gasLimit
             );
 
