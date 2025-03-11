@@ -180,15 +180,6 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
 
         uint256 fees = router.getFee(_destinationChainSelector, evm2AnyMessage);
 
-        emit MessageSent(
-            messageId,
-            _destinationChainSelector,
-            _receiver,
-            _tokenAmounts,
-            address(0),
-            fees
-        );
-
         uint256 gasRefundAmount = validateGasFeesAndCalculateExcess(fees);
 
         for (uint256 i = 0; i < _tokenAmounts.length; i++) {
@@ -210,6 +201,15 @@ abstract contract BaseMessengerCCIP is CCIPReceiver, OwnableUpgradeable {
         messageId = router.ccipSend{value: fees}(
             _destinationChainSelector,
             evm2AnyMessage
+        );
+
+        emit MessageSent(
+            messageId,
+            _destinationChainSelector,
+            _receiver,
+            _tokenAmounts,
+            address(0),
+            fees
         );
 
         if (gasRefundAmount > 0) {
