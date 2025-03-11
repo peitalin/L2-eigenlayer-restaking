@@ -38,6 +38,7 @@ import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
 import {EthSepolia} from "./Addresses.sol";
 
 
+// @dev must match EIGENLAYER_VERSION in EigenAgent6551.sol
 string constant EIGENLAYER_VERSION = "v1.3.0";
 // forge install git@github.com/Layr-Labs/eigenlayer-contracts@v1.3.0
 
@@ -63,7 +64,7 @@ contract DeployMockEigenlayerContractsScript is Script {
     ProxyAdmin public proxyAdmin;
     EmptyContract public emptyContract;
 
-    // RewardsCoordinator Parameters. TBD what they should be for Treasure chain
+    // RewardsCoordinator Parameters. TBD what they should be
     uint32 public CALCULATION_INTERVAL_SECONDS = 604800; // 7 days
     uint32 public MAX_REWARDS_DURATION = 7257600; // 84 days
     uint32 public MAX_RETROACTIVE_LENGTH = 0; // 0 days // must be zero or reverts on anvil localhost
@@ -74,7 +75,7 @@ contract DeployMockEigenlayerContractsScript is Script {
     uint256 public TOTAL_DEPOSIT_LIMIT = 10_000_000 ether; // uint256 _maxTotalDeposits,
 
     uint32 public MIN_WITHDRAWAL_DELAY = 10;
-    uint32 public DEALLOCATION_DELAY= MIN_WITHDRAWAL_DELAY;
+    uint32 public DEALLOCATION_DELAY = MIN_WITHDRAWAL_DELAY;
     uint32 public ALLOCATION_CONFIGURATION_DELAY = 10;
 
     function run() public returns (

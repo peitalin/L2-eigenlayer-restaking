@@ -91,6 +91,8 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
             IBurnMintERC20(tokenL2).mint(deployer, 1 ether);
         }
 
+        vm.stopBroadcast();
+
         require(
             address(senderProxy.getSenderHooks()) != address(0),
             "senderProxy: missing senderHooks"
@@ -108,8 +110,6 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
             "senderProxy: must allowlist DestinationChain: EthSepolia)"
         );
 
-        vm.stopBroadcast();
-
         ///////////////////////////////////////////////
         //////////// Setup L1 ReceiverCCIP ////////////
         ///////////////////////////////////////////////
@@ -125,7 +125,7 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
         // Remember to fund L1 receiver with gas and tokens in production.
 
         uint256[] memory gasLimits_R = new uint256[](1);
-        gasLimits_R[0] = 270_000; // handleTransferToAgentOwner [gas: 261,029]
+        gasLimits_R[0] = 300_000; // handleTransferToAgentOwner [gas: 261,029]
 
         bytes4[] memory functionSelectors_R = new bytes4[](1);
         functionSelectors_R[0] = 0xd8a85b48;

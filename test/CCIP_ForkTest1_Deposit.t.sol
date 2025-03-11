@@ -76,7 +76,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
             address strategy_,
             address token_,
             uint256 amount_,
-            address signer_,
+            address agentOwner_,
             uint256 expiry_,
             bytes memory signature_
         ) = decoders.decodeDepositIntoStrategyMsg(
@@ -89,7 +89,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         require(token_ == address(tokenL1), "token incorrect");
         require(amount_ == amount, "amount incorrect");
 
-        require(signer_ == bob, "signer incorrect");
+        require(agentOwner_ == bob, "agentOwner incorrect");
         require(expiry_ == expiry, "expiry incorrect");
         require(signature_.length == 65, "signature length incorrect");
 
@@ -124,7 +124,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         vm.selectFork(ethForkId);
 
         uint256 execNonce = 0;
-        // should revert with EigenAgentExecutionError(signer, expiry)
+        // should revert with EigenAgentExecutionError(agentOwner, expiry)
         address invalidEigenlayerContract = vm.addr(4444);
         // make expiryShort to test refund on expiry feature
         uint256 expiryShort = block.timestamp + 60 seconds;
@@ -262,7 +262,7 @@ contract CCIP_ForkTest_Deposit_Tests is BaseTestEnvironment {
         uint256 execNonce = 0;
         // introduce a permanent error with invalid Eigenlayer contract
         address invalidEigenlayerContract = vm.addr(4444);
-        // should revert with EigenAgentExecutionError(signer, expiry)
+        // should revert with EigenAgentExecutionError(agentOwner, expiry)
         uint256 expiryShort = block.timestamp + 60 seconds;
         // make expiryShort to test refund on expiry feature
         bytes32 messageId = bytes32(abi.encode(124));

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {Merkle} from "@eigenlayer-contracts/libraries/Merkle.sol";
@@ -16,8 +19,10 @@ import {BaseScript} from "./BaseScript.sol";
 // Note: you can only post rewardRoots once for each week. Once posted
 // the RewardsCoordinator will reject rewardRoots posted for that timestamp, and you will have to
 // wait a week to post another one for the next week (or re-deploy RewardsCoordinator).
+uint256 constant REWARDS_AMOUNT = 0.1 ether;
 
 contract SubmitRewardsScript is BaseScript {
+    using SafeERC20 for IERC20;
 
     uint256 deployerKey;
     address deployer;
@@ -30,7 +35,6 @@ contract SubmitRewardsScript is BaseScript {
     uint32 timeNow;
     uint32 startOfTheWeek;
     uint32 startOfLastWeek;
-
 
     function run() public {
         return _run(false);
@@ -66,7 +70,7 @@ contract SubmitRewardsScript is BaseScript {
         (
             bytes memory proof,
             uint256 earnerIndex
-        ) = submitRewards(address(eigenAgent), 0.1 ether);
+        ) = submitRewards(address(eigenAgent), REWARDS_AMOUNT);
         // Save the proofs and earnerIndexes for each user and use them in the frontend
         // to load and submit processClaims requests from L2
     }
@@ -90,7 +94,7 @@ contract SubmitRewardsScript is BaseScript {
                 earnerTokenRoot: rewardsCoordinator.calculateTokenLeafHash(
                     IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
                         token: tokenL1,
-                        cumulativeEarnings: amount
+                        cumulativeEarnings: REWARDS_AMOUNT
                     })
                 )
             })
@@ -105,14 +109,17 @@ contract SubmitRewardsScript is BaseScript {
 
         uint32 startTimestamp = startOfLastWeek; // startTimestamp, must be a multiple of 604800 (7 days)
         uint32 duration = 604800; // duration, must be a multiple of 604800
-
         uint32 rewardsCalculationEndTimestamp = startOfLastWeek + duration;
 
         vm.startBroadcast(deployer);
+        // mint tokens to deployer
+        IBurnMintERC20(address(tokenL1)).mint(deployer, REWARDS_AMOUNT);
+        // approve rewardsCoordinator to spend tokens
+        tokenL1.approve(address(rewardsCoordinator), REWARDS_AMOUNT);
         // submit rewardsRoot
         rewardsCoordinator.submitRoot(root, rewardsCalculationEndTimestamp);
         // transfer rewards amount to RewardsCoordinator
-        tokenL1.transfer(address(rewardsCoordinator), amount);
+        tokenL1.safeTransfer(address(rewardsCoordinator), REWARDS_AMOUNT);
         vm.stopBroadcast();
 
         require(

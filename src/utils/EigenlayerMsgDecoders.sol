@@ -22,7 +22,7 @@ library AgentOwnerSignature {
      * @param sigOffset is the offset where the user signature begins
      */
     function decodeAgentOwnerSignature(bytes memory message, uint256 sigOffset) public pure returns (
-        address signer,
+        address agentOwner,
         uint256 expiry,
         bytes memory signature
     ) {
@@ -32,7 +32,7 @@ library AgentOwnerSignature {
         bytes1 v;
 
         assembly {
-            signer := mload(add(message, sigOffset))
+            agentOwner := mload(add(message, sigOffset))
             expiry := mload(add(message, add(sigOffset, 32)))
             r := mload(add(message, add(sigOffset, 64)))
             s := mload(add(message, add(sigOffset, 96)))
@@ -42,7 +42,7 @@ library AgentOwnerSignature {
         signature = abi.encodePacked(r, s, v);
 
         return (
-            signer,
+            agentOwner,
             expiry,
             signature
         );
@@ -64,7 +64,7 @@ contract EigenlayerMsgDecoders {
     * @return strategy Eigenlayer strategy vault user is depositing into.
     * @return token Token address associated with the strategy.
     * @return amount Amount user is depositing
-    * @return signer Owner of the EigenAgent
+    * @return agentOwner Owner of the EigenAgent
     * @return expiry Determines when a cross chain deposit can be refunded.
     * If a deposit is stuck in CCIP after bridging, user may manually trigger a refund after expiry.
     * @return signature Signed by the user for their EigenAgent to excecute.
@@ -77,7 +77,7 @@ contract EigenlayerMsgDecoders {
             address strategy,
             address token,
             uint256 amount,
-            address signer,
+            address agentOwner,
             uint256 expiry,
             bytes memory signature
         )
@@ -89,7 +89,7 @@ contract EigenlayerMsgDecoders {
         // 000000000000000000000000e642c43b2a7d4510233a30f7695f437878bfee09 [100] strategy
         // 000000000000000000000000fd57b4ddbf88a4e07ff4e34c487b99af2fe82a05 [132] token
         // 000000000000000000000000000000000000000000000000002f40478f834000 [164] amount
-        // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [196] signer (original staker)
+        // 000000000000000000000000ff56509f4a1992c52577408cd2075b8a8531dc0a [196] agentOwner (signer)
         // 0000000000000000000000000000000000000000000000000000000066d063d4 [228] expiry (signature)
         // b65bb77203b002de051363fd17437187540d5c6a0cfcb75c31dfffff9108e41d [260] signature r
         // 037e6bdadf2079e5268e5ad0000699611e63c3e015027ad7f8e7b4a252bbb9bb [292] signature s
@@ -102,7 +102,7 @@ contract EigenlayerMsgDecoders {
         }
 
         (
-            signer,
+            agentOwner,
             expiry,
             signature
         ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, message.length - 124);
@@ -136,7 +136,7 @@ contract EigenlayerMsgDecoders {
     /**
      * @param message CCIP message to Eigenlayer
      * @return arrayQueuedWithdrawalParams is the message sent to Eigenlayer when calling queueWithdrawals()
-     * @return signer Owner of the EigenAgent
+     * @return agentOwner Owner of the EigenAgent
      * @return expiry Expiry of the signature (does not revert)
      * @return signature Signed by the user for their EigenAgent to excecute.
      */
@@ -145,7 +145,7 @@ contract EigenlayerMsgDecoders {
         pure
         returns (
             IDelegationManagerTypes.QueuedWithdrawalParams[] memory arrayQueuedWithdrawalParams,
-            address signer,
+            address agentOwner,
             uint256 expiry,
             bytes memory signature
         )
@@ -160,7 +160,7 @@ contract EigenlayerMsgDecoders {
         // ...
         // ... QueuedWithdrawalParams structs
         // ...
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [-124] signer (message.length - 124)
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [-124] agentOwner (message.length - 124)
         // 00000000000000000000000000000000000000000000000000000000424b2a0e [-92] expiry
         // 1f7c77a6b0940a7ce34edf2821d323701213db8e237c46fdf8b7bedc8f295359 [-60] signature r
         // 1b82b0bd80af2140d658af1312ba94049de6c699533bca58da0f29d659cdf61a [-28] signature s
@@ -184,13 +184,13 @@ contract EigenlayerMsgDecoders {
         uint256 sigOffset = message.length - 124;
         // signature starts 124 bytes back from the end of the message
         (
-            signer,
+            agentOwner,
             expiry,
             signature
         ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, sigOffset);
         return (
             arrayQueuedWithdrawalParams,
-            signer,
+            agentOwner,
             expiry,
             signature
         );
@@ -244,7 +244,7 @@ contract EigenlayerMsgDecoders {
         // 0000000000000000000000000000000000000000000000000000000000000002 [900] struct[2].shares[].length = 2
         // 000000000000000000000000000000000000000000000000008f8b3953814000 [932] struct[2].shares[0] value
         // 0000000000000000000000000000000000000000000000000000000000000000 [964] struct[2].shares[0] value
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [996] signer
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [996] agentOwner
         // 0000000000000000000000000000000000000000000000000000000000015195 [1028] expiry
         // 3b9af3af035e664cf70928cf3cff00e0dc7af51a75a6f3a99b7e76ec2254f775 [1060] sig r
         // 57946e51a5170e647f770b3f524fda096f67a1bf8c34db20d702bcd7af39ea6a [1092] sig s
@@ -322,7 +322,7 @@ contract EigenlayerMsgDecoders {
         IDelegationManagerTypes.Withdrawal withdrawal;
         IERC20[] tokensToWithdraw;
         bool receiveAsTokens;
-        address signer;
+        address agentOwner;
         uint256 expiry;
         bytes signature;
     }
@@ -338,7 +338,7 @@ contract EigenlayerMsgDecoders {
             IERC20[] memory tokensToWithdraw,
             bool receiveAsTokens,
             // message signature
-            address signer,
+            address agentOwner,
             uint256 expiry,
             bytes memory signature
         ) = decodeCompleteWithdrawalMsg(messageWithSignature);
@@ -347,7 +347,7 @@ contract EigenlayerMsgDecoders {
             withdrawal: withdrawal,
             tokensToWithdraw: tokensToWithdraw,
             receiveAsTokens: receiveAsTokens,
-            signer: signer,
+            agentOwner: agentOwner,
             expiry: expiry,
             signature: signature
         });
@@ -358,7 +358,7 @@ contract EigenlayerMsgDecoders {
      * @return withdrawal is the message sent to Eigenlayer to call completeWithdrawal()
      * @return tokensToWithdraw Eigenlayer parameter when calling completeWithdrawal()
      * @return receiveAsTokens determines whether to redeposit into Eigenlayer or receive as tokens.
-     * @return signer Owner of the EigenAgent
+     * @return agentOwner Owner of the EigenAgent
      * @return expiry Expiry of the signature (does not revert)
      * @return signature Signed by the user for their EigenAgent to excecute.
      */
@@ -369,7 +369,7 @@ contract EigenlayerMsgDecoders {
             IDelegationManagerTypes.Withdrawal memory withdrawal,
             IERC20[] memory tokensToWithdraw,
             bool receiveAsTokens,
-            address signer,
+            address agentOwner,
             uint256 expiry,
             bytes memory signature
         )
@@ -410,7 +410,7 @@ contract EigenlayerMsgDecoders {
         // 0000000000000000000000000000000000000000000000000000000000000002 [612] tokens[] length = 2
         // 0000000000000000000000008fdfb0d901de9055c110569cdc08f54bd4af7128 [644] tokens[0] value
         // 000000000000000000000000a0cb889707d426a7a386870a03bc70d1b0697598 [676] tokens[1] value
-        // 000000000000000000000000a6ab3a612722d5126b160eef5b337b8a04a76dd8 [708] signer
+        // 000000000000000000000000a6ab3a612722d5126b160eef5b337b8a04a76dd8 [708] agentOwner
         // 0000000000000000000000000000000000000000000000000000000000000e11 [740] expiry
         // 65bd0ed9d964e9415ebc19303873f672eeb9b1709e957ce49b0224747fb92378 [768] sig r
         // 55ce98314bbe28891c925ff62cc66e35ed9cf11dc03b774813aafa2eec0dedd2 [800] sig s
@@ -427,7 +427,7 @@ contract EigenlayerMsgDecoders {
         uint256 sigOffset = message.length - 124;
         // signature starts 124 bytes back from the end of the message
         (
-            signer,
+            agentOwner,
             expiry,
             signature
         ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, sigOffset);
@@ -563,7 +563,7 @@ contract EigenlayerMsgDecoders {
     struct PackedRewardsClaimVars {
         IRewardsCoordinatorTypes.RewardsMerkleClaim claim;
         address recipient; // eigenAgent
-        address signer;
+        address agentOwner;
         uint256 expiry;
         bytes signature;
     }
@@ -586,7 +586,7 @@ contract EigenlayerMsgDecoders {
             IRewardsCoordinatorTypes.RewardsMerkleClaim memory claim,
             address recipient, // eigenAgent
             // message signature
-            address signer,
+            address agentOwner,
             uint256 expiry,
             bytes memory signature
         ) = decodeProcessClaimMsg(messageWithSignature);
@@ -594,7 +594,7 @@ contract EigenlayerMsgDecoders {
         return PackedRewardsClaimVars({
             claim: claim,
             recipient: recipient,
-            signer: signer,
+            agentOwner: agentOwner,
             expiry: expiry,
             signature: signature
         });
@@ -606,7 +606,7 @@ contract EigenlayerMsgDecoders {
      * @return claim The RewardsMerkleClaim to be processed.
      * Contains the root index, earner, token leaves, and required proofs
      * @return recipient The address recipient that receives the ERC20 rewards
-     * @return signer Owner of the EigenAgent
+     * @return agentOwner Owner of the EigenAgent
      * @return expiry Expiry of the signature
      * @return signature Signed by the user for their EigenAgent to excecute.
      */
@@ -616,7 +616,7 @@ contract EigenlayerMsgDecoders {
         returns (
             IRewardsCoordinatorTypes.RewardsMerkleClaim memory claim,
             address recipient,
-            address signer,
+            address agentOwner,
             uint256 expiry,
             bytes memory signature
         )
@@ -668,7 +668,7 @@ contract EigenlayerMsgDecoders {
         // 0000000000000000000000000000000000000000000000d47bfc8f6569c68ff4 [1380] tokenLeaves[0].cumulativeEarnings
         // 000000000000000000000000deeeee2b48c121e6728ed95c860e296177849932 [1412] tokenLeaves[1].token
         // 00000000000000000000000000000000000000000000be0b981f6fde72408340 [1444] tokenLeaves[1].cumulativeEarnings
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [1476] [OFFSET_4] signer
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [1476] [OFFSET_4] agentOwner
         // 0000000000000000000000000000000000000000000000000000000000015195 [1508] expiry
         // 03814b471f1beef18326b0d63c4a0f4431fdb72be167ee8aeb6212c8bd14d8e5 [1540] signature r
         // 74fa9f4f34373bef152fdcba912a10b0a5c77be53c00d04c4c6c77ae407136e7 [1572] signature s
@@ -721,7 +721,7 @@ contract EigenlayerMsgDecoders {
         uint256 sigOffset = message.length - 124;
         // signature starts 124 bytes back from the end of the message
         (
-            signer,
+            agentOwner,
             expiry,
             signature
         ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, sigOffset);
@@ -729,7 +729,7 @@ contract EigenlayerMsgDecoders {
         return (
             claim,
             recipient,
-            signer,
+            agentOwner,
             expiry,
             signature
         );
@@ -953,7 +953,7 @@ library CompleteWithdrawalsArrayDecoder {
             IDelegationManagerTypes.Withdrawal[] memory withdrawals,
             IERC20[][] memory tokens,
             bool[] memory receiveAsTokens,
-            address signer,
+            address agentOwner,
             uint256 expiry,
             bytes memory signature
         )
@@ -1019,7 +1019,7 @@ library CompleteWithdrawalsArrayDecoder {
         // 0000000000000000000000000000000000000000000000000000000000000002 [1412] receiveAsTokens[] length = 2
         // 0000000000000000000000000000000000000000000000000000000000000001 [1444] receiveAsTokens[0] value
         // 0000000000000000000000000000000000000000000000000000000000000000 [1476] receiveAsTokens[1] value
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [1508] signer
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [1508] agentOwner
         // 0000000000000000000000000000000000000000000000000000000000015195 [1540] expiry
         // d75fd557096ca23f683d964df7fdfce79f3295c8e19a4da4811beab582eaa95a [1572] sig r
         // 3891eaf0232a18a5ba93cc0aa801e966be7427f249c4d3c07727dfc4d29971e8 [1604] sig s
@@ -1071,7 +1071,7 @@ library CompleteWithdrawalsArrayDecoder {
         uint256 sigOffset = message.length - 124;
         // signature starts 124 bytes back from the end of the message
         (
-            signer,
+            agentOwner,
             expiry,
             signature
         ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, sigOffset);
@@ -1209,7 +1209,7 @@ library DelegationDecoders {
     /// @return operator Eigenalyer parameter: address to delegate to.
     /// @return approverSignatureAndExpiry Eigenlayer parameter: signature from Operator.
     /// @return approverSalt Eigenlayer parameter: approver salt.
-    /// @return signer owner of the EigenAgent
+    /// @return agentOwner owner of the EigenAgent
     /// @return expiryEigenAgent expiry of the signature (does not revert)
     /// @return signatureEigenAgent Signed by the user for their EigenAgent to excecute.
     function decodeDelegateToMsg(bytes memory message)
@@ -1219,7 +1219,7 @@ library DelegationDecoders {
             address operator,
             ISignatureUtilsMixinTypes.SignatureWithExpiry memory approverSignatureAndExpiry,
             bytes32 approverSalt,
-            address signer,
+            address agentOwner,
             uint256 expiryEigenAgent,
             bytes memory signatureEigenAgent
         )
@@ -1243,7 +1243,7 @@ library DelegationDecoders {
         // d2ec2451a264124b3966b82aad0e40e9517175affad9f23d600dbddfff57db4d [292] sig r
         // 62440bdea7d1a009fb374773868853d52e7425035fddfff0256c26650dcfed34 [324] sig s
         // 1c00000000000000000000000000000000000000000000000000000000000000 [356] sig v
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [388] eigenAgent signer
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [388] eigenAgent agentOwner
         // 0000000000000000000000000000000000000000000000000000000066d3b834 [420] eigenAgent sig expiry
         // e00176f55bcbdf4f335018dc3b676b349c938a51804d3f0d78d02f75f77b85c1 [452] eigenAgent sig r
         // 78060931402acbf07ebbe20d1648a2b3072ad508523d947a0eee31cdd386d6fd [484] eigenAgent sig s
@@ -1273,7 +1273,7 @@ library DelegationDecoders {
         });
 
         (
-            signer,
+            agentOwner,
             expiryEigenAgent,
             signatureEigenAgent
         ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 388); // user signature starts on 388
@@ -1284,7 +1284,7 @@ library DelegationDecoders {
             approverSignatureAndExpiry,
             approverSalt,
             // signature for EigenAgent execution
-            signer,
+            agentOwner,
             expiryEigenAgent,
             signatureEigenAgent
         );
@@ -1293,7 +1293,7 @@ library DelegationDecoders {
     /**
      * @param message CCIP message to Eigenlayer
      * @return staker address of the EigenAgent (the staker from Eigenlayer's perspective)
-     * @return signer Owner of the EigenAgent
+     * @return agentOwner Owner of the EigenAgent
      * @return expiry Expiry of the signature
      * @return signature Signed by the user for their EigenAgent to excecute.
      */
@@ -1302,7 +1302,7 @@ library DelegationDecoders {
         pure
         returns (
             address staker, // eigenAgent
-            address signer,
+            address agentOwner,
             uint256 expiry,
             bytes memory signature
         )
@@ -1312,7 +1312,7 @@ library DelegationDecoders {
         // 00000000000000000000000000000000000000000000000000000000000000a5
         // da8be864                                                         [96] function selector
         // 0000000000000000000000002fd5589daa0eb790b9237a300479924f9023efef [100] staker address (delegating)
-        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] eigenAgent signer
+        // 0000000000000000000000008454d149beb26e3e3fc5ed1c87fb0b2a1b7b6c2c [132] eigenAgent agentOwner
         // 0000000000000000000000000000000000000000000000000000000000000e11 [164] eigenAgent sig expiry
         // b20a886dfc3208a956b14419e367c1127258b8079559b101a7d6ced1271d464f [196] eigenAgent sig r
         // 271a38b87fd2cd30f183d542483cc71269711bdc9044b24baf2b7aa189a3d1e0 [228] eigenAgent sig s
@@ -1326,14 +1326,14 @@ library DelegationDecoders {
         }
 
         (
-            signer,
+            agentOwner,
             expiry,
             signature
         ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, 132);
 
         return (
             staker,
-            signer,
+            agentOwner,
             expiry,
             signature
         );

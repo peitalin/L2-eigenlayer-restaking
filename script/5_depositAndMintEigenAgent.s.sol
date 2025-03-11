@@ -45,13 +45,12 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         TARGET_CONTRACT = address(strategyManager);
 
         vm.selectFork(ethForkId);
-        (
-            eigenAgent,
-            execNonce
-        ) = getEigenAgentAndExecNonce(staker);
 
+        (eigenAgent, execNonce) = getEigenAgentAndExecNonce(staker);
         require(address(eigenAgent) == address(0), "User already has an EigenAgent");
         // User already has an EigenAgent, use script 5b_depositIntoStrategy for lower cost.
+
+        address predictedEigenAgentAddr = agentFactory.predictEigenAgentAddress(staker, 0);
 
         //////////////////////////////////////////////////////
         /// L2: Fund staker account
@@ -62,11 +61,14 @@ contract DepositAndMintEigenAgentScript is BaseScript {
             vm.deal(staker, 1 ether);
             (bool success, ) = staker.call{value: 0.5 ether}("");
         } else {
-            if (address(staker).balance < 0.04 ether) {
+            if (staker.balance < 0.04 ether) {
                 (bool success, ) = staker.call{value: 0.03 ether}("");
             }
         }
-        IBurnMintERC20(address(tokenL2)).mint(staker, 1 ether);
+
+        if (tokenL2.balanceOf(deployer) < 1 ether) {
+            IBurnMintERC20(address(tokenL2)).mint(deployer, 1 ether);
+        }
         vm.stopBroadcast();
 
         //////////////////////////////////////////////////////
@@ -80,7 +82,7 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
             stakerKey,
-            address(eigenAgent),
+            predictedEigenAgentAddr,
             EthSepolia.ChainId, // destination chainid where EigenAgent lives
             TARGET_CONTRACT, // StrategyManager is the target
             encodeDepositIntoStrategyMsg(
@@ -92,8 +94,8 @@ contract DepositAndMintEigenAgentScript is BaseScript {
             expiry
         );
 
-        uint256 gasLimit = 730_000;
-        // Note: must set gasLimit for deposit + mint EigenAgent: [gas: 724,221]
+        uint256 gasLimit = 860_000;
+        // Note: must set gasLimit for deposit + mint EigenAgent: [gas: 851,384]
 
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
         tokenAmounts[0] = Client.EVMTokenAmount({
@@ -112,6 +114,9 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         vm.startBroadcast(stakerKey);
         {
             tokenL2.approve(address(senderContract), amount);
+            if (staker != deployer) {
+                tokenL2.transfer(staker, amount);
+            }
 
             senderContract.sendMessagePayNative{value: routerFees}(
                 EthSepolia.ChainSelector, // destination chain

@@ -9,7 +9,7 @@ import {IStrategyManager} from "@eigenlayer-contracts/interfaces/IStrategyManage
 import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 
 import {ISenderHooks} from "./interfaces/ISenderHooks.sol";
-import {EigenlayerMsgDecoders, TransferToAgentOwnerMsg} from "./utils/EigenlayerMsgDecoders.sol";
+import {EigenlayerMsgDecoders, AgentOwnerSignature, TransferToAgentOwnerMsg} from "./utils/EigenlayerMsgDecoders.sol";
 import {FunctionSelectorDecoder} from "./utils/FunctionSelectorDecoder.sol";
 import {Adminable} from "./utils/Adminable.sol";
 
@@ -35,6 +35,7 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
     error OnlySendFundsForDeposits(bytes4 functionSelector, string msg);
     error OnlyDepositOneTokenAtATime(string msg);
     error UnsupportedFunctionCall(bytes4 functionSelector);
+    error ExpiryMustBeLessThan3Days(uint256 expiry);
 
     constructor() {
         _disableInitializers();
@@ -185,6 +186,16 @@ contract SenderHooks is Initializable, Adminable, EigenlayerMsgDecoders {
             // check tokens are only bridged for deposit calls
             if (tokenAmounts[0].amount > 0) {
                 revert OnlySendFundsForDeposits(functionSelector,"Only send funds for DepositIntoStrategy calls");
+            }
+        }
+        if (functionSelector == IStrategyManager.depositIntoStrategy.selector) {
+            (
+                address agentOwner,
+                uint256 expiry,
+                // signature
+            ) = AgentOwnerSignature.decodeAgentOwnerSignature(message, message.length - 124);
+            if (expiry > block.timestamp + 3 days) {
+                revert ExpiryMustBeLessThan3Days(expiry);
             }
         }
 

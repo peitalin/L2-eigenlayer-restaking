@@ -173,6 +173,8 @@ contract ClientSigners is Script {
     ) public view returns (bytes memory) {
 
         require(targetContractAddr != address(0x0), "ClientSigner: targetContract cannot be 0x0");
+        require(eigenAgentAddr != address(0x0), "ClientSigner: eigenAgent cannot be 0x0");
+        require(chainid != 0, "ClientSigner: chainid cannot be 0");
 
         bytes memory messageWithSignature;
         bytes memory signatureEigenAgent;
@@ -200,12 +202,12 @@ contract ClientSigners is Script {
             // 4: signature
             messageWithSignature = abi.encodePacked(
                 messageToEigenlayer,
-                bytes32(abi.encode(vm.addr(signerKey))), // pad signer to 32byte word
+                bytes32(abi.encode(vm.addr(signerKey))), // AgentOwner. Pad signer to 32byte word
                 expiry,
                 signatureEigenAgent
             );
 
-            _logClientEigenAgentExecutionMessage(chainid, targetContractAddr, messageToEigenlayer, execNonceEigenAgent, expiry);
+            _logClientEigenAgentExecutionMessage(chainid, eigenAgentAddr, targetContractAddr, messageToEigenlayer, execNonceEigenAgent, expiry);
             _logClientSignature(vm.addr(signerKey), digestHash, signatureEigenAgent);
             checkSignature_EIP1271(vm.addr(signerKey), digestHash, signatureEigenAgent);
         }
@@ -215,23 +217,30 @@ contract ClientSigners is Script {
 
     function _logClientEigenAgentExecutionMessage(
         uint256 chainid,
+        address eigenAgentAddr,
         address targetContractAddr,
         bytes memory messageToEigenlayer,
         uint256 execNonce,
         uint256 expiry
     ) private pure {
         console.log("===== EigenAgent Signature =====");
-        console.log("chainid:", uint256(chainid));
         console.log("targetContractAddr:", targetContractAddr);
+        console.log("eigenAgent:", eigenAgentAddr);
         console.log("messageToEigenlayer:");
         console.logBytes(messageToEigenlayer);
+        // foundry v1.01 console.log is broken, does not log uints even with this fix:
+        // https://github.com/foundry-rs/foundry/issues/9959
+        // Use v0.3.0 to log expiry, execNonce, chainid
+        // foundryup --use stable
+        // foundryup --use v0.3.0
         console.log("execNonce:", uint256(execNonce));
+        console.log("chainid:", uint256(chainid));
         console.log("expiry:", uint256(expiry));
         console.log("--------------------------------");
     }
 
     function _logClientSignature(address signer, bytes32 digestHash, bytes memory signatureEigenAgent) private pure {
-        console.log("signer:", signer);
+        console.log("agentOwner/signer:", signer);
         console.log("digestHash:");
         console.logBytes32(digestHash);
         console.log("signature:");

@@ -109,11 +109,7 @@ contract RedepositScript is BaseScript {
                 sigExpiry
             );
 
-            Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-            tokenAmounts[0] = Client.EVMTokenAmount({
-                token: address(tokenL2),
-                amount: amount
-            });
+            Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
 
             uint256 gasLimit = senderHooks.getGasLimitForFunctionSelector(
                 IDelegationManager.completeQueuedWithdrawal.selector

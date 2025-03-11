@@ -27,7 +27,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
     // SenderHooks.RewardsTransferRootCommitted
     event RewardsTransferRootCommitted(
         bytes32 indexed rewardsTransferRoot,
-        address signer
+        address agentOwner
     );
 
     event SendingFundsToAgentOwner(address indexed, uint256 indexed);
