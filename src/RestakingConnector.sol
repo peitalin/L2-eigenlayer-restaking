@@ -161,7 +161,7 @@ contract RestakingConnector is
      * If the user already has an EigenAgent this call will continue depositing,
      * It will not mint a new EigenAgent if a user already has one.
      *
-     * Errors with EigenAgentExecutionError(signer, expiry) error if there is an issue
+     * Errors with EigenAgentExecutionError(agentOwner, expiry) error if there is an issue
      * retrieving an EigenAgent, spawning an EigenAgent, or depositing into Eigenlayer,
      * allowing the caller (ReceiverCCIP) to handle the error and refund the user if necessary.
      * @param messageWithSignature is the depositIntoSignature message with
@@ -178,7 +178,7 @@ contract RestakingConnector is
             address token,
             uint256 amount,
             // message signature
-            address signer, // original_staker
+            address agentOwner, // original_staker
             uint256 expiry,
             bytes memory signature // signature from original_staker
         ) = decodeDepositIntoStrategyMsg(messageWithSignature);
@@ -189,7 +189,7 @@ contract RestakingConnector is
             // However it is possible to send multiple tokens with CCIP in other Sender implementations,
             // so revert with EigenAgentExecutionError to refund in case this happens.
             revert IRestakingConnector.EigenAgentExecutionError(
-                signer,
+                agentOwner,
                 expiry,
                 abi.encodeWithSelector(
                     TooManyTokensToDeposit.selector,
@@ -201,7 +201,7 @@ contract RestakingConnector is
         // Validate token and amount in the CCIP message match the actual tokens received
         if (token != destTokenAmounts[0].token || amount != destTokenAmounts[0].amount) {
             revert IRestakingConnector.EigenAgentExecutionError(
-                signer,
+                agentOwner,
                 expiry,
                 abi.encodeWithSelector(
                     TokenAmountMismatch.selector,
@@ -211,7 +211,7 @@ contract RestakingConnector is
         }
 
         // Get original_staker's EigenAgent, or spawn one.
-        try agentFactory.tryGetEigenAgentOrSpawn(signer) returns (IEigenAgent6551 eigenAgent) {
+        try agentFactory.tryGetEigenAgentOrSpawn(agentOwner) returns (IEigenAgent6551 eigenAgent) {
 
             // Token flow: ReceiverCCIP approves RestakingConnector to move tokens to EigenAgent,
             // then EigenAgent approves StrategyManager to move tokens into Eigenlayer
@@ -237,11 +237,11 @@ contract RestakingConnector is
             ) returns (bytes memory _result) {
                 // success, do nothing.
             } catch (bytes memory err) {
-                revert IRestakingConnector.EigenAgentExecutionError(signer, expiry, err);
+                revert IRestakingConnector.EigenAgentExecutionError(agentOwner, expiry, err);
             }
 
         } catch (bytes memory err) {
-            revert IRestakingConnector.EigenAgentExecutionError(signer, expiry, err);
+            revert IRestakingConnector.EigenAgentExecutionError(agentOwner, expiry, err);
         }
 
     }
@@ -257,7 +257,7 @@ contract RestakingConnector is
             // original message
             IDelegationManagerTypes.QueuedWithdrawalParams[] memory qwpArray,
             // message signature
-            , // address __signer
+            , // address _agentOwner
             uint256 expiry,
             bytes memory signature
         ) = decodeQueueWithdrawalsMsg(messageWithSignature);
@@ -412,12 +412,12 @@ contract RestakingConnector is
             ISignatureUtilsMixinTypes.SignatureWithExpiry memory approverSignatureAndExpiry,
             bytes32 approverSalt,
             // message signature
-            address signer,
+            address agentOwner,
             uint256 expiry,
             bytes memory signature
         ) = DelegationDecoders.decodeDelegateToMsg(messageWithSignature);
 
-        IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(signer);
+        IEigenAgent6551 eigenAgent = agentFactory.getEigenAgent(agentOwner);
 
         eigenAgent.executeWithSignature(
             address(delegationManager),
@@ -442,7 +442,7 @@ contract RestakingConnector is
             // original message
             address eigenAgentAddr, // staker in Eigenlayer delegating
             // message signature
-            , // address __signer
+            , // address _agentOwner
             uint256 expiry,
             bytes memory signature
         ) = DelegationDecoders.decodeUndelegateMsg(messageWithSignature);
