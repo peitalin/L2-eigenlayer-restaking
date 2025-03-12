@@ -20,6 +20,9 @@ docs/
 /test/withdrawals-undelegated/*
 /test/temp-files/*
 
+# Ignore app
+/app
+
 /.vscode
 .DS_Store
 **/.DS_Store
