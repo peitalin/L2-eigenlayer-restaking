@@ -1,15 +1,15 @@
 {
   "chainInfo": {
-    "block": 7880917,
+    "block": 7884826,
     "chainid": 11155111,
-    "timestamp": 1741704348
+    "timestamp": 1741754928
   },
   "contracts": {
-    "agentFactory": "0x77d04e0fEF457957ec60C621333aEC81BF66879C",
-    "baseEigenAgent": "0xA791743B5EAC99b74Bff8a178f7fb3E1F9fc8cf0",
-    "eigenAgentOwner721": "0x685d6029d3F21F2730f0eb8Acecab84D8c1386B4",
-    "receiverCCIP": "0x390225c015FfB24E18bdca2E1DdF87367e62c049",
-    "registry6551": "0x42d7A9A20290df5EAc398B00c34CA4f6C5DCceCE",
-    "restakingConnector": "0x284691a52D74884BCdd49e726354c0D2427E2CF6"
+    "agentFactory": "0x2808898C7E1d1F2773D6919b3e9e82e7b1492d57",
+    "baseEigenAgent": "0x9aAF82fb5e3abb0955d5535F6cDBED4874E0e80C",
+    "eigenAgentOwner721": "0x8243dED6cD7a1c4fa3ddd44D536e61110C5f4dfD",
+    "receiverCCIP": "0x0C3AcbFdA67bb7a8E987a77fF505730230D7Ce9A",
+    "registry6551": "0x6E7552654CeE28849f93D5f2702B32a83eA9337E",
+    "restakingConnector": "0xC480F6724d958b4Fc5887ca3AF5045f3dc8CAd86"
   }
 }
