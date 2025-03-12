@@ -6,6 +6,7 @@ import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 import {IERC20} from "@openzeppelin-v5-contracts/token/ERC20/IERC20.sol";
 import {IERC1271} from "@openzeppelin-v5-contracts/interfaces/IERC1271.sol";
 import {IERC165} from "@openzeppelin-v5-contracts/utils/introspection/IERC165.sol";
+import {SignatureChecker} from "@openzeppelin-v5-contracts/utils/cryptography/SignatureChecker.sol";
 
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
@@ -63,20 +64,6 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         vm.assertEq(
             keccak256("ExecuteWithSignature(address target,uint256 value,bytes data,uint256 execNonce,uint256 chainId,uint256 expiry)"),
             eigenAgent.EIGEN_AGENT_EXEC_TYPEHASH()
-        );
-    }
-
-    function test_EigenAgent_DomainTypehash() public {
-        vm.assertEq(
-            EIP712_DOMAIN_TYPEHASH,
-            eigenAgent.EIP712_DOMAIN_TYPEHASH()
-        );
-    }
-
-    function test_EigenAgent_EigenlayerVersionMatches() public {
-        vm.assertEq(
-            EIGENLAYER_VERSION,
-            EigenAgent6551(payable(address(eigenAgent))).EIGENLAYER_VERSION()
         );
     }
 
@@ -147,7 +134,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(bobKey, digestHash);
             signature = abi.encodePacked(r, s, v);
         }
-        checkSignature_EIP1271(bob, digestHash, signature);
+        SignatureChecker.isValidSignatureNow(bob, digestHash, signature);
         vm.stopBroadcast();
 
         //////////////////////////////////////////////////////
@@ -495,7 +482,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 message0,
                 execNonce0
             );
-            checkSignature_EIP1271(bob, digestHash0, signature0);
+            SignatureChecker.isValidSignatureNow(bob, digestHash0, signature0);
 
             eigenAgentBob.executeWithSignature(
                 address(tokenL1), // CCIP-BnM token
@@ -526,7 +513,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 amount,
                 execNonce1
             );
-            checkSignature_EIP1271(bob, digestHash1, signature1);
+            SignatureChecker.isValidSignatureNow(bob, digestHash1, signature1);
 
             eigenAgentBob.executeWithSignature(
                 address(strategyManager), // strategyManager
@@ -626,7 +613,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 execNonce2,
                 queuedWithdrawalParams
             );
-            checkSignature_EIP1271(alice, digestHash2, signature2);
+            SignatureChecker.isValidSignatureNow(alice, digestHash2, signature2);
 
             bytes memory result = eigenAgentBob.executeWithSignature(
                 address(delegationManager), // delegationManager
@@ -667,7 +654,7 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
                 message3,
                 execNonce3
             );
-            checkSignature_EIP1271(bob, digestHash3, signature3);
+            SignatureChecker.isValidSignatureNow(bob, digestHash3, signature3);
 
             vm.expectRevert(abi.encodeWithSelector(
                 SignatureInvalid.selector,

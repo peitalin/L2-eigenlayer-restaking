@@ -11,64 +11,23 @@ import {EIP712_DOMAIN_TYPEHASH} from "@eigenlayer-contracts/mixins/SignatureUtil
 /// @dev Retrieve these struct hashes by calling Eigenlayer contracts, or storing the hash.
 contract ClientSigners is Script {
 
-    /*
-     *
-     *            Constants
-     *
-     */
-
     /// @notice The EIP-712 typehash for the deposit struct used by the contract
     bytes32 public constant EIGEN_AGENT_EXEC_TYPEHASH = keccak256(
         "ExecuteWithSignature(address target,uint256 value,bytes data,uint256 execNonce,uint256 chainId,uint256 expiry)"
     );
 
+    /// @notice EigenAgent version
+    string public constant TREASURE_RESTAKING_VERSION = "v1.0.0";
+
     /*
      *
-     *            Functions
+     *            Eigenlayer Signatures
      *
      */
 
-    function checkSignature_EIP1271(
-        address signer,
-        bytes32 digestHash,
-        bytes memory signature
-    ) public view {
-        SignatureChecker.isValidSignatureNow(signer, digestHash, signature);
-    }
-
-    function createEigenlayerDepositDigest(
-        IStrategy strategy,
-        address token,
-        uint256 amount,
-        address staker,
-        uint256 nonce,
-        uint256 expiry,
-        bytes32 _domainSeparator
-    ) public pure returns (bytes32) {
-
-        /// @notice The EIP-712 typehash for the deposit struct used by the contract
-        bytes32 DEPOSIT_TYPEHASH = keccak256("Deposit(address staker,address strategy,address token,uint256 amount,uint256 nonce,uint256 expiry)");
-
-        bytes32 structHash = keccak256(abi.encode(
-            DEPOSIT_TYPEHASH,
-            staker,
-            strategy,
-            token,
-            amount,
-            nonce,
-            expiry
-        ));
-        // calculate the digest hash
-        bytes32 digestHash = keccak256(abi.encodePacked(
-            "\x19\x01",
-            _domainSeparator,
-            structHash
-        ));
-
-        return digestHash;
-    }
-
     /// @dev domainSeparator as per: eigenlayer-contracts/src/contracts/mixins/SignatureUtilsMixin.sol
+    /// @notice This function is used to calculate the domainSeparator for calls to Eigenlayer contracts
+    /// that require signatures (delegation approvals for instance)
     function domainSeparator(
         address contractAddr,
         uint256 destinationChainid
@@ -78,22 +37,21 @@ contract ClientSigners is Script {
             abi.encode(
                 EIP712_DOMAIN_TYPEHASH,
                 keccak256(bytes("EigenLayer")),
-                keccak256(bytes(_majorVersion())),
+                keccak256(bytes(_majorVersion(EIGENLAYER_VERSION))),
                 chainid,
                 contractAddr
             )
         );
         // Note: in calculating the domainSeparator:
-        // contractAddr is the target contract validating the signature, not this contract (SignatureUtils)
-        // e.g the DepositManager, or StrategyManager, or EigenAgent
-        // chainid is the chain Eigenlayer is deployed on (it can fork!), not the chain you are calling this function
-        // So chainid should be destination chainid in the context of L2 -> L1 restaking calls
+        // contractAddr is the target contract validating the signature, not this contract (ClientSigners)
+        // e.g the DepositManager, or StrategyManager.
+        // chainid should be destination chainid in the context of L2 -> L1 restaking calls
     }
 
     /// @notice Returns the major version of the contract. See Eigenlayer SemVerMixin.sol
     /// @return The major version string (e.g., "v1" for version "v1.2.3")
-    function _majorVersion() internal pure returns (string memory) {
-        bytes memory v = bytes(EIGENLAYER_VERSION);
+    function _majorVersion(string memory _version) internal pure returns (string memory) {
+        bytes memory v = bytes(_version);
         return string(bytes.concat(v[0], v[1]));
     }
 
@@ -111,12 +69,9 @@ contract ClientSigners is Script {
         bytes32 DELEGATION_APPROVAL_TYPEHASH = keccak256(
             "DelegationApproval(address delegationApprover,address staker,address operator,bytes32 salt,uint256 expiry)"
         );
-
-        // calculate the struct hash
         bytes32 approverStructHash = keccak256(
             abi.encode(DELEGATION_APPROVAL_TYPEHASH, _delegationApprover, staker, operator, approverSalt, expiry)
         );
-        // calculate the digest hash
         bytes32 approverDigestHash = keccak256(abi.encodePacked(
             "\x19\x01",
             domainSeparator(delegationManagerAddr, destinationChainid),
@@ -124,6 +79,12 @@ contract ClientSigners is Script {
         ));
         return approverDigestHash;
     }
+
+    /*
+     *
+     *            Treasure EigenAgent Signatures
+     *
+     */
 
     function createEigenAgentCallDigestHash(
         address _target,
@@ -147,11 +108,38 @@ contract ClientSigners is Script {
         // calculate the digest hash
         bytes32 digestHash = keccak256(abi.encodePacked(
             "\x19\x01",
-            domainSeparator(_eigenAgent, _chainid),
+            domainSeparatorEigenAgent(_eigenAgent, _chainid),
             structHash
         ));
 
         return digestHash;
+    }
+
+    /// @notice This function is used to calculate the domainSeparator calls to EigenAgent
+    function domainSeparatorEigenAgent(
+        address contractAddr,
+        uint256 destinationChainid
+    ) public pure returns (bytes32) {
+        uint256 chainid = destinationChainid;
+        return keccak256(
+            abi.encode(
+                EIP712_DOMAIN_TYPEHASH,
+                keccak256(bytes("EigenAgent")),
+                keccak256(bytes(_majorVersionEigenAgent())),
+                chainid,
+                contractAddr
+            )
+        );
+        // Note: in calculating the domainSeparator:
+        // contractAddr is the target contract validating the signature, not this contract (ClientSigners)
+        // e.g the EigenAgent address
+    }
+
+    /// @notice Returns the major version of the contract. See Eigenlayer SemVerMixin.sol
+    /// @return The major version string (e.g., "v1" for version "v1.2.3")
+    function _majorVersionEigenAgent() internal pure returns (string memory) {
+        bytes memory v = bytes(TREASURE_RESTAKING_VERSION);
+        return string(bytes.concat(v[0], v[1]));
     }
 
     struct EigenAgentExecution {
@@ -209,7 +197,7 @@ contract ClientSigners is Script {
 
             _logClientEigenAgentExecutionMessage(chainid, eigenAgentAddr, targetContractAddr, messageToEigenlayer, execNonceEigenAgent, expiry);
             _logClientSignature(vm.addr(signerKey), digestHash, signatureEigenAgent);
-            checkSignature_EIP1271(vm.addr(signerKey), digestHash, signatureEigenAgent);
+            SignatureChecker.isValidSignatureNow(vm.addr(signerKey), digestHash, signatureEigenAgent);
         }
 
         return messageWithSignature;
