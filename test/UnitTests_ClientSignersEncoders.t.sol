@@ -5,6 +5,8 @@ import {BaseTestEnvironment} from "./BaseTestEnvironment.t.sol";
 
 import {IERC20} from "@openzeppelin-v4-contracts/token/ERC20/IERC20.sol";
 import {IERC1271} from "@openzeppelin-v5-contracts/interfaces/IERC1271.sol";
+import {SignatureChecker} from "@openzeppelin-v5-contracts/utils/cryptography/SignatureChecker.sol";
+
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {IDelegationManager} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
 import {IDelegationManagerTypes} from "@eigenlayer-contracts/interfaces/IDelegationManager.sol";
@@ -20,6 +22,7 @@ import {
     AgentOwnerSignature
 } from "../src/utils/EigenlayerMsgDecoders.sol";
 import {EigenlayerMsgEncoders} from "../src/utils/EigenlayerMsgEncoders.sol";
+import {EigenAgent6551} from "../src/6551/EigenAgent6551.sol";
 
 import {ClientEncoders} from "../script/ClientEncoders.sol";
 import {ClientSigners} from "../script/ClientSigners.sol";
@@ -84,7 +87,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        clientSignersTest.checkSignature_EIP1271(signer, digestHash, signature);
+        SignatureChecker.isValidSignatureNow(signer, digestHash, signature);
 
         vm.assertEq(
             IERC1271.isValidSignature.selector,
@@ -92,36 +95,11 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         );
     }
 
-    function test_ClientSigner_createEigenlayerDepositDigest() public view {
-
-        bytes32 domainSeparator = clientSignersTest.domainSeparator(
-            address(strategyManager),
-            EthSepolia.ChainId
+    function test_ClientSigner_EigenAgentVersionMatches() public view {
+        vm.assertEq(
+            clientSignersTest.TREASURE_RESTAKING_VERSION(),
+            EigenAgent6551(payable(address(eigenAgent))).TREASURE_RESTAKING_VERSION()
         );
-
-        bytes32 digest1 = clientSignersTest.createEigenlayerDepositDigest(
-            strategy,
-            address(tokenL1),
-            amount,
-            staker,
-            execNonce,
-            expiry,
-            domainSeparator
-        );
-
-        bytes32 DEPOSIT_TYPEHASH = keccak256("Deposit(address staker,address strategy,address token,uint256 amount,uint256 nonce,uint256 expiry)");
-        bytes32 structHash = keccak256(abi.encode(
-            DEPOSIT_TYPEHASH,
-            staker,
-            strategy,
-            tokenL1,
-            amount,
-            execNonce,
-            expiry
-        ));
-        bytes32 digest2 = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
-
-        vm.assertEq(digest1, digest2);
     }
 
     function test_ClientSigner_getDomainSeparator() public view {
@@ -206,7 +184,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
         // calculate the digest hash
         bytes32 digestHash = keccak256(abi.encodePacked(
             "\x19\x01",
-            clientSignersTest.domainSeparator(address(eigenAgent), _chainid),
+            clientSignersTest.domainSeparatorEigenAgent(address(eigenAgent), _chainid),
             structHash
         ));
 
