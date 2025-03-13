@@ -25,8 +25,8 @@ contract DepositAndMintEigenAgentScript is BaseScript {
     function run() public {
         deployerKey = vm.envUint("DEPLOYER_KEY");
         deployer = vm.addr(deployerKey);
-        stakerKey = deployerKey;
-        staker = deployer;
+        stakerKey = vm.envUint("STAKER_KEY");
+        staker = vm.addr(stakerKey);
         return _run(false);
     }
 
@@ -61,13 +61,15 @@ contract DepositAndMintEigenAgentScript is BaseScript {
             vm.deal(staker, 1 ether);
             (bool success, ) = staker.call{value: 0.5 ether}("");
         } else {
-            if (staker.balance < 0.04 ether) {
-                (bool success, ) = staker.call{value: 0.03 ether}("");
+            if (staker.balance < 0.4 ether) {
+                (bool success, ) = staker.call{value: 0.157 ether}("");
             }
         }
-
         if (tokenL2.balanceOf(deployer) < 1 ether) {
             IBurnMintERC20(address(tokenL2)).mint(deployer, 1 ether);
+        }
+        if (staker != deployer) {
+            tokenL2.transfer(staker, 1 ether);
         }
         vm.stopBroadcast();
 
@@ -114,9 +116,6 @@ contract DepositAndMintEigenAgentScript is BaseScript {
         vm.startBroadcast(stakerKey);
         {
             tokenL2.approve(address(senderContract), amount);
-            if (staker != deployer) {
-                tokenL2.transfer(staker, amount);
-            }
 
             senderContract.sendMessagePayNative{value: routerFees}(
                 EthSepolia.ChainSelector, // destination chain

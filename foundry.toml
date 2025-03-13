@@ -45,7 +45,9 @@ localhost = "http://localhost:8545"
 # ethsepolia = "https://sepolia.drpc.org"
 ethsepolia = "https://sepolia.gateway.tenderly.co"
 # ethsepolia = "https://sepolia.infura.io/v3/${INFURA_API_KEY}"
-basesepolia = "https://sepolia.base.org"
+# basesepolia = "https://sepolia.base.org"
+basesepolia = "https://base-sepolia.drpc.org"
+
 
 [etherscan]
 holesky = { key = "${ETHERSCAN_API_KEY}" }
