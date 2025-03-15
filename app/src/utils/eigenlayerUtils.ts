@@ -21,17 +21,12 @@ export async function getEigenAgentAndExecNonce(userAddress: Address): Promise<{
   execNonce: bigint;
 }> {
   try {
-    // Log parameters for debugging
-    // console.log('Checking EigenAgent for address:', userAddress);
-
     // Create contract instances
     const agentFactory = getContract({
       address: AGENT_FACTORY_ADDRESS,
       abi: agentFactoryAbi,
       publicClient,
     });
-
-    console.log('AgentFactory contract created, attempting to read getEigenAgent...');
 
     // Get the EigenAgent address for the user
     const eigenAgentAddress = await agentFactory.read.getEigenAgent([userAddress]) as Address;

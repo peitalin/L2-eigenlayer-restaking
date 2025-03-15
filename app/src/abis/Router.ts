@@ -1,4 +1,5 @@
 import { Address } from 'viem';
+
 // Router ABI for the Chainlink CCIP router
 export const ROUTER_ABI = [
   {
@@ -26,7 +27,6 @@ export const ROUTER_ABI = [
   }
 ] as const;
 
-// Export interfaces
 export interface EVMTokenAmount {
   token: Address;
   amount: bigint;

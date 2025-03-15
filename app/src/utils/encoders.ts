@@ -27,7 +27,6 @@ export function encodeDepositIntoStrategyMsg(
   token: Address,
   amount: bigint
 ): Hex {
-  // Define the function ABI for depositIntoStrategy
   // Function signature: depositIntoStrategy(address,address,uint256)
   const abi = [
     {

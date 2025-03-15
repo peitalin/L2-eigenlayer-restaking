@@ -1,5 +1,6 @@
 import { Address, Hex, Hash, concat, encodeAbiParameters, keccak256, pad, toBytes, WalletClient, createPublicClient, http, PublicClient, verifyMessage, SignableMessage, verifyTypedData, stringToHex, hexToBytes, bytesToHex, hexToString } from 'viem';
 import { sepolia } from 'viem/chains';
+import { CHAINLINK_CONSTANTS } from '../addresses';
 
 // Constants from ClientSigners.sol
 export const EIGEN_AGENT_EXEC_TYPEHASH = keccak256(
@@ -19,7 +20,16 @@ export const TREASURE_RESTAKING_VERSION = "v1.0.0";
 export function domainSeparatorEigenAgent(contractAddr: Address, chainId: bigint): Hash {
   // Get the major version (v1) from v1.0.0
   const majorVersion = TREASURE_RESTAKING_VERSION.substring(0, 2);
-  // Directly calculate domain separator using the same approach as Solidity
+  // Calculate domain separator, same as Solidity
+  // keccak256(
+  //     abi.encode(
+  //         EIP712_DOMAIN_TYPEHASH,
+  //         keccak256(bytes("EigenAgent")),
+  //         keccak256(bytes(_majorVersionEigenAgent())),
+  //         destinationChainid,
+  //         contractAddr
+  //     )
+  // );
   const domainSeparator = keccak256(
     encodeAbiParameters(
       [
@@ -65,6 +75,15 @@ export function createEigenAgentCallDigestHash(
   expiry: bigint
 ): Hex {
   // Calculate struct hash
+  // bytes32 structHash = keccak256(abi.encode(
+  //     EIGEN_AGENT_EXEC_TYPEHASH,
+  //     _target,
+  //     _value,
+  //     keccak256(_data),
+  //     _nonce,
+  //     _chainid,
+  //     _expiry
+  // ));
   const structHash = keccak256(
     encodeAbiParameters(
       [
@@ -92,6 +111,11 @@ export function createEigenAgentCallDigestHash(
   const domainSeparator = domainSeparatorEigenAgent(eigenAgentAddr, chainId);
 
   // Calculate the final digest hash
+  // bytes32 digestHash = keccak256(abi.encodePacked(
+  //     "\x19\x01",
+  //     domainSeparatorEigenAgent(_eigenAgent, _chainid),
+  //     structHash
+  // ));
   return keccak256(
     concat([
       toBytes('0x1901'), // EIP-712 prefix      toBytes('0x1901'), // EIP-712 prefix
@@ -106,7 +130,6 @@ export function createEigenAgentCallDigestHash(
  * @param client The wallet client to use for signing
  * @param signer The account address to sign with
  * @param eigenAgentAddr EigenAgent contract address
- * @param chainId Chain ID where the transaction will execute
  * @param targetContractAddr Contract to call via the EigenAgent
  * @param messageToEigenlayer Data to send in the call
  * @param execNonce Execution nonce from the EigenAgent
@@ -117,7 +140,6 @@ export async function signMessageForEigenAgentExecution(
   client: WalletClient,
   signer: Address,
   eigenAgentAddr: Address,
-  chainId: number,
   targetContractAddr: Address,
   messageToEigenlayer: Hex,
   execNonce: bigint,
@@ -130,38 +152,27 @@ export async function signMessageForEigenAgentExecution(
   if (eigenAgentAddr === '0x0000000000000000000000000000000000000000') {
     throw new Error('EigenAgent cannot be zero address');
   }
-  if (chainId === 0) {
-    throw new Error('Chain ID cannot be zero');
+  let targetChainId = Number(CHAINLINK_CONSTANTS.ethSepolia.chainId);
+  if (TREASURE_RESTAKING_VERSION.substring(0, 2) !== 'v1') {
+    throw new Error('Invalid TREASURE_RESTAKING_VERSION');
   }
 
-  // Sign the digest using EIP-712
-  const signature = await client.signTypedData({
+  // Create the digest hash manually using our function
+  const digestHash = createEigenAgentCallDigestHash(
+    targetContractAddr,
+    eigenAgentAddr,
+    0n, // value (0 for token transfers)
+    messageToEigenlayer,
+    execNonce,
+    BigInt(targetChainId), // target chain where EigenAgent is
+    expiry
+  );
+
+  // Sign the digest hash directly using signMessage
+  const signature = await client.signMessage({
     account: signer,
-    domain: {
-      name: 'EigenAgent',
-      version: TREASURE_RESTAKING_VERSION.substring(0, 2),
-      chainId: chainId,
-      verifyingContract: eigenAgentAddr
-    },
-    types: {
-      ExecuteWithSignature: [
-        { name: 'target', type: 'address' },
-        { name: 'value', type: 'uint256' },
-        { name: 'data', type: 'bytes' },
-        { name: 'execNonce', type: 'uint256' },
-        { name: 'chainId', type: 'uint256' },
-        { name: 'expiry', type: 'uint256' }
-      ]
-    },
-    primaryType: 'ExecuteWithSignature',
-    message: {
-      target: targetContractAddr,
-      value: 0n,
-      data: messageToEigenlayer,
-      execNonce: execNonce,
-      chainId: BigInt(chainId),
-      expiry: expiry
-    }
+    message: { raw: digestHash }
+    // message: digestHash
   });
 
   // Format signature to ensure it has a '0' prefix for the v value
@@ -169,7 +180,7 @@ export async function signMessageForEigenAgentExecution(
     `0x0${signature.slice(2)}` as Hex :
     signature;
 
-  // This matches the Solidity implementation exactly:
+  // match the Solidity implementation:
   // messageWithSignature = abi.encodePacked(
   //   messageToEigenlayer,
   //   bytes32(abi.encode(vm.addr(signerKey))), // AgentOwner. Pad signer to 32byte word
@@ -177,9 +188,28 @@ export async function signMessageForEigenAgentExecution(
   //   signatureEigenAgent
   // );
 
-  // Properly encode each part
+  // Comment out excessive logging for test runs
+  /*
+  console.log("signer", signer);
+  console.log("eigenAgentAddr", eigenAgentAddr);
+  console.log("targetContractAddr", targetContractAddr);
+  console.log("messageToEigenlayer", messageToEigenlayer);
+  console.log("execNonce", execNonce);
+  console.log("chainid", targetChainId);
+  console.log("expiry", expiry);
+  console.log("formattedSignature", formattedSignature);
+  */
+
+  // encode and pad signer to 32byte word
   const encodedExpiry = encodeAbiParameters([{ type: 'uint256' }], [expiry]);
   const encodedSigner = encodeAbiParameters([{ type: 'address' }], [signer]);
+
+  /*
+  console.log("\nencodedSigner", encodedSigner);
+  console.log("encodedExpiry", encodedExpiry);
+  console.log("\ndigestHash", digestHash);
+  console.log("signature", formattedSignature);
+  */
 
   const messageWithSignature = concat([
     messageToEigenlayer,
