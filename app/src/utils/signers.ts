@@ -1,4 +1,4 @@
-import { Address, Hex, Hash, concat, encodeAbiParameters, keccak256, pad, toBytes, WalletClient, createPublicClient, http, PublicClient, verifyMessage, SignableMessage, verifyTypedData, stringToHex, hexToBytes, bytesToHex } from 'viem';
+import { Address, Hex, Hash, concat, encodeAbiParameters, keccak256, pad, toBytes, WalletClient, createPublicClient, http, PublicClient, verifyMessage, SignableMessage, verifyTypedData, stringToHex, hexToBytes, bytesToHex, hexToString } from 'viem';
 import { sepolia } from 'viem/chains';
 
 // Constants from ClientSigners.sol
@@ -133,17 +133,6 @@ export async function signMessageForEigenAgentExecution(
   if (chainId === 0) {
     throw new Error('Chain ID cannot be zero');
   }
-
-  // // Calculate the digest hash exactly as in Solidity
-  // const digest = createEigenAgentCallDigestHash(
-  //   targetContractAddr,
-  //   eigenAgentAddr,
-  //   0n, // not sending ether
-  //   messageToEigenlayer,
-  //   execNonce,
-  //   BigInt(chainId),
-  //   expiry
-  // );
 
   // Sign the digest using EIP-712
   const signature = await client.signTypedData({

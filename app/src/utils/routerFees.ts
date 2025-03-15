@@ -131,18 +131,14 @@ export async function getRouterFeesL2(
   // Empty the tokenAmounts array to avoid errors since our tests show it's not supported
   const validatedTokenAmounts: EVMTokenAmount[] = [];
 
-  if (tokenAmounts.length > 0) {
-    console.warn('Token transfers from L2 to L1 are not supported. Using only message data with no tokens.');
-  }
-
   // Log the encoded values for debugging
-  console.log('Estimating L2 router fees with:', {
-    receiver,
-    receiverEncoded,
-    destinationChain: CHAINLINK_CONSTANTS.ethSepolia.chainSelector,
-    tokenAmounts: validatedTokenAmounts, // Use empty token amounts to avoid errors
-    extraArgs
-  });
+  // console.log('Estimating L2 router fees with:', {
+  //   receiver,
+  //   receiverEncoded,
+  //   destinationChain: CHAINLINK_CONSTANTS.ethSepolia.chainSelector,
+  //   tokenAmounts: validatedTokenAmounts, // Use empty token amounts to avoid errors
+  //   extraArgs
+  // });
 
   try {
     // Call the getFee function on the router contract
