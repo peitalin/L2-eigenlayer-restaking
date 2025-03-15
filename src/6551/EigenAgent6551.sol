@@ -197,7 +197,17 @@ contract EigenAgent6551 is ERC6551 {
             structHash
         ));
 
+        digestHash = hashDigest191(digestHash);
+
         return digestHash;
+    }
+
+    function hashDigest191(bytes32 message) internal pure returns (bytes32) {
+        // Follow EIP-191 format
+        return keccak256(abi.encodePacked(
+            "\x19Ethereum Signed Message:\n32",
+            message
+        ));
     }
 
     /**
