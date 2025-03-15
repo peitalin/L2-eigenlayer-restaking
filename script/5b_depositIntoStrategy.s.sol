@@ -53,7 +53,7 @@ contract DepositIntoStrategyScript is BaseScript {
         // Make sure we are on BaseSepolia Fork
         vm.selectFork(l2ForkId);
 
-        uint256 amount = 0.00797 ether;
+        uint256 amount = 0.0897 ether;
         uint256 expiry = block.timestamp + 45 minutes;
 
         // sign the message for EigenAgent to execute Eigenlayer command
@@ -92,7 +92,7 @@ contract DepositIntoStrategyScript is BaseScript {
         senderContract.sendMessagePayNative{value: routerFees}(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
-            string(messageWithSignature),
+            string(messageWithSignature), // must be string
             tokenAmounts,
             gasLimit
         );

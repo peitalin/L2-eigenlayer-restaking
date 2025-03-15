@@ -7,7 +7,7 @@ import { getL1Client } from './clients';
 const AGENT_FACTORY_ADDRESS = bridgeContractsL1Config.contracts.agentFactory as Address;
 
 // Log the address we're using for debugging
-console.log('Using AgentFactory address:', AGENT_FACTORY_ADDRESS);
+// console.log('Using AgentFactory address:', AGENT_FACTORY_ADDRESS);
 
 // Get the L1 client from the clients utility
 const publicClient = getL1Client();
@@ -22,7 +22,7 @@ export async function getEigenAgentAndExecNonce(userAddress: Address): Promise<{
 }> {
   try {
     // Log parameters for debugging
-    console.log('Checking EigenAgent for address:', userAddress);
+    // console.log('Checking EigenAgent for address:', userAddress);
 
     // Create contract instances
     const agentFactory = getContract({
@@ -35,7 +35,7 @@ export async function getEigenAgentAndExecNonce(userAddress: Address): Promise<{
 
     // Get the EigenAgent address for the user
     const eigenAgentAddress = await agentFactory.read.getEigenAgent([userAddress]) as Address;
-    console.log('EigenAgent address:', eigenAgentAddress);
+    // console.log('EigenAgent address:', eigenAgentAddress);
 
     // If user has no EigenAgent, return null and zero nonce
     if (eigenAgentAddress === '0x0000000000000000000000000000000000000000') {

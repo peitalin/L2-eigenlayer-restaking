@@ -1,9 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createWalletClient, createPublicClient, http, custom,
   formatEther, parseEther, type WalletClient, type PublicClient,
   defineChain, Chain, Address, Hex, encodeAbiParameters,
   toHex, toBytes, encodeFunctionData, getFunctionSelector, fromHex,
-  hexToString
+  stringToBytes,
+  stringToHex,
+  hexToString,
+  encodePacked,
+  fromBytes,
+  bytesToString,
 } from 'viem';
 import { sepolia, base, mainnet } from 'viem/chains';
 import { getEigenAgentAndExecNonce, checkAgentFactoryContract } from '../utils/eigenlayerUtils';
@@ -66,6 +71,52 @@ const publicClients: Record<number, PublicClient> = {
   })
 };
 
+// Add ERC20 ABI for token approval
+const erc20Abi = [
+  {
+    name: "approve",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      {
+        name: "spender",
+        type: "address"
+      },
+      {
+        name: "amount",
+        type: "uint256"
+      }
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "bool"
+      }
+    ]
+  },
+  {
+    name: "allowance",
+    type: "function",
+    stateMutability: "view",
+    inputs: [
+      {
+        name: "owner",
+        type: "address"
+      },
+      {
+        name: "spender",
+        type: "address"
+      }
+    ],
+    outputs: [
+      {
+        name: "",
+        type: "uint256"
+      }
+    ]
+  }
+];
+
 const WalletConnect = () => {
   // Set default chain to Base Sepolia (L2)
   const [selectedChain, setSelectedChain] = useState<Chain>(baseSepolia);
@@ -83,10 +134,15 @@ const WalletConnect = () => {
   const [isAgentFactoryValid, setIsAgentFactoryValid] = useState<boolean | null>(null);
 
   // New state for transaction details
-  const [transactionAmount, setTransactionAmount] = useState<string>('0.11');
-  const [tokenAmounts, setTokenAmounts] = useState<EVMTokenAmount[]>([]);
+  const [transactionAmount, setTransactionAmount] = useState<number>(0.11);
   const [expiryMinutes, setExpiryMinutes] = useState<number>(60);
   const [expiryTimestamp, setExpiryTimestamp] = useState<number>(Math.floor(Date.now()/1000) + 60*60);
+
+  // Memoize the parsed amount to update whenever transactionAmount changes
+  const amount = useMemo(() => {
+    if (!transactionAmount) return parseEther("0");
+    return parseEther(transactionAmount.toString());
+  }, [transactionAmount]);
 
   // New state for signature process
   const [isCreatingSignature, setIsCreatingSignature] = useState(false);
@@ -99,6 +155,10 @@ const WalletConnect = () => {
   const [estimatedFee, setEstimatedFee] = useState<bigint | null>(null);
   const [formattedFee, setFormattedFee] = useState<string | null>(null);
   const [feeError, setFeeError] = useState<string | null>(null);
+
+  // Add state for token approval
+  const [isApprovingToken, setIsApprovingToken] = useState(false);
+  const [approvalHash, setApprovalHash] = useState<string | null>(null);
 
   // Get if connected to current chain
   const isConnected = !!accounts[selectedChain.id];
@@ -168,34 +228,6 @@ const WalletConnect = () => {
     setExpiryTimestamp(Math.floor(Date.now()/1000) + expiryMinutes*60);
   }, [expiryMinutes]);
 
-  // Update tokenAmounts when transactionAmount changes
-  useEffect(() => {
-    if (transactionAmount && parseFloat(transactionAmount) > 0) {
-      try {
-        const amount = parseEther(transactionAmount);
-        setTokenAmounts([
-          {
-            token: ERC20_TOKEN_ADDRESS,
-            amount: amount
-          }
-        ]);
-      } catch (err) {
-        console.error('Error parsing token amount:', err);
-        // Clear token amounts if there's an error
-        setTokenAmounts([]);
-      }
-    } else {
-      // Clear token amounts if amount is empty or zero
-      setTokenAmounts([]);
-    }
-  }, [transactionAmount]);
-
-  // Estimate fee when transaction details change
-  useEffect(() => {
-    if (isConnected && eigenAgentInfo?.eigenAgentAddress && targetContractAddr && tokenAmounts.length > 0) {
-      estimateFee();
-    }
-  }, [targetContractAddr, tokenAmounts, eigenAgentInfo?.eigenAgentAddress]);
 
   const fetchBalance = async (chainId: number, address: string) => {
     setIsLoadingBalance(true);
@@ -214,12 +246,6 @@ const WalletConnect = () => {
       console.error(`Error fetching balance for chain ${chainId}:`, err);
     } finally {
       setIsLoadingBalance(false);
-    }
-  };
-
-  const refreshBalance = async () => {
-    if (isConnected) {
-      await fetchBalance(selectedChain.id, accounts[selectedChain.id]);
     }
   };
 
@@ -394,9 +420,8 @@ const WalletConnect = () => {
     const value = e.target.value;
     // Allow only valid number inputs
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      setTransactionAmount(value);
-
-      // Token amount will be updated by the useEffect
+      const numValue = value === '' ? 0 : parseFloat(value);
+      setTransactionAmount(numValue);
     }
   };
 
@@ -416,88 +441,120 @@ const WalletConnect = () => {
     }
   };
 
-  // Add function to estimate transaction fee
-  const estimateFee = async () => {
-    if (!eigenAgentInfo?.eigenAgentAddress || !targetContractAddr || !accounts[sepolia.id]) {
-      return;
-    }
-
-    setIsEstimatingFee(true);
-    setFeeError(null);
-
+  // Add function to check token allowance
+  const checkTokenAllowance = async (tokenAddress: Address, ownerAddress: Address, spenderAddress: Address): Promise<bigint> => {
     try {
-      // We're on Base Sepolia (L2) estimating fees to Ethereum Sepolia (L1)
-      const gasLimit = 300000n;
-      const message = ''; // Empty message for a simple transfer
-
-      console.log('Estimating fee for message from L2 to L1');
-
-      // Try to get the fee estimate without including tokens
-      const fee = await getRouterFeesL2(
-        targetContractAddr,
-        message,
-        [], // Empty token amounts - token transfers from L2 to L1 aren't supported
-        gasLimit
-      );
-
-      setEstimatedFee(fee);
-      setFormattedFee(formatFees(fee));
-
-    } catch (err: any) {
-      console.error('Error estimating fees:', err);
-
-      // Handle CCIPTokenTransferError specifically
-      if (err.name === 'CCIPTokenTransferError') {
-        setFeeError(`CCIP Error: ${err.message}`);
-      } else {
-        // Format a user-friendly error message
-        let errorMessage = 'Failed to estimate fees';
-        if (err.message) {
-          if (err.message.includes('0xbf16aab6')) {
-            errorMessage = 'Token transfer not supported in this direction. Please use native ETH only.';
-          } else if (err.message.includes('Invalid')) {
-            errorMessage = 'Invalid parameters for fee estimation. Please check your inputs.';
-          } else {
-            errorMessage = `Error: ${err.message}`;
-          }
-        }
-
-        setFormattedFee(null);
-        setFeeError(errorMessage);
+      const publicClient = publicClients[baseSepolia.id];
+      if (!publicClient) {
+        throw new Error("Public client not available for Base Sepolia");
       }
-    } finally {
-      setIsEstimatingFee(false);
+
+      const allowance = await publicClient.readContract({
+        address: tokenAddress,
+        abi: erc20Abi,
+        functionName: 'allowance',
+        args: [ownerAddress, spenderAddress]
+      });
+
+      return allowance as bigint;
+    } catch (error) {
+      console.error('Error checking token allowance:', error);
+      throw error;
     }
   };
 
-  // New function to handle deposit into strategy
+  // Add function to approve token spending
+  const approveTokenSpending = async (tokenAddress: Address, spenderAddress: Address, amount: bigint): Promise<string> => {
+    try {
+      setIsApprovingToken(true);
+
+      // Get the wallet client for Base Sepolia
+      const client = walletClients[baseSepolia.id];
+      if (!client) {
+        throw new Error("Wallet client not available for Base Sepolia");
+      }
+
+      // Check current allowance first
+      const userAddress = accounts[baseSepolia.id] as Address;
+      const currentAllowance = await checkTokenAllowance(tokenAddress, userAddress, spenderAddress);
+
+      // If allowance is already sufficient, return early
+      if (currentAllowance >= amount) {
+        console.log(`Allowance already sufficient: ${currentAllowance} >= ${amount}`);
+        return "Allowance already sufficient";
+      }
+
+      // Send approval transaction
+      const hash = await client.writeContract({
+        address: tokenAddress,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [spenderAddress, amount],
+        account: userAddress,
+        chain: baseSepolia
+      });
+
+      setApprovalHash(hash);
+
+      // Wait for transaction to be mined
+      const receipt = await publicClients[baseSepolia.id].waitForTransactionReceipt({
+        hash
+      });
+
+      if (receipt.status === 'success') {
+        console.log(`Token approval successful: ${hash}`);
+        return hash;
+      } else {
+        throw new Error('Token approval transaction failed on-chain');
+      }
+    } catch (error) {
+      console.error('Error approving token spending:', error);
+      throw error;
+    } finally {
+      setIsApprovingToken(false);
+    }
+  };
+
+  // Modify handleDepositIntoStrategy to handle single tokenAmount
   const handleDepositIntoStrategy = async () => {
     // Ensure we have all required information
     if (!eigenAgentInfo?.eigenAgentAddress || !accounts[sepolia.id]) {
       setError("EigenAgent information or wallet not connected");
       return;
     }
-    if (tokenAmounts.length === 0) {
-      setError("Invalid token amount");
+    if (!transactionAmount) {
+      setError("Invalid transaction amount");
       return;
     }
 
-    // First, estimate the fees if not already done
-    if (!estimatedFee) {
-      await estimateFee();
-
-      // If fee estimation failed with a critical error, don't continue
-      if (feeError) {
-        setError(`Fee estimation failed: ${feeError}`);
-        return;
-      }
-    }
-
-    setIsCreatingSignature(true);
-    setError(null);
-    setSignature(null);
+    // No need to calculate amount here, we use the memoized value
 
     try {
+      // Check if we need to approve token spending first
+      // Only for non-native tokens (if token address is not zero address)
+      setIsCreatingSignature(false);
+
+      try {
+        // Show approval status to user
+        setError(`Approving ${formatEther(amount)} tokens...`);
+
+        // Approve token spending
+        await approveTokenSpending(
+          CHAINLINK_CONSTANTS.baseSepolia.bridgeToken,
+          SENDER_CCIP_ADDRESS, // The contract that will spend the tokens
+          amount
+        );
+      } catch (approvalError) {
+        setError(`Token approval failed: ${approvalError instanceof Error ? approvalError.message : 'Unknown error'}`);
+        return;
+      }
+
+      // Clear approval message
+      setError(null);
+      // Continue with signature creation
+      setIsCreatingSignature(true);
+      setSignature(null);
+
       // Request the connected wallet to sign the message
       const client = walletClients[sepolia.id];
 
@@ -507,15 +564,15 @@ const WalletConnect = () => {
 
       // Get the account address
       const userAddress = accounts[sepolia.id] as Address;
-
       // Get the current timestamp + expiry minutes for the expiry time
       const expiryTime = BigInt(Math.floor(Date.now()/1000) + expiryMinutes*60);
-
       // Use encodeDepositIntoStrategyMsg to create the calldata for the strategy deposit
+      console.log("depositIntoStrategy amount: ", amount);
+      console.log("depositIntoStrategy token: ", CHAINLINK_CONSTANTS.ethSepolia.bridgeToken);
       const depositCalldata = encodeDepositIntoStrategyMsg(
         STRATEGY, // The strategy address from eigenlayerContracts
-        tokenAmounts[0].token, // The token address from eigenlayerContracts
-        tokenAmounts[0].amount // Use the amount from tokenAmounts
+        CHAINLINK_CONSTANTS.ethSepolia.bridgeToken, // The L1 token address from eigenlayerContracts
+        amount
       );
 
       // Use signMessageForEigenAgentExecution with Base Sepolia (L2) chain ID
@@ -531,11 +588,9 @@ const WalletConnect = () => {
       );
 
       setSignature(signature);
-      setMessageWithSignature(messageWithSignature);
-      alert(messageWithSignature);
 
-      // // Dispatch the transaction with messageWithSignature as calldata
-      // await dispatchTransaction(messageWithSignature);
+      // Dispatch the transaction with messageWithSignature as calldata
+      await dispatchTransaction(messageWithSignature);
 
     } catch (err) {
       console.error('Error creating signature or dispatching transaction:', err);
@@ -546,12 +601,8 @@ const WalletConnect = () => {
   };
 
   // New function to handle transaction dispatch using viem
-  const dispatchTransaction = async (messageWithSignature: string) => {
+  const dispatchTransaction = async (messageWithSignature: Hex) => {
     try {
-      // Ensure we have a fee estimate
-      if (!estimatedFee) {
-        throw new Error("Fee estimation required before sending transaction");
-      }
 
       if (!window.ethereum) {
         throw new Error("Ethereum provider not available");
@@ -563,32 +614,67 @@ const WalletConnect = () => {
         throw new Error("Wallet client not available for Base Sepolia");
       }
 
-      // Format token amounts to the structure expected by the contract
-      const ccipTokenAmounts = tokenAmounts.map((item: EVMTokenAmount) => [
-        item.token,
-        item.amount
-      ]);
+      // Encode the function call manually
+      // const functionSelector = getFunctionSelector('sendMessagePayNative(uint64,address,string,tuple[],uint256)');
+      const functionSelector = '0x7132732a' as Hex;
 
-      // Ensure messageWithSignature is properly formatted as a hex string
-      const messageHex = messageWithSignature.startsWith('0x')
-        ? messageWithSignature as Hex
-        : `0x${messageWithSignature}` as Hex;
+      // No need to calculate amount here, we use the memoized value
 
-      // Use viem's writeContract to send the transaction
-      const hash = await client.writeContract({
-        address: SENDER_CCIP_ADDRESS,
-        abi: senderCCIPAbi,
-        functionName: 'sendMessagePayNative',
-        args: [
+      // Format token amount for ABI encoding - ensure correct token on correct chain
+      const formattedTokenAmounts = [
+        [
+          CHAINLINK_CONSTANTS.baseSepolia.bridgeToken as Address,
+          amount
+        ] as const
+      ]
+
+      console.log("formattedTokensAmounts:", formattedTokenAmounts);
+      console.log("messageWithSignature: ", messageWithSignature);
+      console.log("toHex(messageWithSignature): ", toHex(messageWithSignature));
+
+      const estimatedFee = await getRouterFeesL2(
+        targetContractAddr,
+        messageWithSignature,
+        [{
+          token: CHAINLINK_CONSTANTS.baseSepolia.bridgeToken as Address,
+          amount: amount
+        }],
+        BigInt(860_000) // gasLimit
+      );
+
+      // Encode the function parameters
+      const encodedParams = encodeAbiParameters(
+        [
+          { type: 'uint64' }, // destinationChainSelector
+          { type: 'address' }, // receiverContract
+          { type: 'bytes' }, // message in bytes, not string. Viem tries to encode string as hex twice
+          { type: 'tuple[]', components: [
+            { type: 'address' }, // token
+            { type: 'uint256' } // amount
+          ]},
+          { type: 'uint256' } // gasLimit
+        ],
+        [
           BigInt(CHAINLINK_CONSTANTS.ethSepolia.chainSelector),
           RECEIVER_CCIP_ADDRESS,
-          messageHex,
-          ccipTokenAmounts,
-          860000n
-        ],
-        value: estimatedFee,
+          messageWithSignature,
+          formattedTokenAmounts,
+          BigInt(860_000) // gasLimit
+        ]
+      );
+
+      // Combine the function selector with the encoded parameters
+      const data: Hex = `0x${functionSelector.slice(2)}${encodedParams.slice(2)}`;
+      console.log("estimatedFee: ", estimatedFee);
+      console.log("calldata:", data);
+
+      // Use sendTransaction directly
+      const hash = await client.sendTransaction({
         account: accounts[baseSepolia.id] as Address,
-        chain: baseSepolia
+        chain: baseSepolia,
+        to: SENDER_CCIP_ADDRESS,
+        data: data as Hex,
+        value: estimatedFee,
       });
 
       alert(`Transaction sent! Hash: ${hash}\nView on BaseScan: https://sepolia.basescan.org/tx/${hash}`);
@@ -697,7 +783,7 @@ const WalletConnect = () => {
                   <input
                     id="amount"
                     type="text"
-                    value={transactionAmount}
+                    value={transactionAmount === 0 ? '' : transactionAmount.toString()}
                     onChange={handleAmountChange}
                     className="amount-input"
                     placeholder="0.11"
@@ -715,27 +801,6 @@ const WalletConnect = () => {
                     onChange={handleExpiryChange}
                     className="expiry-input"
                   />
-                </div>
-
-
-                {/* Display estimated fee */}
-                <div className="fee-display">
-                  <div className="fee-header">
-                    <strong>Estimated Fee:</strong>
-                    {isEstimatingFee && <span className="loading-indicator"> (Calculating...)</span>}
-                  </div>
-                  {formattedFee ? (
-                    <div className="fee-amount">{formattedFee}</div>
-                  ) : (
-                    <div className="fee-error">{feeError || 'Not estimated yet'}</div>
-                  )}
-                  <button
-                    onClick={estimateFee}
-                    className="refresh-fee-button"
-                    disabled={isEstimatingFee || !eigenAgentInfo.eigenAgentAddress}
-                  >
-                    Refresh Fee Estimate
-                  </button>
                 </div>
 
                 <button
@@ -781,6 +846,26 @@ const WalletConnect = () => {
                 <p>Failed to load EigenAgent information</p>
               )}
             </div>
+
+            {/* Add approval status display */}
+            {isApprovingToken && (
+              <div className="approval-status">
+                <h3>Token Approval Status</h3>
+                <p>Approving token for spending...</p>
+                {approvalHash && (
+                  <p>
+                    Approval Transaction:
+                    <a
+                      href={`https://sepolia.basescan.org/tx/${approvalHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {approvalHash.substring(0, 10)}...
+                    </a>
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -878,6 +963,31 @@ const styles = `
 .loading-indicator {
   font-style: italic;
   color: #bbb;
+}
+
+.approval-status {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #333;
+  border-left: 4px solid #17a2b8;
+  border-radius: 5px;
+  color: #fff;
+}
+
+.approval-status h3 {
+  margin-top: 0;
+  color: #17a2b8;
+}
+
+.approval-status a {
+  color: #4dabf7;
+  text-decoration: none;
+  margin-left: 5px;
+}
+
+.approval-status a:hover {
+  text-decoration: underline;
+  color: #74c0fc;
 }
 `;
 
