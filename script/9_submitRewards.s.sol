@@ -119,7 +119,7 @@ contract SubmitRewardsScript is BaseScript {
         // submit rewardsRoot
         rewardsCoordinator.submitRoot(root, rewardsCalculationEndTimestamp);
         // transfer rewards amount to RewardsCoordinator
-        tokenL1.safeTransfer(address(rewardsCoordinator), REWARDS_AMOUNT);
+        IERC20(address(tokenL1)).safeTransfer(address(rewardsCoordinator), REWARDS_AMOUNT);
         vm.stopBroadcast();
 
         require(

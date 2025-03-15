@@ -6,7 +6,7 @@ import {SignatureChecker} from "@openzeppelin-v5-contracts/utils/cryptography/Si
 import {IStrategy} from "@eigenlayer-contracts/interfaces/IStrategy.sol";
 import {EIGENLAYER_VERSION} from "./1_deployMockEigenlayerContracts.s.sol";
 import {EIP712_DOMAIN_TYPEHASH} from "@eigenlayer-contracts/mixins/SignatureUtilsMixin.sol";
-
+import {Strings} from "@openzeppelin-v5-contracts/utils/Strings.sol";
 
 /// @dev Retrieve these struct hashes by calling Eigenlayer contracts, or storing the hash.
 contract ClientSigners is Script {
@@ -112,6 +112,9 @@ contract ClientSigners is Script {
             structHash
         ));
 
+        // Conform with EIP-191 for frontend clients
+        digestHash = hashDigest191(digestHash);
+
         return digestHash;
     }
 
@@ -120,13 +123,12 @@ contract ClientSigners is Script {
         address contractAddr,
         uint256 destinationChainid
     ) public pure returns (bytes32) {
-        uint256 chainid = destinationChainid;
         return keccak256(
             abi.encode(
                 EIP712_DOMAIN_TYPEHASH,
                 keccak256(bytes("EigenAgent")),
                 keccak256(bytes(_majorVersionEigenAgent())),
-                chainid,
+                destinationChainid,
                 contractAddr
             )
         );
@@ -188,6 +190,7 @@ contract ClientSigners is Script {
             // 2: signer
             // 3: expiry
             // 4: signature
+
             messageWithSignature = abi.encodePacked(
                 messageToEigenlayer,
                 bytes32(abi.encode(vm.addr(signerKey))), // AgentOwner. Pad signer to 32byte word
@@ -235,4 +238,13 @@ contract ClientSigners is Script {
         console.logBytes(signatureEigenAgent);
         console.log("================================");
     }
+
+    function hashDigest191(bytes32 message) internal pure returns (bytes32) {
+        // Follow EIP-191 format for personal_sign
+        return keccak256(abi.encodePacked(
+            "\x19Ethereum Signed Message:\n32",
+            message
+        ));
+    }
 }
+

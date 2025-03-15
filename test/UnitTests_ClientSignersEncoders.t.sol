@@ -191,6 +191,10 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
             clientSignersTest.domainSeparatorEigenAgent(address(eigenAgent), _chainid),
             structHash
         ));
+        digestHash = keccak256(abi.encodePacked(
+            "\x19Ethereum Signed Message:\n32",
+            digestHash
+        ));
 
         bytes32 digestHash2 = clientSignersTest.createEigenAgentCallDigestHash(
             _target,
