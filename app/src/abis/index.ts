@@ -12,3 +12,4 @@ export const strategyManagerAbi = StrategyManagerJSON.abi;
 
 // Export chainlink ABIs
 export * from './Router';
+export * from './ERC20';
