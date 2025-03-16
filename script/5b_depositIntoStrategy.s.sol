@@ -56,9 +56,8 @@ contract DepositIntoStrategyScript is BaseScript {
         vm.selectFork(l2ForkId);
 
         uint256 amount = 0.11 ether;
-        // uint256 expiry = block.timestamp + 45 minutes;
-        uint256 expiry = 1742066222;
-        console.log("expiry", expiry);
+        uint256 expiry = block.timestamp + 45 minutes;
+        // uint256 expiry = 1742066222;
 
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
@@ -89,18 +88,18 @@ contract DepositIntoStrategyScript is BaseScript {
             gasLimit
         );
 
-        // vm.startBroadcast(deployerKey);
-        // // token approval
-        // tokenL2.approve(address(senderContract), amount);
+        vm.startBroadcast(deployerKey);
+        // token approval
+        tokenL2.approve(address(senderContract), amount);
 
-        // senderContract.sendMessagePayNative{value: routerFees}(
-        //     EthSepolia.ChainSelector, // destination chain
-        //     address(receiverContract),
-        //     string(messageWithSignature), // must be string
-        //     tokenAmounts,
-        //     gasLimit
-        // );
+        senderContract.sendMessagePayNative{value: routerFees}(
+            EthSepolia.ChainSelector, // destination chain
+            address(receiverContract),
+            string(messageWithSignature), // must be string
+            tokenAmounts,
+            gasLimit
+        );
 
-        // vm.stopBroadcast();
+        vm.stopBroadcast();
     }
 }

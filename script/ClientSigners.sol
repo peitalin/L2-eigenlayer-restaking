@@ -112,9 +112,6 @@ contract ClientSigners is Script {
             structHash
         ));
 
-        // Conform with EIP-191 for frontend clients
-        digestHash = hashDigest191(digestHash);
-
         return digestHash;
     }
 
@@ -180,7 +177,10 @@ contract ClientSigners is Script {
             );
 
             {
-                (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
+                (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+                    signerKey,
+                    hashDigest191(digestHash) // Conform with EIP-191 for frontend clients
+                );
                 signatureEigenAgent = abi.encodePacked(r, s, v);
             }
 

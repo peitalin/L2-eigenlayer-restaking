@@ -154,7 +154,7 @@ contract DeployReceiverOnL1Script is Script, FileReader {
         agentFactoryProxy.addAdmin(deployer);
         agentFactoryProxy.setRestakingConnector(address(restakingProxy));
         // doesn't strictly need to be set, as AgentFactory clones the baseEigenAgent, but good to have.
-        baseEigenAgent.setInitialRestakingConnector(address(restakingProxy));
+        // baseEigenAgent.setInitialRestakingConnector(address(restakingProxy));
 
         // deploy real receiver implementation and upgradeAndCall initializer
         ReceiverCCIP receiverImpl;
@@ -177,11 +177,6 @@ contract DeployReceiverOnL1Script is Script, FileReader {
             ))
         );
 
-        // Receiver both receives and sends messages back to L2 Sender
-        receiverProxy.allowlistSourceChain(BaseSepolia.ChainSelector, true);
-        receiverProxy.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
-
-        receiverProxy.allowlistSender(BaseSepolia.ChainSelector, address(senderContract), true);
         receiverProxy.setSenderContractL2(address(senderContract));
 
         eigenAgentOwner721.addAdmin(deployer);
@@ -192,11 +187,14 @@ contract DeployReceiverOnL1Script is Script, FileReader {
 
         restakingProxy.setReceiverCCIP(address(receiverProxy));
 
+        // Remember to fund L1 receiver with gas and tokens in production.
         // seed the receiver contract with a bit of ETH
         if (address(receiverProxy).balance < 0.01 ether) {
             (bool sent, ) = address(receiverProxy).call{value: 0.02 ether}("");
             require(sent, "Failed to send Ether");
         }
+
+        vm.stopBroadcast();
 
         require(
             address(agentFactoryProxy.getRestakingConnector()) == address(restakingProxy),
@@ -234,8 +232,6 @@ contract DeployReceiverOnL1Script is Script, FileReader {
             address(agentFactoryProxy.baseEigenAgent()) == address(baseEigenAgent),
             "agentFactory: missing baseEigenAgent"
         );
-
-        vm.stopBroadcast();
 
         if (!isMockRun) {
             saveReceiverBridgeContracts(
