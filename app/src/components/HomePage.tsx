@@ -242,8 +242,8 @@ const HomePage: React.FC = () => {
       }
 
       // Create the deposit calldata
-      // const expiryTime = BigInt(Math.floor(Date.now()/1000) + expiryMinutes*60);
-      const expiryTime = BigInt(1742066222);
+      const expiryTime = BigInt(Math.floor(Date.now()/1000) + expiryMinutes*60);
+      // const expiryTime = BigInt(1742066222);
 
       // Sign the message
       const { signature, messageWithSignature } = await signMessageForEigenAgentExecution(
