@@ -169,10 +169,11 @@ export async function signMessageForEigenAgentExecution(
   );
 
   // Sign the digest hash directly using signMessage
+  // This automatically adds a EIP-191 prefix, so no need to
+  // process the digestHash as we do in the solidity version in ClientSigners.sol
   const signature = await client.signMessage({
     account: signer,
     message: { raw: digestHash }
-    // message: digestHash
   });
 
   // Format signature to ensure it has a '0' prefix for the v value
@@ -188,28 +189,21 @@ export async function signMessageForEigenAgentExecution(
   //   signatureEigenAgent
   // );
 
-  // Comment out excessive logging for test runs
-  /*
-  console.log("signer", signer);
-  console.log("eigenAgentAddr", eigenAgentAddr);
   console.log("targetContractAddr", targetContractAddr);
+  console.log("eigenAgentAddr", eigenAgentAddr);
   console.log("messageToEigenlayer", messageToEigenlayer);
   console.log("execNonce", execNonce);
   console.log("chainid", targetChainId);
   console.log("expiry", expiry);
-  console.log("formattedSignature", formattedSignature);
-  */
+  console.log("--------------");
+  console.log("agentOwner/signer", signer);
 
   // encode and pad signer to 32byte word
   const encodedExpiry = encodeAbiParameters([{ type: 'uint256' }], [expiry]);
   const encodedSigner = encodeAbiParameters([{ type: 'address' }], [signer]);
 
-  /*
-  console.log("\nencodedSigner", encodedSigner);
-  console.log("encodedExpiry", encodedExpiry);
   console.log("\ndigestHash", digestHash);
   console.log("signature", formattedSignature);
-  */
 
   const messageWithSignature = concat([
     messageToEigenlayer,
