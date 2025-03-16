@@ -8,9 +8,9 @@ forge script script/3_deployReceiverOnL1.s.sol:DeployReceiverOnL1Script \
     --broadcast \
     --etherscan-api-key $ETHERSCAN_API_KEY \
     --private-key $DEPLOYER_KEY \
+    --gas-estimate-multiplier 250 \
     --priority-gas-price 200 \
-    --verify \
-    -vvvv
+    --verify
 
 
 # forge verify-contract \

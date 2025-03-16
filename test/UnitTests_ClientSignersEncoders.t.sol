@@ -83,8 +83,8 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
 
         bytes32 digestHash = keccak256(abi.encode(bob, alice, deployer));
         address signer = deployer;
-
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash);
+        // vm.sign must conform with EIP-191
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, hashDigest191(digestHash));
         bytes memory signature = abi.encodePacked(r, s, v);
 
         SignatureChecker.isValidSignatureNow(signer, digestHash, signature);
@@ -191,10 +191,6 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
             clientSignersTest.domainSeparatorEigenAgent(address(eigenAgent), _chainid),
             structHash
         ));
-        digestHash = keccak256(abi.encodePacked(
-            "\x19Ethereum Signed Message:\n32",
-            digestHash
-        ));
 
         bytes32 digestHash2 = clientSignersTest.createEigenAgentCallDigestHash(
             _target,
@@ -237,8 +233,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
                 chainid, // destination chainid where EigenAgent lives, usually ETH
                 _expiry
             );
-
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, hashDigest191(digestHash));
             signatureEigenAgent1 = abi.encodePacked(r, s, v);
             address signer = vm.addr(signerKey);
 
@@ -406,8 +401,7 @@ contract UnitTests_ClientSignersEncoders is BaseTestEnvironment {
                 address(delegationManager),
                 EthSepolia.ChainSelector
             );
-
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash1);
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, hashDigest191(digestHash1));
             bytes memory signature1 = abi.encodePacked(r, s, v);
 
             approverSignatureAndExpiry = ISignatureUtilsMixinTypes.SignatureWithExpiry({

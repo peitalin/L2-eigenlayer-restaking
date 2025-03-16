@@ -122,7 +122,13 @@ contract WhitelistCCIPContractsScript is Script, FileReader, GasLimits {
         receiverProxy.allowlistSourceChain(EthSepolia.ChainSelector, true);
         receiverProxy.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
         // allow L1 receiver to send tokens back to L2 for withdrawals and reward claims
+
         // Remember to fund L1 receiver with gas and tokens in production.
+        // seed the receiver contract with a bit of ETH
+        if (address(receiverProxy).balance < 0.01 ether) {
+            (bool sent, ) = address(receiverProxy).call{value: 0.02 ether}("");
+            require(sent, "Failed to send Ether");
+        }
 
         uint256[] memory gasLimits_R = new uint256[](1);
         gasLimits_R[0] = 300_000; // handleTransferToAgentOwner [gas: 261,029]

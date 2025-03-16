@@ -155,6 +155,8 @@ contract EigenAgent6551 is ERC6551 {
         bytes32 digestHash,
         bytes memory signature
     ) public view virtual override returns (bytes4) {
+        // Conform with EIP-191 for frontend clients
+        digestHash = hashDigest191(digestHash);
         address signer = owner();
         if (SignatureChecker.isValidSignatureNow(signer, digestHash, signature)) {
             return IERC1271.isValidSignature.selector;
@@ -196,8 +198,6 @@ contract EigenAgent6551 is ERC6551 {
             domainSeparatorEigenAgent(chainid),
             structHash
         ));
-
-        digestHash = hashDigest191(digestHash);
 
         return digestHash;
     }

@@ -115,11 +115,10 @@ contract UnitTests_Compare6551Costs is BaseTestEnvironment {
             expiry
         );
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, hashDigest191(digestHash));
         bytes memory signature = abi.encodePacked(r, s, v);
 
         return signature;
     }
-
 }
 
