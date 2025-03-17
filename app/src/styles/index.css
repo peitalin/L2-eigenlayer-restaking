@@ -14,7 +14,9 @@
   --color-text-primary: #c9d1d9;
   --color-text-secondary: #8b949e;
   --color-accent-primary: #2ea043;
+  --color-accent-primary-hover: #2c974b;
   --color-accent-secondary: #1f6feb;
+  --color-accent-secondary-hover: #1a5dca;
   --color-error: #f85149;
   --color-warning: #d29922;
   --color-success: #2ea043;
@@ -94,6 +96,7 @@ a:hover {
 .app-container {
   display: flex;
   flex-direction: column;
+  margin-top: 4rem;
   min-height: 100vh;
   width: 100%;
   max-width: 100%;
@@ -101,14 +104,134 @@ a:hover {
 
 .content-container {
   flex: 1;
-  padding: 1rem;
   max-width: 1200px;
   width: 100%;
-  margin-top: 70px; /* Same as navbar height */
   box-sizing: border-box;
 }
 
 /* Navbar Styles */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000;
+  box-sizing: border-box;
+  height: 4rem; /* Allow height to adjust based on content */
+  border-bottom: 1px solid var(--color-border-primary);
+  flex-wrap: wrap; /* Allow wrapping of navbar items */
+}
+
+.navbar-title {
+  flex: 1;
+  margin-right: 20px;
+}
+
+.navbar-title h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.navbar-wallet-info {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 15px;
+}
+
+.switch-chain-button {
+  background-color: var(--color-accent-secondary);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.switch-chain-button:hover {
+  background-color: var(--color-accent-secondary-hover);
+}
+
+.switch-chain-button:disabled {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+.connect-button {
+  background-color: var(--color-accent-primary);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: none;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.connect-button:hover {
+  background-color: var(--color-accent-primary-hover);
+}
+
+.connect-button:disabled {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+.connection-error {
+  width: 100%;
+  color: var(--color-error);
+  font-size: 0.9rem;
+  margin-top: 8px;
+  padding: 8px;
+  background-color: rgba(255, 0, 0, 0.1);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.wallet-info {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.current-chain {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg-tertiary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border-primary);
+}
+
+.current-account {
+  font-family: monospace;
+  font-size: 0.9rem;
+  background-color: var(--color-bg-tertiary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border-primary);
+}
+
+/* Keep the existing styles for .wallet-navbar for backward compatibility */
 .wallet-navbar {
   display: flex;
   justify-content: space-between;
@@ -127,6 +250,35 @@ a:hover {
   min-height: 70px; /* Minimum height */
   border-bottom: 1px solid var(--color-border-primary);
   flex-wrap: wrap; /* Allow wrapping of navbar items */
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.navbar-links {
+  display: flex;
+  gap: 20px;
+}
+
+.navbar-link {
+  color: var(--color-text-primary);
+  text-decoration: none;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.navbar-link:hover {
+  background-color: var(--color-bg-tertiary);
+  text-decoration: none;
+}
+
+.navbar-link.active {
+  background-color: var(--color-accent-secondary);
+  color: white;
 }
 
 .navbar-info {
@@ -190,30 +342,9 @@ a:hover {
   margin-top: 30px;
 }
 
-.connect-button {
-  background-color: var(--color-accent-secondary);
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  border-radius: 6px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  max-width: 100%;
-}
-
-.connect-button:hover {
-  background-color: #1a5dca;
-}
-
-.connect-button:disabled {
-  background-color: #3d4a5c;
-  cursor: not-allowed;
-}
-
 /* HomePage Styles */
 .home-page {
-  padding: 20px 0;
+  padding: 0;
   width: 100%;
   box-sizing: border-box;
   overflow-x: hidden;
@@ -230,7 +361,7 @@ a:hover {
   padding: 20px;
   box-sizing: border-box;
   overflow: hidden;
-  align-items: start;
+  align-items: flex-start; /* Explicitly set to flex-start for clearer top alignment */
 }
 
 @media (max-width: 768px) {
@@ -251,23 +382,20 @@ a:hover {
   width: 100%;
   box-sizing: border-box;
   max-width: 100%;
+  align-self: flex-start; /* Ensure both columns align to the top */
 }
 
 .left-column {
   grid-column: 1;
   min-width: 0;
   overflow: hidden;
-  align-self: start;
   display: flex;
   flex-direction: column;
 }
 
 .right-column {
   grid-column: 2;
-  position: sticky;
-  top: 90px; /* Below navbar */
-  height: fit-content;
-  align-self: start;
+  position: relative; /* Changed from sticky to relative */
   min-width: 0;
   overflow: hidden;
   display: flex;
@@ -571,43 +699,12 @@ a:hover {
   max-width: 100%;
 }
 
-.current-chain {
-  margin-bottom: 20px;
-  padding: 5px;
-  background-color: var(--color-bg-tertiary);
-  border-radius: 6px;
-  display: inline-block;
-  border: 1px solid var(--color-border-primary);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .chain-controls {
   display: flex;
   align-items: center;
   gap: 15px;
   margin-bottom: 10px;
   flex-wrap: wrap;
-}
-
-.switch-chain-button {
-  background-color: var(--color-accent-secondary);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.3s;
-}
-
-.switch-chain-button:hover {
-  background-color: #1a5dca;
-  border-color: #1a5dca;
-}
-
-.switch-chain-button:disabled {
-  background-color: #3d4a5c;
-  cursor: not-allowed;
 }
 
 .chain-id {
@@ -697,10 +794,14 @@ a:hover {
 /* Responsive Adaptations */
 @media (max-width: 600px) {
   .navbar-info {
-    flex-direction: column;
-    gap: 10px;
-    align-items: flex-start;
     width: 100%;
+    margin-top: 10px;
+  }
+
+  .navbar-wallet-info {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
   }
 
   .wallet-navbar {
@@ -797,4 +898,84 @@ a:hover {
   word-break: break-word;
   hyphens: auto;
   max-width: 100%;
+}
+
+.connection-message {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 20px;
+  text-align: center;
+}
+
+.connection-message h3 {
+  color: var(--color-accent-secondary);
+  margin-bottom: 10px;
+}
+
+/* Navigation Panel Styles */
+.navigation-panel {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  background-color: var(--color-bg-primary);
+  border-bottom: none;
+  padding: 0 40px; /* Increased left padding for better left alignment */
+  box-sizing: border-box;
+  box-shadow: none;
+}
+
+.navigation-list {
+  display: flex;
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.navigation-item {
+  display: flex;
+  margin-right: 10px; /* Add space between items */
+}
+
+.navigation-link {
+  display: block;
+  color: var(--color-text-secondary); /* Lighter color for normal state */
+  text-align: left; /* Left align text */
+  padding: 12px 16px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+  border-bottom: 3px solid transparent;
+}
+
+.navigation-link:hover {
+  background-color: transparent; /* No background on hover */
+  color: var(--color-text-primary); /* Brighter text on hover */
+  text-decoration: none;
+}
+
+.navigation-link.active {
+  border-bottom: 3px solid var(--color-accent-secondary);
+  color: var(--color-accent-secondary);
+  background-color: transparent; /* No background when active */
+}
+
+/* Responsive adaptations for navigation */
+@media (max-width: 600px) {
+  .navigation-panel {
+    position: static;
+    margin-top: 70px; /* Push below navbar */
+    padding: 0 20px; /* Less padding on mobile */
+    background-color: var(--color-bg-primary);
+  }
+
+  .navigation-list {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .content-container {
+  }
 }

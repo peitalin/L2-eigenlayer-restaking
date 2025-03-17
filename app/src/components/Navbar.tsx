@@ -1,50 +1,67 @@
 import React from 'react';
-import { Chain, Address } from 'viem';
+import { useClientsContext } from '../contexts/ClientsContext';
 
-interface NavbarProps {
-  selectedChain: Chain;
-  account: Address | null;
-  isConnected: boolean;
-  onDisconnect: () => void;
-}
+// Utility function to shorten addresses for display
+const shortenAddress = (address: string): string => {
+  if (!address) return '';
+  return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+};
 
-const Navbar: React.FC<NavbarProps> = ({
-  selectedChain,
-  account,
-  isConnected,
-  onDisconnect
-}) => {
-  // Format the wallet address for display
-  const formatAddress = (address: string) => {
-    return `${address.substring(0, 6)}...${address.substring(38)}`;
-  };
+interface NavbarProps { }
 
-  if (!isConnected) {
-    return null;
-  }
+const Navbar: React.FC<NavbarProps> = (props) => {
+  const {
+    l1Wallet,
+    l2Wallet,
+    selectedChain,
+    isConnected,
+    handleConnect,
+    disconnect,
+    isConnecting,
+    connectionError
+  } = useClientsContext();
+
+  // Sepolia chain ID is 11155111
+  const isEthereumChain = selectedChain.id === 11155111;
+  const currentWallet = isEthereumChain ? l1Wallet : l2Wallet;
 
   return (
-    <div className="wallet-navbar">
-      <div className="navbar-info">
-        <div className="navbar-section">
-          <span className="section-label">Current Chain:</span>
-          <span className="section-value">{selectedChain.name}</span>
-        </div>
-
-        <div className="navbar-section">
-          <span className="section-label">Connected Wallet:</span>
-          <span className="section-value wallet-address-short">
-            {account ? formatAddress(account) : 'Not connected'}
-          </span>
-        </div>
+    <div className="navbar">
+      <div className="navbar-title">
       </div>
-
-      <button
-        onClick={onDisconnect}
-        className="disconnect-button"
-      >
-        Disconnect
-      </button>
+      <div className="navbar-actions">
+        {isConnected ? (
+          <div className="navbar-wallet-info">
+            <div className="wallet-info">
+              <div className="current-chain">
+                {isEthereumChain ? 'Ethereum Sepolia' : 'Base Sepolia'}
+              </div>
+              <div className="current-account">
+                {currentWallet.account && shortenAddress(currentWallet.account)}
+              </div>
+            </div>
+            <button
+              className="disconnect-button"
+              onClick={disconnect}
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <button
+            className="connect-button"
+            onClick={handleConnect}
+            disabled={isConnecting}
+          >
+            {isConnecting ? 'Connecting...' : 'Connect'}
+          </button>
+        )}
+      </div>
+      {connectionError && (
+        <div className="connection-error">
+          Error connecting: {connectionError}
+        </div>
+      )}
     </div>
   );
 };
