@@ -1,6 +1,7 @@
 import { Address, Hex, Hash, concat, encodeAbiParameters, keccak256, pad, toBytes, WalletClient, createPublicClient, http, PublicClient, verifyMessage, SignableMessage, verifyTypedData, stringToHex, hexToBytes, bytesToHex, hexToString } from 'viem';
 import { sepolia } from 'viem/chains';
 import { CHAINLINK_CONSTANTS } from '../addresses';
+import { ZeroAddress } from './encoders';
 
 // Constants from ClientSigners.sol
 export const EIGEN_AGENT_EXEC_TYPEHASH = keccak256(
@@ -146,10 +147,10 @@ export async function signMessageForEigenAgentExecution(
   expiry: bigint
 ): Promise<{ signature: Hex, messageWithSignature: Hex }> {
   // Verify parameters
-  if (targetContractAddr === '0x0000000000000000000000000000000000000000') {
+  if (targetContractAddr === ZeroAddress) {
     throw new Error('Target contract cannot be zero address');
   }
-  if (eigenAgentAddr === '0x0000000000000000000000000000000000000000') {
+  if (eigenAgentAddr === ZeroAddress) {
     throw new Error('EigenAgent cannot be zero address');
   }
   let targetChainId = Number(CHAINLINK_CONSTANTS.ethSepolia.chainId);

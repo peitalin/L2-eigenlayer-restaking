@@ -6,7 +6,7 @@ import { Address } from 'viem';
 // Extend the ClientsState with EigenAgent info
 interface ExtendedClientsState extends ClientsState {
   eigenAgentInfo: {
-    eigenAgentAddress: Address | null;
+    eigenAgentAddress: Address;
     execNonce: bigint;
   } | null;
   isLoadingEigenAgent: boolean;
@@ -31,7 +31,7 @@ export const ClientsProvider: React.FC<ClientsProviderProps> = ({ children }) =>
   const clientsState = useClients();
   const { isConnected, l1Wallet, connect } = clientsState;
   const [eigenAgentInfo, setEigenAgentInfo] = useState<{
-    eigenAgentAddress: Address | null;
+    eigenAgentAddress: Address;
     execNonce: bigint;
   } | null>(null);
   const [isLoadingEigenAgent, setIsLoadingEigenAgent] = useState(false);

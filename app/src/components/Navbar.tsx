@@ -1,15 +1,14 @@
 import React from 'react';
 import { useClientsContext } from '../contexts/ClientsContext';
 
-// Utility function to shorten addresses for display
 const shortenAddress = (address: string): string => {
   if (!address) return '';
   return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
 };
 
-interface NavbarProps { }
+interface NavbarProps {}
 
-const Navbar: React.FC<NavbarProps> = (props) => {
+const Navbar: React.FC<NavbarProps> = () => {
   const {
     l1Wallet,
     l2Wallet,

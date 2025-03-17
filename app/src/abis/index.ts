@@ -1,15 +1,37 @@
-// Import ABIs from JSON files
-import AgentFactoryJSON from './AgentFactory.json';
-import EigenAgentJSON from './EigenAgent6551.json';
-import SenderCCIPJSON from './SenderCCIP.json';
-import StrategyManagerJSON from './StrategyManager.json';
+// Import ABIs from abiUtils.ts
+import {
+  DelegationManagerABI,
+  StrategyManagerABI,
+  IERC20ABI,
+  SenderCCIPABI,
+  EigenAgent6551ABI,
+  AgentFactoryABI
+} from './abiUtils';
 
-// Export ABIs directly
-export const agentFactoryAbi = AgentFactoryJSON.abi;
-export const eigenAgentAbi = EigenAgentJSON.abi;
-export const senderCCIPAbi = SenderCCIPJSON.abi;
-export const strategyManagerAbi = StrategyManagerJSON.abi;
+// Export the ABIs
+export {
+  DelegationManagerABI,
+  StrategyManagerABI,
+  IERC20ABI,
+  SenderCCIPABI,
+  EigenAgent6551ABI,
+  AgentFactoryABI
+};
+
+// Keep backward compatibility with existing code
+export const agentFactoryAbi = AgentFactoryABI;
+export const eigenAgentAbi = EigenAgent6551ABI;
+export const senderCCIPAbi = SenderCCIPABI;
+export const strategyManagerAbi = StrategyManagerABI;
+export const ERC20_ABI = IERC20ABI;
 
 // Export chainlink ABIs
 export * from './Router';
-export * from './ERC20';
+
+/**
+ * Re-export validation functions from abiUtils
+ */
+export {
+  validateABI,
+  ensureAbiHasFunctions
+} from './abiUtils';

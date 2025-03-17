@@ -1,4 +1,8 @@
 import { Address, Hex, encodeFunctionData } from 'viem';
+import { DelegationManagerABI } from '../abis';
+
+// Constant for zero address
+export const ZeroAddress: Address = "0x0000000000000000000000000000000000000000";
 
 /**
  * Encodes a depositIntoStrategy call for IStrategyManager
@@ -53,48 +57,34 @@ export function encodeDepositIntoStrategyMsg(
 }
 
 /**
- * Encodes a queueWithdrawal call for IStrategyManager
- * TypeScript equivalent of the Solidity function:
- *
- * function encodeQueueWithdrawalMsg(
- *     address strategy,
- *     uint256 shares
- * ) public pure returns (bytes memory) {
- *     return abi.encodeWithSelector(
- *         IStrategyManager.queueWithdrawal.selector,
- *         strategy,
- *         shares
- *     );
- * }
+ * Encodes a queueWithdrawals call for IDelegationManager
+ * TypeScript equivalent of the Solidity function that creates a QueuedWithdrawalParams struct
+ * and calls queueWithdrawals.
  *
  * @param strategy The strategy address
  * @param shares The amount of shares to withdraw
+ * @param withdrawer The address that will be able to claim the withdrawal (deprecated but still required)
  * @returns Encoded function call as a hex string
  */
 export function encodeQueueWithdrawalMsg(
   strategy: Address,
-  shares: bigint
+  shares: bigint,
+  withdrawer: Address
 ): Hex {
-  // Function signature: queueWithdrawal(address,uint256)
-  const abi = [
+
+  // Create a single withdrawal parameter
+  const queuedWithdrawalParams = [
     {
-      name: 'queueWithdrawal',
-      type: 'function',
-      inputs: [
-        { name: 'strategy', type: 'address' },
-        { name: 'shares', type: 'uint256' }
-      ],
-      outputs: [
-        { name: 'withdrawalRoot', type: 'bytes32' }
-      ],
-      stateMutability: 'nonpayable'
+      strategies: [strategy],
+      depositShares: [shares],
+      __deprecated_withdrawer: withdrawer // Still required by the struct despite being deprecated
     }
-  ] as const;
+  ];
 
   // Encode the function call
   return encodeFunctionData({
-    abi,
-    functionName: 'queueWithdrawal',
-    args: [strategy, shares]
+    abi: DelegationManagerABI,
+    functionName: 'queueWithdrawals',
+    args: [queuedWithdrawalParams]
   });
 }

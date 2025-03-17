@@ -6,6 +6,7 @@ import { signMessageForEigenAgentExecution } from '../utils/signers';
 import { CHAINLINK_CONSTANTS, SENDER_CCIP_ADDRESS } from '../addresses';
 import { getRouterFeesL2 } from '../utils/routerFees';
 import { RECEIVER_CCIP_ADDRESS } from '../addresses/ethSepoliaContracts';
+import { IERC20ABI } from '../abis';
 
 type TokenApproval = {
   tokenAddress: Address;
@@ -78,18 +79,7 @@ export function useEigenLayerOperation({
 
       const allowance = await l2Wallet.publicClient.readContract({
         address: tokenAddress,
-        abi: [
-          {
-            name: "allowance",
-            type: "function",
-            stateMutability: "view",
-            inputs: [
-              { name: "owner", type: "address" },
-              { name: "spender", type: "address" }
-            ],
-            outputs: [{ name: "", type: "uint256" }]
-          }
-        ],
+        abi: IERC20ABI,
         functionName: 'allowance',
         args: [ownerAddress, spenderAddress]
       });
@@ -122,18 +112,7 @@ export function useEigenLayerOperation({
       // Send approval transaction
       const hash = await l2Wallet.client.writeContract({
         address: tokenAddress,
-        abi: [
-          {
-            name: "approve",
-            type: "function",
-            stateMutability: "nonpayable",
-            inputs: [
-              { name: "spender", type: "address" },
-              { name: "amount", type: "uint256" }
-            ],
-            outputs: [{ name: "", type: "bool" }]
-          }
-        ],
+        abi: IERC20ABI,
         functionName: 'approve',
         args: [spenderAddress, amount],
         account: l2Wallet.account,
@@ -196,6 +175,12 @@ export function useEigenLayerOperation({
           { type: 'uint64' }, // destinationChainSelector
           { type: 'address' }, // receiverContract
           { type: 'bytes' }, // message
+          // `message` is string in the ABI, but force bytes type here as
+          // Viem handles string differently than Foundry, and tries
+          // to cast bytes to invalid hex strings.
+          // TODO: find a way to make Viem behave like Foundry:
+          // Solidity:  string(bytes memory messageToEigenlayer)
+          // Viem:      toHex(messageToEigenlayer)
           { type: 'tuple[]', components: [
             { type: 'address' }, // token
             { type: 'uint256' } // amount

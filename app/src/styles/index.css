@@ -153,27 +153,6 @@ a:hover {
   gap: 15px;
 }
 
-.switch-chain-button {
-  background-color: var(--color-accent-secondary);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  border: none;
-  font-weight: 500;
-  transition: background-color 0.3s;
-}
-
-.switch-chain-button:hover {
-  background-color: var(--color-accent-secondary-hover);
-}
-
-.switch-chain-button:disabled {
-  background-color: var(--color-bg-tertiary);
-  color: var(--color-text-secondary);
-  cursor: not-allowed;
-}
-
 .connect-button {
   background-color: var(--color-accent-primary);
   color: white;
@@ -231,125 +210,6 @@ a:hover {
   border: 1px solid var(--color-border-primary);
 }
 
-/* Keep the existing styles for .wallet-navbar for backward compatibility */
-.wallet-navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  background-color: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  z-index: 1000;
-  box-sizing: border-box;
-  height: auto; /* Allow height to adjust based on content */
-  min-height: 70px; /* Minimum height */
-  border-bottom: 1px solid var(--color-border-primary);
-  flex-wrap: wrap; /* Allow wrapping of navbar items */
-}
-
-.navbar-left {
-  display: flex;
-  align-items: center;
-}
-
-.navbar-links {
-  display: flex;
-  gap: 20px;
-}
-
-.navbar-link {
-  color: var(--color-text-primary);
-  text-decoration: none;
-  font-weight: 500;
-  padding: 8px 12px;
-  border-radius: 6px;
-  transition: background-color 0.2s, color 0.2s;
-}
-
-.navbar-link:hover {
-  background-color: var(--color-bg-tertiary);
-  text-decoration: none;
-}
-
-.navbar-link.active {
-  background-color: var(--color-accent-secondary);
-  color: white;
-}
-
-.navbar-info {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap; /* Allow wrapping */
-}
-
-.navbar-section {
-  display: flex;
-  flex-direction: column;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.section-label {
-  font-size: 0.8rem;
-  color: var(--color-text-secondary);
-  margin-bottom: 4px;
-}
-
-.section-value {
-  font-weight: bold;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.disconnect-button {
-  background-color: #21262d;
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-error);
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: background-color 0.2s;
-  white-space: nowrap;
-}
-
-.disconnect-button:hover {
-  background-color: #30363d;
-  border-color: var(--color-error);
-}
-
-/* WalletConnect Page Styles */
-.wallet-connect-page {
-  max-width: 500px;
-  width: 100%;
-  margin: 100px auto;
-  padding: 30px;
-  background-color: var(--color-bg-secondary);
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-  text-align: center;
-  border: 1px solid var(--color-border-primary);
-  box-sizing: border-box;
-}
-
-.connect-container {
-  margin-top: 30px;
-}
-
-/* HomePage Styles */
-.home-page {
-  padding: 0;
-  width: 100%;
-  box-sizing: border-box;
-  overflow-x: hidden;
-}
-
 /* Page Layout */
 .page-layout {
   display: grid;
@@ -391,6 +251,8 @@ a:hover {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  border: 0;
+  padding: 0;
 }
 
 .right-column {
@@ -669,94 +531,7 @@ a:hover {
   min-width: 0;
 }
 
-/* Chain Components */
-.connected-address {
-  margin-top: 20px;
-  padding: 10px;
-  background-color: var(--color-bg-tertiary);
-  border-radius: 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-  border: 1px solid var(--color-border-primary);
-  box-sizing: border-box;
-  word-break: break-all;
-}
-
-.chain-selector {
-  margin: 20px 0;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.chain-selector select {
-  margin-left: 10px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  background-color: var(--color-bg-tertiary);
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-border-primary);
-  max-width: 100%;
-}
-
-.chain-controls {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-
-.chain-id {
-  font-size: 0.9em;
-  color: var(--color-text-secondary);
-  margin-top: 4px;
-}
-
-/* Wallet Connect Components */
-.wallet-connect {
-  margin-top: 70px; /* Push header below navbar */
-  margin-bottom: 20px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.connection-info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-}
-
-.wallet-address {
-  font-family: monospace;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  word-break: break-all;
-  color: var(--color-text-primary);
-  max-width: 100%;
-}
-
-.wallet-address-short {
-  font-family: monospace;
-  color: var(--color-text-primary);
-}
-
 /* Button and Control Styles */
-.refresh-button {
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  cursor: pointer;
-  color: var(--color-accent-secondary);
-  padding: 0 5px;
-}
-
-.refresh-button:disabled {
-  color: var(--color-text-secondary);
-  cursor: not-allowed;
-}
-
 .refresh-balance-button {
   background: none;
   border: none;
@@ -774,131 +549,8 @@ a:hover {
   cursor: not-allowed;
 }
 
-.refresh-fee-button {
-  background-color: rgba(46, 160, 67, 0.2);
-  color: var(--color-text-primary);
-}
-
 /* Additional Components */
-.fee-display {
-  background-color: var(--color-bg-tertiary);
-  color: var(--color-text-primary);
-  padding: 10px;
-  border-radius: 6px;
-  border: 1px solid var(--color-border-primary);
-  width: 100%;
-  box-sizing: border-box;
-  overflow-wrap: break-word;
-}
-
-/* Responsive Adaptations */
-@media (max-width: 600px) {
-  .navbar-info {
-    width: 100%;
-    margin-top: 10px;
-  }
-
-  .navbar-wallet-info {
-    flex-direction: column;
-    width: 100%;
-    gap: 10px;
-  }
-
-  .wallet-navbar {
-    flex-direction: column;
-    gap: 10px;
-    align-items: flex-start;
-    height: auto;
-    padding: 10px;
-  }
-
-  .disconnect-button {
-    align-self: stretch;
-    width: 100%;
-    text-align: center;
-  }
-
-  .balance-item {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .balance-label {
-    margin-bottom: 5px;
-    width: 100%;
-  }
-
-  .balance-value {
-    width: 100%;
-    text-align: left;
-  }
-
-  .refresh-balance-button {
-    margin-left: 0;
-    margin-top: 5px;
-    align-self: flex-end;
-  }
-}
-
-/* Light theme adjustments */
-@media (prefers-color-scheme: light) {
-  :root {
-    --color-bg-primary: #ffffff;
-    --color-bg-secondary: #f6f8fa;
-    --color-bg-tertiary: #eaeef2;
-    --color-bg-input: #ffffff;
-    --color-border-primary: #d0d7de;
-    --color-border-secondary: #e6ebf1;
-    --color-text-primary: #24292f;
-    --color-text-secondary: #57606a;
-
-    color-scheme: light;
-    color: var(--color-text-primary);
-    background-color: var(--color-bg-primary);
-  }
-
-  button {
-    background-color: #f6f8fa;
-    color: var(--color-text-primary);
-  }
-
-  .connected-address, .chain-selector select, .current-chain {
-    background-color: var(--color-bg-tertiary);
-    color: var(--color-text-primary);
-  }
-
-  .wallet-navbar {
-    background-color: var(--color-bg-secondary);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    color: var(--color-text-primary);
-  }
-
-  .error-message {
-    background-color: #ffebe9;
-    color: #24292f;
-  }
-
-  .no-agent-warning {
-    background-color: #ffebe9;
-    color: #24292f;
-  }
-}
-
-/* Prevent text overflow throughout transaction form */
-.transaction-form h2,
-.transaction-form label,
-.transaction-form .input-note,
-.transaction-form button,
-.eigenagent-address,
-.execution-nonce,
-.no-agent-warning p,
-.error-message {
-  overflow-wrap: break-word;
-  word-wrap: break-word;
-  word-break: break-word;
-  hyphens: auto;
-  max-width: 100%;
-}
+/* The fee-display class has been removed */
 
 .connection-message {
   background-color: var(--color-bg-secondary);
@@ -977,5 +629,416 @@ a:hover {
   }
 
   .content-container {
+  }
+}
+
+/* User Deposits Styles */
+.user-deposits {
+  background-color: var(--color-bg-secondary);
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid var(--color-border-primary);
+  margin-bottom: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.user-deposits-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.user-deposits h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--color-text-primary);
+}
+
+.refresh-deposits-button {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--color-accent-secondary);
+  padding: 0 5px;
+  flex-shrink: 0;
+  min-width: 24px;
+}
+
+.refresh-deposits-button:disabled {
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+.no-deposits-message {
+  color: var(--color-text-secondary);
+  text-align: center;
+  padding: 15px 0;
+  font-style: italic;
+}
+
+.deposits-loading {
+  color: var(--color-text-secondary);
+  text-align: center;
+  padding: 15px 0;
+}
+
+.deposits-error {
+  color: var(--color-error);
+  background-color: rgba(248, 81, 73, 0.1);
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+}
+
+.deposits-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.deposits-table th {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid var(--color-border-primary);
+  color: var(--color-text-secondary);
+  font-weight: 600;
+}
+
+.deposit-item td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--color-border-secondary);
+}
+
+.strategy-address {
+  font-family: monospace;
+  word-break: break-all;
+  font-size: 0.85rem;
+}
+
+.deposit-shares {
+  font-family: monospace;
+  text-align: right;
+  font-size: 0.95rem;
+}
+
+.withdrawal-info {
+  margin-top: 20px;
+  padding: 15px;
+  border-radius: 6px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-primary);
+}
+
+.info-item {
+  margin-bottom: 10px;
+  font-size: 14px;
+  padding: 8px;
+  background-color: var(--color-bg-tertiary);
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.disconnect-button {
+  background-color: #21262d;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-error);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.disconnect-button:hover {
+  background-color: #30363d;
+  border-color: var(--color-error);
+}
+
+/* Light theme adjustments */
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #f6f8fa;
+    --color-bg-tertiary: #eaeef2;
+    --color-bg-input: #ffffff;
+    --color-border-primary: #d0d7de;
+    --color-border-secondary: #e6ebf1;
+    --color-text-primary: #24292f;
+    --color-text-secondary: #57606a;
+
+    color-scheme: light;
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-primary);
+  }
+
+  button {
+    background-color: #f6f8fa;
+    color: var(--color-text-primary);
+  }
+
+  .current-chain {
+    background-color: var(--color-bg-tertiary);
+    color: var(--color-text-primary);
+  }
+
+  .error-message {
+    background-color: #ffebe9;
+    color: #24292f;
+  }
+
+  .no-agent-warning {
+    background-color: #ffebe9;
+    color: #24292f;
+  }
+}
+
+/* Prevent text overflow throughout transaction form */
+.transaction-form h2,
+.transaction-form label,
+.transaction-form .input-note,
+.transaction-form button,
+.eigenagent-address,
+.execution-nonce,
+.no-agent-warning p,
+.error-message {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  max-width: 100%;
+}
+
+/* Responsive Adaptations */
+@media (max-width: 600px) {
+  .navbar-wallet-info {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+  }
+
+  .disconnect-button {
+    align-self: stretch;
+    width: 100%;
+    text-align: center;
+  }
+
+  .balance-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .balance-label {
+    margin-bottom: 5px;
+    width: 100%;
+  }
+
+  .balance-value {
+    width: 100%;
+    text-align: left;
+  }
+
+  .refresh-balance-button {
+    margin-left: 0;
+    margin-top: 5px;
+    align-self: flex-end;
+  }
+}
+
+/* Withdrawals Section Container */
+.withdrawals-section {
+  margin-top: 30px;
+}
+
+/* Queued Withdrawals (On-Chain Data) */
+.queued-withdrawals {
+  background-color: #2b2d3e;
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  border-left: 4px solid #6e67e0;
+}
+
+.queued-withdrawals-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.queued-withdrawals h3 {
+  margin-top: 0;
+  color: #eee;
+  font-size: 1.2rem;
+}
+
+.queued-withdrawals h4 {
+  margin: 15px 0 10px;
+  color: #6e67e0;
+  font-size: 1.1rem;
+  border-bottom: 1px solid #444;
+  padding-bottom: 5px;
+}
+
+.refresh-withdrawals-button {
+  background-color: transparent;
+  border: 1px solid #6e67e0;
+  color: #6e67e0;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.refresh-withdrawals-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.withdrawals-loading {
+  color: #aaa;
+  text-align: center;
+  padding: 15px 0;
+}
+
+.withdrawals-error {
+  color: #e74c3c;
+  background-color: rgba(231, 76, 60, 0.1);
+  border-radius: 4px;
+  padding: 10px;
+  margin-bottom: 15px;
+  font-size: 0.9rem;
+}
+
+.no-withdrawals-message {
+  color: #aaa;
+  font-style: italic;
+  text-align: center;
+  padding: 15px 0;
+}
+
+.withdrawals-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.withdrawals-table th {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid #444;
+  color: #aaa;
+  font-weight: normal;
+}
+
+.withdrawal-item td {
+  padding: 12px;
+  border-bottom: 1px solid #333;
+}
+
+.withdrawal-strategies div,
+.withdrawal-shares div {
+  margin-bottom: 4px;
+  padding: 2px 4px;
+  background-color: rgba(110, 103, 224, 0.1);
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.withdrawal-withdrawer {
+  font-family: monospace;
+  font-size: 0.85rem;
+}
+
+.withdrawal-roots {
+  background-color: #21242f;
+  border-radius: 6px;
+  padding: 10px;
+  margin-top: 10px;
+}
+
+.withdrawal-root {
+  font-family: monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
+  background-color: rgba(110, 103, 224, 0.1);
+  padding: 8px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+}
+
+.withdrawal-root:last-child {
+  margin-bottom: 0;
+}
+
+@media (prefers-color-scheme: light) {
+  .queued-withdrawals {
+    background-color: #f5f5f7;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    border-left: 4px solid #6e67e0;
+  }
+
+  .queued-withdrawals h3 {
+    color: #333;
+  }
+
+  .queued-withdrawals h4 {
+    color: #6e67e0;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .withdrawal-strategies div,
+  .withdrawal-shares div {
+    background-color: rgba(110, 103, 224, 0.1);
+  }
+
+  .withdrawal-roots {
+    background-color: #eaeef2;
+  }
+
+  .withdrawal-root {
+    background-color: rgba(110, 103, 224, 0.1);
+  }
+
+  .withdrawals-table th {
+    border-bottom: 1px solid #ddd;
+    color: #666;
+  }
+
+  .withdrawal-item td {
+    border-bottom: 1px solid #eee;
+  }
+
+  .no-withdrawals-message {
+    color: #777;
+  }
+}
+
+.withdrawal-timestamp {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.withdrawal-delay-info {
+  font-size: 0.9rem;
+  margin-bottom: 15px;
+  padding: 8px 10px;
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+}
+
+@media (prefers-color-scheme: light) {
+  .withdrawal-delay-info {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: var(--color-text-primary);
   }
 }
