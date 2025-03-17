@@ -1,8 +1,23 @@
-import React, { createContext, useContext, ReactNode } from 'react';
-import { useClients, ClientsState } from '../hooks/useClients';
+import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+import { useClients, ClientsState, baseSepolia } from '../hooks/useClients';
+import { getEigenAgentAndExecNonce } from '../utils/eigenlayerUtils';
+import { Address } from 'viem';
+
+// Extend the ClientsState with EigenAgent info
+interface ExtendedClientsState extends ClientsState {
+  eigenAgentInfo: {
+    eigenAgentAddress: Address | null;
+    execNonce: bigint;
+  } | null;
+  isLoadingEigenAgent: boolean;
+  fetchEigenAgentInfo: () => Promise<void>;
+  handleConnect: () => Promise<void>;
+  isConnecting: boolean;
+  connectionError: string | null;
+}
 
 // Create a context with a default empty value
-const ClientsContext = createContext<ClientsState | null>(null);
+const ClientsContext = createContext<ExtendedClientsState | null>(null);
 
 interface ClientsProviderProps {
   children: ReactNode;
@@ -14,9 +29,67 @@ interface ClientsProviderProps {
  */
 export const ClientsProvider: React.FC<ClientsProviderProps> = ({ children }) => {
   const clientsState = useClients();
+  const { isConnected, l1Wallet, connect } = clientsState;
+  const [eigenAgentInfo, setEigenAgentInfo] = useState<{
+    eigenAgentAddress: Address | null;
+    execNonce: bigint;
+  } | null>(null);
+  const [isLoadingEigenAgent, setIsLoadingEigenAgent] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
+  // Fetch EigenAgent info whenever L1 account changes
+  useEffect(() => {
+    if (l1Wallet.account) {
+      fetchEigenAgentInfo();
+    }
+  }, [l1Wallet.account]);
+
+  // Function to fetch EigenAgent info
+  const fetchEigenAgentInfo = async () => {
+    if (!l1Wallet.account) return;
+
+    setIsLoadingEigenAgent(true);
+    try {
+      const info = await getEigenAgentAndExecNonce(l1Wallet.account);
+      setEigenAgentInfo(info);
+    } catch (err) {
+      console.error('Error checking EigenAgent:', err);
+      setEigenAgentInfo(null);
+    } finally {
+      setIsLoadingEigenAgent(false);
+    }
+  };
+
+  // Handle wallet connection
+  const handleConnect = async () => {
+    setIsConnecting(true);
+    setConnectionError(null);
+
+    try {
+      await connect();
+    } catch (err) {
+      console.error('Error connecting wallet:', err);
+      setConnectionError(err instanceof Error ? err.message : 'Failed to connect wallet');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  // Combine the client state with EigenAgent info and connection handlers
+  const extendedState: ExtendedClientsState = {
+    ...clientsState,
+    eigenAgentInfo,
+    isLoadingEigenAgent,
+    fetchEigenAgentInfo,
+    handleConnect,
+    isConnecting,
+    connectionError
+  };
+
+  // Always provide the context to children, regardless of connection state
   return (
-    <ClientsContext.Provider value={clientsState}>
+    <ClientsContext.Provider value={extendedState}>
       {children}
     </ClientsContext.Provider>
   );
@@ -26,7 +99,7 @@ export const ClientsProvider: React.FC<ClientsProviderProps> = ({ children }) =>
  * Hook for components to get the clients state
  * and re-render when it changes
  */
-export const useClientsContext = (): ClientsState => {
+export const useClientsContext = (): ExtendedClientsState => {
   const context = useContext(ClientsContext);
 
   if (context === null) {

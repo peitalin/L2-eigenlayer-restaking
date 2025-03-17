@@ -51,3 +51,50 @@ export function encodeDepositIntoStrategyMsg(
     args: [strategy, token, amount]
   });
 }
+
+/**
+ * Encodes a queueWithdrawal call for IStrategyManager
+ * TypeScript equivalent of the Solidity function:
+ *
+ * function encodeQueueWithdrawalMsg(
+ *     address strategy,
+ *     uint256 shares
+ * ) public pure returns (bytes memory) {
+ *     return abi.encodeWithSelector(
+ *         IStrategyManager.queueWithdrawal.selector,
+ *         strategy,
+ *         shares
+ *     );
+ * }
+ *
+ * @param strategy The strategy address
+ * @param shares The amount of shares to withdraw
+ * @returns Encoded function call as a hex string
+ */
+export function encodeQueueWithdrawalMsg(
+  strategy: Address,
+  shares: bigint
+): Hex {
+  // Function signature: queueWithdrawal(address,uint256)
+  const abi = [
+    {
+      name: 'queueWithdrawal',
+      type: 'function',
+      inputs: [
+        { name: 'strategy', type: 'address' },
+        { name: 'shares', type: 'uint256' }
+      ],
+      outputs: [
+        { name: 'withdrawalRoot', type: 'bytes32' }
+      ],
+      stateMutability: 'nonpayable'
+    }
+  ] as const;
+
+  // Encode the function call
+  return encodeFunctionData({
+    abi,
+    functionName: 'queueWithdrawal',
+    args: [strategy, shares]
+  });
+}

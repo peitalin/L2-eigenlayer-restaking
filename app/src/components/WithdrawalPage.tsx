@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { baseSepolia } from '../hooks/useClients';
 import { formatEther, parseEther, Hex, Address } from 'viem';
-import { encodeDepositIntoStrategyMsg } from '../utils/encoders';
+import { encodeQueueWithdrawalMsg } from '../utils/encoders';
 import { CHAINLINK_CONSTANTS, STRATEGY_MANAGER_ADDRESS, STRATEGY, SENDER_CCIP_ADDRESS } from '../addresses';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 
-const HomePage: React.FC = () => {
+const WithdrawalPage: React.FC = () => {
   const {
     l1Wallet,
     l2Wallet,
@@ -21,14 +21,14 @@ const HomePage: React.FC = () => {
   } = useClientsContext();
 
   // State for transaction details
-  const [transactionAmount, setTransactionAmount] = useState<number>(0.11);
+  const [withdrawalAmount, setWithdrawalAmount] = useState<number>(0.05);
   const [expiryMinutes, setExpiryMinutes] = useState<number>(60);
 
-  // Memoize the parsed amount to update whenever transactionAmount changes
+  // Memoize the parsed amount to update whenever withdrawalAmount changes
   const amount = useMemo(() => {
-    if (!transactionAmount) return parseEther("0");
-    return parseEther(transactionAmount.toString());
-  }, [transactionAmount]);
+    if (!withdrawalAmount) return parseEther("0");
+    return parseEther(withdrawalAmount.toString());
+  }, [withdrawalAmount]);
 
   // Add a useEffect that will run once when the component mounts
   useEffect(() => {
@@ -44,7 +44,7 @@ const HomePage: React.FC = () => {
     // Allow only valid number inputs
     if (value === '' || /^\d*\.?\d*$/.test(value)) {
       const numValue = value === '' ? 0 : parseFloat(value);
-      setTransactionAmount(numValue);
+      setWithdrawalAmount(numValue);
     }
   };
 
@@ -58,7 +58,7 @@ const HomePage: React.FC = () => {
 
   // Use the EigenLayer operation hook
   const {
-    execute: executeDeposit,
+    execute: executeWithdrawal,
     isExecuting,
     signature,
     error,
@@ -66,45 +66,40 @@ const HomePage: React.FC = () => {
     approvalHash
   } = useEigenLayerOperation({
     targetContractAddr: STRATEGY_MANAGER_ADDRESS,
-    messageToEigenlayer: encodeDepositIntoStrategyMsg(
+    messageToEigenlayer: encodeQueueWithdrawalMsg(
       STRATEGY,
-      CHAINLINK_CONSTANTS.ethSepolia.bridgeToken,
       amount
     ),
-    amount,
-    tokenApproval: {
-      tokenAddress: CHAINLINK_CONSTANTS.baseSepolia.bridgeToken,
-      spenderAddress: SENDER_CCIP_ADDRESS,
-      amount
-    },
+    // No tokens are sent for withdrawals
+    amount: 0n,
     expiryMinutes,
     onSuccess: (txHash) => {
-      alert(`Transaction sent! Hash: ${txHash}\nView on BaseScan: https://sepolia.basescan.org/tx/${txHash}`);
+      alert(`Withdrawal queued! Transaction hash: ${txHash}\nView on BaseScan: https://sepolia.basescan.org/tx/${txHash}`);
     },
     onError: (err) => {
-      console.error('Error in deposit operation:', err);
+      console.error('Error in withdrawal operation:', err);
     }
   });
 
-  // Handle deposit into strategy
-  const handleDepositIntoStrategy = async () => {
-    if (!transactionAmount) {
-      alert("Invalid transaction amount");
+  // Handle queueing withdrawal from strategy
+  const handleQueueWithdrawal = async () => {
+    if (!withdrawalAmount) {
+      alert("Invalid withdrawal amount");
       return;
     }
 
-    await executeDeposit();
+    await executeWithdrawal();
   };
 
   // Check if we should disable inputs
   const isInputDisabled = !isConnected || isExecuting;
 
   return (
-    <div className="home-page">
+    <div className="withdrawal-page">
       <div className="page-layout">
         <div className="left-column">
           <div className="transaction-form">
-            <h2>Deposit into Strategy</h2>
+            <h2>Queue Withdrawal from Strategy</h2>
 
             <div className="account-balances">
               <h3>Account Balances</h3>
@@ -146,14 +141,14 @@ const HomePage: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="amount">Token Amount:</label>
+              <label htmlFor="amount">Token Amount to Withdraw:</label>
               <input
                 id="amount"
                 type="text"
-                value={transactionAmount === 0 ? '' : transactionAmount.toString()}
+                value={withdrawalAmount === 0 ? '' : withdrawalAmount.toString()}
                 onChange={handleAmountChange}
                 className="amount-input"
-                placeholder="0.11"
+                placeholder="0.05"
                 disabled={isInputDisabled}
               />
               <div className="input-note">Using EigenLayer TokenERC20</div>
@@ -175,9 +170,9 @@ const HomePage: React.FC = () => {
             <button
               className="create-transaction-button"
               disabled={isInputDisabled || !eigenAgentInfo?.eigenAgentAddress}
-              onClick={handleDepositIntoStrategy}
+              onClick={handleQueueWithdrawal}
             >
-              {isExecuting ? 'Processing...' : 'Sign Strategy Deposit'}
+              {isExecuting ? 'Processing...' : 'Queue Withdrawal'}
             </button>
           </div>
         </div>
@@ -218,25 +213,16 @@ const HomePage: React.FC = () => {
             )}
           </div>
 
-          {/* Token Approval Status */}
-          {isApprovingToken && (
-            <div className="approval-status">
-              <h3>Token Approval Status</h3>
-              <p>Approving token for spending...</p>
-              {approvalHash && (
-                <p>
-                  Approval Transaction:
-                  <a
-                    href={`https://sepolia.basescan.org/tx/${approvalHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {approvalHash.substring(0, 10)}...
-                  </a>
-                </p>
-              )}
-            </div>
-          )}
+          <div className="withdrawal-info">
+            <h3>About Withdrawals</h3>
+            <p>
+              Queueing a withdrawal is the first step in the withdrawal process. After queueing,
+              you'll need to wait for the unbonding period to complete before you can complete the withdrawal.
+            </p>
+            <p>
+              The unbonding period is typically 7 days for EigenLayer strategies.
+            </p>
+          </div>
 
           {!isConnected && (
             <div className="connection-message">
@@ -252,7 +238,7 @@ const HomePage: React.FC = () => {
             <div className="no-agent-warning">
               <h3>No EigenAgent Found</h3>
               <p>
-                You need to create an EigenAgent on Ethereum Sepolia before you can deposit into a strategy.
+                You need to create an EigenAgent on Ethereum Sepolia before you can queue withdrawals from a strategy.
               </p>
             </div>
           )}
@@ -268,4 +254,5 @@ const HomePage: React.FC = () => {
   );
 };
 
-export default HomePage;
+export default WithdrawalPage;
+

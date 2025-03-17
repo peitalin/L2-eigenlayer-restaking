@@ -51,20 +51,22 @@ export const publicClients: Record<number, PublicClient> = {
   })
 };
 
+// Interface for wallet state
+export interface WalletState {
+  client: WalletClient | null;
+  account: Address | null;
+  balance: string | null;
+  publicClient: PublicClient;
+}
+
 export interface ClientsState {
-  l1WalletClient: WalletClient | null;
-  l2WalletClient: WalletClient | null;
-  l1PublicClient: PublicClient;
-  l2PublicClient: PublicClient;
-  l1Account: Address | null;
-  l2Account: Address | null;
+  l1Wallet: WalletState;
+  l2Wallet: WalletState;
   selectedChain: Chain;
   isConnected: boolean;
   connect: () => Promise<void>;
   disconnect: () => void;
   switchChain: (chainId: number) => Promise<void>;
-  l1Balance: string | null;
-  l2Balance: string | null;
   isLoadingBalance: boolean;
   refreshBalances: () => Promise<void>;
 }
@@ -73,46 +75,62 @@ export interface ClientsState {
  * Hook that provides wallet and public clients for L1 (Ethereum Sepolia) and L2 (Base Sepolia)
  */
 export function useClients(): ClientsState {
-  const [l1WalletClient, setL1WalletClient] = useState<WalletClient | null>(null);
-  const [l2WalletClient, setL2WalletClient] = useState<WalletClient | null>(null);
-  const [l1Account, setL1Account] = useState<Address | null>(null);
-  const [l2Account, setL2Account] = useState<Address | null>(null);
+  // Consolidated L1 wallet state (Ethereum Sepolia)
+  const [l1Wallet, setL1Wallet] = useState<WalletState>({
+    client: null,
+    account: null,
+    balance: null,
+    publicClient: publicClients[sepolia.id]
+  });
+
+  // Consolidated L2 wallet state (Base Sepolia)
+  const [l2Wallet, setL2Wallet] = useState<WalletState>({
+    client: null,
+    account: null,
+    balance: null,
+    publicClient: publicClients[baseSepolia.id]
+  });
+
   const [selectedChain, setSelectedChain] = useState<Chain>(baseSepolia);
-  const [l1Balance, setL1Balance] = useState<string | null>(null);
-  const [l2Balance, setL2Balance] = useState<string | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
-  const isConnected = !!l2Account;
+  const isConnected = !!l2Wallet.account;
 
   // Function to fetch balances
   const fetchBalances = useCallback(async () => {
     setIsLoadingBalance(true);
     try {
-      if (l1Account) {
-        const balance = await publicClients[sepolia.id].getBalance({ address: l1Account });
-        setL1Balance(balance.toString());
+      if (l1Wallet.account) {
+        const balance = await l1Wallet.publicClient.getBalance({ address: l1Wallet.account });
+        setL1Wallet(prev => ({
+          ...prev,
+          balance: balance.toString()
+        }));
       }
 
-      if (l2Account) {
-        const balance = await publicClients[baseSepolia.id].getBalance({ address: l2Account });
-        setL2Balance(balance.toString());
+      if (l2Wallet.account) {
+        const balance = await l2Wallet.publicClient.getBalance({ address: l2Wallet.account });
+        setL2Wallet(prev => ({
+          ...prev,
+          balance: balance.toString()
+        }));
       }
     } catch (error) {
       console.error('Error fetching balances:', error);
     } finally {
       setIsLoadingBalance(false);
     }
-  }, [l1Account, l2Account]);
+  }, [l1Wallet.account, l2Wallet.account, l1Wallet.publicClient, l2Wallet.publicClient]);
 
   // Fetch balances when accounts change
   useEffect(() => {
-    if (l1Account || l2Account) {
+    if (l1Wallet.account || l2Wallet.account) {
       fetchBalances();
     } else {
-      setL1Balance(null);
-      setL2Balance(null);
+      setL1Wallet(prev => ({ ...prev, balance: null }));
+      setL2Wallet(prev => ({ ...prev, balance: null }));
     }
-  }, [l1Account, l2Account, fetchBalances]);
+  }, [l1Wallet.account, l2Wallet.account, fetchBalances]);
 
   // Connect to wallet and initialize clients
   const connect = async () => {
@@ -139,11 +157,21 @@ export function useClients(): ClientsState {
       // Switch to Base Sepolia
       await switchChain(baseSepolia.id);
 
-      // Set the clients and accounts
-      setL1WalletClient(sepoliaClient);
-      setL2WalletClient(baseClient);
-      setL1Account(address);
-      setL2Account(address);
+      // Update L1 and L2 wallet states
+      setL1Wallet({
+        client: sepoliaClient,
+        account: address,
+        balance: null,
+        publicClient: publicClients[sepolia.id]
+      });
+
+      setL2Wallet({
+        client: baseClient,
+        account: address,
+        balance: null,
+        publicClient: publicClients[baseSepolia.id]
+      });
+
       setSelectedChain(baseSepolia);
     } catch (error) {
       console.error('Error connecting wallet:', error);
@@ -153,10 +181,19 @@ export function useClients(): ClientsState {
 
   // Disconnect wallet
   const disconnect = () => {
-    setL1WalletClient(null);
-    setL2WalletClient(null);
-    setL1Account(null);
-    setL2Account(null);
+    setL1Wallet(prev => ({
+      ...prev,
+      client: null,
+      account: null,
+      balance: null
+    }));
+
+    setL2Wallet(prev => ({
+      ...prev,
+      client: null,
+      account: null,
+      balance: null
+    }));
   };
 
   // Switch the active chain
@@ -204,19 +241,13 @@ export function useClients(): ClientsState {
   };
 
   return {
-    l1WalletClient,
-    l2WalletClient,
-    l1PublicClient: publicClients[sepolia.id],
-    l2PublicClient: publicClients[baseSepolia.id],
-    l1Account,
-    l2Account,
+    l1Wallet,
+    l2Wallet,
     selectedChain,
     isConnected,
     connect,
     disconnect,
     switchChain,
-    l1Balance,
-    l2Balance,
     isLoadingBalance,
     refreshBalances: fetchBalances
   };
