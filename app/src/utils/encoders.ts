@@ -88,3 +88,41 @@ export function encodeQueueWithdrawalMsg(
     args: [queuedWithdrawalParams]
   });
 }
+
+/**
+ * Interface representing a Withdrawal struct from DelegationManager
+ */
+export interface WithdrawalStruct {
+  staker: Address;
+  delegatedTo: Address;
+  withdrawer: Address;
+  nonce: bigint;
+  startBlock: bigint;
+  strategies: Address[];
+  scaledShares: bigint[];
+}
+
+/**
+ * Encodes a completeQueuedWithdrawal call for IDelegationManager
+ * TypeScript equivalent of encodeCompleteWithdrawalMsg in Solidity
+ *
+ * @param withdrawal The Withdrawal struct with withdrawal details
+ * @param tokensToWithdraw Array of token addresses to receive from withdrawal
+ * @param receiveAsTokens Whether to receive the withdrawal as tokens (true) or shares (false)
+ * @returns Encoded function call as a hex string
+ */
+export function encodeCompleteWithdrawalMsg(
+  withdrawal: WithdrawalStruct,
+  tokensToWithdraw: Address[],
+  receiveAsTokens: boolean
+): Hex {
+  return encodeFunctionData({
+    abi: DelegationManagerABI,
+    functionName: 'completeQueuedWithdrawal',
+    args: [
+      withdrawal,
+      tokensToWithdraw,
+      receiveAsTokens
+    ]
+  });
+}

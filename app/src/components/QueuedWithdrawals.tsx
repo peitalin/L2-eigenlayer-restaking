@@ -3,7 +3,8 @@ import { formatEther, Address } from 'viem';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { DelegationManagerABI } from '../abis';
 import { DELEGATION_MANAGER_ADDRESS } from '../addresses';
-import { blockNumberToTimestamp, formatBlockTimestamp, getMinWithdrawalDelayBlocks } from '../utils/eigenlayerUtils';
+import { blockNumberToTimestamp, formatBlockTimestamp, getMinWithdrawalDelayBlocks, calculateWithdrawalRoot } from '../utils/eigenlayerUtils';
+import { useToast } from './ToastContainer';
 
 // Define types for the withdrawal data structure based on the Solidity contract
 interface Withdrawal {
@@ -16,6 +17,7 @@ interface Withdrawal {
 interface ProcessedWithdrawal extends Withdrawal {
   endBlock: bigint;
   canWithdrawAfter: string | null;
+  withdrawalRoot?: string;
 }
 
 interface QueuedWithdrawalsData {
@@ -24,12 +26,31 @@ interface QueuedWithdrawalsData {
   minWithdrawalDelayBlocks: bigint;
 }
 
-const QueuedWithdrawals: React.FC = () => {
+interface QueuedWithdrawalsProps {
+  onSelectWithdrawal?: (withdrawal: ProcessedWithdrawal, sharesArray: bigint[]) => void;
+  isCompletingWithdrawal?: boolean;
+}
+
+const QueuedWithdrawals: React.FC<QueuedWithdrawalsProps> = ({
+  onSelectWithdrawal,
+  isCompletingWithdrawal = false
+}) => {
   const { eigenAgentInfo, isConnected, l1Wallet } = useClientsContext();
   const [queuedWithdrawals, setQueuedWithdrawals] = useState<QueuedWithdrawalsData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [withdrawalRoots, setWithdrawalRoots] = useState<string[]>([]);
+  const [completingWithdrawalIndex, setCompletingWithdrawalIndex] = useState<number | null>(null);
+  const [delegatedTo, setDelegatedTo] = useState<Address | null>(null);
+  const { showToast } = useToast();
+
+  // Reset the completing withdrawal index when isCompletingWithdrawal changes to false
+  // This ensures our button state is reset when a transaction is rejected
+  useEffect(() => {
+    if (!isCompletingWithdrawal && completingWithdrawalIndex !== null) {
+      setCompletingWithdrawalIndex(null);
+    }
+  }, [isCompletingWithdrawal]);
 
   const fetchQueuedWithdrawals = async () => {
     if (!isConnected || !eigenAgentInfo?.eigenAgentAddress || !l1Wallet.publicClient) {
@@ -43,6 +64,16 @@ const QueuedWithdrawals: React.FC = () => {
       // Fetch the minimum withdrawal delay blocks
       const minDelay = await getMinWithdrawalDelayBlocks();
 
+      // Fetch delegated address for withdrawal root calculation
+      const delegatedAddress = await l1Wallet.publicClient.readContract({
+        address: DELEGATION_MANAGER_ADDRESS,
+        abi: DelegationManagerABI,
+        functionName: 'delegatedTo',
+        args: [eigenAgentInfo.eigenAgentAddress]
+      }) as Address;
+
+      setDelegatedTo(delegatedAddress);
+
       // Fetch queued withdrawals from the DelegationManager contract
       const result = await l1Wallet.publicClient.readContract({
         address: DELEGATION_MANAGER_ADDRESS,
@@ -53,7 +84,7 @@ const QueuedWithdrawals: React.FC = () => {
 
       // Process withdrawals to add end block and timestamp
       const processedWithdrawals: ProcessedWithdrawal[] = await Promise.all(
-        result[0].map(async (withdrawal) => {
+        result[0].map(async (withdrawal, index) => {
           // Ensure all values are the right type
           const startBlock = BigInt(withdrawal.startBlock.toString());
 
@@ -73,10 +104,27 @@ const QueuedWithdrawals: React.FC = () => {
             }
           }
 
+          // Calculate withdrawal root if we have delegatedTo address
+          let withdrawalRoot: string | undefined = undefined;
+          try {
+            withdrawalRoot = calculateWithdrawalRoot(
+              eigenAgentInfo.eigenAgentAddress,
+              delegatedAddress,
+              eigenAgentInfo.eigenAgentAddress,
+              withdrawal.nonce,
+              startBlock,
+              withdrawal.strategies,
+              result[1][index]
+            );
+          } catch (err) {
+            console.error('Error calculating withdrawal root:', err);
+          }
+
           return {
             ...withdrawal,
             endBlock,
-            canWithdrawAfter
+            canWithdrawAfter,
+            withdrawalRoot
           };
         })
       );
@@ -87,7 +135,7 @@ const QueuedWithdrawals: React.FC = () => {
         minWithdrawalDelayBlocks: minDelay
       });
 
-      // Also fetch withdrawal roots
+      // Also fetch withdrawal roots from contract
       const roots = await l1Wallet.publicClient.readContract({
         address: DELEGATION_MANAGER_ADDRESS,
         abi: DelegationManagerABI,
@@ -100,6 +148,7 @@ const QueuedWithdrawals: React.FC = () => {
     } catch (err) {
       console.error('Error fetching queued withdrawals:', err);
       setError('Failed to fetch queued withdrawals. Please try again later.');
+      showToast('Failed to fetch queued withdrawals. Please try again later.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -115,6 +164,30 @@ const QueuedWithdrawals: React.FC = () => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
+  // Show notification that withdrawal root was copied
+  const handleWithdrawalRootClick = (root: string) => {
+    // Copy to clipboard if supported
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(root)
+        .then(() => {
+          showToast('Withdrawal Root copied to clipboard', 'success');
+        })
+        .catch(() => {
+          showToast('Failed to copy to clipboard, but here is the Withdrawal Root', 'info');
+          showToast(root, 'info');
+        });
+    } else {
+      showToast('Clipboard API not available, but here is the Withdrawal Root', 'info');
+      showToast(root, 'info');
+    }
+  };
+
+  // Helper function to truncate the withdrawal root for display
+  const truncateWithdrawalRoot = (root: string): string => {
+    if (!root) return '';
+    return `${root.substring(0, 10)}...${root.substring(root.length - 8)}`;
+  };
+
   // Helper function to render withdrawal time
   const renderWithdrawalTime = (withdrawal: ProcessedWithdrawal): string => {
     if (withdrawal.canWithdrawAfter) {
@@ -122,6 +195,34 @@ const QueuedWithdrawals: React.FC = () => {
     }
 
     return withdrawal.startBlock.toString() === '0' ? 'Pending' : 'Calculating...';
+  };
+
+  // Helper function to determine if a withdrawal is ready to be completed
+  const canCompleteWithdrawal = (withdrawal: ProcessedWithdrawal): boolean => {
+    // Check if startBlock is greater than 0 (withdrawal has been processed)
+    if (withdrawal.startBlock <= 0n) return false;
+
+    // Check if the current time is past the end time
+    const currentTime = Math.floor(Date.now() / 1000);
+
+    // If we don't have canWithdrawAfter timestamp, we'll just check if it's been 7 days
+    if (!withdrawal.canWithdrawAfter) {
+      // Default to 7 days from startBlock as a fallback
+      const sevenDaysInSeconds = 7 * 24 * 60 * 60;
+      return currentTime > (Number(withdrawal.startBlock) * 12 + sevenDaysInSeconds); // rough estimate
+    }
+
+    // Parse the canWithdrawAfter date
+    const withdrawAfterDate = new Date(withdrawal.canWithdrawAfter).getTime() / 1000;
+    return currentTime > withdrawAfterDate;
+  };
+
+  // Handle the complete withdrawal button click
+  const handleCompleteClick = (withdrawal: ProcessedWithdrawal, sharesArray: bigint[], index: number) => {
+    if (onSelectWithdrawal) {
+      setCompletingWithdrawalIndex(index);
+      onSelectWithdrawal(withdrawal, sharesArray);
+    }
   };
 
   if (!isConnected) {
@@ -136,7 +237,7 @@ const QueuedWithdrawals: React.FC = () => {
   return (
     <div className="queued-withdrawals">
       <div className="queued-withdrawals-header">
-        <h3>On-Chain Queued Withdrawals</h3>
+        <h3>Queued Withdrawals</h3>
         <button
           onClick={fetchQueuedWithdrawals}
           disabled={isLoading}
@@ -147,52 +248,64 @@ const QueuedWithdrawals: React.FC = () => {
         </button>
       </div>
 
-      {error && (
-        <div className="withdrawals-error">
-          {error}
-        </div>
-      )}
-
       {isLoading ? (
         <div className="withdrawals-loading">Loading queued withdrawals...</div>
       ) : queuedWithdrawals && queuedWithdrawals.withdrawals.length > 0 ? (
         <div className="withdrawals-list">
-          <h4>Withdrawal Details</h4>
-          <p className="withdrawal-delay-info">
-            Minimum withdrawal delay: {queuedWithdrawals.minWithdrawalDelayBlocks.toString()} blocks
-          </p>
           <table className="withdrawals-table">
             <thead>
               <tr>
-                <th>Nonce</th>
-                <th>Strategies</th>
                 <th>Shares</th>
-                <th>Start Block</th>
                 <th>End Block</th>
-                <th>Can Withdraw After</th>
+                <th>Status</th>
                 <th>Withdrawer</th>
+                <th>Withdrawal Root</th>
+                {onSelectWithdrawal && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {queuedWithdrawals.withdrawals.map((withdrawal, index) => (
                 <tr key={index} className="withdrawal-item">
-                  <td>{withdrawal.nonce.toString()}</td>
-                  <td className="withdrawal-strategies">
-                    {withdrawal.strategies.map((strategy, idx) => (
-                      <div key={idx}>{formatAddress(strategy)}</div>
-                    ))}
-                  </td>
                   <td className="withdrawal-shares">
                     {queuedWithdrawals.shares[index].map((share, idx) => (
                       <div key={idx}>{formatEther(share)}</div>
                     ))}
                   </td>
-                  <td>{withdrawal.startBlock.toString()}</td>
                   <td>{withdrawal.endBlock.toString()}</td>
-                  <td className="withdrawal-timestamp">
-                    {renderWithdrawalTime(withdrawal)}
+                  <td className="withdrawal-status">
+                    {canCompleteWithdrawal(withdrawal) ?
+                      <span className="ready">Ready</span> :
+                      <span className="pending">Pending</span>
+                    }
                   </td>
                   <td className="withdrawal-withdrawer">{formatAddress(withdrawal.withdrawer)}</td>
+                  <td className="withdrawal-root-cell">
+                    {withdrawal.withdrawalRoot ?
+                      <div
+                        className="withdrawal-root-hash-compact"
+                        onClick={() => withdrawal.withdrawalRoot && handleWithdrawalRootClick(withdrawal.withdrawalRoot)}
+                        title={withdrawal.withdrawalRoot}
+                      >
+                        {truncateWithdrawalRoot(withdrawal.withdrawalRoot)}
+                      </div> :
+                      <span className="no-root">Not available</span>
+                    }
+                  </td>
+                  {onSelectWithdrawal && (
+                    <td>
+                      <button
+                        onClick={() => handleCompleteClick(withdrawal, queuedWithdrawals.shares[index], index)}
+                        disabled={!canCompleteWithdrawal(withdrawal) || completingWithdrawalIndex === index}
+                        className="complete-withdrawal-button"
+                      >
+                        {completingWithdrawalIndex === index
+                          ? 'Processing...'
+                          : canCompleteWithdrawal(withdrawal)
+                            ? 'Complete'
+                            : 'Not Ready'}
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -200,7 +313,7 @@ const QueuedWithdrawals: React.FC = () => {
 
           {withdrawalRoots.length > 0 && (
             <>
-              <h4>Withdrawal Roots</h4>
+              <h4>On-Chain Withdrawal Roots</h4>
               <div className="withdrawal-roots">
                 {withdrawalRoots.map((root, index) => (
                   <div key={index} className="withdrawal-root">

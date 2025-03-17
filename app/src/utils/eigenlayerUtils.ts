@@ -1,4 +1,4 @@
-import { Address, getContract } from 'viem';
+import { Address, getContract, encodeAbiParameters, keccak256 } from 'viem';
 import { agentFactoryAbi, eigenAgentAbi } from '../abis';
 import bridgeContractsL1Config from '../addresses/ethsepolia/bridgeContractsL1.config.json';
 import { getL1Client } from './clients';
@@ -71,6 +71,72 @@ export async function getMinWithdrawalDelayBlocks(): Promise<bigint> {
     console.error('Error getting minimum withdrawal delay blocks:', error);
     throw new Error('Failed to get minimum withdrawal delay blocks');
   }
+}
+
+/**
+ * Calculates the withdrawal root hash for a withdrawal
+ * TypeScript equivalent of Solidity: keccak256(abi.encode(withdrawalStruct))
+ *
+ * @param staker The address of the staker
+ * @param delegatedTo The address staker is delegated to
+ * @param withdrawer The address that will receive the withdrawal
+ * @param nonce The withdrawal nonce
+ * @param startBlock The block when the withdrawal was initiated
+ * @param strategies Array of strategy addresses
+ * @param shares Array of share amounts
+ * @returns The keccak256 hash of the encoded withdrawal struct
+ */
+export function calculateWithdrawalRoot(
+  staker: Address,
+  delegatedTo: Address,
+  withdrawer: Address,
+  nonce: bigint,
+  startBlock: bigint,
+  strategies: Address[],
+  scaledShares: bigint[]
+): string {
+  // In Solidity, the struct is defined like this in IDelegationManager.sol:
+  // struct Withdrawal {
+  //     address staker;
+  //     address delegatedTo;
+  //     address withdrawer;
+  //     uint256 nonce;
+  //     uint32 startBlock;
+  //     IStrategy[] strategies;
+  //     uint256[] scaledShares;
+  // }
+
+  // This matches exactly how the struct is encoded in Solidity's abi.encode
+  const encodedData = encodeAbiParameters(
+    [
+      {
+        type: 'tuple',
+        components: [
+          { name: 'staker', type: 'address' },
+          { name: 'delegatedTo', type: 'address' },
+          { name: 'withdrawer', type: 'address' },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'startBlock', type: 'uint32' },
+          { name: 'strategies', type: 'address[]' },
+          { name: 'scaledShares', type: 'uint256[]' }
+        ]
+      }
+    ],
+    [
+      {
+        staker,
+        delegatedTo,
+        withdrawer,
+        nonce,
+        startBlock: Number(startBlock), // Convert to uint32
+        strategies,
+        scaledShares
+      }
+    ]
+  );
+
+  // Calculate the keccak256 hash
+  return keccak256(encodedData);
 }
 
 /**

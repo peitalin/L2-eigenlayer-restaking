@@ -4,6 +4,7 @@ import { encodeDepositIntoStrategyMsg } from '../utils/encoders';
 import { CHAINLINK_CONSTANTS, STRATEGY_MANAGER_ADDRESS, STRATEGY, SENDER_CCIP_ADDRESS } from '../addresses';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
+import { useToast } from './ToastContainer';
 
 
 const DepositPage: React.FC = () => {
@@ -19,10 +20,10 @@ const DepositPage: React.FC = () => {
     isLoadingEigenAgent,
     fetchEigenAgentInfo
   } = useClientsContext();
+  const { showToast } = useToast();
 
   // State for transaction details
   const [transactionAmount, setTransactionAmount] = useState<number>(0.11);
-  const [expiryMinutes, setExpiryMinutes] = useState<number>(60);
 
   // Memoize the parsed amount to update whenever transactionAmount changes
   const amount = useMemo(() => {
@@ -48,52 +49,72 @@ const DepositPage: React.FC = () => {
     }
   };
 
-  // Handle expiry minutes changes
-  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value);
-    if (!isNaN(value) && value > 0) {
-      setExpiryMinutes(value);
-    }
-  };
-
   // Use the EigenLayer operation hook
   const {
-    execute: executeDeposit,
     isExecuting,
     signature,
     error,
     isApprovingToken,
-    approvalHash
+    approvalHash,
+    executeWithMessage: executeDepositMessage
   } = useEigenLayerOperation({
     targetContractAddr: STRATEGY_MANAGER_ADDRESS,
-    messageToEigenlayer: encodeDepositIntoStrategyMsg(
-      STRATEGY,
-      CHAINLINK_CONSTANTS.ethSepolia.bridgeToken,
-      amount
-    ),
     amount,
     tokenApproval: {
       tokenAddress: CHAINLINK_CONSTANTS.baseSepolia.bridgeToken,
       spenderAddress: SENDER_CCIP_ADDRESS,
       amount
     },
-    expiryMinutes,
+    expiryMinutes: 45,
     onSuccess: (txHash) => {
-      alert(`Transaction sent! Hash: ${txHash}\nView on BaseScan: https://sepolia.basescan.org/tx/${txHash}`);
+      showToast(`Transaction sent! Hash: ${txHash}`, 'success');
     },
     onError: (err) => {
       console.error('Error in deposit operation:', err);
+      showToast(`Error in deposit operation: ${err.message}`, 'error');
     }
   });
+
+  // Show toast when error occurs
+  useEffect(() => {
+    if (error) {
+      showToast(error, 'error');
+    }
+  }, [error, showToast]);
 
   // Handle deposit into strategy
   const handleDepositIntoStrategy = async () => {
     if (!transactionAmount) {
-      alert("Invalid transaction amount");
+      showToast("Invalid transaction amount", 'error');
       return;
     }
 
-    await executeDeposit();
+    // Create the Eigenlayer depositIntoStrategy message
+    const depositMessage = encodeDepositIntoStrategyMsg(
+      STRATEGY,
+      CHAINLINK_CONSTANTS.ethSepolia.bridgeToken,
+      amount
+    );
+
+    // Execute with the message directly
+    try {
+      await executeDepositMessage(depositMessage);
+    } catch (error) {
+      console.error("Error depositing into strategy:", error);
+
+      // If this contains 'rejected', it's likely a user cancellation
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.toLowerCase().includes('rejected') ||
+          errorMessage.toLowerCase().includes('denied') ||
+          errorMessage.toLowerCase().includes('cancelled') ||
+          errorMessage.toLowerCase().includes('user refused') ||
+          errorMessage.toLowerCase().includes('declined')) {
+        // It's a rejection - immediately reset all states
+        console.log('Transaction rejected by user, resetting states...');
+        showToast('Transaction was rejected by user', 'info');
+      }
+      // No need to show error toast here as it's already handled in onError callback
+    }
   };
 
   // Check if we should disable inputs
@@ -102,31 +123,6 @@ const DepositPage: React.FC = () => {
   return (
     <div className="transaction-form">
       <h2>Deposit into Strategy</h2>
-
-      <div className="account-balances">
-        <h3>Account Balances</h3>
-        <div className="balance-item">
-          <span className="balance-label">Ethereum Sepolia:</span>
-          <span className="balance-value">
-            {isConnected && l1Wallet.balance ? `${formatEther(BigInt(l1Wallet.balance))} ETH` : 'Not Connected'}
-          </span>
-        </div>
-        <div className="balance-item">
-          <span className="balance-label">Base Sepolia:</span>
-          <span className="balance-value">
-            {isConnected && l2Wallet.balance ? `${formatEther(BigInt(l2Wallet.balance))} ETH` : 'Not Connected'}
-          </span>
-          {isConnected && (
-            <button
-              onClick={refreshBalances}
-              disabled={isLoadingBalance || !isConnected}
-              className="refresh-balance-button"
-            >
-              {isLoadingBalance ? '...' : '⟳'}
-            </button>
-          )}
-        </div>
-      </div>
 
       <div className="form-group">
         <label htmlFor="receiver">Target Address (Strategy Manager):</label>
@@ -157,16 +153,10 @@ const DepositPage: React.FC = () => {
       </div>
 
       <div className="form-group">
-        <label htmlFor="expiry">Expiry (minutes from now):</label>
-        <input
-          id="expiry"
-          type="number"
-          min="1"
-          value={expiryMinutes}
-          onChange={handleExpiryChange}
-          className="expiry-input"
-          disabled={isInputDisabled}
-        />
+        <label>Transaction Expiry:</label>
+        <div className="info-item">
+          45 minutes from signing
+        </div>
       </div>
 
       <button
@@ -194,12 +184,6 @@ const DepositPage: React.FC = () => {
               </a>
             </p>
           )}
-        </div>
-      )}
-
-      {error && (
-        <div className="error-message">
-          {error}
         </div>
       )}
     </div>
