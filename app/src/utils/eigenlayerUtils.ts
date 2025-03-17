@@ -2,6 +2,8 @@ import { Address, getContract } from 'viem';
 import { agentFactoryAbi, eigenAgentAbi } from '../abis';
 import bridgeContractsL1Config from '../addresses/ethsepolia/bridgeContractsL1.config.json';
 import { getL1Client } from './clients';
+import { ZeroAddress } from './encoders';
+import { DELEGATION_MANAGER_ADDRESS } from '../addresses';
 
 // Get agent factory address from the correct config file
 const AGENT_FACTORY_ADDRESS = bridgeContractsL1Config.contracts.agentFactory as Address;
@@ -13,13 +15,72 @@ const AGENT_FACTORY_ADDRESS = bridgeContractsL1Config.contracts.agentFactory as 
 const publicClient = getL1Client();
 
 /**
+ * Converts an Ethereum block number to a timestamp
+ * @param blockNumber The block number to convert
+ * @returns The timestamp in seconds since epoch
+ */
+export async function blockNumberToTimestamp(blockNumber: bigint): Promise<number> {
+  try {
+    // Ensure the blockNumber is a valid BigInt
+    const safeBlockNumber = BigInt(blockNumber.toString());
+
+    // Fetch the block details
+    const block = await publicClient.getBlock({
+      blockNumber: safeBlockNumber
+    });
+
+    // Return the timestamp (which is in seconds since epoch)
+    return Number(block.timestamp);
+  } catch (error) {
+    console.error('Error fetching block timestamp:', error);
+    throw new Error(`Failed to get timestamp for block ${blockNumber}`);
+  }
+}
+
+/**
+ * Formats a block timestamp as a human-readable date string
+ * @param timestamp Timestamp in seconds
+ * @returns Formatted date string
+ */
+export function formatBlockTimestamp(timestamp: number): string {
+  return new Date(timestamp * 1000).toLocaleString();
+}
+
+/**
+ * Gets the minimum withdrawal delay blocks from the DelegationManager contract
+ * @returns The minimum withdrawal delay in blocks
+ */
+export async function getMinWithdrawalDelayBlocks(): Promise<bigint> {
+  try {
+    const result = await publicClient.readContract({
+      address: DELEGATION_MANAGER_ADDRESS,
+      abi: [
+        {
+          name: 'minWithdrawalDelayBlocks',
+          type: 'function',
+          inputs: [],
+          outputs: [{ type: 'uint32', name: '' }],
+          stateMutability: 'view'
+        }
+      ],
+      functionName: 'minWithdrawalDelayBlocks'
+    });
+
+    return BigInt(result as number);
+  } catch (error) {
+    console.error('Error getting minimum withdrawal delay blocks:', error);
+    throw new Error('Failed to get minimum withdrawal delay blocks');
+  }
+}
+
+/**
  * Gets the EigenAgent address and execution nonce for a user
  * Equivalent to getEigenAgentAndExecNonce in BaseScript.sol
  */
 export async function getEigenAgentAndExecNonce(userAddress: Address): Promise<{
-  eigenAgentAddress: Address | null;
+  eigenAgentAddress: Address;
   execNonce: bigint;
-}> {
+} | null> {
   try {
     // Create contract instances
     const agentFactory = getContract({
@@ -32,12 +93,9 @@ export async function getEigenAgentAndExecNonce(userAddress: Address): Promise<{
     const eigenAgentAddress = await agentFactory.read.getEigenAgent([userAddress]) as Address;
     // console.log('EigenAgent address:', eigenAgentAddress);
 
-    // If user has no EigenAgent, return null and zero nonce
-    if (eigenAgentAddress === '0x0000000000000000000000000000000000000000') {
-      return {
-        eigenAgentAddress: null,
-        execNonce: 0n,
-      };
+    // If user has no EigenAgent, return null
+    if (eigenAgentAddress === ZeroAddress) {
+      return null;
     }
 
     // Create contract instance for the EigenAgent
@@ -56,11 +114,8 @@ export async function getEigenAgentAndExecNonce(userAddress: Address): Promise<{
     };
   } catch (error) {
     console.error('Error in getEigenAgentAndExecNonce:', error);
-    // return a mock response to allow the UI to function
-    return {
-      eigenAgentAddress: null,
-      execNonce: 0n
-    };
+    // Return null instead of a partial object
+    return null;
   }
 }
 

@@ -2,6 +2,7 @@ import { Address, Hex, encodeAbiParameters, concat, toHex } from 'viem';
 import { ROUTER_ABI, EVMTokenAmount } from '../abis';
 import { CHAINLINK_CONSTANTS } from '../addresses';
 import { getL1Client, getL2Client } from './clients';
+import { ZeroAddress } from './encoders';
 
 // Custom error class for invalid token transfers
 export class CCIPTokenTransferError extends Error {
@@ -81,7 +82,7 @@ export async function getRouterFeesL1(
           receiver: receiverEncoded,
           data: dataEncoded,
           tokenAmounts: tokenAmounts,
-          feeToken: '0x0000000000000000000000000000000000000000', // native token (ETH)
+          feeToken: ZeroAddress, // native token (ETH)
           extraArgs: extraArgs
         }
       ]
@@ -152,7 +153,7 @@ export async function getRouterFeesL2(
           receiver: receiverEncoded,
           data: dataEncoded,
           tokenAmounts: validatedTokenAmounts, // Use empty token amounts to avoid errors
-          feeToken: '0x0000000000000000000000000000000000000000', // native token (ETH)
+          feeToken: ZeroAddress, // native token (ETH)
           extraArgs: extraArgs
         }
       ]

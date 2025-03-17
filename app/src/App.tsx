@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import HomePage from './components/HomePage';
+import DepositPage from './components/DepositPage';
 import WithdrawalPage from './components/WithdrawalPage';
 import { ClientsProvider } from './contexts/ClientsContext';
 
@@ -18,7 +18,7 @@ function App() {
       <ClientsProvider>
         <Layout>
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<DepositPage />} />
             <Route path="/withdraw" element={<WithdrawalPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
