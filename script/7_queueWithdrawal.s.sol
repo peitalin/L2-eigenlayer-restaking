@@ -79,7 +79,7 @@ contract QueueWithdrawalScript is BaseScript {
 
         // only sending a withdrawal message, not bridging tokens.
         amount = 0 ether;
-        expiry = block.timestamp + 2 hours;
+        expiry = block.timestamp + 1 hours;
         staker = address(eigenAgent);
         withdrawer = address(eigenAgent);
         // staker == withdrawer == msg.sender in StrategyManager, which is EigenAgent
