@@ -5,8 +5,9 @@ import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createPublicClient, http, decodeEventLog, PublicClient } from 'viem';
+import { createPublicClient, http, decodeEventLog, PublicClient, keccak256, toBytes } from 'viem';
 import { sepolia } from 'viem/chains';
+import { parseAbi } from 'viem/utils';
 
 // Load environment variables
 config();
@@ -91,34 +92,45 @@ interface CCIPTransaction {
   txHash: string;
   messageId: string;
   timestamp: number;
-  type: 'deposit' | 'withdrawal' | 'completeWithdrawal' | 'bridgingWithdrawalToL2' | 'other';
+  type: 'deposit' | 'withdrawal' | 'completeWithdrawal' | 'bridgingWithdrawalToL2' | 'bridgingRewardsToL2' | 'other';
   status: 'pending' | 'confirmed' | 'failed';
   from: string;
   to: string;
-  receiptTransactionHash?: string;
+  receiptTransactionHash: string;
+  isComplete: boolean;
+  sourceChainId: string | number;
+  destinationChainId: string | number;
+  user: string;
 }
 
-// MessageSent event signature for CCIP transactions
-const MESSAGE_SENT_EVENT = {
-  name: 'MessageSent',
-  inputs: [
-    { indexed: true, name: 'messageId', type: 'bytes32' },
-    { indexed: true, name: 'destinationChainSelector', type: 'uint64' },
-    { name: 'receiver', type: 'address' },
-    { name: 'tokenAmounts', type: 'tuple[]' },
-    { name: 'feeToken', type: 'address' },
-    { name: 'fees', type: 'uint256' }
-  ]
-} as const;
-
 // Add this constant for the MessageSent event signature
-const MESSAGE_SENT_SIGNATURE = '0xf41bc76bbe18ec95334bdb88f45c769b987464044ead28e11193a766ae8225cb';
+const MESSAGE_SENT_SIGNATURE = keccak256(toBytes('MessageSent(bytes32 indexed, uint64 indexed, address, (address, uint256)[], address, uint256)'));
+// const MESSAGE_SENT_SIGNATURE = '0xf41bc76bbe18ec95334bdb88f45c769b987464044ead28e11193a766ae8225cb';
 
-// Create a public client to interact with the chain
-const publicClient = createPublicClient({
+// Add event signatures for bridging events
+const BRIDGING_WITHDRAWAL_TO_L2_SIGNATURE = keccak256(toBytes('BridgingWithdrawalToL2(address,(address,uint256)[])'));
+// const BRIDGING_WITHDRAWAL_TO_L2_SIGNATURE = "0xfa108e7e127cd9ffa35e2c8a5e30a502d7bc57f04c0ad2be2018456d8c1704bd"
+const BRIDGING_REWARDS_TO_L2_SIGNATURE = keccak256(toBytes('BridgingRewardsToL2(address,(address,uint256)[])'));
+// const BRIDGING_REWARDS_TO_L2_SIGNATURE = "0x180f259676103b09549f37ce39504dc86937e3c15825d8172d829f506f7f17b2"
+// NOTE: cast sig-event "BridgingRewardsToL2(address,(address,uint256)[])"
+
+// Create public clients to interact with different chains
+const publicClientL1 = createPublicClient({
   chain: sepolia,
   transport: http(process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia.publicnode.com')
 });
+
+// Import Base Sepolia chain configuration
+import { baseSepolia } from 'viem/chains';
+
+// Create a second client for Base Sepolia (L2)
+const publicClientL2 = createPublicClient({
+  chain: baseSepolia,
+  transport: http(process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org')
+});
+
+// Update variable name for consistency
+const publicClient = publicClientL1;
 
 // Helper function to fetch CCIP message data
 const fetchCCIPMessageData = async (messageId: string): Promise<CCIPMessageData | null> => {
@@ -136,6 +148,142 @@ const fetchCCIPMessageData = async (messageId: string): Promise<CCIPMessageData 
   } catch (error) {
     console.error('Error fetching CCIP message data:', error);
     return null;
+  }
+};
+
+/**
+ * Extract a CCIP messageId and agentOwner from a transaction receipt
+ * @param receiptHash Transaction hash to extract data from
+ * @param client Viem public client to use for fetching the receipt
+ * @returns Object containing messageId and agentOwner if found
+ */
+const extractMessageIdFromReceipt = async (
+  receiptHash: string,
+  client: PublicClient
+): Promise<{ messageId: string | null, agentOwner: string | null }> => {
+  if (!receiptHash || !receiptHash.startsWith('0x')) {
+    console.error('Invalid receipt hash provided:', receiptHash);
+    return { messageId: null, agentOwner: null };
+  }
+
+  try {
+    console.log(`Getting transaction receipt for: ${receiptHash}`);
+    const hash = receiptHash as `0x${string}`;
+    const receipt = await client.getTransactionReceipt({
+      hash
+    });
+
+    console.log(`Receipt contains ${receipt.logs.length} logs`);
+
+    // Initialize return values
+    let foundMessageId: string | null = null;
+    let foundAgentOwner: string | null = null;
+
+    // Find logs that contain the events we're interested in
+    for (const log of receipt.logs) {
+      // Check for MessageSent event
+      if (log.topics[0] === MESSAGE_SENT_SIGNATURE) {
+        try {
+          console.log('Found MessageSent event, decoding...');
+          const decodedLog = decodeEventLog({
+            abi: parseAbi(['event MessageSent(bytes32 indexed, uint64 indexed, address, (address, uint256)[], address, uint256)']),
+            data: log.data,
+            topics: log.topics
+          });
+
+          if (decodedLog && decodedLog.args) {
+            const args = decodedLog.args as any;
+            if (args.messageId) {
+              foundMessageId = args.messageId.toString();
+              console.log(`Extracted messageId: ${foundMessageId}`);
+            }
+          }
+        } catch (decodeError) {
+          console.error('Error decoding MessageSent event:', decodeError);
+          // Fallback extraction for messageId
+          if (log.topics.length > 1) {
+            const topic = log.topics[1];
+            if (topic) {
+              foundMessageId = topic;
+              console.log(`Extracted messageId using fallback method: ${foundMessageId}`);
+            }
+          }
+        }
+      }
+
+      // Check for BridgingWithdrawalToL2 event
+      else if (log.topics[0] === BRIDGING_WITHDRAWAL_TO_L2_SIGNATURE) {
+        try {
+          console.log('Found BridgingWithdrawalToL2 event, decoding...');
+          const decodedLog = decodeEventLog({
+            abi: parseAbi(['event BridgingWithdrawalToL2(address indexed agentOwner, (address, uint256)[] withdrawalTokenAmounts)']),
+            data: log.data,
+            topics: log.topics
+          });
+
+          if (decodedLog && decodedLog.args) {
+            const args = decodedLog.args as any;
+            if (args.agentOwner) {
+              foundAgentOwner = args.agentOwner.toLowerCase();
+              console.log(`Extracted agentOwner from BridgingWithdrawalToL2: ${foundAgentOwner}`);
+            }
+          }
+        } catch (decodeError) {
+          console.error('Error decoding BridgingWithdrawalToL2 event:', decodeError);
+          // Fallback extraction for agentOwner
+          if (log.topics.length > 1) {
+            const topic = log.topics[1];
+            if (topic) {
+              const address = `0x${topic.slice(26).toLowerCase()}`;
+              // Validate that we have a proper address
+              if (address.length === 42) {
+                foundAgentOwner = address;
+                console.log(`Extracted agentOwner using fallback method: ${foundAgentOwner}`);
+              }
+            }
+          }
+        }
+      }
+
+      // Check for BridgingRewardsToL2 event
+      else if (log.topics[0] === BRIDGING_REWARDS_TO_L2_SIGNATURE) {
+        try {
+          console.log('Found BridgingRewardsToL2 event, decoding...');
+          const decodedLog = decodeEventLog({
+            abi: parseAbi(['event BridgingRewardsToL2(address indexed agentOwner, (address, uint256)[] rewardsTokenAmounts)']),
+            data: log.data,
+            topics: log.topics
+          });
+
+          if (decodedLog && decodedLog.args) {
+            const args = decodedLog.args as any;
+            if (args.agentOwner) {
+              foundAgentOwner = args.agentOwner.toLowerCase();
+              console.log(`Extracted agentOwner from BridgingRewardsToL2: ${foundAgentOwner}`);
+            }
+          }
+        } catch (decodeError) {
+          console.error('Error decoding BridgingRewardsToL2 event:', decodeError);
+          // Fallback extraction for agentOwner
+          if (log.topics.length > 1) {
+            const topic = log.topics[1];
+            if (topic) {
+              const address = `0x${topic.slice(26).toLowerCase()}`;
+              // Validate that we have a proper address
+              if (address.length === 42) {
+                foundAgentOwner = address;
+                console.log(`Extracted agentOwner using fallback method: ${foundAgentOwner}`);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return { messageId: foundMessageId, agentOwner: foundAgentOwner };
+  } catch (error) {
+    console.error(`Error processing transaction receipt for ${receiptHash}:`, error);
+    return { messageId: null, agentOwner: null };
   }
 };
 
@@ -302,176 +450,111 @@ app.post('/api/check-withdrawal-completion', async (req, res) => {
 
     console.log(`Transaction completed with receipt hash: ${messageData.receiptTransactionHash}`);
 
-    // Step 3: Get the receipt transaction to check for MessageSent events
-    try {
-      console.log(`Getting transaction receipt for: ${messageData.receiptTransactionHash}`);
-      const receipt = await publicClient.getTransactionReceipt({
-        hash: messageData.receiptTransactionHash as `0x${string}`
-      });
+    // Step 3: Choose the right client based on chainId
+    // If chainId is specified, use it to determine which client to use
+    let clientToUse: PublicClient = publicClientL1; // Default to L1 client
 
-      console.log(`Receipt contains ${receipt.logs.length} logs`);
-
-      // Step 4: Look for MessageSent events in the receipt
-      let newMessageId: string | null = null;
-
-      // Find logs that contain the MessageSent event
-      for (const log of receipt.logs) {
-        console.log(`Checking log with topics: ${JSON.stringify(log.topics)}`);
-        console.log(`Looking for topic[0] = ${MESSAGE_SENT_SIGNATURE}`);
-
-        // Check if this log is for a MessageSent event (comparing the first topic with the event signature)
-        if (log.topics[0] === MESSAGE_SENT_SIGNATURE && log.topics.length >= 2) {
-          // The messageId is the first indexed parameter (second topic)
-          // Ensure messageId is a string
-          newMessageId = log.topics[1] ? log.topics[1].toString() : null;
-          console.log(`Found MessageSent event with new messageId: ${newMessageId}`);
-          break;
-        }
-      }
-      console.log('New messageId:', newMessageId);
-
-      // After the first attempt to find MessageSent event
-      if (!newMessageId) {
-        console.log('No MessageSent event found by topic signature, trying ABI decoding approach...');
-
-        // Try to decode each log with the MessageSent ABI
-        for (const log of receipt.logs) {
-          try {
-            const decodedLog = decodeEventLog({
-              abi: [MESSAGE_SENT_EVENT],
-              data: log.data,
-              topics: log.topics as any
-            });
-
-            console.log('Successfully decoded log:', decodedLog);
-
-            // Check if this is a MessageSent event
-            if (decodedLog.eventName === 'MessageSent' && decodedLog.args) {
-              // Extract the messageId from the decoded log
-              // Type assertion to handle the unknown type of args
-              const args = decodedLog.args as any;
-              newMessageId = args.messageId ? args.messageId.toString() : null;
-              console.log(`Found MessageSent event using ABI decoding. MessageId: ${newMessageId}`);
-              break;
-            }
-          } catch (decodeError) {
-            // Log the error and continue to the next log
-            console.log('Failed to decode log:', decodeError.message);
-            continue;
-          }
-        }
-      }
-
-      console.log('Final messageId determination:', newMessageId);
-
-      // Step 5: If we found a new messageId, fetch its data
-      if (newMessageId) {
-        console.log(`Found new messageId: ${newMessageId}, fetching details...`);
-
-        // Use our helper function to fetch the CCIP message data
-        const newMessageData = await fetchCCIPMessageData(newMessageId);
-        let newTxHash: string | null = null;
-        let bridgingTransactionData: CCIPTransaction | null = null;
-
-        if (newMessageData) {
-          newTxHash = newMessageData.sendTransactionHash;
-          console.log(`Found transaction hash for new message: ${newTxHash}`);
-
-          // Create bridging transaction data with proper validation
-          if (newTxHash) {
-            bridgingTransactionData = {
-              txHash: newTxHash,
-              messageId: newMessageId,
-              timestamp: Math.floor(Date.now() / 1000),
-              type: 'bridgingWithdrawalToL2' as const,
-              status: 'pending' as const,
-              from: messageData.receiver || '0x0000000000000000000000000000000000000000',
-              to: messageData.receiver || '0x0000000000000000000000000000000000000000'
-            } as CCIPTransaction;
-            console.log('Created bridging transaction data:', bridgingTransactionData);
-          }
-        } else {
-          console.warn(`Could not fetch data for new messageId ${newMessageId}`);
-        }
-
-        // Read the current transaction history
-        const transactions: CCIPTransaction[] = JSON.parse(fs.readFileSync(txHistoryPath, 'utf-8'));
-
-        // Find the original completeWithdrawal transaction
-        const txIndex = transactions.findIndex(tx => tx.txHash === originalTxHash);
-
-        if (txIndex !== -1) {
-          // Update the original transaction as confirmed and add receiptTransactionHash
-          transactions[txIndex] = {
-            ...transactions[txIndex],
-            status: 'confirmed',
-            receiptTransactionHash: messageData.receiptTransactionHash as string
-          };
-
-          // Add a new transaction for the bridging event if we have the data
-          if (bridgingTransactionData) {
-            // Check if this transaction already exists
-            const existingTxIndex = transactions.findIndex(tx => tx.txHash === bridgingTransactionData?.txHash);
-            if (existingTxIndex === -1) {
-              // Only add if it doesn't already exist
-              transactions.push(bridgingTransactionData);
-              console.log(`Added new bridging transaction with hash: ${bridgingTransactionData.txHash}`);
-            } else {
-              console.log(`Bridging transaction with hash ${bridgingTransactionData.txHash} already exists`);
-            }
-          }
-
-          // Save the updated transaction history
-          fs.writeFileSync(txHistoryPath, JSON.stringify(transactions, null, 2));
-          console.log('Transaction history updated successfully');
-
-          return res.json({
-            isComplete: true,
-            updatedOriginalTx: transactions[txIndex],
-            bridgingTransaction: bridgingTransactionData,
-            newMessageId
-          });
-        } else {
-          return res.status(404).json({
-            error: 'Original transaction not found in history',
-            isComplete: true,
-            originalTxUpdated: false
-          });
-        }
+    if (messageData.destChainId) {
+      // Determine which client to use based on chainId
+      if (messageData.destChainId === "84532") {
+        clientToUse = publicClientL2 as PublicClient;
+      } else if (messageData.destChainId === "11155111") {
+        clientToUse = publicClientL1;
       } else {
-        // No MessageSent event found, but transaction completed
-        // Just update the original transaction status
-        const transactions: CCIPTransaction[] = JSON.parse(fs.readFileSync(txHistoryPath, 'utf-8'));
-        const txIndex = transactions.findIndex(tx => tx.txHash === originalTxHash);
-
-        if (txIndex !== -1) {
-          // Update with receiptTransactionHash
-          transactions[txIndex] = {
-            ...transactions[txIndex],
-            status: 'confirmed',
-            receiptTransactionHash: messageData.receiptTransactionHash as string
-          };
-
-          fs.writeFileSync(txHistoryPath, JSON.stringify(transactions, null, 2));
-
-          return res.json({
-            isComplete: true,
-            updatedOriginalTx: transactions[txIndex],
-            newTxAdded: false,
-            message: 'No bridging transaction detected, but original withdrawal marked as complete'
-          });
-        } else {
-          return res.status(404).json({
-            error: 'Original transaction not found in history',
-            isComplete: true,
-            originalTxUpdated: false
-          });
-        }
+        console.log(`Unknown chainId ${messageData.destChainId}, defaulting to L1 client`);
       }
-    } catch (receiptError) {
-      console.error(`Error getting receipt for transaction: ${messageData.receiptTransactionHash}`, receiptError);
+    } else {
+      console.log('No chainId provided, defaulting to L1 client');
+    }
+
+    // Step 4: Get the receipt transaction to check for MessageSent events
+    let newMessageId: string | null = null;
+    let agentOwner: string | null = null;
+    try {
+      // Try to extract the messageId and agentOwner from the receipt using the appropriate client
+      const { messageId: extractedMessageId, agentOwner: extractedAgentOwner } = await extractMessageIdFromReceipt(
+        messageData.receiptTransactionHash as string,
+        clientToUse
+      );
+
+      if (extractedMessageId) {
+        newMessageId = extractedMessageId;
+        console.log(`Extracted messageId: ${newMessageId}`);
+      }
+
+      if (extractedAgentOwner) {
+        agentOwner = extractedAgentOwner;
+        console.log(`Extracted agentOwner: ${agentOwner}`);
+      }
+    } catch (extractError) {
+      console.error('Error extracting messageId and agentOwner from receipt:', extractError);
+      // Continue with the process even if extraction fails
+    }
+
+    // Step 5: Update the original transaction and create bridging transaction if needed
+
+    // 1. First update the original completeWithdrawal transaction
+    try {
+      // Update the transaction status to confirmed and add the receipt hash
+      const updatedOriginalTx = {
+        status: 'confirmed' as 'pending' | 'confirmed' | 'failed',
+        receiptTransactionHash: messageData.receiptTransactionHash
+      };
+
+      // Find and update the original transaction
+      const transactions: CCIPTransaction[] = JSON.parse(fs.readFileSync(txHistoryPath, 'utf-8'));
+      const existingTxIndex = transactions.findIndex(tx => tx.txHash === originalTxHash);
+
+      if (existingTxIndex !== -1) {
+        transactions[existingTxIndex] = {
+          ...transactions[existingTxIndex],
+          ...updatedOriginalTx
+        };
+      }
+
+      // 2. If we found a new messageId, add a new transaction for the bridging
+      // This is for bridgingWithdrawalToL2 transactions and bridgingRewardsToL2 txs
+      let bridgingTransaction: CCIPTransaction | null = null;
+      if (newMessageId) {
+        console.log(`Creating bridging transaction with messageId: ${newMessageId}`);
+
+        bridgingTransaction = {
+          txHash: messageData.receiptTransactionHash as string,
+          messageId: newMessageId,
+          timestamp: Math.floor(Date.now() / 1000),
+          type: 'bridgingWithdrawalToL2',
+          status: 'pending',
+          from: messageData.sender || '0x0000000000000000000000000000000000000000',
+          to: messageData.receiver || '0x0000000000000000000000000000000000000000',
+          receiptTransactionHash: messageData.receiptTransactionHash,
+          isComplete: messageData.receiptTransactionHash ? true : false,
+          sourceChainId: messageData.sourceChainId,
+          destinationChainId: messageData.destChainId,
+          user: agentOwner || '0x0000000000000000000000000000000000000000',
+        };
+
+        // Add the new transaction to history
+        transactions.push(bridgingTransaction);
+      }
+
+      // 3. Save the updated transaction history
+      fs.writeFileSync(txHistoryPath, JSON.stringify(transactions, null, 2));
+
+      // 4. Return the result
+      return res.json({
+        isComplete: true,
+        message: 'Withdrawal has completed',
+        updatedOriginalTx: existingTxIndex !== -1 ? transactions[existingTxIndex] : null,
+        bridgingTransaction,
+        destChainId: messageData.destChainId
+      });
+    } catch (updateError) {
+      console.error('Error updating transaction history:', updateError);
       return res.status(500).json({
-        error: `Failed to get transaction receipt: ${receiptError.message}`
+        error: 'Failed to update transaction history',
+        isComplete: true,
+        message: 'Withdrawal has completed, but failed to update transaction history',
+        destChainId: messageData.destChainId
       });
     }
   } catch (error) {
@@ -519,7 +602,12 @@ app.post('/api/transactions/bridging', async (req, res) => {
       type: 'bridgingWithdrawalToL2',
       status: 'pending',
       from: messageData.sender || '0x0000000000000000000000000000000000000000',
-      to: messageData.receiver || '0x0000000000000000000000000000000000000000'
+      to: messageData.receiver || '0x0000000000000000000000000000000000000000',
+      receiptTransactionHash: messageData.receiptTransactionHash || txHash,
+      isComplete: messageData.receiptTransactionHash ? true : false,
+      sourceChainId: messageData.sourceChainId || '11155111',
+      destinationChainId: messageData.destChainId || '84532',
+      user: messageData.origin || '0x0000000000000000000000000000000000000000',
     };
 
     // Check if transaction already exists
@@ -580,8 +668,176 @@ if (process.env.NODE_ENV === 'production') {
 // Start the server
 const httpServer = createServer(app);
 
+// Periodic task to update pending transactions
+async function updatePendingTransactions() {
+  console.log('Starting periodic check for pending transactions...');
+  try {
+    // Read all transactions
+    const transactions: CCIPTransaction[] = JSON.parse(fs.readFileSync(txHistoryPath, 'utf-8'));
+
+    // Filter incomplete transactions (pending status or specific transaction types that need completion check)
+    const pendingTransactions = transactions.filter(tx => !tx.isComplete);
+
+    if (pendingTransactions.length === 0) {
+      console.log('No pending transactions to update');
+      return;
+    }
+
+    console.log(`Found ${pendingTransactions.length} pending transactions to check`);
+    let updatedCount = 0;
+
+    // Check each pending transaction
+    for (const tx of pendingTransactions) {
+      try {
+        let isUpdated = false;
+
+        // For transactions with messageId, check CCIP status
+        if (tx.messageId) {
+          const messageData = await fetchCCIPMessageData(tx.messageId);
+
+          if (messageData) {
+            // Update status based on CCIP message state
+            if (messageData.state === 2) { // Confirmed
+              tx.status = 'confirmed';
+              isUpdated = true;
+              console.log(`Updated transaction ${tx.txHash} to confirmed status`);
+            } else if (messageData.state === 3) { // Failed
+              tx.status = 'failed';
+              isUpdated = true;
+              console.log(`Updated transaction ${tx.txHash} to failed status`);
+            }
+
+            // For bridging transactions, check if the receipt transaction exists
+            if ((tx.type === 'bridgingWithdrawalToL2' || tx.type === 'completeWithdrawal' || tx.type === 'bridgingRewardsToL2'
+                || tx.type === 'deposit' || tx.type === 'withdrawal')
+                && messageData.receiptTransactionHash && !tx.isComplete) {
+
+              // Determine which chain to use based on transaction type
+              let client;
+              if (tx.type === 'bridgingWithdrawalToL2' || tx.type === 'bridgingRewardsToL2') {
+                client = publicClientL2;  // Use L2 client for bridging to L2
+              } else if (tx.type === 'deposit' || tx.type === 'withdrawal' || tx.type === 'completeWithdrawal') {
+                client = publicClientL1; // Use L1 client for other transaction types
+              } else {
+                // Determine client based on destination chain
+                client = tx.destinationChainId === "84532" ? publicClientL2 : publicClientL1;
+              }
+
+              try {
+                // Check if the receipt transaction was successful
+                const receiptHash = messageData.receiptTransactionHash as `0x${string}`;
+                const receipt = await client.getTransactionReceipt({ hash: receiptHash });
+
+                if (receipt && receipt.status === 'success') {
+                  tx.isComplete = true;
+                  tx.receiptTransactionHash = messageData.receiptTransactionHash;
+                  tx.status = 'confirmed';
+                  isUpdated = true;
+                  console.log(`Completed bridging transaction ${tx.txHash}`);
+                }
+              } catch (receiptError) {
+                console.error(`Error checking receipt transaction for ${tx.txHash}:`, receiptError);
+              }
+            }
+          }
+        }
+
+        // Count if we made an update
+        if (isUpdated) {
+          updatedCount++;
+        }
+      } catch (txError) {
+        console.error(`Error processing transaction ${tx.txHash}:`, txError);
+      }
+    }
+
+    // Save updated transactions back to file only if we made changes
+    if (updatedCount > 0) {
+      console.log(`Updated ${updatedCount} transactions, saving to file`);
+      fs.writeFileSync(txHistoryPath, JSON.stringify(transactions, null, 2));
+    } else {
+      console.log('No transaction updates needed');
+    }
+  } catch (error) {
+    console.error('Error updating pending transactions:', error);
+  }
+}
+
+// Set up periodic task to run every minute
+const UPDATE_INTERVAL = 30 * 1000; // 30 seconds
+setInterval(updatePendingTransactions, UPDATE_INTERVAL);
+
+// Run an initial update when the server starts
+updatePendingTransactions();
+
+// Add this utility function to fix transactions with missing fields
+function fixTransactionMissingFields() {
+  try {
+    console.log('Checking for transactions with missing required fields...');
+
+    // Read all transactions
+    const transactions: CCIPTransaction[] = JSON.parse(fs.readFileSync(txHistoryPath, 'utf-8'));
+    let modifiedCount = 0;
+
+    // Fix each transaction if needed
+    const fixedTransactions = transactions.map(tx => {
+      let isModified = false;
+      const fixedTx = { ...tx };
+
+      // Add receiptTransactionHash if missing
+      if (!fixedTx.receiptTransactionHash) {
+        fixedTx.receiptTransactionHash = fixedTx.txHash; // Use txHash as fallback
+        isModified = true;
+      }
+
+      // Add isComplete if missing
+      if (fixedTx.isComplete === undefined) {
+        fixedTx.isComplete = fixedTx.status === 'confirmed';
+        isModified = true;
+      }
+
+      // Add sourceChainId if missing
+      if (!fixedTx.sourceChainId) {
+        fixedTx.sourceChainId = (fixedTx.type === 'bridgingWithdrawalToL2' || fixedTx.type === 'bridgingRewardsToL2')
+          ? '11155111' // Sepolia
+          : '84532';   // Base Sepolia
+        isModified = true;
+      }
+
+      // Add destinationChainId if missing
+      if (!fixedTx.destinationChainId) {
+        fixedTx.destinationChainId = (fixedTx.type === 'bridgingWithdrawalToL2' || fixedTx.type === 'bridgingRewardsToL2')
+          ? '84532'     // Base Sepolia
+          : '11155111'; // Sepolia
+        isModified = true;
+      }
+
+      if (isModified) {
+        modifiedCount++;
+      }
+
+      return fixedTx;
+    });
+
+    // Save fixed transactions back to file only if we made changes
+    if (modifiedCount > 0) {
+      console.log(`Fixed ${modifiedCount} transactions with missing fields, saving to file`);
+      fs.writeFileSync(txHistoryPath, JSON.stringify(fixedTransactions, null, 2));
+    } else {
+      console.log('No transactions needed fixing');
+    }
+  } catch (error) {
+    console.error('Error fixing transactions with missing fields:', error);
+  }
+}
+
+// After initializing the server, fix any transactions with missing fields
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+
+  // Run an initial update when the server starts
+  fixTransactionMissingFields();
+  updatePendingTransactions();
 });
 
 // Utility function to convert CCIP message state to a human-readable status
