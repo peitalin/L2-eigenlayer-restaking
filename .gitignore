@@ -24,6 +24,9 @@ docs/
 /app/node_modules
 /app/.env
 
+/app-server/node_modules
+/app-server/.env
+
 /.vscode
 .DS_Store
 **/.DS_Store

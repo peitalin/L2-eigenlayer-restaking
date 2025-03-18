@@ -1,11 +1,21 @@
 [
   {
-    "txHash": "0xc10e8d0aff30ebf262c5ad6cdaacf5fe896b75b528d1b59700f7848d8f5f6dae",
-    "messageId": "0x50fe540c9e1b021f8caeff68d706f82bddd37444a6ed11a91db8814dc28d6905",
-    "timestamp": 1742290697,
+    "txHash": "0x878a897276256cf382164ff67fc704c68163f889f391605bd5f6261e065ca2f8",
+    "messageId": "0xe05cee733fc8ab08118cc3f4f40e71b1a275f5b3b65030d4aa22be8f9b2a8e41",
+    "timestamp": 1742300521,
     "type": "completeWithdrawal",
     "status": "confirmed",
     "from": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c",
-    "to": "0x2604e5a6b77b5Ab95e38b6fA6fc1F5db5585F562"
+    "to": "0x2604e5a6b77b5Ab95e38b6fA6fc1F5db5585F562",
+    "receiptTransactionHash": "0x1bda567f1dcaa7e28b143669b7bf484fc6d61f9809424224fdbfafcd05009bc7"
+  },
+  {
+    "txHash": "0x1bda567f1dcaa7e28b143669b7bf484fc6d61f9809424224fdbfafcd05009bc7",
+    "messageId": "0x4bb260d4fd0fff3378751eb73168b3e3984c47fde2ffe4b142dd85698cb2a61a",
+    "timestamp": 1742303360,
+    "type": "bridgingWithdrawalToL2",
+    "status": "pending",
+    "from": "0xaa1ffb25606a449c5b03ea0433b0541c36fe8903",
+    "to": "0xaa1ffb25606a449c5b03ea0433b0541c36fe8903"
   }
 ]
