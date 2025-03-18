@@ -4,7 +4,7 @@ import { encodeDepositIntoStrategyMsg } from '../utils/encoders';
 import { CHAINLINK_CONSTANTS, STRATEGY_MANAGER_ADDRESS, STRATEGY, SENDER_CCIP_ADDRESS } from '../addresses';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
-import { useToast } from '../components/ToastContainer';
+import { useToast } from '../utils/toast';
 
 
 const DepositPage: React.FC = () => {
@@ -23,29 +23,35 @@ const DepositPage: React.FC = () => {
   const { showToast } = useToast();
 
   // State for transaction details
-  const [transactionAmount, setTransactionAmount] = useState<number>(0.11);
+  const [transactionAmount, setTransactionAmount] = useState<string>('0.11');
 
   // Memoize the parsed amount to update whenever transactionAmount changes
   const amount = useMemo(() => {
-    if (!transactionAmount) return parseEther("0");
-    return parseEther(transactionAmount.toString());
+    if (!transactionAmount || transactionAmount === '.') return parseEther("0");
+    try {
+      return parseEther(transactionAmount);
+    } catch (error) {
+      console.error('Error parsing amount:', error);
+      return parseEther("0");
+    }
   }, [transactionAmount]);
 
   // Add a useEffect that will run once when the component mounts
   useEffect(() => {
     // Check if we already have the l1Account and still need to fetch eigenAgentInfo
-    if (l1Wallet.account && !eigenAgentInfo && isConnected) {
+    // Only fetch if not already loading and not already fetched
+    if (l1Wallet.account && !eigenAgentInfo && isConnected && !isLoadingEigenAgent) {
       fetchEigenAgentInfo();
     }
-  }, [l1Wallet.account, eigenAgentInfo, isConnected, fetchEigenAgentInfo]);
+    // Don't include eigenAgentInfo in deps to avoid refetching when it changes
+  }, [l1Wallet.account, isConnected, isLoadingEigenAgent, fetchEigenAgentInfo]);
 
   // Handle amount input changes with validation
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Allow only valid number inputs
-    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-      const numValue = value === '' ? 0 : parseFloat(value);
-      setTransactionAmount(numValue);
+    // Allow only valid number inputs (digits, one decimal point, and decimal digits)
+    if (value === '' || /^(\d*\.?\d*)$/.test(value)) {
+      setTransactionAmount(value);
     }
   };
 
@@ -54,6 +60,7 @@ const DepositPage: React.FC = () => {
     isExecuting,
     signature,
     error,
+    info,
     isApprovingToken,
     approvalHash,
     executeWithMessage: executeDepositMessage
@@ -65,8 +72,9 @@ const DepositPage: React.FC = () => {
       spenderAddress: SENDER_CCIP_ADDRESS,
       amount
     },
-    expiryMinutes: 45,
+    expiryMinutes: 45, // expiry for refunds on reverts, max is 3 days.
     onSuccess: (txHash) => {
+      // No need to call addTransaction - the hook already does this
       showToast(`Transaction sent! Hash: ${txHash}`, 'success');
     },
     onError: (err) => {
@@ -88,6 +96,9 @@ const DepositPage: React.FC = () => {
       showToast("Invalid transaction amount", 'error');
       return;
     }
+
+    // Show signing notification
+    showToast("Please sign the transaction in your wallet...", 'info');
 
     // Create the Eigenlayer depositIntoStrategy message
     const depositMessage = encodeDepositIntoStrategyMsg(
@@ -143,7 +154,7 @@ const DepositPage: React.FC = () => {
         <input
           id="amount"
           type="text"
-          value={transactionAmount === 0 ? '' : transactionAmount.toString()}
+          value={transactionAmount}
           onChange={handleAmountChange}
           className="amount-input"
           placeholder="0.11"

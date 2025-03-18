@@ -116,8 +116,8 @@ export async function getRouterFeesL1(
 export async function getRouterFeesL2(
   receiver: Address,
   message: string,
-  tokenAmounts: EVMTokenAmount[] = [],
-  gasLimit: bigint = 200000n
+  tokenAmounts: EVMTokenAmount[],
+  gasLimit: bigint
 ): Promise<bigint> {
   const client = getL2Client();
 
@@ -127,19 +127,6 @@ export async function getRouterFeesL2(
 
   // Encode the extraArgs with gas limit
   const extraArgs = encodeEVMExtraArgs(gasLimit);
-
-  // For token transfers from L2 to L1, we need to use only supported tokens
-  // Empty the tokenAmounts array to avoid errors since our tests show it's not supported
-  const validatedTokenAmounts: EVMTokenAmount[] = [];
-
-  // Log the encoded values for debugging
-  // console.log('Estimating L2 router fees with:', {
-  //   receiver,
-  //   receiverEncoded,
-  //   destinationChain: CHAINLINK_CONSTANTS.ethSepolia.chainSelector,
-  //   tokenAmounts: validatedTokenAmounts, // Use empty token amounts to avoid errors
-  //   extraArgs
-  // });
 
   try {
     // Call the getFee function on the router contract
@@ -152,7 +139,7 @@ export async function getRouterFeesL2(
         {
           receiver: receiverEncoded,
           data: dataEncoded,
-          tokenAmounts: validatedTokenAmounts, // Use empty token amounts to avoid errors
+          tokenAmounts: tokenAmounts,
           feeToken: ZeroAddress, // native token (ETH)
           extraArgs: extraArgs
         }

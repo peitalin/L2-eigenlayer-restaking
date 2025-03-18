@@ -6,9 +6,11 @@ import { CHAINLINK_CONSTANTS, STRATEGY_MANAGER_ADDRESS, STRATEGY, SENDER_CCIP_AD
 import { useClientsContext } from '../contexts/ClientsContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { DelegationManagerABI } from '../abis';
-import QueuedWithdrawals from './QueuedWithdrawals';
+import QueuedWithdrawals from '../components/QueuedWithdrawals';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
-import { useToast } from './ToastContainer';
+import { useToast } from '../utils/toast';
+import UserDeposits from '../components/UserDeposits';
+import Expandable from '../components/Expandable';
 
 // Extend the ProcessedWithdrawal interface from QueuedWithdrawals component
 interface ProcessedWithdrawal {
@@ -45,11 +47,9 @@ const WithdrawalPage: React.FC = () => {
   const [withdrawalNonce, setWithdrawalNonce] = useState<bigint>(0n);
   const [delegatedTo, setDelegatedTo] = useState<Address | null>(null);
   const [isLoadingL1Data, setIsLoadingL1Data] = useState<boolean>(false);
-  const [selectedWithdrawal, setSelectedWithdrawal] = useState<ProcessedWithdrawal | null>(null);
   const receiveAsTokens = true;
   const [isCompletingWithdrawal, setIsCompletingWithdrawal] = useState<boolean>(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
-  const [completeWithdrawalMessage, setCompleteWithdrawalMessage] = useState<Hex>("0x" as Hex);
 
   // Memoize the parsed amount to update whenever withdrawalAmount changes
   const amount = useMemo(() => {
@@ -65,49 +65,56 @@ const WithdrawalPage: React.FC = () => {
   // Add a useEffect that will run once when the component mounts
   useEffect(() => {
     // Check if we already have the l1Account and still need to fetch eigenAgentInfo
-    if (l1Wallet.account && !eigenAgentInfo && isConnected) {
+    // Only fetch if not already loading and not already fetched
+    if (l1Wallet.account && !eigenAgentInfo && isConnected && !isLoadingEigenAgent) {
       fetchEigenAgentInfo();
     }
-  }, [l1Wallet.account, eigenAgentInfo, isConnected, fetchEigenAgentInfo]);
+    // Don't include eigenAgentInfo in deps to avoid refetching when it changes
+  }, [l1Wallet.account, isConnected, isLoadingEigenAgent, fetchEigenAgentInfo]);
 
-  // Fetch L1 data needed for withdrawal
+  // Fetch L1 data needed for withdrawal - with debouncing
   useEffect(() => {
-    const fetchL1Data = async () => {
-      if (!isConnected || !eigenAgentInfo || !l1Wallet.publicClient) {
-        return;
-      }
+    // Skip if conditions aren't met or if we're already loading
+    if (!isConnected || !eigenAgentInfo || !l1Wallet.publicClient || isLoadingL1Data) {
+      return;
+    }
 
-      try {
-        setIsLoadingL1Data(true);
+    // Use a timer to debounce rapid fetchL1Data calls
+    const timer = setTimeout(() => {
+      const fetchL1Data = async () => {
+        try {
+          setIsLoadingL1Data(true);
 
-        // Get the withdrawalNonce from DelegationManager using the imported ABI
-        const nonce = await l1Wallet.publicClient.readContract({
-          address: DELEGATION_MANAGER_ADDRESS,
-          abi: DelegationManagerABI,
-          functionName: 'cumulativeWithdrawalsQueued',
-          args: [eigenAgentInfo.eigenAgentAddress]
-        });
+          // Get both values in parallel to reduce API calls
+          const [nonce, delegated] = await Promise.all([
+            l1Wallet.publicClient.readContract({
+              address: DELEGATION_MANAGER_ADDRESS,
+              abi: DelegationManagerABI,
+              functionName: 'cumulativeWithdrawalsQueued',
+              args: [eigenAgentInfo.eigenAgentAddress]
+            }),
+            l1Wallet.publicClient.readContract({
+              address: DELEGATION_MANAGER_ADDRESS,
+              abi: DelegationManagerABI,
+              functionName: 'delegatedTo',
+              args: [eigenAgentInfo.eigenAgentAddress]
+            })
+          ]);
 
-        // Get the delegatedTo address from DelegationManager using the imported ABI
-        const delegated = await l1Wallet.publicClient.readContract({
-          address: DELEGATION_MANAGER_ADDRESS,
-          abi: DelegationManagerABI,
-          functionName: 'delegatedTo',
-          args: [eigenAgentInfo.eigenAgentAddress]
-        });
+          setWithdrawalNonce(nonce as bigint);
+          setDelegatedTo(delegated as Address);
+        } catch (err) {
+          console.error('Error fetching L1 data:', err);
+        } finally {
+          setIsLoadingL1Data(false);
+        }
+      };
 
-        setWithdrawalNonce(nonce as bigint);
-        setDelegatedTo(delegated as Address);
-      } catch (err) {
-        console.error('Error fetching L1 data:', err);
-        showToast(`Error fetching L1 data: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
-      } finally {
-        setIsLoadingL1Data(false);
-      }
-    };
+      fetchL1Data();
+    }, 500); // Debounce for 500ms
 
-    fetchL1Data();
-  }, [eigenAgentInfo, isConnected, l1Wallet.publicClient, showToast]);
+    return () => clearTimeout(timer);
+  }, [eigenAgentInfo, isConnected, l1Wallet.publicClient]);
 
   // Handle amount input changes with validation
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,6 +130,7 @@ const WithdrawalPage: React.FC = () => {
     isExecuting: isQueueingWithdrawal,
     signature: queueSignature,
     error: queueError,
+    info,
     isApprovingToken: isQueueApprovingToken,
     approvalHash: queueApprovalHash,
     executeWithMessage: executeQueueWithdrawalMessage
@@ -131,6 +139,7 @@ const WithdrawalPage: React.FC = () => {
     amount: 0n,
     expiryMinutes: 45,
     onSuccess: (txHash) => {
+      // No need to call addTransaction - the hook already does this
       showToast(`Withdrawal queued! Transaction hash: ${txHash}`, 'success');
     },
     onError: (err) => {
@@ -139,8 +148,6 @@ const WithdrawalPage: React.FC = () => {
     }
   });
 
-  // IMPORTANT: Always define this hook, regardless of whether completeWithdrawalMessage is set
-  // This ensures consistent hook order between renders
   const {
     isExecuting: isExecutingComplete,
     error: completeHookError,
@@ -151,7 +158,6 @@ const WithdrawalPage: React.FC = () => {
     expiryMinutes: 45,
     onSuccess: (txHash) => {
       showToast(`Withdrawal completed! Transaction hash: ${txHash}`, 'success');
-      setSelectedWithdrawal(null);
       setIsCompletingWithdrawal(false);
     },
     onError: (err) => {
@@ -167,9 +173,6 @@ const WithdrawalPage: React.FC = () => {
       setCompleteError(completeHookError);
       // Ensure the isCompletingWithdrawal state is reset when an error occurs
       setIsCompletingWithdrawal(false);
-
-      // Display toast notification for the error
-      showToast(completeHookError, 'error');
     }
   }, [completeHookError, showToast]);
 
@@ -180,13 +183,6 @@ const WithdrawalPage: React.FC = () => {
       setCompleteError(null);
     }
   }, [completeHookError, completeError]);
-
-  // Show toast when queue error occurs
-  useEffect(() => {
-    if (queueError) {
-      showToast(queueError, 'error');
-    }
-  }, [queueError, showToast]);
 
   // Handle completing a withdrawal
   const handleCompleteWithdrawal = async (withdrawal: ProcessedWithdrawal, sharesArray: bigint[]) => {
@@ -203,6 +199,9 @@ const WithdrawalPage: React.FC = () => {
     try {
       setIsCompletingWithdrawal(true);
       setCompleteError(null);
+
+      // Show a signing notification
+      showToast("Please sign the transaction in your wallet...", 'info');
 
       // Prepare the objects for the completeQueuedWithdrawal function
       const withdrawalStruct: WithdrawalStruct = {
@@ -224,9 +223,6 @@ const WithdrawalPage: React.FC = () => {
         tokensToWithdraw,
         receiveAsTokens
       );
-
-      // Set the message and it will be used by the complete withdrawal hook
-      setCompleteWithdrawalMessage(message);
 
       // Execute with the message directly
       await executeCompleteWithdrawal(message);
@@ -265,6 +261,9 @@ const WithdrawalPage: React.FC = () => {
       return;
     }
 
+    // Show a signing notification
+    showToast("Please sign the transaction in your wallet...", 'info');
+
     // Create the withdraw message with the encoded parameters
     const queueWithdrawalMessage = encodeQueueWithdrawalMsg(
       STRATEGY,
@@ -287,7 +286,10 @@ const WithdrawalPage: React.FC = () => {
 
   return (
     <div className="transaction-form">
-      <h2>Queue Withdrawal from Strategy</h2>
+      <h2>Withdraw from Strategy</h2>
+
+      {/* Display user deposits */}
+      <UserDeposits />
 
       <div className="withdrawal-info">
         <p>
@@ -303,8 +305,7 @@ const WithdrawalPage: React.FC = () => {
       </div>
 
       {isConnected && eigenAgentInfo && (
-        <div className="form-group">
-          <label>Withdrawal Information:</label>
+        <Expandable title="Withdrawal Information" initialExpanded={false}>
           <div className="info-item">
             <strong>Target Address:</strong> {DELEGATION_MANAGER_ADDRESS}
             <div className="input-note">Using DelegationManager for Queue Withdrawals</div>
@@ -322,7 +323,7 @@ const WithdrawalPage: React.FC = () => {
           <div className="info-item">
             <strong>Transaction Expiry:</strong> 45 minutes from signing
           </div>
-        </div>
+        </Expandable>
       )}
 
       <div className="form-group">

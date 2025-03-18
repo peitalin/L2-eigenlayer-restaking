@@ -36,7 +36,8 @@ export async function processCCIPTransaction(
   receipt: TransactionReceipt,
   senderAddress: string,
   targetContract: string,
-  txType: 'deposit' | 'withdrawal' | 'completeWithdrawal' | 'other'
+  txType: 'deposit' | 'withdrawal' | 'completeWithdrawal' | 'other',
+  user: string
 ): Promise<CCIPTransaction | null> {
   try {
     console.log('Processing CCIP transaction receipt:', receipt.transactionHash);
@@ -93,7 +94,8 @@ export async function processCCIPTransaction(
         type: txType,
         status: receipt.status === 'success' ? 'confirmed' : 'failed',
         from: senderAddress,
-        to: targetContract
+        to: targetContract,
+        user: user,
       };
     }
 
@@ -115,7 +117,8 @@ export async function processCCIPTransaction(
         type: txType,
         status: receipt.status === 'success' ? 'confirmed' : 'failed',
         from: senderAddress,
-        to: targetContract
+        to: targetContract,
+        user: user,
       };
     }
 
@@ -130,7 +133,8 @@ export async function processCCIPTransaction(
       type: txType,
       status: receipt.status === 'success' ? 'confirmed' : 'failed',
       from: senderAddress,
-      to: targetContract
+      to: targetContract,
+      user: user,
     };
   } catch (error) {
     console.error('Error processing CCIP transaction:', error);
@@ -142,7 +146,8 @@ export async function processCCIPTransaction(
       type: txType,
       status: receipt.status === 'success' ? 'confirmed' : 'failed',
       from: senderAddress,
-      to: targetContract
+      to: targetContract,
+      user: user,
     };
   }
 }
@@ -154,6 +159,7 @@ export async function processCCIPTransaction(
  * @param senderAddress The address that sent the transaction
  * @param targetContract The target contract that will receive the message
  * @param txType The type of transaction
+ * @param user The user's address
  * @param onComplete Callback when processing is complete
  */
 export async function watchCCIPTransaction(
@@ -162,6 +168,7 @@ export async function watchCCIPTransaction(
   senderAddress: string,
   targetContract: string,
   txType: 'deposit' | 'withdrawal' | 'completeWithdrawal' | 'other',
+  user: string,
   onComplete: (transaction: CCIPTransaction | null) => void
 ): Promise<void> {
   try {
@@ -175,7 +182,13 @@ export async function watchCCIPTransaction(
     console.log('Transaction receipt received:', receipt.transactionHash);
 
     // Process the transaction to extract CCIP data
-    const ccipTransaction = await processCCIPTransaction(receipt, senderAddress, targetContract, txType);
+    const ccipTransaction = await processCCIPTransaction(
+      receipt,
+      senderAddress,
+      targetContract,
+      txType,
+      user
+    );
 
     // Call the completion callback with the result
     if (ccipTransaction) {

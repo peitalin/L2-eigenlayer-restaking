@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
-import { getCCIPExplorerUrl } from '../utils/ccipEventListener';
-import { useToast } from './ToastContainer';
+import { useToast } from '../utils/toast';
 import CCIPStatusChecker from './CCIPStatusChecker';
-import WithdrawalCompletionStatus from './WithdrawalCompletionStatus';
 
 interface TransactionHistoryDropdownProps {}
 
@@ -99,19 +97,6 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
     return !!messageId && messageId !== '';
   };
 
-  // Helper to get status badge class
-  const getStatusBadgeClass = (status: string): string => {
-    switch (status) {
-      case 'confirmed':
-        return 'status-confirmed';
-      case 'failed':
-        return 'status-failed';
-      case 'pending':
-      default:
-        return 'status-pending';
-    }
-  };
-
   return (
     <div className="transaction-history-dropdown">
       <button
@@ -169,49 +154,67 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
             </div>
           ) : (
             <div className="transaction-history-list">
-              {transactions.map((tx, index) => (
-                <div key={index} className="transaction-history-item">
-                  <div className="transaction-type">
-                    {getTransactionTypeLabel(tx.type)}
-                    <span className={`transaction-status-badge ${getStatusBadgeClass(tx.status)}`}>
-                      {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
-                    </span>
+              {transactions.map((tx, index) => {
+
+                const sourceChain = tx.sourceChainId === 84532 ? 'Base' : 'Ethereum';
+                const destinationChain = tx.destinationChainId === 84532 ? 'Base' : 'Ethereum';
+                const blockExplorerUrls = {
+                  Base: 'https://sepolia.basescan.org/tx/',
+                  Ethereum: 'https://sepolia.etherscan.io/tx/',
+                };
+
+                return (
+                  <div key={index} className="transaction-history-item">
+                    <div className="transaction-type">
+                      {getTransactionTypeLabel(tx.type)}
+                    </div>
+                    <div className="transaction-details">
+                      <div className="transaction-hash">
+                        <span className="transaction-label">{sourceChain}:</span>
+                        <a
+                          href={`${blockExplorerUrls[sourceChain]}${tx.txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="View on BaseScan"
+                        >
+                          {formatHash(tx.txHash)}
+                        </a>
+                      </div>
+
+                      <div className="transaction-ccip">
+                        <span className="transaction-label">CCIP Message:</span>
+                        {isValidMessageId(tx.messageId) ? (
+                          <CCIPStatusChecker
+                            messageId={tx.messageId}
+                            txType={tx.type}
+                          />
+                        ) : (
+                          <span className="ccip-pending">Pending...</span>
+                        )}
+                      </div>
+
+                      {
+                        (tx.type === 'completeWithdrawal' || tx.type === 'processClaim' || tx.type === 'bridgingWithdrawalToL2' || tx.type === 'bridgingRewardsToL2')
+                        && tx.receiptTransactionHash &&
+                        <div className="receipt-hash">
+                          <span className="transaction-label">{destinationChain}:</span>
+                          <a
+                            href={`${blockExplorerUrls[destinationChain]}${tx.receiptTransactionHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {`${tx.receiptTransactionHash.substring(0, 10)}...`}
+                          </a>
+                        </div>
+                      }
+
+                      <div className="transaction-timestamp">
+                        {formatTimestamp(tx.timestamp)}
+                      </div>
+                    </div>
                   </div>
-                  <div className="transaction-details">
-                    <div className="transaction-hash">
-                      <span className="transaction-label">Transaction:</span>
-                      <a
-                        href={`https://sepolia.basescan.org/tx/${tx.txHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="View on BaseScan"
-                      >
-                        {formatHash(tx.txHash)}
-                      </a>
-                    </div>
-
-                    <div className="transaction-ccip">
-                      <span className="transaction-label">CCIP Message:</span>
-                      {isValidMessageId(tx.messageId) ? (
-                        <CCIPStatusChecker
-                          messageId={tx.messageId}
-                          txHash={tx.txHash}
-                        />
-                      ) : (
-                        <span className="ccip-pending">Pending...</span>
-                      )}
-                    </div>
-
-                    {tx.type === 'completeWithdrawal' && tx.status === 'confirmed' && (
-                      <WithdrawalCompletionStatus transaction={tx} />
-                    )}
-
-                    <div className="transaction-timestamp">
-                      {formatTimestamp(tx.timestamp)}
-                    </div>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>

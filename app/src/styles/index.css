@@ -216,8 +216,21 @@ a:hover {
   margin: 0 auto;
   padding: 20px;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: visible; /* Changed from hidden to visible */
   align-items: flex-start; /* Explicitly set to flex-start for clearer top alignment */
+}
+
+/* Full-width layout for transactions page */
+.transactions-page-layout {
+  grid-template-columns: 1fr; /* Single column layout */
+  gap: 0;
+  overflow: visible; /* Changed from inherited overflow: hidden */
+  min-height: fit-content; /* Added to ensure it expands to fit all content */
+}
+
+.full-width {
+  max-width: 100%;
+  width: 100%;
 }
 
 @media (max-width: 768px) {
@@ -284,12 +297,13 @@ a:hover {
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 6px;
   background-color: var(--color-bg-secondary);
   border: 1px solid var(--color-border-primary);
   display: flex;
   flex-direction: column;
+  min-height: fit-content;
 }
 
 .transaction-form h2 {
@@ -1811,4 +1825,51 @@ a:hover {
     background-color: #888;
     color: #fff;
   }
+}
+
+/* Expandable Section */
+.expandable-section {
+  margin-bottom: 20px;
+  width: 100%;
+  border-radius: 6px;
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-primary);
+  overflow: hidden;
+}
+
+.expandable-header {
+  padding: 12px 16px;
+  background-color: var(--color-bg-tertiary);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  user-select: none;
+  border-bottom: 1px solid var(--color-border-primary);
+}
+
+.expandable-header.collapsed {
+  border-bottom: none;
+}
+
+.expandable-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.expandable-icon {
+  font-size: 1rem;
+  transition: transform 0.3s ease;
+}
+
+.expandable-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.expandable-content {
+  padding: 16px;
+  background-color: var(--color-bg-secondary);
+  transition: max-height 0.3s ease;
 }
