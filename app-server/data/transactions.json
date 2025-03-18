@@ -1,0 +1,11 @@
+[
+  {
+    "txHash": "0xc10e8d0aff30ebf262c5ad6cdaacf5fe896b75b528d1b59700f7848d8f5f6dae",
+    "messageId": "0x50fe540c9e1b021f8caeff68d706f82bddd37444a6ed11a91db8814dc28d6905",
+    "timestamp": 1742290697,
+    "type": "completeWithdrawal",
+    "status": "confirmed",
+    "from": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c",
+    "to": "0x2604e5a6b77b5Ab95e38b6fA6fc1F5db5585F562"
+  }
+]
