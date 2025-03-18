@@ -177,10 +177,19 @@ export async function signMessageForEigenAgentExecution(
     message: { raw: digestHash }
   });
 
-  // Format signature to ensure it has a '0' prefix for the v value
-  const formattedSignature = signature.startsWith('0x3') ?
-    `0x0${signature.slice(2)}` as Hex :
-    signature;
+  // Format signature to ensure it has the correct length
+  // Standard Ethereum signature is 65 bytes: r (32 bytes) + s (32 bytes) + v (1 byte)
+  // As a hex string with 0x prefix: 2 + 64 + 64 + 2 = 132 characters
+  let formattedSignature: Hex;
+
+  if (signature.length === 132) {
+    // Signature already has the correct length, keep it as is
+    formattedSignature = signature;
+  } else {
+    // Viem returns a signature with a '3' prefix for some reason
+    // and it was the wrong length (len=130)
+    formattedSignature = `0x0${signature.slice(2)}` as Hex;
+  }
 
   // match the Solidity implementation:
   // messageWithSignature = abi.encodePacked(

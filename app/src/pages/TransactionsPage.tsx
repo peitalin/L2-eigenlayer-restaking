@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import CCIPStatusChecker from '../components/CCIPStatusChecker';
-import { useToast } from '../components/ToastContainer';
+import { useToast } from '../utils/toast';
 
 const TransactionsPage: React.FC = () => {
   const { transactions, clearHistory, isLoading, error } = useTransactionHistory();
@@ -26,7 +26,9 @@ const TransactionsPage: React.FC = () => {
       case 'deposit': return 'Deposit';
       case 'withdrawal': return 'Queue Withdrawal';
       case 'completeWithdrawal': return 'Complete Withdrawal';
-      default: return 'Transaction';
+      case 'bridgingWithdrawalToL2': return 'Bridge Withdrawal to L2';
+      case 'bridgingRewardsToL2': return 'Bridge Rewards to L2';
+      default: return type.charAt(0).toUpperCase() + type.slice(1);
     }
   };
 
@@ -46,6 +48,26 @@ const TransactionsPage: React.FC = () => {
       default:
         return 'status-pending';
     }
+  };
+
+  // Helper to determine source chain based on transaction type
+  const getSourceChain = (type: string): { chain: string, direction: 'forward' | 'reverse' } => {
+    switch (type) {
+      case 'deposit':
+      case 'withdrawal':
+      case 'completeWithdrawal':
+        return { chain: 'Base', direction: 'forward' }; // Base Sepolia -> Eth Sepolia
+      case 'bridgingWithdrawalToL2':
+      case 'bridgingRewardsToL2':
+        return { chain: 'Eth', direction: 'reverse' }; // Eth Sepolia -> Base Sepolia
+      default:
+        return { chain: 'Base', direction: 'forward' };
+    }
+  };
+
+  // Helper to render directional arrow based on source chain
+  const renderDirectionalArrow = (direction: 'forward' | 'reverse'): string => {
+    return direction === 'forward' ? '→' : '←';
   };
 
   const handleClearRequest = () => {
@@ -71,9 +93,9 @@ const TransactionsPage: React.FC = () => {
   };
 
   return (
-    <div className="transactions-page">
-      <div className="transactions-header">
-        <h1>Transactions</h1>
+    <div className="transaction-form transactions-page">
+      <div className="form-header">
+        <h2>Transaction History</h2>
         {!confirmClearVisible ? (
           <button
             onClick={handleClearRequest}
@@ -108,61 +130,99 @@ const TransactionsPage: React.FC = () => {
         )}
       </div>
 
-      {isLoading && transactions.length === 0 ? (
-        <div className="transactions-loading">
-          <div className="loading-spinner"></div>
-          <p>Loading transactions...</p>
-        </div>
-      ) : transactions.length === 0 ? (
-        <div className="transactions-empty">
-          <p>No transactions yet</p>
-          <p className="empty-details">Your transaction history will appear here</p>
-        </div>
-      ) : (
-        <div className="transactions-list">
-          <div className="transactions-list-header">
-            <div className="transaction-header-type">Type</div>
-            <div className="transaction-header-hash">Transaction</div>
-            <div className="transaction-header-ccip">CCIP Message</div>
-            <div className="transaction-header-time">Time</div>
+      <div className="form-content">
+        {isLoading && transactions.length === 0 ? (
+          <div className="transactions-loading">
+            <div className="loading-spinner"></div>
+            <p>Loading transactions...</p>
           </div>
-          {transactions.map((tx, index) => (
-            <div key={index} className="transaction-item">
-              <div className="transaction-type">
-                <div className="transaction-type-label">
-                  {getTransactionTypeLabel(tx.type)}
-                </div>
-                <div className={`transaction-status-badge ${getStatusBadgeClass(tx.status)}`}>
-                  {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
-                </div>
-              </div>
-              <div className="transaction-hash">
-                <a
-                  href={`https://sepolia.basescan.org/tx/${tx.txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="View on BaseScan"
-                >
-                  {formatHash(tx.txHash)}
-                </a>
-              </div>
-              <div className="transaction-ccip">
-                {isValidMessageId(tx.messageId) ? (
-                  <CCIPStatusChecker
-                    messageId={tx.messageId}
-                    txHash={tx.txHash}
-                  />
-                ) : (
-                  <span className="ccip-pending">Pending...</span>
-                )}
-              </div>
-              <div className="transaction-timestamp">
-                {formatTimestamp(tx.timestamp)}
-              </div>
+        ) : transactions.length === 0 ? (
+          <div className="transactions-empty">
+            <p>No transactions yet</p>
+            <p className="empty-details">Your transaction history will appear here</p>
+          </div>
+        ) : (
+          <div className="transactions-table">
+            <div className="transactions-table-header">
+              <div className="table-col col-type">Type</div>
+              <div className="table-col col-source">Source</div>
+              <div className="table-col col-status">Status</div>
+              <div className="table-col col-hash">L2 Transaction</div>
+              <div className="table-col col-ccip">CCIP Message</div>
+              <div className="table-col col-l1hash">L1 Transaction</div>
+              <div className="table-col col-time">Time</div>
             </div>
-          ))}
-        </div>
-      )}
+            <div className="transactions-table-body">
+              {transactions.map((tx, index) => {
+                const { chain, direction } = getSourceChain(tx.type);
+                const arrow = renderDirectionalArrow(direction);
+                return (
+                  <div key={index} className="transaction-row">
+                    <div className="table-col col-type">
+                      <div className="transaction-type-label">
+                        {getTransactionTypeLabel(tx.type)}
+                      </div>
+                    </div>
+                    <div className="table-col col-source">
+                      <div className={`source-chain-badge chain-${chain.toLowerCase()}`}>
+                        {chain}
+                      </div>
+                    </div>
+                    <div className="table-col col-status">
+                      <div className={`transaction-status-badge ${getStatusBadgeClass(tx.status)}`}>
+                        {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
+                      </div>
+                    </div>
+                    <div className="table-col col-hash">
+                      <a
+                        href={`https://sepolia.basescan.org/tx/${tx.txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="View on BaseScan"
+                        className="hash-link"
+                      >
+                        {formatHash(tx.txHash)}
+                      </a>
+                      <span className="directional-arrow">{arrow}</span>
+                    </div>
+                    <div className="table-col col-ccip">
+                      {isValidMessageId(tx.messageId) ? (
+                        <>
+                          <CCIPStatusChecker
+                            messageId={tx.messageId}
+                            txType={tx.type}
+                          />
+                          <span className="directional-arrow">{arrow}</span>
+                        </>
+                      ) : (
+                        <span className="ccip-pending">Pending...</span>
+                      )}
+                    </div>
+                    <div className="table-col col-l1hash">
+                      {tx.receiptTransactionHash ? (
+                        <a
+                          href={`https://sepolia.etherscan.io/tx/${tx.receiptTransactionHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="View on Etherscan"
+                          className="hash-link"
+                        >
+                          {formatHash(tx.receiptTransactionHash)}
+                        </a>
+                      ) : (
+                        <span className="l1-pending">Pending...</span>
+                      )}
+                    </div>
+                    <div className="table-col col-time">
+                      {formatTimestamp(tx.timestamp)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

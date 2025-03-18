@@ -4,7 +4,7 @@ import { useClientsContext } from '../contexts/ClientsContext';
 import { DelegationManagerABI } from '../abis';
 import { DELEGATION_MANAGER_ADDRESS } from '../addresses';
 import { blockNumberToTimestamp, formatBlockTimestamp, getMinWithdrawalDelayBlocks, calculateWithdrawalRoot } from '../utils/eigenlayerUtils';
-import { useToast } from './ToastContainer';
+import { useToast } from '../utils/toast';
 
 // Define types for the withdrawal data structure based on the Solidity contract
 interface Withdrawal {

@@ -1,36 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { useClientsContext } from '../contexts/ClientsContext';
 import { formatEther, Address } from 'viem';
-import { STRATEGY_MANAGER_ADDRESS, STRATEGY } from '../addresses';
+import { useClientsContext } from '../contexts/ClientsContext';
 import { StrategyManagerABI } from '../abis';
+import { STRATEGY_MANAGER_ADDRESS, STRATEGY } from '../addresses';
+import { useToast } from '../utils/toast';
 
-interface Deposit {
+interface UserDeposit {
   strategy: Address;
-  shares: string;
-  strategyName: string;
+  shares: bigint;
 }
 
-// Helper function to get a human-readable name for a strategy
-const getStrategyName = (strategyAddress: Address): string => {
-  // Compare with known strategy addresses
-  if (strategyAddress.toLowerCase() === STRATEGY.toLowerCase()) {
-    return "Eigenlayer MAGIC Strategy";
-  }
-
-  // For unknown strategies, shorten the address
-  return `${strategyAddress.substring(0, 6)}...${strategyAddress.substring(strategyAddress.length - 4)}`;
-};
-
 const UserDeposits: React.FC = () => {
-  const { l1Wallet, isConnected, eigenAgentInfo } = useClientsContext();
-  const [deposits, setDeposits] = useState<Deposit[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const { l1Wallet, eigenAgentInfo, isConnected } = useClientsContext();
+  const [deposits, setDeposits] = useState<UserDeposit[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
-  // Function to fetch deposits from the StrategyManager contract
   const fetchDeposits = async () => {
     if (!isConnected || !eigenAgentInfo?.eigenAgentAddress || !l1Wallet.publicClient) {
-      setDeposits([]);
       return;
     }
 
@@ -38,44 +26,52 @@ const UserDeposits: React.FC = () => {
       setIsLoading(true);
       setError(null);
 
-      // Call the getDeposits function on the StrategyManager contract
-      const result = await l1Wallet.publicClient.readContract({
+      // Call getDeposits function on the StrategyManager contract
+      const stakerStrategies = await l1Wallet.publicClient.readContract({
         address: STRATEGY_MANAGER_ADDRESS,
         abi: StrategyManagerABI,
         functionName: 'getDeposits',
         args: [eigenAgentInfo.eigenAgentAddress]
-      });
+      }) as [Address[], bigint[]];
 
-      // Process the results
-      const [strategies, shares] = result as [Address[], bigint[]];
-
-      // Map the results to a more user-friendly format
-      const depositList: Deposit[] = strategies.map((strategy, index) => ({
+      // Convert to UserDeposit objects
+      const depositItems: UserDeposit[] = stakerStrategies[0].map((strategy, index) => ({
         strategy,
-        shares: shares[index].toString(),
-        strategyName: getStrategyName(strategy)
+        shares: stakerStrategies[1][index]
       }));
 
-      setDeposits(depositList);
+      setDeposits(depositItems);
     } catch (err) {
       console.error('Error fetching deposits:', err);
       setError('Failed to fetch deposits. Please try again later.');
+      showToast('Failed to fetch deposits', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Fetch deposits when the component mounts or when the wallet connection changes
+  // Fetch deposits when component mounts or when dependencies change
   useEffect(() => {
     fetchDeposits();
-  }, [eigenAgentInfo?.eigenAgentAddress, isConnected]);
+  }, [eigenAgentInfo?.eigenAgentAddress, isConnected, l1Wallet.publicClient]);
 
-  // If not connected, show a message
+  // Helper function to format an address for display
+  const formatAddress = (address: Address): string => {
+    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+  };
+
+  const getStrategyName = (address: Address): string => {
+    if (address.toLowerCase() === STRATEGY.toLowerCase()) {
+      return "MAGIC Strategy";
+    }
+    return formatAddress(address);
+  };
+
   if (!isConnected) {
     return (
       <div className="user-deposits">
         <h3>Your Deposits</h3>
-        <p className="no-deposits-message">Connect your wallet to view your deposits.</p>
+        <p className="no-deposits-message">Connect your wallet to view deposits.</p>
       </div>
     );
   }
@@ -94,40 +90,31 @@ const UserDeposits: React.FC = () => {
         </button>
       </div>
 
-      {error && (
-        <div className="deposits-error">
-          {error}
-        </div>
-      )}
+      {error && <div className="deposits-error">{error}</div>}
 
       {isLoading ? (
         <div className="deposits-loading">Loading deposits...</div>
-      ) : deposits.length === 0 ? (
-        <p className="no-deposits-message">No deposits found.</p>
-      ) : (
-        <div className="deposits-list">
-          <table className="deposits-table">
-            <thead>
-              <tr>
-                <th>Strategy</th>
-                <th>Shares</th>
+      ) : deposits.length > 0 ? (
+        <table className="deposits-table">
+          <thead>
+            <tr>
+              <th>Strategy</th>
+              <th>Shares</th>
+            </tr>
+          </thead>
+          <tbody>
+            {deposits.map((deposit, index) => (
+              <tr key={index} className="deposit-item">
+                <td className="strategy-address" title={deposit.strategy}>
+                  {getStrategyName(deposit.strategy)}
+                </td>
+                <td className="deposit-shares">{formatEther(deposit.shares)} MAGIC</td>
               </tr>
-            </thead>
-            <tbody>
-              {deposits.map((deposit, index) => (
-                <tr key={index} className="deposit-item">
-                  <td className="deposit-strategy">
-                    <div className="strategy-name">{deposit.strategyName}</div>
-                    <div className="strategy-address" title={deposit.strategy}>{deposit.strategy}</div>
-                  </td>
-                  <td className="deposit-shares">
-                    {formatEther(BigInt(deposit.shares))}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="no-deposits-message">No deposits found. Deposit tokens first.</p>
       )}
     </div>
   );

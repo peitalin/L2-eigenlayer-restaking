@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   createWalletClient, createPublicClient, http, custom,
   type WalletClient, type PublicClient,
@@ -43,11 +43,23 @@ export const chains: { [key: string]: Chain } = {
 export const publicClients: Record<number, PublicClient> = {
   [sepolia.id]: createPublicClient({
     chain: sepolia,
-    transport: http('https://sepolia.gateway.tenderly.co')
+    transport: http('https://sepolia.gateway.tenderly.co', {
+      // Add reasonable batching
+      batch: true,
+      fetchOptions: {
+        cache: 'force-cache'
+      }
+    })
   }),
   [baseSepolia.id]: createPublicClient({
     chain: baseSepolia,
-    transport: http('https://base-sepolia.gateway.tenderly.co')
+    transport: http('https://base-sepolia.gateway.tenderly.co', {
+      // Add reasonable batching
+      batch: true,
+      fetchOptions: {
+        cache: 'force-cache'
+      }
+    })
   })
 };
 
@@ -96,10 +108,22 @@ export function useClients(): ClientsState {
 
   const isConnected = !!l2Wallet.account;
 
+  // Add a ref to track last balance fetch time
+  const lastBalanceFetchRef = useRef<number>(0);
+
   // Function to fetch balances
   const fetchBalances = useCallback(async () => {
+    // Skip if already loading or if we've fetched within the last 30 seconds
+    if (isLoadingBalance || Date.now() - lastBalanceFetchRef.current < 30000) {
+      console.log('Skipping balance fetch (throttled)');
+      return;
+    }
+
     setIsLoadingBalance(true);
+    lastBalanceFetchRef.current = Date.now();
+
     try {
+      // Only fetch balances if we actually have an account
       if (l1Wallet.account) {
         const balance = await l1Wallet.publicClient.getBalance({ address: l1Wallet.account });
         setL1Wallet(prev => ({
@@ -120,7 +144,7 @@ export function useClients(): ClientsState {
     } finally {
       setIsLoadingBalance(false);
     }
-  }, [l1Wallet.account, l2Wallet.account, l1Wallet.publicClient, l2Wallet.publicClient]);
+  }, [l1Wallet.account, l2Wallet.account, l1Wallet.publicClient, l2Wallet.publicClient, isLoadingBalance]);
 
   // Fetch balances when accounts change
   useEffect(() => {

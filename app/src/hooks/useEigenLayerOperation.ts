@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Address, Hex, formatEther, encodeAbiParameters } from 'viem';
 import { baseSepolia } from '../hooks/useClients';
 import { useClientsContext } from '../contexts/ClientsContext';
@@ -9,6 +9,7 @@ import { RECEIVER_CCIP_ADDRESS } from '../addresses/ethSepoliaContracts';
 import { IERC20ABI } from '../abis';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import { watchCCIPTransaction } from '../utils/ccipEventListener';
+import { useToast } from '../utils/toast';
 
 // Define function selector constants for better maintainability
 // These are the first 4 bytes of the keccak256 hash of the function signature
@@ -41,6 +42,7 @@ interface UseEigenLayerOperationResult {
   isExecuting: boolean;
   signature: Hex | null;
   error: string | null;
+  info: string | null;
   isApprovingToken: boolean;
   approvalHash: string | null;
   executeWithMessage: (message: Hex) => Promise<void>;
@@ -72,9 +74,13 @@ export function useEigenLayerOperation({
   // Get transaction history context
   const { addTransaction } = useTransactionHistory();
 
+  // Access toast functionality
+  const { showToast } = useToast();
+
   const [isExecuting, setIsExecuting] = useState(false);
   const [signature, setSignature] = useState<Hex | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [isApprovingToken, setIsApprovingToken] = useState(false);
   const [approvalHash, setApprovalHash] = useState<string | null>(null);
 
@@ -181,8 +187,6 @@ export function useEigenLayerOperation({
         throw new Error("Wallet client not available for Base Sepolia");
       }
 
-      console.log("Starting CCIP transaction dispatch");
-
       // Format token amounts for CCIP
       const formattedTokenAmounts = [
         [
@@ -240,7 +244,7 @@ export function useEigenLayerOperation({
         account: l2Wallet.account,
         to: SENDER_CCIP_ADDRESS,
         data: data,
-        value: estimatedFee,
+        value: estimatedFee, // send a bit more in case, excess is refunded anyway
         chain: l2Wallet.publicClient.chain ?? baseSepolia,
       });
 
@@ -264,19 +268,12 @@ export function useEigenLayerOperation({
         type: txType,
         status: 'pending' as 'pending' | 'confirmed' | 'failed',
         from: l2Wallet.account,
-        to: targetContractAddr
+        to: targetContractAddr,
+        user: l2Wallet.account
       };
 
-      console.log("Adding initial transaction to history:", initialTransaction);
-      try {
-        // Handle async addTransaction
-        await addTransaction(initialTransaction);
-      } catch (addTxError) {
-        console.error("Error adding transaction to history:", addTxError);
-        // Continue execution since this is non-critical
-      }
-
-      // Wait for transaction to be mined
+      // Wait for transaction to be mined before adding to history
+      // This ensures we don't add failed transactions
       console.log("Waiting for transaction receipt...");
       const receipt = await l2Wallet.publicClient.waitForTransactionReceipt({
         hash
@@ -284,6 +281,15 @@ export function useEigenLayerOperation({
 
       if (receipt.status === 'success') {
         console.log('Transaction successfully mined! Receipt:', receipt.transactionHash);
+
+        console.log("Adding successful transaction to history:", initialTransaction);
+        try {
+          // Only add transaction to history if it succeeded
+          await addTransaction(initialTransaction);
+        } catch (addTxError) {
+          console.error("Error adding transaction to history:", addTxError);
+          // Continue execution since this is non-critical
+        }
 
         // Watch for CCIP events and update the transaction history
         console.log("Starting CCIP event watcher for transaction:", hash);
@@ -293,6 +299,7 @@ export function useEigenLayerOperation({
           l2Wallet.account,
           targetContractAddr,
           txType,
+          l2Wallet.account,
           async (ccipTransaction) => {
             if (ccipTransaction) {
               console.log("CCIP transaction data received:", ccipTransaction);
@@ -333,76 +340,104 @@ export function useEigenLayerOperation({
 
   // Function to execute with a direct message parameter
   const executeWithMessage = async (directMessage: Hex): Promise<void> => {
-    // Ensure we have all required information
-    if (!eigenAgentInfo?.eigenAgentAddress || !l1Wallet.account || !l2Wallet.account) {
-      setError("EigenAgent information or wallet not connected");
-      // Clear error after 5 seconds
-      setTimeout(() => setError(null), 5000);
-      return;
-    }
-
-    let messageWithSignature: Hex | undefined;
+    setError(null);
+    setSignature(null);
+    setIsExecuting(true);
+    let messageWithSignature: Hex | undefined = undefined;
 
     try {
-      setIsExecuting(true);
+      // Step 1: Check that we have eigenAgentInfo
+      if (!eigenAgentInfo) {
+        setIsExecuting(false);
+        throw new Error("EigenAgent info not available. Please connect your wallet and ensure you have a registered agent.");
+      }
 
-      // Step 1: Approve token spending if needed
+      // Step 2a: Check if we need to handle token approval
       if (tokenApproval) {
         try {
-          setError(`Approving ${formatEther(tokenApproval.amount)} tokens...`);
-          await approveTokenSpending(
+          console.log(`Checking token allowance for ${tokenApproval.tokenAddress}`);
+
+          setIsApprovingToken(true);
+
+          // Show info toast for token approval
+          setInfo("Checking token allowance...");
+
+          // Get current allowance
+          const currentAllowance = await checkTokenAllowance(
             tokenApproval.tokenAddress,
-            tokenApproval.spenderAddress,
-            tokenApproval.amount
+            eigenAgentInfo.eigenAgentAddress,
+            tokenApproval.spenderAddress
           );
+
+          console.log(`Current allowance: ${currentAllowance}, Amount needed: ${tokenApproval.amount}`);
+
+          // If allowance is not enough, request approval
+          if (currentAllowance < tokenApproval.amount) {
+            setInfo("Please approve token spending");
+
+            const hash = await approveTokenSpending(
+              tokenApproval.tokenAddress,
+              tokenApproval.spenderAddress,
+              tokenApproval.amount
+            );
+
+            setApprovalHash(hash);
+            setInfo("Token approval submitted");
+          } else {
+            setInfo("Token allowance is sufficient");
+          }
         } catch (approvalError) {
-          // Check if this is a user rejection error
-          const errorMessage = approvalError instanceof Error ? approvalError.message : 'Unknown error';
-          setError(`Token approval failed: ${errorMessage}`);
-
-          // Set a timer to clear the error state after 5 seconds
-          setTimeout(() => setError(null), 5000);
-
-          if (onError) onError(new Error(`Token approval failed: ${approvalError}`));
+          console.error('Error during token approval:', approvalError);
           setIsExecuting(false);
+          setIsApprovingToken(false);
+
+          const approvalErrorMsg = approvalError instanceof Error ? approvalError.message : String(approvalError);
+
+          // Check if it's a user rejection
+          if (approvalErrorMsg.toLowerCase().includes('rejected') ||
+              approvalErrorMsg.toLowerCase().includes('denied') ||
+              approvalErrorMsg.toLowerCase().includes('cancelled')) {
+            setInfo("Token approval was cancelled");
+          } else {
+            setError(`Error approving token: ${approvalErrorMsg}`);
+          }
+
+          if (onError) onError(approvalError instanceof Error ? approvalError : new Error(String(approvalError)));
           return;
+        } finally {
+          setIsApprovingToken(false);
         }
       }
 
-      // Step 2: Switch to Ethereum Sepolia for signing
-      setError("Temporarily switching to Ethereum Sepolia for signing...");
+      // Step 2b: Switch to Ethereum Sepolia for signing
+      setInfo("Temporarily switching to Ethereum Sepolia for signing...");
       await switchChain(l1Wallet.publicClient.chain?.id ?? 11155111);
 
       // Wait a moment for the switch to take effect
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Verify L1 client is available
-      if (!l1Wallet.client) {
-        throw new Error("Wallet client not available for Sepolia");
-      }
-
-      // Step 3: Create expiry time
-      const expiryTime = BigInt(Math.floor(Date.now()/1000) + (expiryMinutes * 60));
-
-      console.log("directMessage", directMessage);
-
       try {
+        // Step 3: Create expiry time
+        const expiryTime = BigInt(Math.floor(Date.now()/1000) + (expiryMinutes * 60));
+
         // Step 4: Sign the message
+        setInfo("Please sign the message with your wallet...");
         const result = await signMessageForEigenAgentExecution(
-          l1Wallet.client,
-          l1Wallet.account,
+          l1Wallet.client!,
+          l1Wallet.account!,
           eigenAgentInfo.eigenAgentAddress,
           targetContractAddr,
-          directMessage, // Use the direct message instead of messageToEigenlayer
+          directMessage,
           eigenAgentInfo.execNonce,
           expiryTime
         );
 
         setSignature(result.signature);
         messageWithSignature = result.messageWithSignature;
+        setInfo("Message signed successfully");
       } catch (signError) {
         // Handle signature rejection
-        const errorMessage = signError instanceof Error ? signError.message : 'Unknown error';
+        const errorMessage = signError instanceof Error ? signError.message : String(signError);
         console.log("Signature rejection detected:", errorMessage);
 
         // If the user rejected the signature request
@@ -415,8 +450,8 @@ export function useEigenLayerOperation({
           // Important: Reset execution state FIRST
           setIsExecuting(false);
 
-          // Then set the error message
-          setError(`Signature was rejected: ${errorMessage}`);
+          // Show rejection as info, not error
+          setInfo("Transaction signing was cancelled");
 
           // Make sure we switch back to Base Sepolia
           try {
@@ -426,12 +461,6 @@ export function useEigenLayerOperation({
           }
 
           if (onError) onError(signError instanceof Error ? signError : new Error(String(signError)));
-
-          // Clear error after a short delay
-          setTimeout(() => {
-            setError(null);
-          }, 5000);
-
           return;
         }
 
@@ -440,26 +469,27 @@ export function useEigenLayerOperation({
       }
 
       // Step 5: Switch back to Base Sepolia
-      setError("Switching back to Base Sepolia...");
+      setInfo("Switching back to Base Sepolia...");
       await switchChain(l2Wallet.publicClient.chain?.id ?? 84532);
 
       // Wait for the switch to complete
       await new Promise(resolve => setTimeout(resolve, 1000));
-      setError(null);
 
       try {
-        // Step 6: Dispatch the transaction (ensure messageWithSignature is defined)
+        // Step 6: Dispatch the transaction
         if (!messageWithSignature) {
           throw new Error("Failed to generate signature message");
         }
 
+        setInfo("Please confirm the transaction in your wallet...");
         const txHash = await dispatchTransaction(messageWithSignature, directMessage);
+        setInfo("Transaction submitted successfully");
 
         // Call onSuccess if provided
         if (onSuccess) onSuccess(txHash);
       } catch (txError) {
         // Handle transaction rejection
-        const errorMessage = txError instanceof Error ? txError.message : 'Unknown error';
+        const errorMessage = txError instanceof Error ? txError.message : String(txError);
         console.log("Transaction rejection detected:", errorMessage);
 
         // If the user rejected the transaction
@@ -472,16 +502,10 @@ export function useEigenLayerOperation({
           // Important: Reset execution state FIRST
           setIsExecuting(false);
 
-          // Then set the error message
-          setError(`Transaction was rejected: ${errorMessage}`);
+          // Show rejection as info, not error
+          setInfo("Transaction was cancelled");
 
           if (onError) onError(txError instanceof Error ? txError : new Error(String(txError)));
-
-          // Clear error after a short delay
-          setTimeout(() => {
-            setError(null);
-          }, 5000);
-
           return;
         }
 
@@ -512,24 +536,15 @@ export function useEigenLayerOperation({
         // Important: Reset execution state FIRST
         setIsExecuting(false);
 
-        // Then set error message
-        setError(`Operation was rejected: ${errorMessage}`);
+        // Show rejection as info, not error
+        setInfo(`Operation was rejected: ${errorMessage}`);
 
         if (onError) onError(err instanceof Error ? err : new Error(String(err)));
-
-        // Clear error after a short delay
-        setTimeout(() => {
-          setError(null);
-        }, 5000);
-
         return;
       }
 
       // For non-rejection errors, set the error message
-      setError(errorMessage);
-
-      // Set a timer to clear the general error state after 10 seconds
-      setTimeout(() => setError(null), 10000);
+      setError(`Error: ${errorMessage}`);
 
       if (onError) onError(err instanceof Error ? err : new Error(String(err)));
     } finally {
@@ -542,6 +557,7 @@ export function useEigenLayerOperation({
     isExecuting,
     signature,
     error,
+    info,
     isApprovingToken,
     approvalHash,
     executeWithMessage

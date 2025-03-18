@@ -1,16 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { Hex } from 'viem';
 
 // Define the structure for a CCIP transaction
 export interface CCIPTransaction {
   txHash: string;
   messageId: string;
   timestamp: number; // Unix timestamp
-  type: 'deposit' | 'withdrawal' | 'completeWithdrawal' | 'bridgingWithdrawalToL2' | 'other';
+  type: 'deposit' | 'withdrawal' | 'completeWithdrawal' | 'processClaim' | 'bridgingWithdrawalToL2' | 'bridgingRewardsToL2' | 'other';
   status: 'pending' | 'confirmed' | 'failed';
   from: string;
   to: string; // target contract
   receiptTransactionHash?: string; // Optional field for tracking the receipt transaction hash for CCIP messages
+  isComplete?: boolean; // Optional field for tracking the completion status of bridgingWithdrawalToL2 transactions
+  sourceChainId?: string | number;
+  destinationChainId?: string | number;
+  user: string;
 }
 
 // Define server base URL
@@ -22,7 +25,8 @@ export type TransactionTypes =
   | 'completeWithdrawal'
   | 'claim'
   | 'depositToL2'
-  | 'bridgingWithdrawalToL2';
+  | 'bridgingWithdrawalToL2'
+  | 'bridgingRewardsToL2';
 
 interface TransactionHistoryContextType {
   transactions: CCIPTransaction[];
@@ -31,10 +35,8 @@ interface TransactionHistoryContextType {
   fetchTransactions: () => Promise<void>;
   addTransaction: (transaction: CCIPTransaction) => Promise<void>;
   updateTransaction: (messageId: string, updates: Partial<CCIPTransaction>) => Promise<void>;
-  updateTransactionByHash: (txHash: string, updates: Partial<CCIPTransaction>) => Promise<void>;
   clearHistory: () => Promise<void>;
   fetchCCIPMessageDetails: (messageId: string) => Promise<any>;
-  checkWithdrawalCompletion: (messageId: string, originalTxHash: string) => Promise<boolean>;
 }
 
 const TransactionHistoryContext = createContext<TransactionHistoryContextType | null>(null);
@@ -51,11 +53,25 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
 
   // Function to fetch all transactions from the server
   const fetchTransactions = async () => {
+    // Don't set loading to true if already loading (prevents multiple concurrent requests)
+    if (isLoading) {
+      console.log('Already fetching transactions, skipping');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`${SERVER_BASE_URL}/api/transactions`);
+      console.log('Fetching transactions from server');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
+
+      const response = await fetch(`${SERVER_BASE_URL}/api/transactions`, {
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch transactions: ${response.status} ${response.statusText}`);
@@ -66,15 +82,6 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
     } catch (err: any) {
       console.error('Error fetching transactions:', err);
       setError(err.message || 'Failed to fetch transactions');
-      // If server is unavailable, try to use localStorage as fallback
-      const storedTransactions = localStorage.getItem('ccip_transaction_history');
-    if (storedTransactions) {
-      try {
-        setTransactions(JSON.parse(storedTransactions));
-        } catch (parseErr) {
-          console.error('Failed to parse stored transaction history:', parseErr);
-      }
-    }
     } finally {
       setIsLoading(false);
     }
@@ -86,12 +93,23 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
     setError(null);
 
     try {
+      // Ensure all required fields are present, including CCIP-related data
+      const confirmedTransaction: CCIPTransaction = {
+        ...transaction,
+        status: 'confirmed',
+        // Make sure these fields are included even if undefined to ensure consistency
+        receiptTransactionHash: transaction.receiptTransactionHash,
+        isComplete: transaction.isComplete || false,
+        sourceChainId: transaction.sourceChainId,
+        destinationChainId: transaction.destinationChainId
+      };
+
       const response = await fetch(`${SERVER_BASE_URL}/api/transactions/add`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(transaction),
+        body: JSON.stringify(confirmedTransaction),
       });
 
       if (!response.ok) {
@@ -99,50 +117,29 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
       }
 
       // Update local state
-    setTransactions(prevTransactions => {
-      // Check if transaction already exists
-      const existingIndex = prevTransactions.findIndex(tx => tx.txHash === transaction.txHash);
+      setTransactions(prevTransactions => {
+        // Check if transaction already exists
+        const existingIndex = prevTransactions.findIndex(tx => tx.txHash === transaction.txHash);
+        let newTransactions: CCIPTransaction[];
 
-      if (existingIndex >= 0) {
-        // Replace the existing transaction with the updated one
-        const newTransactions = [...prevTransactions];
-        newTransactions[existingIndex] = {
-          ...prevTransactions[existingIndex],
-          ...transaction,
-          messageId: transaction.messageId || prevTransactions[existingIndex].messageId,
-          status: transaction.status || prevTransactions[existingIndex].status
-        };
+        if (existingIndex >= 0) {
+          // Replace the existing transaction with the updated one
+          newTransactions = [...prevTransactions];
+          newTransactions[existingIndex] = {
+            ...prevTransactions[existingIndex],
+            ...confirmedTransaction,
+            messageId: confirmedTransaction.messageId || prevTransactions[existingIndex].messageId
+          };
+        } else {
+          // Add new transaction at the beginning of the array (newest first)
+          newTransactions = [confirmedTransaction, ...prevTransactions];
+        }
+
         return newTransactions;
-      }
-
-      // Add new transaction at the beginning of the array (newest first)
-        return [transaction, ...prevTransactions];
       });
-
-      // Also update localStorage as fallback
-      localStorage.setItem('ccip_transaction_history', JSON.stringify(transactions));
     } catch (err: any) {
       console.error('Error adding transaction:', err);
       setError(err.message || 'Failed to add transaction');
-
-      // Update local state even if server request fails
-      setTransactions(prevTransactions => {
-        const existingIndex = prevTransactions.findIndex(tx => tx.txHash === transaction.txHash);
-        if (existingIndex >= 0) {
-          const newTransactions = [...prevTransactions];
-          newTransactions[existingIndex] = {
-            ...prevTransactions[existingIndex],
-            ...transaction,
-            messageId: transaction.messageId || prevTransactions[existingIndex].messageId,
-            status: transaction.status || prevTransactions[existingIndex].status
-          };
-          return newTransactions;
-        }
-      return [transaction, ...prevTransactions];
-    });
-
-      // Update localStorage as fallback
-      localStorage.setItem('ccip_transaction_history', JSON.stringify([transaction, ...transactions]));
     } finally {
       setIsLoading(false);
     }
@@ -154,12 +151,21 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
     setError(null);
 
     try {
+      // Ensure the updates include all necessary fields
+      const completeUpdates = {
+        ...updates,
+        // If the transaction is being marked as complete, ensure these fields are set properly
+        ...(updates.status === 'confirmed' && {
+          isComplete: updates.isComplete !== undefined ? updates.isComplete : true,
+        }),
+      };
+
       const response = await fetch(`${SERVER_BASE_URL}/api/transactions/messageId/${messageId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updates),
+        body: JSON.stringify(completeUpdates),
       });
 
       if (!response.ok) {
@@ -167,72 +173,25 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
       }
 
       // Update local state
-      setTransactions(prevTransactions =>
-        prevTransactions.map(tx =>
+      setTransactions(prevTransactions => {
+        const updatedTransactions = prevTransactions.map(tx =>
+          tx.messageId === messageId ? { ...tx, ...completeUpdates } : tx
+        );
+
+        return updatedTransactions;
+      });
+    } catch (err: any) {
+      console.error('Error updating transaction:', err);
+      setError(err.message || 'Failed to update transaction');
+
+      // Update local state even if server request fails
+      setTransactions(prevTransactions => {
+        const updatedTransactions = prevTransactions.map(tx =>
           tx.messageId === messageId ? { ...tx, ...updates } : tx
-        )
-      );
+        );
 
-      // Update localStorage as fallback
-      localStorage.setItem('ccip_transaction_history', JSON.stringify(transactions));
-    } catch (err: any) {
-      console.error('Error updating transaction:', err);
-      setError(err.message || 'Failed to update transaction');
-
-      // Update local state even if server request fails
-    setTransactions(prevTransactions =>
-      prevTransactions.map(tx =>
-        tx.messageId === messageId ? { ...tx, ...updates } : tx
-      )
-    );
-
-      // Update localStorage as fallback
-      localStorage.setItem('ccip_transaction_history', JSON.stringify(transactions));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Update an existing transaction by transaction hash
-  const updateTransactionByHash = async (txHash: string, updates: Partial<CCIPTransaction>) => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`${SERVER_BASE_URL}/api/transactions/${txHash}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updates),
+        return updatedTransactions;
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update transaction: ${response.status} ${response.statusText}`);
-      }
-
-      // Update local state
-      setTransactions(prevTransactions =>
-        prevTransactions.map(tx =>
-          tx.txHash === txHash ? { ...tx, ...updates } : tx
-        )
-      );
-
-      // Update localStorage as fallback
-      localStorage.setItem('ccip_transaction_history', JSON.stringify(transactions));
-    } catch (err: any) {
-      console.error('Error updating transaction:', err);
-      setError(err.message || 'Failed to update transaction');
-
-      // Update local state even if server request fails
-    setTransactions(prevTransactions =>
-      prevTransactions.map(tx =>
-        tx.txHash === txHash ? { ...tx, ...updates } : tx
-      )
-    );
-
-      // Update localStorage as fallback
-      localStorage.setItem('ccip_transaction_history', JSON.stringify(transactions));
     } finally {
       setIsLoading(false);
     }
@@ -254,15 +213,12 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
 
       // Clear local state
       setTransactions([]);
-      // Clear localStorage as well
-      localStorage.removeItem('ccip_transaction_history');
     } catch (err: any) {
       console.error('Error clearing transaction history:', err);
       setError(err.message || 'Failed to clear transaction history');
 
       // Clear local state even if server request fails
-    setTransactions([]);
-      localStorage.removeItem('ccip_transaction_history');
+      setTransactions([]);
     } finally {
       setIsLoading(false);
     }
@@ -288,56 +244,6 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
     }
   };
 
-  // New function to check withdrawal completion status
-  const checkWithdrawalCompletion = async (messageId: string, originalTxHash: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`${SERVER_BASE_URL}/api/check-withdrawal-completion`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ messageId, originalTxHash }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      console.log('Withdrawal completion check result:', data);
-
-      if (data.isComplete) {
-        console.log(`Withdrawal with messageId ${messageId} is complete!`);
-
-        // Update the original transaction
-        if (data.updatedOriginalTx) {
-          // Make a shallow copy to avoid modifying the response directly
-          const updatedTx = {...data.updatedOriginalTx};
-
-          // Update the local transaction
-          await updateTransaction(messageId, {
-            status: updatedTx.status,
-            receiptTransactionHash: updatedTx.receiptTransactionHash
-          });
-        }
-
-        // Add bridging transaction if it exists
-        if (data.bridgingTransaction) {
-          await addTransaction(data.bridgingTransaction);
-          console.log(`Added bridging transaction with hash: ${data.bridgingTransaction.txHash}`);
-        }
-
-        return true;
-      }
-
-      return false;
-    } catch (error) {
-      console.error('Error checking withdrawal completion:', error);
-      setError('Failed to check withdrawal completion status');
-      throw error;
-    }
-  };
-
   return (
     <TransactionHistoryContext.Provider
       value={{
@@ -347,10 +253,8 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
         fetchTransactions,
         addTransaction,
         updateTransaction,
-        updateTransactionByHash,
         clearHistory,
         fetchCCIPMessageDetails,
-        checkWithdrawalCompletion,
       }}
     >
       {children}
@@ -359,7 +263,7 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
 };
 
 // Custom hook to use the transaction history context
-export const useTransactionHistory = () => {
+export const useTransactionHistory = (): TransactionHistoryContextType => {
   const context = useContext(TransactionHistoryContext);
   if (!context) {
     throw new Error('useTransactionHistory must be used within a TransactionHistoryProvider');
@@ -367,88 +271,94 @@ export const useTransactionHistory = () => {
   return context;
 };
 
-// Add this hook to monitor and process complete withdrawals
-export const useCompleteWithdrawalMonitor = (
-  checkInterval: number = 60000
-): {
-  startMonitoring: () => () => void;
-  stopMonitoring: () => void;
-} => {
-  const ctx = useContext(TransactionHistoryContext);
+// Custom hook for polling transaction history at regular intervals
+export const useTransactionHistoryPolling = () => {
+  const { fetchTransactions } = useTransactionHistory();
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
 
-  // Guard against null context
-  if (!ctx) {
-    throw new Error('useCompleteWithdrawalMonitor must be used within a TransactionHistoryProvider');
-  }
+  // Use a ref to store stable function references
+  const stableCallbacks = useRef({
+    startPolling: () => {
+      if (isPollingRef.current) return; // Already polling
 
-  const { transactions, checkWithdrawalCompletion } = ctx;
-  const [isMonitoring, setIsMonitoring] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+      console.log('Starting transaction polling');
 
-  const monitorWithdrawals = useCallback(() => {
-    if (!isMonitoring) return;
-
-    const pendingWithdrawals = transactions.filter(
-      (tx) => tx.type === 'completeWithdrawal' && tx.status === 'confirmed' && tx.messageId
-    );
-
-    // Process each pending withdrawal
-    const processWithdrawals = async () => {
-      console.log(`Checking ${pendingWithdrawals.length} pending withdrawals for completion...`);
-
-      for (const withdrawal of pendingWithdrawals) {
-        if (withdrawal.messageId && withdrawal.txHash) {
-          try {
-            await checkWithdrawalCompletion(withdrawal.messageId, withdrawal.txHash);
-          } catch (error) {
-            console.error(`Error checking withdrawal completion for messageId ${withdrawal.messageId}:`, error);
-          }
-        }
+      // Clear any existing interval first
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
 
-      // Schedule next check if still monitoring
-      if (isMonitoring) {
-        timeoutRef.current = setTimeout(monitorWithdrawals, checkInterval);
+      // Run once immediately
+      fetchTransactions().catch(err => console.error('Error in initial transaction fetch:', err));
+
+      // Set up polling with a reasonable interval (every 2 minutes)
+      intervalRef.current = setInterval(() => {
+        console.log('Polling for transaction updates...');
+        fetchTransactions().catch(err => console.error('Error polling transactions:', err));
+      }, 120000); // 2 minutes
+
+      isPollingRef.current = true;
+      setIsPolling(true);
+    },
+
+    stopPolling: () => {
+      console.log('Stopping transaction polling');
+
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
-    };
 
-    processWithdrawals();
-  }, [transactions, checkWithdrawalCompletion, isMonitoring, checkInterval]);
-
-  const startMonitoring = useCallback(() => {
-    console.log('Starting withdrawal completion monitoring');
-    setIsMonitoring(true);
-
-    // Start initial check
-    timeoutRef.current = setTimeout(monitorWithdrawals, 0);
-
-    // Return cleanup function
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      setIsMonitoring(false);
-    };
-  }, [monitorWithdrawals]);
-
-  const stopMonitoring = useCallback(() => {
-    console.log('Stopping withdrawal completion monitoring');
-    setIsMonitoring(false);
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
+      isPollingRef.current = false;
+      setIsPolling(false);
     }
-  }, []);
+  });
 
+  // Use a ref to track polling state that persists through renders
+  const isPollingRef = useRef(false);
+
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
+      console.log('Cleaning up transaction polling');
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
+      isPollingRef.current = false;
     };
   }, []);
 
-  return { startMonitoring, stopMonitoring };
+  // Initialize callbacks with access to the current fetchTransactions
+  useEffect(() => {
+    // Update the fetchTransactions reference in the callbacks
+    const originalStartPolling = stableCallbacks.current.startPolling;
+    stableCallbacks.current.startPolling = () => {
+      if (isPollingRef.current) return; // Already polling
+
+      console.log('Starting transaction polling');
+
+      // Clear any existing interval first
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+
+      // Run once immediately
+      fetchTransactions().catch(err => console.error('Error in initial transaction fetch:', err));
+
+      // Set up polling with a reasonable interval (every 2 minutes)
+      intervalRef.current = setInterval(() => {
+        console.log('Polling for transaction updates...');
+        fetchTransactions().catch(err => console.error('Error polling transactions:', err));
+      }, 120000); // 2 minutes
+
+      isPollingRef.current = true;
+      setIsPolling(true);
+    };
+  }, [fetchTransactions]);
+
+  return stableCallbacks.current;
 };
