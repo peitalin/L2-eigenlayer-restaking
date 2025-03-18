@@ -1,0 +1,465 @@
+/* Transactions Page Styles */
+.transactions-page {
+  width: 100%;
+  background-color: #f8f9fa;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  padding: 24px;
+  margin-bottom: 40px;
+}
+
+.transactions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e3e3e3;
+}
+
+.transactions-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.clear-history-button {
+  background-color: transparent;
+  color: #ff5e57;
+  border: 1px solid #ff5e57;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clear-history-button:hover {
+  background-color: #ffeae9;
+}
+
+.clear-history-button:disabled {
+  border-color: #ccc;
+  color: #999;
+  cursor: not-allowed;
+  background-color: transparent;
+}
+
+.confirm-clear-container {
+  display: flex;
+  align-items: center;
+}
+
+.confirm-text {
+  font-size: 14px;
+  margin-right: 12px;
+  color: #555;
+}
+
+.confirm-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.confirm-clear-yes {
+  background-color: #ff5e57;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.confirm-clear-yes:hover {
+  background-color: #e54541;
+}
+
+.confirm-clear-yes:disabled {
+  background-color: #ffb3b0;
+  cursor: not-allowed;
+}
+
+.confirm-clear-no {
+  background-color: #f0f0f0;
+  color: #333;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.confirm-clear-no:hover {
+  background-color: #e3e3e3;
+}
+
+.confirm-clear-no:disabled {
+  color: #999;
+  cursor: not-allowed;
+}
+
+/* Transaction List */
+.transactions-list {
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e3e3e3;
+}
+
+.transactions-list-header {
+  display: grid;
+  grid-template-columns: 25% 25% 25% 25%;
+  background-color: #f3f4f6;
+  padding: 14px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #555;
+  border-bottom: 1px solid #e3e3e3;
+}
+
+.transaction-item {
+  display: grid;
+  grid-template-columns: 25% 25% 25% 25%;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e3e3e3;
+  align-items: center;
+  transition: background-color 0.2s ease;
+}
+
+.transaction-item:last-child {
+  border-bottom: none;
+}
+
+.transaction-item:hover {
+  background-color: #f8f9fa;
+}
+
+/* Transaction Type and Status */
+.transaction-type {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.transaction-type-label {
+  font-weight: 500;
+  color: #333;
+}
+
+.transaction-status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.status-confirmed {
+  background-color: #e6f7ed;
+  color: #17a24c;
+}
+
+.status-pending {
+  background-color: #fff9e6;
+  color: #e6a317;
+}
+
+.status-failed {
+  background-color: #ffeae9;
+  color: #e5484d;
+}
+
+/* Transaction Hash */
+.transaction-hash a {
+  color: #3a75f7;
+  text-decoration: none;
+  font-family: monospace;
+  font-size: 14px;
+  transition: color 0.2s ease;
+}
+
+.transaction-hash a:hover {
+  color: #2c5cc5;
+  text-decoration: underline;
+}
+
+/* CCIP Message */
+.transaction-ccip {
+  display: flex;
+  align-items: center;
+}
+
+.ccip-status-checker {
+  display: flex;
+  align-items: center;
+}
+
+.ccip-status-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ccip-link {
+  color: #3a75f7;
+  text-decoration: none;
+  font-family: monospace;
+  font-size: 14px;
+}
+
+.ccip-link:hover {
+  text-decoration: underline;
+  color: #2c5cc5;
+}
+
+.ccip-check-button {
+  background-color: #f0f0f0;
+  border: none;
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  padding: 0;
+  font-size: 14px;
+}
+
+.ccip-check-button:hover {
+  background-color: #e3e3e3;
+}
+
+.ccip-check-button:disabled {
+  cursor: not-allowed;
+  color: #999;
+}
+
+.ccip-pending {
+  color: #999;
+  font-style: italic;
+  font-size: 14px;
+}
+
+/* Timestamp */
+.transaction-timestamp {
+  color: #555;
+  font-size: 14px;
+}
+
+/* Empty State */
+.transactions-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+  text-align: center;
+}
+
+.transactions-empty p {
+  margin: 0;
+  color: #555;
+}
+
+.transactions-empty p:first-child {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.empty-details {
+  color: #888;
+  font-size: 14px;
+}
+
+/* Loading State */
+.transactions-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+}
+
+.loading-spinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #3a75f7;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.transactions-loading p {
+  color: #666;
+  margin: 0;
+}
+
+/* Media Queries for Responsiveness */
+@media (max-width: 768px) {
+  .transactions-list-header {
+    display: none;
+  }
+
+  .transaction-item {
+    grid-template-columns: 1fr;
+    grid-gap: 12px;
+    padding: 16px;
+  }
+
+  .transaction-hash,
+  .transaction-ccip,
+  .transaction-timestamp {
+    padding-left: 0;
+  }
+
+  .transaction-timestamp {
+    font-size: 12px;
+    color: #777;
+  }
+
+  .transactions-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .confirm-clear-container {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* Withdrawal Completion Status */
+.withdrawal-completion-status {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.status-container {
+  background-color: #f9f9f9;
+  border-radius: 6px;
+  padding: 10px 12px;
+  border: 1px solid #e3e3e3;
+}
+
+.status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.status-header h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.status-badge {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.status-badge.complete {
+  background-color: #e6f7ed;
+  color: #17a24c;
+}
+
+.status-badge.pending {
+  background-color: #fff9e6;
+  color: #e6a317;
+}
+
+.action-container {
+  margin-top: 10px;
+}
+
+.check-button {
+  background-color: #3a75f7;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.check-button:hover {
+  background-color: #2c5cc5;
+}
+
+.check-button:disabled {
+  background-color: #b3c9fb;
+  cursor: not-allowed;
+}
+
+.last-checked {
+  font-size: 12px;
+  color: #777;
+  margin-top: 6px;
+}
+
+.error-message {
+  color: #e5484d;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.completion-details {
+  margin-top: 6px;
+}
+
+.completion-details p {
+  font-size: 13px;
+  color: #555;
+  margin: 0 0 6px 0;
+}
+
+.receipt-hash {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.receipt-hash a {
+  color: #3a75f7;
+  text-decoration: none;
+  font-family: monospace;
+  transition: color 0.2s ease;
+}
+
+.receipt-hash a:hover {
+  color: #2c5cc5;
+  text-decoration: underline;
+}
+
+/* Media Queries */
+@media (max-width: 768px) {
+  .withdrawal-completion-status {
+    margin-top: 12px;
+  }
+
+  .status-container {
+    padding: 8px;
+  }
+}

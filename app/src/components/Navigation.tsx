@@ -11,7 +11,8 @@ const Navigation: React.FC = () => {
   // Define navigation items - easy to add new ones in the future
   const navigationItems: NavigationItem[] = [
     { path: '/', label: 'Deposit', exact: true },
-    { path: '/withdraw', label: 'Withdraw' }
+    { path: '/withdraw', label: 'Withdraw' },
+    { path: '/transactions', label: 'Transactions' }
     // Add more navigation items here as the app grows
   ];
 
