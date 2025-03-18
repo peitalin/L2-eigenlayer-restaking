@@ -268,7 +268,13 @@ export function useEigenLayerOperation({
       };
 
       console.log("Adding initial transaction to history:", initialTransaction);
-      addTransaction(initialTransaction);
+      try {
+        // Handle async addTransaction
+        await addTransaction(initialTransaction);
+      } catch (addTxError) {
+        console.error("Error adding transaction to history:", addTxError);
+        // Continue execution since this is non-critical
+      }
 
       // Wait for transaction to be mined
       console.log("Waiting for transaction receipt...");
@@ -287,7 +293,7 @@ export function useEigenLayerOperation({
           l2Wallet.account,
           targetContractAddr,
           txType,
-          (ccipTransaction) => {
+          async (ccipTransaction) => {
             if (ccipTransaction) {
               console.log("CCIP transaction data received:", ccipTransaction);
 
@@ -296,7 +302,11 @@ export function useEigenLayerOperation({
                 console.log(`Updating transaction ${hash} with messageId: ${ccipTransaction.messageId}`);
 
                 // Update the transaction with the new data by adding it (replaces existing by txHash)
-                addTransaction(ccipTransaction);
+                try {
+                  await addTransaction(ccipTransaction);
+                } catch (updateTxError) {
+                  console.error("Error updating transaction with CCIP data:", updateTxError);
+                }
               } else {
                 console.log("No messageId found in CCIP transaction data");
               }

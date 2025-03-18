@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { baseSepolia } from '../hooks/useClients';
 import { formatEther, parseEther, Hex, Address } from 'viem';
 import { encodeQueueWithdrawalMsg, encodeCompleteWithdrawalMsg, ZeroAddress, WithdrawalStruct } from '../utils/encoders';
-import { CHAINLINK_CONSTANTS, STRATEGY_MANAGER_ADDRESS, STRATEGY, SENDER_CCIP_ADDRESS, DELEGATION_MANAGER_ADDRESS } from '../addresses';
+import { CHAINLINK_CONSTANTS, STRATEGY_MANAGER_ADDRESS, STRATEGY, SENDER_CCIP_ADDRESS, DELEGATION_MANAGER_ADDRESS, ERC20_TOKEN_ADDRESS } from '../addresses';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { DelegationManagerABI } from '../abis';
@@ -215,8 +215,8 @@ const WithdrawalPage: React.FC = () => {
         scaledShares: sharesArray
       };
 
-      // Create tokens to withdraw array (using strategy addresses)
-      const tokensToWithdraw: Address[] = withdrawal.strategies;
+      // Create tokens to withdraw array (tokens, not strategies)
+      const tokensToWithdraw: Address[] = [CHAINLINK_CONSTANTS.ethSepolia.bridgeToken as Address];
 
       // Create the complete withdrawal message
       const message = encodeCompleteWithdrawalMsg(
@@ -356,4 +356,3 @@ const WithdrawalPage: React.FC = () => {
 };
 
 export default WithdrawalPage;
-

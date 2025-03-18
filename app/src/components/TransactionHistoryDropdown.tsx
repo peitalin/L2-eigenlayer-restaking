@@ -2,16 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import { getCCIPExplorerUrl } from '../utils/ccipEventListener';
 import { useToast } from './ToastContainer';
+import CCIPStatusChecker from './CCIPStatusChecker';
+import WithdrawalCompletionStatus from './WithdrawalCompletionStatus';
 
 interface TransactionHistoryDropdownProps {}
 
 const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = () => {
-  const { transactions, clearHistory } = useTransactionHistory();
+  const { transactions, clearHistory, isLoading, error } = useTransactionHistory();
   const [isOpen, setIsOpen] = useState(false);
   const [hasNewTransactions, setHasNewTransactions] = useState(false);
   const [lastViewedCount, setLastViewedCount] = useState(0);
   const { showToast } = useToast();
   const [confirmClearVisible, setConfirmClearVisible] = useState(false);
+  const [isClearingHistory, setIsClearingHistory] = useState(false);
 
   // Track when new transactions are added
   useEffect(() => {
@@ -28,6 +31,13 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
     }
   }, [isOpen, transactions.length]);
 
+  // Show toast when error occurs
+  useEffect(() => {
+    if (error) {
+      showToast(error, 'error');
+    }
+  }, [error, showToast]);
+
   const toggleDropdown = () => {
     setIsOpen(!isOpen);
     // Hide confirm clear if dropdown is being closed
@@ -41,11 +51,19 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
     setConfirmClearVisible(true);
   };
 
-  const handleConfirmClear = (e: React.MouseEvent) => {
+  const handleConfirmClear = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    clearHistory();
-    setConfirmClearVisible(false);
-    showToast('Transaction history cleared', 'info');
+    try {
+      setIsClearingHistory(true);
+      await clearHistory();
+      setConfirmClearVisible(false);
+      showToast('Transaction history cleared', 'info');
+    } catch (err) {
+      console.error('Error clearing history:', err);
+      showToast('Failed to clear history', 'error');
+    } finally {
+      setIsClearingHistory(false);
+    }
   };
 
   const handleCancelClear = (e: React.MouseEvent) => {
@@ -68,6 +86,8 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
   const getTransactionTypeLabel = (type: string): string => {
     switch (type) {
       case 'deposit': return 'Deposit';
+      case 'bridgingWithdrawalToL2': return 'Bridging Withdrawal to L2';
+      case 'bridgingRewardsToL2': return 'Bridging Rewards to L2';
       case 'withdrawal': return 'Queue Withdrawal';
       case 'completeWithdrawal': return 'Complete Withdrawal';
       default: return 'Transaction';
@@ -77,6 +97,19 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
   // Helper to determine if a messageId is valid
   const isValidMessageId = (messageId: string): boolean => {
     return !!messageId && messageId !== '';
+  };
+
+  // Helper to get status badge class
+  const getStatusBadgeClass = (status: string): string => {
+    switch (status) {
+      case 'confirmed':
+        return 'status-confirmed';
+      case 'failed':
+        return 'status-failed';
+      case 'pending':
+      default:
+        return 'status-pending';
+    }
   };
 
   return (
@@ -99,6 +132,7 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
                 onClick={handleClearRequest}
                 className="clear-history-button"
                 title="Clear History"
+                disabled={isLoading || isClearingHistory}
               >
                 Clear
               </button>
@@ -109,13 +143,15 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
                   onClick={handleConfirmClear}
                   className="confirm-clear-yes"
                   title="Yes, clear history"
+                  disabled={isClearingHistory}
                 >
-                  Yes
+                  {isClearingHistory ? '...' : 'Yes'}
                 </button>
                 <button
                   onClick={handleCancelClear}
                   className="confirm-clear-no"
                   title="No, keep history"
+                  disabled={isClearingHistory}
                 >
                   No
                 </button>
@@ -123,7 +159,11 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
             )}
           </div>
 
-          {transactions.length === 0 ? (
+          {isLoading && transactions.length === 0 ? (
+            <div className="transaction-history-loading">
+              Loading transactions...
+            </div>
+          ) : transactions.length === 0 ? (
             <div className="transaction-history-empty">
               No transactions yet
             </div>
@@ -133,6 +173,9 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
                 <div key={index} className="transaction-history-item">
                   <div className="transaction-type">
                     {getTransactionTypeLabel(tx.type)}
+                    <span className={`transaction-status-badge ${getStatusBadgeClass(tx.status)}`}>
+                      {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
+                    </span>
                   </div>
                   <div className="transaction-details">
                     <div className="transaction-hash">
@@ -150,19 +193,18 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
                     <div className="transaction-ccip">
                       <span className="transaction-label">CCIP Message:</span>
                       {isValidMessageId(tx.messageId) ? (
-                        <a
-                          href={getCCIPExplorerUrl(tx.messageId)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ccip-link"
-                          title="View on CCIP Explorer"
-                        >
-                          {formatHash(tx.messageId)}
-                        </a>
+                        <CCIPStatusChecker
+                          messageId={tx.messageId}
+                          txHash={tx.txHash}
+                        />
                       ) : (
                         <span className="ccip-pending">Pending...</span>
                       )}
                     </div>
+
+                    {tx.type === 'completeWithdrawal' && tx.status === 'confirmed' && (
+                      <WithdrawalCompletionStatus transaction={tx} />
+                    )}
 
                     <div className="transaction-timestamp">
                       {formatTimestamp(tx.timestamp)}

@@ -4,7 +4,7 @@ import { encodeDepositIntoStrategyMsg } from '../utils/encoders';
 import { CHAINLINK_CONSTANTS, STRATEGY_MANAGER_ADDRESS, STRATEGY, SENDER_CCIP_ADDRESS } from '../addresses';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
-import { useToast } from './ToastContainer';
+import { useToast } from '../components/ToastContainer';
 
 
 const DepositPage: React.FC = () => {

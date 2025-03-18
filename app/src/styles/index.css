@@ -1,3 +1,5 @@
+@import 'transactions.css';
+
 /* Base Styles */
 :root {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica', 'Arial', sans-serif;
@@ -1659,5 +1661,154 @@ a:hover {
 @media (prefers-color-scheme: light) {
   .transaction-label {
     color: #666;
+  }
+}
+
+/* Add these styles near the transaction history styles */
+.transaction-status-badge {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-left: 6px;
+  font-weight: 500;
+  display: inline-block;
+}
+
+.status-pending {
+  background-color: #7a7a7a;
+  color: #fff;
+}
+
+.status-confirmed {
+  background-color: #1e8b1e;
+  color: #fff;
+}
+
+.status-failed {
+  background-color: #b41717;
+  color: #fff;
+}
+
+.ccip-message-container {
+  display: flex;
+  align-items: center;
+}
+
+.ccip-check-button {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background-color: #333;
+  color: #fff;
+  margin-left: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+  transition: background-color 0.2s;
+}
+
+.ccip-check-button:hover {
+  background-color: #555;
+}
+
+.ccip-check-button:disabled {
+  background-color: #666;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: light) {
+  .status-pending {
+    background-color: #aaa;
+    color: #000;
+  }
+
+  .status-confirmed {
+    background-color: #2dc72d;
+    color: #000;
+  }
+
+  .status-failed {
+    background-color: #e13030;
+    color: #fff;
+  }
+
+  .ccip-check-button {
+    background-color: #ddd;
+    color: #333;
+  }
+
+  .ccip-check-button:hover {
+    background-color: #ccc;
+  }
+
+  .ccip-check-button:disabled {
+    background-color: #eee;
+    color: #999;
+  }
+}
+
+/* CCIP Status Checker Component */
+.ccip-status-checker {
+  display: inline-flex;
+  align-items: center;
+  margin: 4px 0;
+}
+
+.ccip-status-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-badge {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.status-confirmed {
+  background-color: #1e8b1e;
+  color: #fff;
+}
+
+.status-failed {
+  background-color: #b41717;
+  color: #fff;
+}
+
+.status-pending, .status-in.flight {
+  background-color: #7a7a7a;
+  color: #fff;
+}
+
+.status-unknown {
+  background-color: #555;
+  color: #fff;
+}
+
+@media (prefers-color-scheme: light) {
+  .status-confirmed {
+    background-color: #2dc72d;
+    color: #000;
+  }
+
+  .status-failed {
+    background-color: #e13030;
+    color: #fff;
+  }
+
+  .status-pending, .status-in.flight {
+    background-color: #aaa;
+    color: #000;
+  }
+
+  .status-unknown {
+    background-color: #888;
+    color: #fff;
   }
 }
