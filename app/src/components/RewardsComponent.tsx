@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Address, Hex } from 'viem';
+import { Address, formatEther } from 'viem';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { encodeProcessClaimMsg } from '../utils/encoders';
 import { REWARDS_COORDINATOR_ADDRESS } from '../addresses';
 import { createClaim, REWARDS_AMOUNT, simulateRewardClaim } from '../utils/rewards';
-import { RewardsMerkleClaim } from '../abis/generated/RewardsCoordinatorTypes';
+import { RewardsMerkleClaim } from '../abis/RewardsCoordinatorTypes';
 import { RewardsCoordinatorABI } from '../abis';
 import { useToast } from '../utils/toast';
 
@@ -14,16 +14,14 @@ const RewardsComponent: React.FC = () => {
     l1Wallet,
     isConnected,
     eigenAgentInfo,
-    isLoadingEigenAgent,
-    fetchEigenAgentInfo
+    isLoadingEigenAgent
   } = useClientsContext();
   const { showToast } = useToast();
 
-  const [currentRootIndex, setCurrentRootIndex] = useState<number | null>(null);
+  const [currentDistRootIndex, setCurrentDistRootIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [simulationResult, setSimulationResult] = useState<boolean | null>(null);
-  const [tokenAddress, setTokenAddress] = useState<Address>('0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE'); // Default to native token
 
   // Set up the EigenLayer operation hook
   const {
@@ -46,7 +44,7 @@ const RewardsComponent: React.FC = () => {
   });
 
   // Fetch the current distribution root index
-  const fetchCurrentRootIndex = async () => {
+  const fetchCurrentDistRootIndex = async () => {
     if (!l1Wallet.publicClient) {
       setError('Ethereum Sepolia client not available');
       return;
@@ -62,7 +60,7 @@ const RewardsComponent: React.FC = () => {
 
       // Convert to number and subtract 1 to get the latest index
       const latestIndex = Number(rootsLength) - 1;
-      setCurrentRootIndex(latestIndex);
+      setCurrentDistRootIndex(latestIndex);
       setError(null);
     } catch (err) {
       console.error('Error fetching distribution roots length:', err);
@@ -74,8 +72,14 @@ const RewardsComponent: React.FC = () => {
 
   // Simulate the claim
   const simulateClaim = async () => {
-    if (!l1Wallet.publicClient || !eigenAgentInfo?.eigenAgentAddress || currentRootIndex === null) {
+    if (!l1Wallet.publicClient || !eigenAgentInfo?.eigenAgentAddress || currentDistRootIndex === null) {
       setError('Required data not available');
+      return;
+    }
+
+    // Make sure we have a connected wallet address
+    if (!l1Wallet.account) {
+      setError('No wallet connected. Please connect your wallet first.');
       return;
     }
 
@@ -83,18 +87,18 @@ const RewardsComponent: React.FC = () => {
       setLoading(true);
 
       // Create the claim object
-      const claim = createClaim(
-        currentRootIndex,
+      const claim: RewardsMerkleClaim = createClaim(
+        currentDistRootIndex,
         eigenAgentInfo.eigenAgentAddress as Address,
         REWARDS_AMOUNT,
-        '0x', // Empty proof for single claim
+        '0x', // proof is empty as theres only 1 claim (just the merkle root)
         0,    // Earner index
-        tokenAddress
       );
 
       // Simulate the claim
       const success = await simulateRewardClaim(
         l1Wallet.publicClient,
+        l1Wallet.account,  // Pass the wallet address directly
         eigenAgentInfo.eigenAgentAddress as Address,
         REWARDS_COORDINATOR_ADDRESS,
         claim,
@@ -119,7 +123,7 @@ const RewardsComponent: React.FC = () => {
 
   // Claim rewards
   const claimRewards = async () => {
-    if (!eigenAgentInfo?.eigenAgentAddress || currentRootIndex === null) {
+    if (!eigenAgentInfo?.eigenAgentAddress || currentDistRootIndex === null) {
       setError('Required data not available');
       return;
     }
@@ -127,7 +131,7 @@ const RewardsComponent: React.FC = () => {
     try {
       // Create the claim object
       const claim: RewardsMerkleClaim = createClaim(
-        currentRootIndex,
+        currentDistRootIndex,
         eigenAgentInfo.eigenAgentAddress as Address,
         REWARDS_AMOUNT,
         '0x', // Empty proof for single claim
@@ -149,7 +153,7 @@ const RewardsComponent: React.FC = () => {
   // Fetch the current root index on mount
   useEffect(() => {
     if (l1Wallet.publicClient) {
-      fetchCurrentRootIndex();
+      fetchCurrentDistRootIndex();
     }
   }, [l1Wallet.publicClient]);
 
@@ -174,29 +178,12 @@ const RewardsComponent: React.FC = () => {
       ) : (
         <>
           <div className="form-group">
-            <label>Current Distribution Root Index</label>
-            {loading ? (
-              <p>Loading...</p>
-            ) : currentRootIndex !== null ? (
-              <p className="monospace-text">{currentRootIndex}</p>
-            ) : (
-              <p>Not available</p>
-            )}
+            <label>Eigenlayer Distribution Root Index: {currentDistRootIndex}</label>
           </div>
 
           <div className="form-group">
-            <label>Your EigenAgent</label>
-            <p className="monospace-text">{eigenAgentInfo.eigenAgentAddress}</p>
-          </div>
-
-          <div className="form-group">
-            <label>Execution Nonce</label>
-            <p className="monospace-text">{eigenAgentInfo.execNonce.toString()}</p>
-          </div>
-
-          <div className="form-group">
-            <label>Reward Amount</label>
-            <p className="monospace-text">{REWARDS_AMOUNT.toString()} wei</p>
+            <label>MAGIC Reward Amount</label>
+            <p className="monospace-text">{formatEther(REWARDS_AMOUNT)} MAGIC</p>
           </div>
 
           {simulationResult !== null && (
@@ -228,11 +215,11 @@ const RewardsComponent: React.FC = () => {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+          <div className="rewards-button-container">
             <button
               className="eigenagent-check-button"
               onClick={simulateClaim}
-              disabled={loading || isLoadingEigenAgent || currentRootIndex === null || !eigenAgentInfo?.eigenAgentAddress}
+              disabled={loading || isLoadingEigenAgent || currentDistRootIndex === null || !eigenAgentInfo?.eigenAgentAddress}
             >
               Simulate Claim
             </button>
@@ -244,7 +231,7 @@ const RewardsComponent: React.FC = () => {
                 isExecuting ||
                 loading ||
                 isLoadingEigenAgent ||
-                currentRootIndex === null ||
+                currentDistRootIndex === null ||
                 !eigenAgentInfo?.eigenAgentAddress ||
                 (simulationResult !== null && !simulationResult)
               }

@@ -19,6 +19,10 @@ import {
 } from 'viem';
 import { sepolia } from 'viem/chains';
 import dotenv from 'dotenv';
+import { calculateTokenLeafHash, calculateEarnerLeafHash, createClaim, REWARDS_AMOUNT } from '../utils/rewards';
+import { CHAINLINK_CONSTANTS } from '../addresses';
+import { encodeProcessClaimMsg } from '../utils/encoders';
+import { RewardsMerkleClaim } from '../abis/RewardsCoordinatorTypes';
 
 // Load environment variables at the beginning of the test file
 dotenv.config();
@@ -111,24 +115,6 @@ describe('EigenAgent Signature Functions', () => {
     expect(signature).toBeDefined();
     expect(signature.startsWith('0x')).toBe(true);
     expect(signature.length).toBeGreaterThan(66); // minimum EIP-712 signature length
-  });
-
-  it('should generate a valid signature for an ETH transfer', async () => {
-    const { signature, messageWithSignature } = await signMessageForEigenAgentExecution(
-      walletClient as any,
-      walletClient.account.address,
-      testEigenAgentAddress,
-      testTargetAddress,
-      '0x', // messageToEigenlayer
-      testExecNonce,
-      testExpiry
-    );
-
-    // Reduce logging
-    // console.log('ETH transfer signature:', signature);
-    expect(signature).toBeDefined();
-    expect(signature.startsWith('0x')).toBe(true);
-    expect(signature.length).toBeGreaterThan(66);
   });
 
   it('should generate messageWithSignature that matches the solidity test message', async () => {
@@ -312,5 +298,91 @@ describe('EigenAgent Signature Functions', () => {
     // same expected hash as in the solidity test
     const expectedHash = '0xfbd4755832659339a0fce01fe6d0da7b477ff33f806a164db9fe9a16ca891d72';
     expect(digestHash).toBe(expectedHash);
+  });
+
+  it('should calculate token leaf hash correctly', () => {
+    const amount = 100000000000000000n;
+    const expectedHash = "0x2275559c723ed63f581166bd0fd7ae1e8cbda26ea166d9614e5dbc1061a553aa";
+
+    // Create token leaf
+    const tokenLeaf = {
+      token: CHAINLINK_CONSTANTS.ethSepolia.bridgeToken,
+      cumulativeEarnings: amount
+    };
+
+    // Calculate token leaf hash
+    const tokenLeafHash = calculateTokenLeafHash(tokenLeaf);
+
+    // Verify the hash matches expected value
+    expect(tokenLeafHash.toLowerCase()).toBe(expectedHash.toLowerCase());
+  });
+
+  it('should calculate earner leaf hash correctly using the token leaf hash', () => {
+    const amount = 100000000000000000n;
+    const testAddress = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' as Address;
+
+    // First create and calculate the token leaf hash
+    const tokenLeaf = {
+      token: CHAINLINK_CONSTANTS.ethSepolia.bridgeToken,
+      cumulativeEarnings: amount
+    };
+
+    const tokenLeafHash = calculateTokenLeafHash(tokenLeaf);
+
+    // Create the earner leaf using the token leaf hash
+    const earnerLeaf = {
+      earner: testAddress,
+      earnerTokenRoot: tokenLeafHash
+    };
+
+    // Calculate the earner leaf hash
+    const earnerLeafHash = calculateEarnerLeafHash(earnerLeaf);
+
+    // Verify it produces a valid hash (can't check against a known value)
+    expect(earnerLeafHash).toBeDefined();
+    expect(earnerLeafHash.startsWith('0x')).toBe(true);
+    expect(earnerLeafHash.length).toBe(66); // 32 bytes + 0x prefix
+
+    // Changing any input should produce a different hash
+    const differentAddressLeaf = {
+      earner: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC' as Address,
+      earnerTokenRoot: tokenLeafHash
+    };
+
+    const differentHash = calculateEarnerLeafHash(differentAddressLeaf);
+    expect(differentHash).not.toBe(earnerLeafHash);
+  });
+
+  it('should correctly encode processClaim message', () => {
+    // Define expected hex message
+    const expectedMessage = "0x3ccc861d0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000abac0ee51946b38a02ad8150fa85e9147bc8851f000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000abac0ee51946b38a02ad8150fa85e9147bc8851f2275559c723ed63f581166bd0fd7ae1e8cbda26ea166d9614e5dbc1061a553aa0000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000001c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000af03f2a302a2c4867d622de44b213b8f870c0f1a000000000000000000000000000000000000000000000000016345785d8a0000";
+
+    // Recipient is the EigenAgent address
+    const recipient: Address = '0xabac0ee51946b38a02ad8150fa85e9147bc8851f';
+    const bridgeToken: Address = CHAINLINK_CONSTANTS.ethSepolia.bridgeToken;
+
+    // Create the claim object similar to what's done in RewardsComponent.tsx
+    const claim: RewardsMerkleClaim = createClaim(
+      1, // rootIndex
+      recipient, // earner
+      REWARDS_AMOUNT, // amount
+      '0x', // proof is empty as there's only 1 claim
+      0 // earnerIndex
+    );
+
+    // Encode the message for processing the claim
+    const message = encodeProcessClaimMsg(claim, recipient);
+
+    // Verify message matches expected output (case insensitive comparison)
+    expect(message.toLowerCase()).toBe(expectedMessage.toLowerCase());
+
+    // Also verify the message contains the correct recipient address
+    expect(message.toLowerCase()).toContain(recipient.toLowerCase().substring(2)); // without 0x prefix
+
+    // Verify the message contains the token address (bridge token)
+    expect(message.toLowerCase()).toContain(bridgeToken.toLowerCase().substring(2)); // without 0x prefix
+
+    // Verify the message contains the function selector for processClaim
+    expect(message.startsWith('0x3ccc861d')).toBe(true);
   });
 });

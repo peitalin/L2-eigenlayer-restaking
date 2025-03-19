@@ -1,28 +1,14 @@
-import { PublicClient, Abi, WalletClient, TransactionReceipt, keccak256, toHex } from 'viem';
+import { PublicClient, Abi, WalletClient, TransactionReceipt, keccak256, toHex, toBytes } from 'viem';
 import { SENDER_CCIP_ADDRESS } from '../addresses';
-import { SenderCCIPABI } from '../abis';
 import { CCIPTransaction } from '../contexts/TransactionHistoryContext';
 
-// MessageSent event signature
-const MESSAGE_SENT_EVENT = {
-  name: 'MessageSent',
-  inputs: [
-    { indexed: true, name: 'messageId', type: 'bytes32' },
-    { indexed: true, name: 'destinationChainSelector', type: 'uint64' },
-    { name: 'receiver', type: 'address' },
-    { name: 'tokenAmounts', type: 'tuple[]' },
-    { name: 'feeToken', type: 'address' },
-    { name: 'fees', type: 'uint256' }
-  ]
-} as const;
 
-// Calculate the event signature hash
-const MESSAGE_SENT_SIGNATURE = `${MESSAGE_SENT_EVENT.name}(${MESSAGE_SENT_EVENT.inputs.map(input =>
-  input.type === 'tuple[]' ? 'tuple[]' : input.type).join(',')})`;
-const MESSAGE_SENT_TOPIC = keccak256(toHex(MESSAGE_SENT_SIGNATURE));
+// Define server base URL
+const SERVER_BASE_URL = 'http://localhost:3001';
 
-// This is the known topic hash for MessageSent event used as a fallback
-const KNOWN_MESSAGE_SENT_TOPIC = '0x8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036';
+const MESSAGE_SENT_SIGNATURE = keccak256(toBytes('MessageSent(bytes32 indexed, uint64 indexed, address, (address, uint256)[], address, uint256)'));
+// cast sig-event 'MessageSent(bytes32 indexed, uint64 indexed, address, (address, uint256)[], address, uint256)'
+// is: 0xf41bc76bbe18ec95334bdb88f45c769b987464044ead28e11193a766ae8225cb
 
 /**
  * Processes a transaction receipt to extract CCIP event data
@@ -43,37 +29,15 @@ export async function processCCIPTransaction(
     console.log('Processing CCIP transaction receipt:', receipt.transactionHash);
     console.log('Log count in receipt:', receipt.logs.length);
 
-    // Step 1: Try with the calculated topic
+    // Step 1: Extract MessageSent events from the receipt
     let messageSentEvents = receipt.logs.filter(log => {
       const isSenderAddress = log.address.toLowerCase() === SENDER_CCIP_ADDRESS.toLowerCase();
-      const hasCalculatedTopic = log.topics[0] === MESSAGE_SENT_TOPIC;
+      const hasCalculatedTopic = log.topics[0] === MESSAGE_SENT_SIGNATURE;
       if (isSenderAddress) console.log('Found sender address in log, topic match:', hasCalculatedTopic);
       return isSenderAddress && hasCalculatedTopic;
     });
 
-    // Step 2: If no events found, try with the known hardcoded topic
-    if (messageSentEvents.length === 0) {
-      console.log('No events found with calculated topic, trying hardcoded topic');
-      messageSentEvents = receipt.logs.filter(log => {
-        const isSenderAddress = log.address.toLowerCase() === SENDER_CCIP_ADDRESS.toLowerCase();
-        const hasKnownTopic = log.topics[0] === KNOWN_MESSAGE_SENT_TOPIC;
-        if (isSenderAddress) console.log('Found sender address in log, known topic match:', hasKnownTopic);
-        return isSenderAddress && hasKnownTopic;
-      });
-    }
-
-    // Step 3: Last resort - check any events from the sender address with enough topics
-    if (messageSentEvents.length === 0) {
-      console.log('No events found with known topics, checking all events from sender');
-      messageSentEvents = receipt.logs.filter(log => {
-        const isSenderAddress = log.address.toLowerCase() === SENDER_CCIP_ADDRESS.toLowerCase();
-        const hasEnoughTopics = log.topics.length > 1;
-        if (isSenderAddress) console.log('Found sender address in log, has enough topics:', hasEnoughTopics);
-        return isSenderAddress && hasEnoughTopics;
-      });
-    }
-
-    // Step 4: No events found from the sender
+    // Step 2: No events found from the sender
     if (messageSentEvents.length === 0) {
       console.warn('No MessageSent events found from CCIP sender');
 
@@ -214,4 +178,104 @@ export function getCCIPExplorerUrl(messageId: string): string {
     return 'https://ccip.chain.link';
   }
   return `https://ccip.chain.link/#/side-drawer/msg/${messageId}`;
+}
+
+// Define the structure of the CCIP message data from the API
+export interface CCIPMessageData {
+  messageId: string;
+  state: number;
+  votes: any;
+  sourceNetworkName: string;
+  destNetworkName: string;
+  commitBlockTimestamp: string;
+  root: string;
+  sendFinalized: string;
+  commitStore: string;
+  origin: string;
+  sequenceNumber: number;
+  sender: string;
+  receiver: string;
+  sourceChainId: string;
+  destChainId: string;
+  routerAddress: string;
+  onrampAddress: string;
+  offrampAddress: string;
+  destRouterAddress: string;
+  sendTransactionHash: string;
+  sendTimestamp: string;
+  sendBlock: number;
+  sendLogIndex: number;
+  min: string;
+  max: string;
+  commitTransactionHash: string;
+  commitBlockNumber: number;
+  commitLogIndex: number;
+  arm: string;
+  blessTransactionHash: string | null;
+  blessBlockNumber: string | null;
+  blessBlockTimestamp: string | null;
+  blessLogIndex: string | null;
+  receiptTransactionHash: string | null;
+  receiptTimestamp: string | null;
+  receiptBlock: number | null;
+  receiptLogIndex: number | null;
+  receiptFinalized: string | null;
+  data: string;
+  strict: boolean;
+  nonce: number;
+  feeToken: string;
+  gasLimit: string;
+  feeTokenAmount: string;
+  tokenAmounts: any[];
+}
+
+/**
+ * Fetches CCIP message data from the server API
+ * @param messageId The CCIP message ID to fetch data for
+ * @returns A promise that resolves to the CCIP message data
+ */
+export async function fetchCCIPMessageData(messageId: string): Promise<CCIPMessageData | null> {
+  if (!messageId || messageId === '') {
+    console.log('No messageId provided to fetchCCIPMessageData');
+    return null;
+  }
+
+  try {
+    console.log(`Fetching CCIP data for messageId: ${messageId}`);
+
+    // Use the app server API instead of calling CCIP API directly
+    const response = await fetch(`${SERVER_BASE_URL}/api/ccip/message/${messageId}`);
+
+    if (!response.ok) {
+      console.error(`Error fetching CCIP data: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('CCIP data received:', data);
+    return data as CCIPMessageData;
+  } catch (error) {
+    console.error('Error fetching CCIP message data:', error);
+    return null;
+  }
+}
+
+/**
+ * Utility to convert CCIP message state to a human-readable status
+ * @param state CCIP message state number
+ * @returns Human-readable status
+ */
+export function getCCIPMessageStatusText(state: number): string {
+  switch (state) {
+    case 0:
+      return 'Pending';
+    case 1:
+      return 'In Flight';
+    case 2:
+      return 'Confirmed';
+    case 3:
+      return 'Failed';
+    default:
+      return 'Unknown';
+  }
 }

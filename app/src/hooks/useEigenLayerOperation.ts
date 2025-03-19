@@ -74,9 +74,6 @@ export function useEigenLayerOperation({
   // Get transaction history context
   const { addTransaction } = useTransactionHistory();
 
-  // Access toast functionality
-  const { showToast } = useToast();
-
   const [isExecuting, setIsExecuting] = useState(false);
   const [signature, setSignature] = useState<Hex | null>(null);
   const [error, setError] = useState<string | null>(null);

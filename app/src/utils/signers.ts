@@ -1,5 +1,10 @@
-import { Address, Hex, Hash, concat, encodeAbiParameters, keccak256, pad, toBytes, WalletClient, createPublicClient, http, PublicClient, verifyMessage, SignableMessage, verifyTypedData, stringToHex, hexToBytes, bytesToHex, hexToString } from 'viem';
-import { sepolia } from 'viem/chains';
+import {
+  Address, Hex, Hash, concat,
+  encodeAbiParameters, keccak256, encodePacked,
+  toBytes, WalletClient,
+  verifyMessage, SignableMessage, verifyTypedData,
+  stringToHex, hexToBytes, bytesToHex, hexToString
+} from 'viem';
 import { CHAINLINK_CONSTANTS } from '../addresses';
 import { ZeroAddress } from './encoders';
 
@@ -215,6 +220,10 @@ export async function signMessageForEigenAgentExecution(
   console.log("\ndigestHash", digestHash);
   console.log("signature", formattedSignature);
 
+    // encodePacked(
+    //   ['uint8', 'address', 'bytes32'],
+    //   [EARNER_LEAF_SALT, earnerLeaf.earner, earnerLeaf.earnerTokenRoot]
+    // )
   const messageWithSignature = concat([
     messageToEigenlayer,
     encodedSigner,

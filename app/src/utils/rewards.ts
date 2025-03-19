@@ -1,13 +1,15 @@
-import { Address, Hex, keccak256, encodeAbiParameters } from 'viem';
+import { Address, Hex, keccak256, encodeAbiParameters, encodePacked } from 'viem';
 import {
   RewardsMerkleClaim,
   TokenTreeMerkleLeaf,
   EarnerTreeMerkleLeaf
-} from '../abis/generated/RewardsCoordinatorTypes';
-import { RewardsCoordinatorABI } from '../abis';
+} from '../abis/RewardsCoordinatorTypes';
+import {encodeProcessClaimMsg} from "./encoders";
+import {CHAINLINK_CONSTANTS} from "../addresses";
 
-// Reward amount constant - can be adjusted as needed
-export const REWARDS_AMOUNT = 1000000000000000000n; // 1 ETH in wei
+export const REWARDS_AMOUNT = 100000000000000000n;
+// 0.1 ETH in wei, defined in 9_submitRewards.s.sol
+// Hardcoded here until we switch to Eigenlayer's RewardsCoordinator
 
 /**
  * Calculate the token leaf hash equivalent to the Solidity implementation
@@ -17,13 +19,40 @@ export const REWARDS_AMOUNT = 1000000000000000000n; // 1 ETH in wei
  */
 export function calculateTokenLeafHash(tokenLeaf: TokenTreeMerkleLeaf): Hex {
   // This replicates the Solidity function that encodes and hashes the token leaf
+  // function calculateTokenLeafHash(
+  //     TokenTreeMerkleLeaf calldata leaf
+  // ) public pure returns (bytes32) {
+  //     return keccak256(abi.encodePacked(TOKEN_LEAF_SALT, leaf.token, leaf.cumulativeEarnings));
+  // }
+  // uint8 internal constant TOKEN_LEAF_SALT = 1;
+  const TOKEN_LEAF_SALT = 1;
   return keccak256(
-    encodeAbiParameters(
-      [
-        { name: 'token', type: 'address' },
-        { name: 'cumulativeEarnings', type: 'uint256' }
-      ],
-      [tokenLeaf.token, tokenLeaf.cumulativeEarnings]
+    encodePacked(
+      ['uint8', 'address', 'uint256'],
+      [TOKEN_LEAF_SALT, tokenLeaf.token, tokenLeaf.cumulativeEarnings]
+    )
+  );
+}
+
+/**
+ * Calculate the earner leaf hash equivalent to the Solidity implementation
+ *
+ * @param earnerLeaf The earner leaf with earner address and earner token root
+ * @returns The keccak256 hash of the encoded leaf
+ */
+export function calculateEarnerLeafHash(earnerLeaf: EarnerTreeMerkleLeaf): Hex {
+  // This replicates the Solidity function that encodes and hashes the earner leaf
+  // function calculateEarnerLeafHash(
+  //     EarnerTreeMerkleLeaf calldata leaf
+  // ) public pure returns (bytes32) {
+  //     return keccak256(abi.encodePacked(EARNER_LEAF_SALT, leaf.earner, leaf.earnerTokenRoot));
+  // }
+  // uint8 internal constant EARNER_LEAF_SALT = 0;
+  const EARNER_LEAF_SALT = 0;
+  return keccak256(
+    encodePacked(
+      ['uint8', 'address', 'bytes32'],
+      [EARNER_LEAF_SALT, earnerLeaf.earner, earnerLeaf.earnerTokenRoot]
     )
   );
 }
@@ -52,20 +81,18 @@ export function createClaim(
   earner: Address,
   amount: bigint,
   proof: Hex = '0x',
-  earnerIndex: number = 0,
-  tokenAddress?: Address
+  earnerIndex: number = 0
 ): RewardsMerkleClaim {
-  // Use default token address if not provided
-  const token = tokenAddress || '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE' as Address;
 
   // Create token leaf
   const tokenLeaf: TokenTreeMerkleLeaf = {
-    token: token,
+    token: CHAINLINK_CONSTANTS.ethSepolia.bridgeToken,
     cumulativeEarnings: amount
   };
 
-  // Calculate token leaf hash (would normally call the contract)
+  // Calculate token leaf hash
   const tokenLeafHash = calculateTokenLeafHash(tokenLeaf);
+  console.log("Token leaf hash: ", tokenLeafHash);
 
   // Create earner leaf
   const earnerLeaf: EarnerTreeMerkleLeaf = {
@@ -73,11 +100,14 @@ export function createClaim(
     earnerTokenRoot: tokenLeafHash
   };
 
-  // For a single claim, tokenIndices is just [0]
-  const tokenIndices: number[] = [0];
+  // Calculate earner leaf hash
+  const earnerLeafHash = calculateEarnerLeafHash(earnerLeaf);
+  console.log("Earner leaf hash: ", earnerLeafHash)
 
   // For a single claim, tokenTreeProofs can be empty as it's just the root
   const tokenTreeProofs: Hex[] = ['0x'];
+
+  const tokenIndices: number[] = [0];
 
   // Return the complete claim structure
   return {
@@ -95,13 +125,16 @@ export function createClaim(
  * Simulate a reward claim through the EigenAgent
  *
  * @param l1Client The L1 ethers client to use for the simulation
+ * @param walletAddress The address of the connected wallet (owner of the EigenAgent)
  * @param eigenAgentAddress The address of the EigenAgent
  * @param rewardsCoordinatorAddress The address of the RewardsCoordinator contract
  * @param claim The claim to process
+ * @param recipient The recipient address for the rewards
  * @returns True if the simulation was successful, false otherwise
  */
 export async function simulateRewardClaim(
   l1Client: any,
+  walletAddress: Address,
   eigenAgentAddress: Address,
   rewardsCoordinatorAddress: Address,
   claim: RewardsMerkleClaim,
@@ -109,52 +142,13 @@ export async function simulateRewardClaim(
 ): Promise<boolean> {
   try {
     // Encode the call to processClaim
-    const calldata = encodeAbiParameters(
-      [
-        {
-          name: 'selector',
-          type: 'bytes4'
-        },
-        {
-          name: 'claim',
-          type: 'tuple',
-          components: [
-            { name: 'rootIndex', type: 'uint32' },
-            { name: 'earnerIndex', type: 'uint32' },
-            { name: 'earnerTreeProof', type: 'bytes' },
-            {
-              name: 'earnerLeaf',
-              type: 'tuple',
-              components: [
-                { name: 'earner', type: 'address' },
-                { name: 'earnerTokenRoot', type: 'bytes32' }
-              ]
-            },
-            { name: 'tokenIndices', type: 'uint32[]' },
-            { name: 'tokenTreeProofs', type: 'bytes[]' },
-            {
-              name: 'tokenLeaves',
-              type: 'tuple[]',
-              components: [
-                { name: 'token', type: 'address' },
-                { name: 'cumulativeEarnings', type: 'uint256' }
-              ]
-            }
-          ]
-        },
-        {
-          name: 'recipient',
-          type: 'address'
-        }
-      ],
-      [
-        '0x3ccc861d', // processClaim selector
-        claim,
-        recipient
-      ]
-    );
+    const calldata = encodeProcessClaimMsg(claim, recipient);
+    console.log("Calldata processedClaim: ", calldata);
 
-    // Simulate the call through the EigenAgent
+    // Log the wallet address for debugging
+    console.log("Simulating with account:", walletAddress);
+
+    // Simulate the call through the EigenAgent with the provided wallet address
     const result = await l1Client.simulateContract({
       address: eigenAgentAddress,
       abi: [
@@ -177,7 +171,8 @@ export async function simulateRewardClaim(
         0n,
         calldata,
         0
-      ]
+      ],
+      account: walletAddress
     });
 
     console.log('Simulation result:', result);

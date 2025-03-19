@@ -1,6 +1,6 @@
 import { Address, Hex, encodeFunctionData } from 'viem';
 import { DelegationManagerABI } from '../abis';
-import { RewardsMerkleClaim } from '../abis/generated/RewardsCoordinatorTypes';
+import { RewardsMerkleClaim } from '../abis/RewardsCoordinatorTypes';
 
 // Constant for zero address
 export const ZeroAddress: Address = "0x0000000000000000000000000000000000000000";
@@ -151,6 +151,26 @@ export function encodeProcessClaimMsg(
   recipient: Address
 ): Hex {
   // Function signature: processClaim((uint32,uint32,bytes,(address,bytes32),uint32[],bytes[],(address,uint256)[]),address)
+
+  // Solidity Structs:
+  // struct RewardsMerkleClaim {
+  //     uint32 rootIndex;
+  //     uint32 earnerIndex;
+  //     bytes earnerTreeProof;
+  //     EarnerTreeMerkleLeaf earnerLeaf;
+  //     uint32[] tokenIndices;
+  //     bytes[] tokenTreeProofs;
+  //     TokenTreeMerkleLeaf[] tokenLeaves;
+  // }
+  // struct EarnerTreeMerkleLeaf {
+  //     address earner;
+  //     bytes32 earnerTokenRoot;
+  // }
+  // struct TokenTreeMerkleLeaf {
+  //     IERC20 token;
+  //     uint256 cumulativeEarnings;
+  // }
+
   const abi = [
     {
       name: 'processClaim',

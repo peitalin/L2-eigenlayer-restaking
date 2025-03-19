@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { fetchCCIPMessageData, getCCIPMessageStatusText } from '../utils/ccipDataFetcher';
+import { getCCIPMessageStatusText } from '../utils/ccipEventListener';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import { useToast } from '../utils/toast';
 import { getCCIPExplorerUrl } from '../utils/ccipEventListener';
@@ -15,16 +15,23 @@ const CCIPStatusChecker: React.FC<CCIPStatusCheckerProps> = ({
   txType,
   showExplorerLink = true,
 }) => {
+
+  const {
+    fetchCCIPMessageDetails,
+    fetchTransactions,
+    updateTransaction
+  } = useTransactionHistory();
+  const { showToast } = useToast();
+
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const { fetchCCIPMessageDetails, fetchTransactions, updateTransaction } = useTransactionHistory();
-  const { showToast } = useToast();
+  const [isConfirmed, setIsConfirmed] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+
   const isWithdrawal = txType === 'completeWithdrawal'
     || txType === 'bridgingWithdrawalToL2'
     || txType === 'bridgingRewardsToL2'
     || txType === 'withdrawal';
-  const [isConfirmed, setIsConfirmed] = useState(false);
-  const [checkingStatus, setCheckingStatus] = useState(false);
 
   const handleCheckStatus = async () => {
     if (!messageId) {
@@ -145,11 +152,6 @@ const CCIPStatusChecker: React.FC<CCIPStatusCheckerProps> = ({
         >
           {isLoading ? '...' : '⟳'}
         </button>
-        {/* {status && (
-          <span className={`status-badge status-${status.toLowerCase()}`}>
-            {status}
-          </span>
-        )} */}
       </div>
     </div>
   );
