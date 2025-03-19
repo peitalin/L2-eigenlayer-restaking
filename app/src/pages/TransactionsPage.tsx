@@ -94,43 +94,11 @@ const TransactionsPage: React.FC = () => {
 
   return (
     <div className="transaction-form transactions-page">
-      <div className="form-header">
+      <div className="transactions-form-header">
         <h2>Transaction History</h2>
-        {!confirmClearVisible ? (
-          <button
-            onClick={handleClearRequest}
-            className="clear-history-button"
-            title="Clear History"
-            disabled={isLoading || isClearingHistory || transactions.length === 0}
-          >
-            Clear History
-          </button>
-        ) : (
-          <div className="confirm-clear-container">
-            <span className="confirm-text">Are you sure?</span>
-            <div className="confirm-buttons">
-              <button
-                onClick={handleConfirmClear}
-                className="confirm-clear-yes"
-                title="Yes, clear history"
-                disabled={isClearingHistory}
-              >
-                {isClearingHistory ? 'Clearing...' : 'Yes'}
-              </button>
-              <button
-                onClick={handleCancelClear}
-                className="confirm-clear-no"
-                title="No, keep history"
-                disabled={isClearingHistory}
-              >
-                No
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
-      <div className="form-content">
+      <div className="transactions-form-content">
         {isLoading && transactions.length === 0 ? (
           <div className="transactions-loading">
             <div className="loading-spinner"></div>

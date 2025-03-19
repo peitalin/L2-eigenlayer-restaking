@@ -2,27 +2,34 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 
 interface NavigationItem {
-  path: string;
+  to: string;
   label: string;
   exact?: boolean;
 }
 
-const Navigation: React.FC = () => {
-  // Define navigation items - easy to add new ones in the future
-  const navigationItems: NavigationItem[] = [
-    { path: '/', label: 'Deposit', exact: true },
-    { path: '/withdraw', label: 'Withdraw' },
-    { path: '/transactions', label: 'Transactions' }
+interface NavigationProps {
+  links?: NavigationItem[];
+}
+
+const Navigation: React.FC<NavigationProps> = ({ links }) => {
+  // Define default navigation items if none are provided
+  const defaultNavigationItems: NavigationItem[] = [
+    { to: '/deposit', label: 'Deposit', exact: true },
+    { to: '/withdrawal', label: 'Withdraw' },
+    { to: '/transactions', label: 'Transactions' }
     // Add more navigation items here as the app grows
   ];
+
+  // Use provided links or default ones
+  const navigationItems = links || defaultNavigationItems;
 
   return (
     <nav className="navigation-panel">
       <ul className="navigation-list">
         {navigationItems.map((item) => (
-          <li key={item.path} className="navigation-item">
+          <li key={item.to} className="navigation-item">
             <NavLink
-              to={item.path}
+              to={item.to}
               className={({ isActive }) =>
                 isActive ? "navigation-link active" : "navigation-link"
               }

@@ -285,72 +285,75 @@ const WithdrawalPage: React.FC = () => {
   const isInputDisabled = !isConnected || isQueueingWithdrawal || isLoadingL1Data;
 
   return (
-    <div className="transaction-form">
-      <h2>Withdraw from Strategy</h2>
-
-      {/* Display user deposits */}
-      <UserDeposits />
-
-      <div className="withdrawal-info">
-        <p>
-          Queue a withdrawal to start the withdrawal process. After queueing,
-          you'll need to wait for the unbonding period to complete before you can complete the withdrawal.
-        </p>
-        <p>
-          The unbonding period is typically 7 days for EigenLayer strategies.
-        </p>
-      </div>
-
-      <div className="form-group">
-      </div>
-
-      {isConnected && eigenAgentInfo && (
-        <Expandable title="Withdrawal Information" initialExpanded={false}>
-          <div className="info-item">
-            <strong>Target Address:</strong> {DELEGATION_MANAGER_ADDRESS}
-            <div className="input-note">Using DelegationManager for Queue Withdrawals</div>
-          </div>
-          <div className="info-item">
-            <strong>Current Withdrawal Nonce:</strong> {isLoadingL1Data ? 'Loading...' : withdrawalNonce.toString()}
-          </div>
-          <div className="info-item">
-            <strong>Delegated To:</strong> {isLoadingL1Data ? 'Loading...' : (delegatedTo ? delegatedTo : 'Not delegated')}
-          </div>
-          <div className="info-item">
-            <strong>Withdrawer Address:</strong> {eigenAgentInfo.eigenAgentAddress}
-            <div className="input-note">Your EigenAgent will be set as the withdrawer</div>
-          </div>
-          <div className="info-item">
-            <strong>Transaction Expiry:</strong> 45 minutes from signing
-          </div>
-        </Expandable>
-      )}
-
-      <div className="form-group">
-        <label htmlFor="amount">Amount to withdraw (MAGIC):</label>
-        <input
-          id="amount"
-          type="text"
-          value={withdrawalAmount}
-          onChange={handleAmountChange}
-          className="amount-input"
-          placeholder="0.05"
-          disabled={isInputDisabled}
-        />
-        <button
-          className="create-transaction-button"
-          disabled={isInputDisabled || !eigenAgentInfo}
-          onClick={handleQueueWithdrawal}
-        >
-          {isQueueingWithdrawal ? 'Processing...' : isLoadingL1Data ? 'Loading L1 Data...' : 'Queue Withdrawal'}
-        </button>
-      </div>
-
-      <div className="withdrawals-section">
+    <div className="withdrawal-page-layout">
+      {/* Top section: Queued Withdrawals */}
+      <div className="transaction-form">
+        <h2>Queued Withdrawals</h2>
         <QueuedWithdrawals
           onSelectWithdrawal={handleCompleteWithdrawal}
           isCompletingWithdrawal={isCompletingWithdrawal}
         />
+      </div>
+
+      {/* Bottom section: Withdraw from Strategy */}
+      <div className="transaction-form">
+        <h2>Withdraw from Strategy</h2>
+
+        {/* Display user deposits */}
+        <UserDeposits />
+
+        <div className="form-group">
+          <label htmlFor="amount">Amount to withdraw (MAGIC)</label>
+          <input
+            id="amount"
+            type="text"
+            value={withdrawalAmount}
+            onChange={handleAmountChange}
+            className="amount-input"
+            placeholder="0.05"
+            disabled={isInputDisabled}
+          />
+          <button
+            className="create-transaction-button"
+            disabled={isInputDisabled || !eigenAgentInfo}
+            onClick={handleQueueWithdrawal}
+          >
+            {isQueueingWithdrawal ? 'Processing...' : isLoadingL1Data ? 'Loading L1 Data...' : 'Queue Withdrawal'}
+          </button>
+        </div>
+
+        <div className="withdrawal-info">
+          <p>
+            Queue a withdrawal to start the withdrawal process. After queueing,
+            you'll need to wait for the unbonding period to complete before you can complete the withdrawal.
+          </p>
+          <p>
+            The unbonding period is typically 7 days for EigenLayer strategies.
+          </p>
+        </div>
+
+        {isConnected && eigenAgentInfo && (
+          <Expandable title="Withdrawal Details" initialExpanded={false}>
+            <div className="info-item">
+              <strong>Target Address:</strong> {DELEGATION_MANAGER_ADDRESS}
+              <div className="input-note">Using DelegationManager for Queue Withdrawals</div>
+            </div>
+            <div className="info-item">
+              <strong>Current Withdrawal Nonce:</strong> {isLoadingL1Data ? 'Loading...' : withdrawalNonce.toString()}
+            </div>
+            <div className="info-item">
+              <strong>Delegated To:</strong> {isLoadingL1Data ? 'Loading...' : (delegatedTo ? delegatedTo : 'Not delegated')}
+            </div>
+            <div className="info-item">
+              <strong>Withdrawer Address:</strong> {eigenAgentInfo.eigenAgentAddress}
+              <div className="input-note">Your EigenAgent will be set as the withdrawer</div>
+            </div>
+            <div className="info-item">
+              <strong>Transaction Expiry:</strong> 45 minutes from signing
+            </div>
+          </Expandable>
+        )}
+
       </div>
     </div>
   );
