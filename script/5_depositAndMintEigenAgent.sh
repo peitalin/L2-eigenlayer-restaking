@@ -11,13 +11,15 @@ forge script script/5_depositAndMintEigenAgent.s.sol:DepositAndMintEigenAgentScr
     -vvvv
 
 
-### TODO: automatically verify EigenAgent contract after they are spawned
+# ### TODO: automatically verify EigenAgent contract after they are spawned
 # forge verify-contract \
 #     --watch \
 #     --rpc-url ethsepolia \
 #     --etherscan-api-key $ETHERSCAN_API_KEY \
-#     --compiler-version v0.8.25 \
-#     0x0aEDf2bfF862E2e8D31951E20f329F3776ceF974 \
+#     --compiler-version v0.8.28 \
+#     --verifier blockscout \
+#     --verifier-url https://eth-sepolia.blockscout.com/api \
+#     0xd1C80a6Ed1FF622832841AeBcf8f109c6c23a9eE \
 #     src/6551/EigenAgent6551.sol:EigenAgent6551
 
 

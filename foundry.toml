@@ -43,9 +43,14 @@ remappings = [
 localhost = "http://localhost:8545"
 # Note: Free RPCs may sometimes fail
 # ethsepolia = "https://sepolia.drpc.org"
-ethsepolia = "https://sepolia.gateway.tenderly.co"
-# ethsepolia = "https://sepolia.infura.io/v3/${INFURA_API_KEY}"
+# ethsepolia = "https://sepolia.gateway.tenderly.co"
+ethsepolia = "https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+# ethsepolia = "https://rpc-sepolia.rockx.com"
+# ethsepolia = "https://eth-sepolia.public.blastapi.io"
+
 basesepolia = "https://sepolia.base.org"
+# basesepolia = "https://base-sepolia.drpc.org"
+
 
 [etherscan]
 holesky = { key = "${ETHERSCAN_API_KEY}" }

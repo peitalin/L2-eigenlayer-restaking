@@ -6,6 +6,8 @@ import {BaseSepolia, EthSepolia} from "./Addresses.sol";
 import {BaseScript} from "./BaseScript.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
+import {console} from "forge-std/console.sol";
+
 
 contract DepositIntoStrategyScript is BaseScript {
 
@@ -53,8 +55,9 @@ contract DepositIntoStrategyScript is BaseScript {
         // Make sure we are on BaseSepolia Fork
         vm.selectFork(l2ForkId);
 
-        uint256 amount = 0.00797 ether;
+        uint256 amount = 0.11 ether;
         uint256 expiry = block.timestamp + 45 minutes;
+        // uint256 expiry = 1742066222;
 
         // sign the message for EigenAgent to execute Eigenlayer command
         bytes memory messageWithSignature = signMessageForEigenAgentExecution(
@@ -92,7 +95,7 @@ contract DepositIntoStrategyScript is BaseScript {
         senderContract.sendMessagePayNative{value: routerFees}(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
-            string(messageWithSignature),
+            string(messageWithSignature), // must be string
             tokenAmounts,
             gasLimit
         );

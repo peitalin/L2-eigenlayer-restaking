@@ -130,6 +130,10 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
         );
         bytes memory signature;
         {
+            digestHash = keccak256(abi.encodePacked(
+                "\x19Ethereum Signed Message:\n32",
+                digestHash
+            ));
             // generate ECDSA signature
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(bobKey, digestHash);
             signature = abi.encodePacked(r, s, v);
@@ -281,34 +285,21 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             expiry
         );
 
-        bytes memory messageWithSignatureBob;
+        // Conform with EIP-191 for frontend clients
+        digestHash = hashDigest191(digestHash);
+
         bytes memory sigBob;
         {
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(bobKey, digestHash);
             sigBob = abi.encodePacked(r, s, v);
             address signer = vm.addr(bobKey);
-
-            messageWithSignatureBob = abi.encodePacked(
-                spawnMessage,
-                bytes32(abi.encode(signer)), // pad signer to 32byte word
-                expiry,
-                sigBob
-            );
         }
 
-        bytes memory messageWithSignatureAlice;
         bytes memory sigAlice;
         {
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(aliceKey, digestHash);
             sigAlice = abi.encodePacked(r, s, v);
             address signer = vm.addr(aliceKey);
-
-            messageWithSignatureAlice = abi.encodePacked(
-                spawnMessage,
-                bytes32(abi.encode(signer)), // pad signer to 32byte word
-                expiry,
-                sigAlice
-            );
         }
 
         // 1st admin signs
@@ -812,7 +803,10 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
         bytes memory signature;
         {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+                signerKey,
+                hashDigest191(digestHash)
+            );
             signature = abi.encodePacked(r, s, v);
         }
 
@@ -839,7 +833,10 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
 
         bytes memory signature;
         {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+                signerKey,
+                hashDigest191(digestHash)
+            );
             signature = abi.encodePacked(r, s, v);
         }
 
@@ -868,10 +865,12 @@ contract UnitTests_EigenAgent is BaseTestEnvironment {
             block.chainid,
             expiry
         );
-
         bytes memory signature;
         {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digestHash);
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+                signerKey,
+                hashDigest191(digestHash)
+            );
             signature = abi.encodePacked(r, s, v);
         }
 

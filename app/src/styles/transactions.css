@@ -1,0 +1,581 @@
+/* Transactions Page Styles */
+.transactions-page {
+  width: 100%;
+  background-color: #f8f9fa;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  padding: 24px;
+  margin-bottom: 40px;
+}
+
+.transactions-form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.transactions-form-content {
+  width: 100%;
+}
+
+/* Clear History Button */
+.clear-history-button {
+  background-color: transparent;
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clear-history-button:hover {
+  background-color: rgba(248, 81, 73, 0.1);
+}
+
+.clear-history-button:disabled {
+  border-color: var(--color-border-secondary);
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+  background-color: transparent;
+}
+
+.confirm-clear-container {
+  display: flex;
+  align-items: center;
+}
+
+.confirm-text {
+  font-size: 14px;
+  margin-right: 12px;
+  color: var(--color-text-secondary);
+}
+
+.confirm-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.confirm-clear-yes {
+  background-color: var(--color-error);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.confirm-clear-yes:hover {
+  background-color: #d4423d;
+}
+
+.confirm-clear-yes:disabled {
+  background-color: rgba(248, 81, 73, 0.5);
+  cursor: not-allowed;
+}
+
+.confirm-clear-no {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.confirm-clear-no:hover {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-accent-secondary);
+}
+
+.confirm-clear-no:disabled {
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+/* Transaction Table */
+.transactions-table {
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-primary);
+}
+
+.transactions-table-header {
+  display: grid;
+  grid-template-columns: 15% 10% 15% 5% 15% 5% 15% 20%;
+  background-color: var(--color-bg-tertiary);
+  padding: 14px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border-primary);
+}
+
+.transactions-table-body {
+  /* Remove the max-height and overflow-y properties */
+  /* max-height: 500px; */
+  /* overflow-y: auto; */
+}
+
+.transaction-row {
+  display: grid;
+  grid-template-columns: 15% 10% 15% 5% 15% 5% 15% 20%;
+  padding: 10px;
+  border-bottom: 1px solid var(--color-border-primary);
+  align-items: center;
+  transition: background-color 0.2s ease;
+}
+
+.transaction-row:last-child {
+  border-bottom: none;
+}
+
+.transaction-row:hover {
+  background-color: var(--color-bg-tertiary);
+}
+
+/* Table Column Styling */
+.table-col {
+  justify-content: center;
+}
+
+.col-type {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.col-source {
+  display: flex;
+  align-items: center;
+}
+
+.col-status {
+  display: flex;
+  align-items: center;
+}
+
+.transaction-type-label {
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+/* Source Chain Badge */
+.source-chain-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  width: fit-content;
+  min-width: 40px;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.chain-base {
+  background-color: #0052FF;
+  color: white;
+}
+
+.chain-ethereum {
+  background-color: #627EEA;
+  color: white;
+}
+
+/* Status Badge */
+.transaction-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  width: fit-content;
+  text-align: center;
+}
+
+.status-confirmed {
+  background-color: var(--color-success);
+  color: white;
+}
+
+.status-pending {
+  background-color: var(--color-warning);
+  color: white;
+}
+
+.status-failed {
+  background-color: var(--color-error);
+  color: white;
+}
+
+/* Transaction Hash */
+.hash-link {
+  color: var(--color-accent-secondary);
+  text-decoration: none;
+  font-family: monospace;
+  font-size: 14px;
+  transition: color 0.2s ease;
+}
+
+.hash-link:hover {
+  color: var(--color-accent-secondary-hover);
+  text-decoration: underline;
+}
+
+/* Directional Arrows */
+.directional-arrow {
+  font-size: 18px;
+  color: var(--color-text-secondary);
+  font-weight: bold;
+}
+
+.directional-arrow.dim {
+  opacity: 0.3;
+}
+
+/* CCIP Message */
+.col-ccip {
+  display: flex;
+  align-items: center;
+}
+
+.ccip-status-checker {
+  display: flex;
+  align-items: center;
+}
+
+.ccip-status-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ccip-link {
+  color: var(--color-accent-secondary);
+  text-decoration: none;
+  font-family: monospace;
+  font-size: 14px;
+}
+
+.ccip-link:hover {
+  text-decoration: underline;
+  color: var(--color-accent-secondary-hover);
+}
+
+.ccip-check-button {
+  background-color: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-primary);
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  padding: 0;
+  font-size: 14px;
+}
+
+.ccip-check-button:hover {
+  background-color: var(--color-bg-tertiary);
+  border-color: var(--color-accent-secondary);
+}
+
+.ccip-check-button:disabled {
+  cursor: not-allowed;
+  color: var(--color-text-secondary);
+}
+
+.ccip-pending, .l1-pending {
+  color: var(--color-text-secondary);
+  font-style: italic;
+  font-size: 14px;
+}
+
+/* L1 Transaction */
+.col-l1hash {
+  display: flex;
+  align-items: center;
+}
+
+/* Timestamp */
+.col-time {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+/* Source & Destination Hash Styling */
+.source-hash, .dest-hash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Arrow Column */
+.col-arrow {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Media Queries for Responsiveness */
+@media (max-width: 1024px) {
+  .transactions-table-header,
+  .transaction-row {
+    grid-template-columns: 15% 10% 20% 5% 15% 5% 20% 10%;
+  }
+
+  .col-time {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .transactions-table-header {
+    display: none;
+  }
+
+  .transaction-row {
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .table-col {
+    width: 100%;
+    display: flex;
+    align-items: center;
+  }
+
+  .col-type, .col-status, .col-hash, .col-ccip, .col-arrow, .col-time {
+    margin-bottom: 8px;
+  }
+
+  .col-type:before, .col-status:before, .col-hash:before, .col-ccip:before, .col-arrow:before, .col-time:before {
+    content: "";
+    width: 120px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+  }
+
+  .source-hash:before { content: "Source TX:"; }
+  .dest-hash:before { content: "Destination TX:"; }
+  .col-status:before { content: "Status:"; }
+  .col-type:before { content: "Type:"; }
+  .col-ccip:before { content: "CCIP:"; }
+  .col-time:before { content: "Time:"; }
+
+  .col-arrow {
+    display: none; /* Hide arrows on mobile */
+  }
+
+  .source-hash, .dest-hash {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .source-chain-badge {
+    margin-right: 8px;
+  }
+
+  .transactions-form-header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .confirm-clear-container {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* Empty State */
+.transactions-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+  text-align: center;
+}
+
+.transactions-empty p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.transactions-empty p:first-child {
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--color-text-primary);
+}
+
+.empty-details {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+/* Loading State */
+.transactions-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 0;
+}
+
+.loading-spinner {
+  border: 3px solid var(--color-border-primary);
+  border-top: 3px solid var(--color-accent-secondary);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.transactions-loading p {
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Withdrawal Completion Status */
+.withdrawal-completion-status {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.status-container {
+  background-color: #f9f9f9;
+  border-radius: 6px;
+  padding: 10px 12px;
+  border: 1px solid #e3e3e3;
+}
+
+.status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.status-header h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.status-badge {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.status-badge.complete {
+  background-color: #e6f7ed;
+  color: #17a24c;
+}
+
+.status-badge.pending {
+  background-color: #fff9e6;
+  color: #e6a317;
+}
+
+.action-container {
+  margin-top: 10px;
+}
+
+.check-button {
+  background-color: #3a75f7;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.check-button:hover {
+  background-color: #2c5cc5;
+}
+
+.check-button:disabled {
+  background-color: #b3c9fb;
+  cursor: not-allowed;
+}
+
+.last-checked {
+  font-size: 12px;
+  color: #777;
+  margin-top: 6px;
+}
+
+.error-message {
+  color: #e5484d;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.completion-details {
+  margin-top: 6px;
+}
+
+.completion-details p {
+  font-size: 13px;
+  color: #555;
+  margin: 0 0 6px 0;
+}
+
+.receipt-hash {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.receipt-hash a {
+  color: #3a75f7;
+  text-decoration: none;
+  font-family: monospace;
+  transition: color 0.2s ease;
+}
+
+.receipt-hash a:hover {
+  color: #2c5cc5;
+  text-decoration: underline;
+}
+
+/* Media Queries */
+@media (max-width: 768px) {
+  .withdrawal-completion-status {
+    margin-top: 12px;
+  }
+
+  .status-container {
+    padding: 8px;
+  }
+}

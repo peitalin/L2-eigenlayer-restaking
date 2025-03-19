@@ -1,11 +1,11 @@
 {
   "chainInfo": {
-    "block": 22912898,
+    "block": 23274074,
     "chainid": 84532,
-    "timestamp": 1741594084
+    "timestamp": 1742316436
   },
   "contracts": {
-    "senderCCIP": "0x2ee92A6E9aFb0E94937F9020Df3bD6203F73d24A",
-    "senderHooks": "0xE04336A5E33451AD56319FF7C09e14e28c65adBE"
+    "senderCCIP": "0x4834DFb5f5A5677eBa93F380EC166375047ea2F6",
+    "senderHooks": "0xbF186e57781c73BA6E13D504E679CdDDe464e5fA"
   }
 }

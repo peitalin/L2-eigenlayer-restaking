@@ -8,15 +8,15 @@ forge script script/3_deployReceiverOnL1.s.sol:DeployReceiverOnL1Script \
     --broadcast \
     --etherscan-api-key $ETHERSCAN_API_KEY \
     --private-key $DEPLOYER_KEY \
+    --gas-estimate-multiplier 250 \
     --priority-gas-price 200 \
-    --verify \
-    -vvvv
+    --verify
 
 
 # forge verify-contract \
 #     --watch \
 #     --rpc-url ethsepolia \
 #     --etherscan-api-key $ETHERSCAN_API_KEY \
-#     --compiler-version v0.8.25 \
-#     0x7f9480b3E5C40C38dFB2DD0D2F7b76DDa5CCFE12 \
+#     --compiler-version v0.8.28 \
+#     0xd1C80a6Ed1FF622832841AeBcf8f109c6c23a9eE \
 #     src/6551/EigenAgent6551.sol:EigenAgent6551

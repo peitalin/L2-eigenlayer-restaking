@@ -1,0 +1,26 @@
+{
+  "name": "ccip-app-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "server": "tsx server.ts",
+    "server:watch": "tsx watch server.ts"
+  },
+  "dependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "better-sqlite3": "^11.9.1",
+    "cors": "^2.8.5",
+    "express": "^4.18.3",
+    "viem": "^2.23.12"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.30",
+    "concurrently": "^8.2.2",
+    "dotenv": "^16.4.7",
+    "tsx": "^4.7.1",
+    "typescript": "^5.2.2"
+  }
+}

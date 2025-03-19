@@ -574,7 +574,7 @@ contract UnitTests_MsgEncodingDecoding is BaseTestEnvironment {
                 EthSepolia.ChainSelector
             );
 
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, digestHash1);
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(deployerKey, hashDigest191(digestHash1));
             bytes memory signature1 = abi.encodePacked(r, s, v);
 
             approverSignatureAndExpiry = ISignatureUtilsMixinTypes.SignatureWithExpiry({

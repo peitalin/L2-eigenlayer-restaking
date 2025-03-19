@@ -20,6 +20,13 @@ docs/
 /test/withdrawals-undelegated/*
 /test/temp-files/*
 
+# Ignore frontend app
+/app/node_modules
+/app/.env
+
+/app-server/node_modules
+/app-server/.env
+
 /.vscode
 .DS_Store
 **/.DS_Store

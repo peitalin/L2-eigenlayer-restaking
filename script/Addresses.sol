@@ -46,5 +46,5 @@ library EthSepolia {
 
     uint256 constant ChainId = 11155111;
 
-    address constant PoolAddress = 0x886330448089754e998BcEfa2a56a91aD240aB60;
+    address constant PoolAddress = 0xa0f5588fA098B56F28a8ae65CaAa43fEFCAf608c;
 }
