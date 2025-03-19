@@ -7,6 +7,7 @@ import IERC20AbiRaw from './IERC20.json';
 import SenderCCIPAbiRaw from './SenderCCIP.json';
 import EigenAgent6551AbiRaw from './EigenAgent6551.json';
 import AgentFactoryAbiRaw from './AgentFactory.json';
+import RewardsCoordinatorAbiRaw from './RewardsCoordinator.json';
 
 // Export the ABIs with proper typing
 export const DelegationManagerABI = DelegationManagerAbiRaw.abi as Abi;
@@ -15,7 +16,7 @@ export const IERC20ABI = IERC20AbiRaw.abi as Abi;
 export const SenderCCIPABI = SenderCCIPAbiRaw.abi as Abi;
 export const EigenAgent6551ABI = EigenAgent6551AbiRaw.abi as Abi;
 export const AgentFactoryABI = AgentFactoryAbiRaw.abi as Abi;
-
+export const RewardsCoordinatorABI = RewardsCoordinatorAbiRaw.abi as Abi;
 // For backward compatibility
 export const ERC20_ABI = IERC20ABI;
 
@@ -64,9 +65,15 @@ const requiredDelegationManagerFunctions = [
   'delegatedTo',
   'queueWithdrawals'
 ];
-
 // This will throw an error if validation fails
 ensureAbiHasFunctions(DelegationManagerABI, requiredDelegationManagerFunctions);
+
+const requiredRewardsCoordinatorFunctions = [
+  'getCurrentDistributionRoot',
+  'getDistributionRootsLength',
+  'processClaims'
+];
+ensureAbiHasFunctions(RewardsCoordinatorABI, requiredRewardsCoordinatorFunctions);
 
 // Define required functions for other ABIs
 const requiredStrategyManagerFunctions = [
@@ -74,8 +81,6 @@ const requiredStrategyManagerFunctions = [
   'getDeposits',
   'stakerDepositShares'
 ];
-
-// Validate the StrategyManagerABI
 ensureAbiHasFunctions(StrategyManagerABI, requiredStrategyManagerFunctions);
 
 // Required functions for IERC20
@@ -86,6 +91,4 @@ const requiredIERC20Functions = [
   'transfer',
   'transferFrom'
 ];
-
-// Validate the IERC20ABI
 ensureAbiHasFunctions(IERC20ABI, requiredIERC20Functions);

@@ -76,7 +76,7 @@
     "from": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c",
     "to": "0x2a41C5D4C9dbAe6577e90154E85746890cf735D0",
     "user": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c",
-    "receiptTransactionHash": "0x13ec30e748018353995760e7ad722fb8080411d92b217ed7dc494fd3e86a05ca",
+    "receiptTransactionHash": "0x06e19ff51ebc77c4ce0c788618dc6ec1ede2f96ddfba373f651fb36974ebe8a4",
     "isComplete": true,
     "sourceChainId": "84532",
     "destinationChainId": "11155111"
@@ -90,9 +90,21 @@
     "from": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c",
     "to": "0x2604e5a6b77b5Ab95e38b6fA6fc1F5db5585F562",
     "user": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c",
-    "receiptTransactionHash": "0x062f3c8d686e7c2fddf6beb06d462759ff2878c430623a1bed689d00ab1660e7",
+    "receiptTransactionHash": "0x06e19ff51ebc77c4ce0c788618dc6ec1ede2f96ddfba373f651fb36974ebe8a4",
     "isComplete": true,
     "sourceChainId": "84532",
     "destinationChainId": "11155111"
+  },
+  {
+    "txHash": "0xa5429bbb3f436fc32ce6fb79bce0b8273578fd14161264125ff4412b1e0725a6",
+    "messageId": "0x7dafc7f3854d6e9d03defba7bdd0f70d1aee090d17e093f6fbb8a205f20dbb5b",
+    "timestamp": 1742325165,
+    "type": "withdrawal",
+    "status": "confirmed",
+    "from": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c",
+    "to": "0x2604e5a6b77b5Ab95e38b6fA6fc1F5db5585F562",
+    "user": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c",
+    "isComplete": true,
+    "receiptTransactionHash": "0xb0b82376c6ace6cf1f47760e7974578807fbc5fbc48016e933dbe51fabfddcc7"
   }
 ]

@@ -1689,3 +1689,11 @@ a:hover {
   border: 1px solid var(--color-error);
   color: var(--color-error);
 }
+
+/* Rewards component button container */
+.rewards-button-container {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  flex-direction: column;
+}

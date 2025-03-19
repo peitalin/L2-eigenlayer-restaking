@@ -5,7 +5,8 @@ import {
   IERC20ABI,
   SenderCCIPABI,
   EigenAgent6551ABI,
-  AgentFactoryABI
+  AgentFactoryABI,
+  RewardsCoordinatorABI
 } from './abiUtils';
 
 // Export the ABIs
@@ -15,7 +16,8 @@ export {
   IERC20ABI,
   SenderCCIPABI,
   EigenAgent6551ABI,
-  AgentFactoryABI
+  AgentFactoryABI,
+  RewardsCoordinatorABI
 };
 
 // Keep backward compatibility with existing code
@@ -35,6 +37,3 @@ export {
   validateABI,
   ensureAbiHasFunctions
 } from './abiUtils';
-
-// Export RewardsCoordinator ABI
-export { RewardsCoordinatorABI } from './generated/RewardsCoordinatorABI';
