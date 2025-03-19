@@ -16,12 +16,23 @@ const dbPath = path.join(__dirname, 'data', 'transactions.db');
 // Create or open the database
 const db = new Database(dbPath);
 
+export type TransactionTypes =
+  | 'deposit'
+  | 'queueWithdrawal'
+  | 'completeWithdrawal'
+  | 'processClaim'
+  | 'bridgingWithdrawalToL2'
+  | 'bridgingRewardsToL2'
+  | 'delegateTo'
+  | 'undelegate'
+  | 'redelegate';
+
 // Define transaction interface (matches CCIPTransaction in server.ts)
 export interface Transaction {
   txHash: string;
   messageId: string;
   timestamp: number;
-  type: 'deposit' | 'withdrawal' | 'completeWithdrawal' | 'processClaim' | 'bridgingWithdrawalToL2' | 'bridgingRewardsToL2' | 'other';
+  txType: TransactionTypes;
   status: 'pending' | 'confirmed' | 'failed';
   from: string;
   to: string;
@@ -37,7 +48,7 @@ type TransactionRow = {
   txHash: string;
   messageId: string;
   timestamp: number;
-  type: 'deposit' | 'withdrawal' | 'completeWithdrawal' | 'processClaim' | 'bridgingWithdrawalToL2' | 'bridgingRewardsToL2' | 'other';
+  txType: TransactionTypes;
   status: 'pending' | 'confirmed' | 'failed';
   from_address: string;
   to_address: string;
@@ -57,7 +68,7 @@ export function initDatabase() {
         txHash TEXT PRIMARY KEY,
         messageId TEXT,
         timestamp INTEGER,
-        type TEXT CHECK(type IN ('deposit', 'withdrawal', 'completeWithdrawal', 'processClaim', 'bridgingWithdrawalToL2', 'bridgingRewardsToL2', 'other')),
+        txType TEXT CHECK(txType IN ('deposit', 'queueWithdrawal', 'completeWithdrawal', 'processClaim', 'bridgingWithdrawalToL2', 'bridgingRewardsToL2', 'delegateTo', 'undelegate', 'redelegate')),
         status TEXT CHECK(status IN ('pending', 'confirmed', 'failed')),
         from_address TEXT,
         to_address TEXT,
@@ -82,7 +93,7 @@ export function initDatabase() {
       const testTxHash = 'test_' + Date.now();
       db.prepare(`
         INSERT INTO transactions (
-          txHash, messageId, timestamp, type, status,
+          txHash, messageId, timestamp, txType, status,
           from_address, to_address, receiptTransactionHash,
           isComplete, sourceChainId, destinationChainId, user
         ) VALUES (
@@ -112,7 +123,7 @@ export function initDatabase() {
             txHash TEXT PRIMARY KEY,
             messageId TEXT,
             timestamp INTEGER,
-            type TEXT CHECK(type IN ('deposit', 'withdrawal', 'completeWithdrawal', 'processClaim', 'bridgingWithdrawalToL2', 'bridgingRewardsToL2', 'other')),
+            txType TEXT CHECK(txType IN ('deposit', 'queueWithdrawal', 'completeWithdrawal', 'processClaim', 'bridgingWithdrawalToL2', 'bridgingRewardsToL2', 'delegateTo', 'undelegate', 'redelegate')),
             status TEXT CHECK(status IN ('pending', 'confirmed', 'failed')),
             from_address TEXT,
             to_address TEXT,
@@ -159,7 +170,7 @@ function rowToTransaction(row: TransactionRow): Transaction {
     txHash: row.txHash,
     messageId: row.messageId,
     timestamp: row.timestamp,
-    type: row.type,
+    txType: row.txType,
     status: row.status,
     from: row.from_address,
     to: row.to_address,
@@ -178,7 +189,7 @@ export function addTransaction(transaction: Transaction): Transaction {
     ...transaction,
     messageId: transaction.messageId || transaction.txHash,
     timestamp: transaction.timestamp || Math.floor(Date.now() / 1000),
-    type: transaction.type || 'other',
+    txType: transaction.txType || 'other',
     status: transaction.status || 'pending',
     from: transaction.from || '0x0000000000000000000000000000000000000000',
     to: transaction.to || '0x0000000000000000000000000000000000000000',
@@ -191,11 +202,11 @@ export function addTransaction(transaction: Transaction): Transaction {
 
   const stmt = db.prepare(`
     INSERT OR REPLACE INTO transactions (
-      txHash, messageId, timestamp, type, status,
+      txHash, messageId, timestamp, txType, status,
       from_address, to_address, receiptTransactionHash,
       isComplete, sourceChainId, destinationChainId, user
     ) VALUES (
-      @txHash, @messageId, @timestamp, @type, @status,
+      @txHash, @messageId, @timestamp, @txType, @status,
       @from, @to, @receiptTransactionHash,
       @isComplete, @sourceChainId, @destinationChainId, @user
     )
@@ -206,7 +217,7 @@ export function addTransaction(transaction: Transaction): Transaction {
     txHash: safeTransaction.txHash,
     messageId: safeTransaction.messageId,
     timestamp: safeTransaction.timestamp,
-    type: safeTransaction.type,
+    txType: safeTransaction.txType,
     status: safeTransaction.status,
     from: safeTransaction.from,
     to: safeTransaction.to,
@@ -224,7 +235,7 @@ export function addTransaction(transaction: Transaction): Transaction {
 export function getAllTransactions(): Transaction[] {
   const rows = db.prepare(`
     SELECT
-      txHash, messageId, timestamp, type, status,
+      txHash, messageId, timestamp, txType, status,
       from_address, to_address, receiptTransactionHash,
       isComplete, sourceChainId, destinationChainId, user
     FROM transactions
@@ -239,7 +250,7 @@ export function getAllTransactions(): Transaction[] {
 export function getTransactionByHash(txHash: string): Transaction | undefined {
   const row = db.prepare(`
     SELECT
-      txHash, messageId, timestamp, type, status,
+      txHash, messageId, timestamp, txType, status,
       from_address, to_address, receiptTransactionHash,
       isComplete, sourceChainId, destinationChainId, user
     FROM transactions
@@ -255,7 +266,7 @@ export function getTransactionByHash(txHash: string): Transaction | undefined {
 export function getTransactionByMessageId(messageId: string): Transaction | undefined {
   const row = db.prepare(`
     SELECT
-      txHash, messageId, timestamp, type, status,
+      txHash, messageId, timestamp, txType, status,
       from_address, to_address, receiptTransactionHash,
       isComplete, sourceChainId, destinationChainId, user
     FROM transactions
@@ -271,7 +282,7 @@ export function getTransactionByMessageId(messageId: string): Transaction | unde
 export function getTransactionsByUser(userAddress: string): Transaction[] {
   const rows = db.prepare(`
     SELECT
-      txHash, messageId, timestamp, type, status,
+      txHash, messageId, timestamp, txType, status,
       from_address, to_address, receiptTransactionHash,
       isComplete, sourceChainId, destinationChainId, user
     FROM transactions
@@ -296,7 +307,7 @@ export function updateTransaction(txHash: string, updates: Partial<Transaction>)
     UPDATE transactions SET
       messageId = @messageId,
       timestamp = @timestamp,
-      type = @type,
+      txType = @txType,
       status = @status,
       from_address = @from,
       to_address = @to,
@@ -313,7 +324,7 @@ export function updateTransaction(txHash: string, updates: Partial<Transaction>)
     txHash: updatedTx.txHash,
     messageId: updatedTx.messageId,
     timestamp: updatedTx.timestamp,
-    type: updatedTx.type,
+    txType: updatedTx.txType,
     status: updatedTx.status,
     from: updatedTx.from,
     to: updatedTx.to,
@@ -340,7 +351,7 @@ export function updateTransactionByMessageId(messageId: string, updates: Partial
 export function getPendingTransactions(): Transaction[] {
   const rows = db.prepare(`
     SELECT
-      txHash, messageId, timestamp, type, status,
+      txHash, messageId, timestamp, txType, status,
       from_address, to_address, receiptTransactionHash,
       isComplete, sourceChainId, destinationChainId, user
     FROM transactions
@@ -361,11 +372,11 @@ export function clearTransactions(): void {
 export function addTransactions(transactions: Transaction[]): Transaction[] {
   const stmt = db.prepare(`
     INSERT OR REPLACE INTO transactions (
-      txHash, messageId, timestamp, type, status,
+      txHash, messageId, timestamp, txType, status,
       from_address, to_address, receiptTransactionHash,
       isComplete, sourceChainId, destinationChainId, user
     ) VALUES (
-      @txHash, @messageId, @timestamp, @type, @status,
+      @txHash, @messageId, @timestamp, @txType, @status,
       @from, @to, @receiptTransactionHash,
       @isComplete, @sourceChainId, @destinationChainId, @user
     )
@@ -380,11 +391,11 @@ export function addTransactions(transactions: Transaction[]): Transaction[] {
 
       // If chain IDs are missing, set defaults based on transaction type
       if (!sourceChain || !destChain) {
-        if (tx.type === 'bridgingWithdrawalToL2' || tx.type === 'bridgingRewardsToL2') {
+        if (tx.txType === 'bridgingWithdrawalToL2' || tx.txType === 'bridgingRewardsToL2') {
           // Default for L1->L2 transactions
           sourceChain = sourceChain || ETH_CHAINID; // Sepolia
           destChain = destChain || L2_CHAINID;      // Base Sepolia
-        } else if (tx.type === 'deposit') {
+        } else if (tx.txType === 'deposit') {
           // Default for L2->L1 transactions
           sourceChain = sourceChain || L2_CHAINID;   // Base Sepolia
           destChain = destChain || ETH_CHAINID;      // Sepolia
@@ -399,7 +410,7 @@ export function addTransactions(transactions: Transaction[]): Transaction[] {
         txHash: tx.txHash,
         messageId: tx.messageId || tx.txHash, // Use txHash as fallback for messageId
         timestamp: tx.timestamp,
-        type: tx.type,
+        txType: tx.txType,
         status: tx.status,
         from: tx.from,
         to: tx.to,
