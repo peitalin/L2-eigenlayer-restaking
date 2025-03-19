@@ -6,9 +6,10 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { promises as fsPromises } from 'fs';
-import { createPublicClient, http, decodeEventLog, PublicClient, keccak256, toBytes } from 'viem';
+import { createPublicClient, http, decodeEventLog, PublicClient, keccak256, toBytes, toHex } from 'viem';
 import { sepolia } from 'viem/chains';
 import { parseAbi } from 'viem/utils';
+import { toEventSignature } from 'viem'
 import * as db from './db.js';
 
 // Chain ID constants
@@ -36,8 +37,6 @@ const L2_CHAINID = "84532";     // Base Sepolia
  * - GET /api/transactions/hash/:txHash - Get a transaction by hash
  * - GET /api/transactions/messageId/:messageId - Get a transaction by message ID
  * - POST /api/transactions/add - Add a new transaction
- * - POST /api/transactions/bridging - Create or update a bridging transaction
- * - POST /api/bridging-transaction-ccip - Create a bridging transaction from CCIP data
  */
 
 // Load environment variables
@@ -79,11 +78,16 @@ interface CCIPMessageData {
 type CCIPTransaction = db.Transaction;
 
 // Add this constant for the MessageSent event signature
-const MESSAGE_SENT_SIGNATURE = keccak256(toBytes('MessageSent(bytes32 indexed, uint64 indexed, address, (address, uint256)[], address, uint256)'));
+const MESSAGE_SENT_SIGNATURE = keccak256(toBytes(toEventSignature('event MessageSent(bytes32 indexed, uint64 indexed, address, (address, uint256)[], address, uint256)')));
+// cast sig-event "MessageSent (bytes32 indexed, uint64 indexed, address, (address, uint256)[], address, uint256)"
+const KNOWN_MESSAGE_SENT_SIGNATURE = '0xf41bc76bbe18ec95334bdb88f45c769b987464044ead28e11193a766ae8225cb';
+if (MESSAGE_SENT_SIGNATURE !== KNOWN_MESSAGE_SENT_SIGNATURE) {
+  throw new Error('MESSAGE_SENT_SIGNATURE does not match KNOWN_MESSAGE_SENT_SIGNATURE');
+}
 
 // Add event signatures for bridging events
-const BRIDGING_WITHDRAWAL_TO_L2_SIGNATURE = keccak256(toBytes('BridgingWithdrawalToL2(address,(address,uint256)[])'));
-const BRIDGING_REWARDS_TO_L2_SIGNATURE = keccak256(toBytes('BridgingRewardsToL2(address,(address,uint256)[])'));
+const BRIDGING_WITHDRAWAL_TO_L2_SIGNATURE = keccak256(toBytes(toEventSignature('event BridgingWithdrawalToL2(address,(address,uint256)[])')));
+const BRIDGING_REWARDS_TO_L2_SIGNATURE = keccak256(toBytes(toEventSignature('event BridgingRewardsToL2(address,(address,uint256)[])')));
 
 // Create public clients to interact with different chains
 const publicClientL1 = createPublicClient({
@@ -100,13 +104,10 @@ const publicClientL2 = createPublicClient({
   transport: http(process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org')
 });
 
-// Update variable name for consistency
-const publicClient = publicClientL1;
-
 // Function to fetch CCIP message data from an external API
 async function fetchCCIPMessageData(messageId: string): Promise<CCIPMessageData | null> {
   try {
-    const response = await fetch(`https://ccip.chain.link/api/message/${messageId}`);
+    const response = await fetch(`https://ccip.chain.link/api/h/atlas/message/${messageId}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch CCIP message data. Status: ${response.status}`);
     }
@@ -196,11 +197,8 @@ const extractMessageIdFromReceipt = async (
             });
 
             if (decodedLog && decodedLog.args) {
-              const args = decodedLog.args as any;
-              if (args.messageId) {
-                foundMessageId = args.messageId.toString();
-                console.log(`Extracted messageId: ${foundMessageId}`);
-              }
+              foundMessageId = decodedLog.args[0];
+              console.log(`Extracted messageId: ${foundMessageId}`);
             }
           } catch (decodeError) {
             console.error('Error decoding MessageSent event:', decodeError);
@@ -393,23 +391,37 @@ app.get('/api/transactions/messageId/:messageId', (req, res) => {
 app.post('/api/transactions/add', async (req, res) => {
   try {
     const newTransaction: CCIPTransaction = req.body;
+    console.log('newTransaction: ', newTransaction);
 
     // Validate transaction type before proceeding
-    const validTypes = ['deposit', 'withdrawal', 'completeWithdrawal', 'processClaim', 'bridgingWithdrawalToL2', 'bridgingRewardsToL2', 'other'];
-    if (!validTypes.includes(newTransaction.type)) {
-      console.error(`Invalid transaction type: ${newTransaction.type}. Valid types are: ${validTypes.join(', ')}`);
+    const validTypes = [
+      'deposit',
+      'depositAndMintEigenAgent',
+      'mintEigenAgent',
+      'queueWithdrawal',
+      'completeWithdrawal',
+      'processClaim',
+      'bridgingWithdrawalToL2',
+      'bridgingRewardsToL2',
+      'delegateTo',
+      'undelegate',
+      'redelegate',
+      'other'
+    ];
+    if (!validTypes.includes(newTransaction.txType)) {
+      console.error(`Invalid transaction type: ${newTransaction.txType}. Valid types are: ${validTypes.join(', ')}`);
       return res.status(400).json({
-        error: `Invalid transaction type: ${newTransaction.type}. Valid types are: ${validTypes.join(', ')}`
+        error: `Invalid transaction type: ${newTransaction.txType}. Valid types are: ${validTypes.join(', ')}`
       });
     }
 
     // Ensure required fields have values
     if (!newTransaction.sourceChainId) {
-      console.log(`No sourceChainId provided for transaction ${newTransaction.txHash}, setting default based on type`);
+      console.log(`No sourceChainId provided for tx ${newTransaction.txHash}, setting default based on type`);
       // Set default source chain ID based on transaction type
       if (
-        newTransaction.type === 'bridgingWithdrawalToL2' ||
-        newTransaction.type === 'bridgingRewardsToL2'
+        newTransaction.txType === 'bridgingWithdrawalToL2' ||
+        newTransaction.txType === 'bridgingRewardsToL2'
       ) {
         newTransaction.sourceChainId = ETH_CHAINID; // Sepolia for L1->L2 bridging
       } else {
@@ -424,11 +436,6 @@ app.post('/api/transactions/add', async (req, res) => {
         newTransaction.sourceChainId === L2_CHAINID
           ? ETH_CHAINID
           : L2_CHAINID;
-    }
-
-    // Ensure messageId has a value
-    if (!newTransaction.messageId) {
-      newTransaction.messageId = newTransaction.txHash;
     }
 
     // Continue with extracting messageId if needed
@@ -450,7 +457,7 @@ app.post('/api/transactions/add', async (req, res) => {
           if (agentOwner && (!newTransaction.user || newTransaction.user === '0x0000000000000000000000000000000000000000')) {
             newTransaction.user = agentOwner;
           }
-        } else {
+    } else {
           // If no messageId found, use txHash as the messageId
           console.log(`No messageId found for transaction ${newTransaction.txHash}, using txHash as messageId`);
           newTransaction.messageId = newTransaction.txHash;
@@ -504,7 +511,7 @@ function determineClientFromTransaction(transaction: CCIPTransaction): PublicCli
   }
 
   // Otherwise, determine based on transaction type
-  switch (transaction.type) {
+  switch (transaction.txType) {
     case 'bridgingWithdrawalToL2':
     case 'bridgingRewardsToL2':
       return publicClientL1 as unknown as PublicClient; // Use L1 client for bridging operations
@@ -634,226 +641,6 @@ app.post("/api/loadTransactionHistory", async (req, res) => {
   }
 });
 
-// Add new endpoint to check CCIP transaction completion status
-app.post('/api/check-withdrawal-completion', async (req, res) => {
-  const { messageId, originalTxHash } = req.body;
-
-  if (!messageId) {
-    return res.status(400).json({ error: 'No messageId provided' });
-  }
-
-  if (!originalTxHash) {
-    return res.status(400).json({ error: 'No originalTxHash provided' });
-  }
-
-  try {
-    // Step 1: Fetch CCIP message data
-    console.log(`Checking completion status for messageId: ${messageId}`);
-    const messageData = await fetchCCIPMessageData(messageId);
-
-    if (!messageData) {
-      return res.status(404).json({
-        error: `Failed to fetch CCIP data for messageId: ${messageId}`
-      });
-    }
-
-    // Step 2: Check if the transaction has completed (has a receipt transaction hash)
-    if (!messageData.receiptTransactionHash) {
-      return res.json({
-        isComplete: false,
-        message: 'Transaction has not been received on the destination chain yet'
-      });
-    }
-
-    console.log(`Transaction completed with receipt hash: ${messageData.receiptTransactionHash}`);
-
-    // Step 3: Choose the right client based on chainId
-    // If chainId is specified, use it to determine which client to use
-    let clientToUse: PublicClient = publicClientL1; // Default to L1 client
-
-    if (messageData.destChainId) {
-      // Determine which client to use based on chainId
-      if (messageData.destChainId === L2_CHAINID) {
-        clientToUse = publicClientL2 as PublicClient;
-      } else if (messageData.destChainId === ETH_CHAINID) {
-        clientToUse = publicClientL1;
-      } else {
-        console.log(`Unknown chainId ${messageData.destChainId}, defaulting to L1 client`);
-      }
-    } else {
-      console.log('No chainId provided, defaulting to L1 client');
-    }
-
-    // Step 4: Get the receipt transaction to check for MessageSent events
-    let newMessageId: string | null = null;
-    let agentOwner: string | null = null;
-    try {
-      // Try to extract the messageId and agentOwner from the receipt using the appropriate client
-      const { messageId: extractedMessageId, agentOwner: extractedAgentOwner } = await extractMessageIdFromReceipt(
-        messageData.receiptTransactionHash as string,
-        clientToUse
-      );
-
-      if (extractedMessageId) {
-        newMessageId = extractedMessageId;
-        console.log(`Extracted messageId: ${newMessageId}`);
-      }
-
-      if (extractedAgentOwner) {
-        agentOwner = extractedAgentOwner;
-        console.log(`Extracted agentOwner: ${agentOwner}`);
-      }
-    } catch (extractError) {
-      console.error('Error extracting messageId and agentOwner from receipt:', extractError);
-      // Continue with the process even if extraction fails
-    }
-
-    // Step 5: Update the original transaction and create bridging transaction if needed
-
-    // 1. First update the original completeWithdrawal transaction
-    try {
-      // Update the transaction status to confirmed and add the receipt hash
-      const updatedOriginalTx = {
-        status: 'confirmed' as 'pending' | 'confirmed' | 'failed',
-        receiptTransactionHash: messageData.receiptTransactionHash
-      };
-
-      // Find and update the original transaction
-      const transactions: CCIPTransaction[] = db.getAllTransactions();
-      const existingTxIndex = transactions.findIndex(tx => tx.txHash === originalTxHash);
-
-      if (existingTxIndex !== -1) {
-        db.updateTransaction(originalTxHash, updatedOriginalTx);
-      }
-
-      // 2. If we found a new messageId, add a new transaction for the bridging
-      // This is for bridgingWithdrawalToL2 transactions and bridgingRewardsToL2 txs
-      let bridgingTransaction: CCIPTransaction | null = null;
-      if (newMessageId) {
-        console.log(`Creating bridging transaction with messageId: ${newMessageId}`);
-
-        bridgingTransaction = {
-          txHash: messageData.receiptTransactionHash as string,
-          messageId: newMessageId,
-          timestamp: Math.floor(Date.now() / 1000),
-          type: 'bridgingWithdrawalToL2',
-          status: 'pending',
-          from: messageData.sender || '0x0000000000000000000000000000000000000000',
-          to: messageData.receiver || '0x0000000000000000000000000000000000000000',
-          receiptTransactionHash: messageData.receiptTransactionHash,
-          isComplete: messageData.receiptTransactionHash ? true : false,
-          sourceChainId: messageData.sourceChainId,
-          destinationChainId: messageData.destChainId,
-          user: agentOwner || '0x0000000000000000000000000000000000000000',
-        };
-
-        // Add the new transaction to history
-        db.addTransaction(bridgingTransaction);
-      }
-
-      // 3. Return the result
-      return res.json({
-        isComplete: true,
-        message: 'Withdrawal has completed',
-        updatedOriginalTx: existingTxIndex !== -1 ? transactions[existingTxIndex] : null,
-        bridgingTransaction,
-        destChainId: messageData.destChainId
-      });
-    } catch (updateError) {
-      console.error('Error updating transaction history:', updateError);
-      return res.status(500).json({
-        error: 'Failed to update transaction history',
-        isComplete: true,
-        message: 'Withdrawal has completed, but failed to update transaction history',
-        destChainId: messageData.destChainId
-      });
-    }
-  } catch (error) {
-    console.error('Error checking withdrawal completion:', error);
-    return res.status(500).json({
-      error: 'Failed to check withdrawal completion status',
-      details: error.message
-    });
-  }
-});
-
-// Add a new endpoint to create or update bridging transactions
-app.post('/api/transactions/bridging', async (req, res) => {
-  const { messageId, originalTxHash } = req.body;
-
-  if (!messageId) {
-    return res.status(400).json({ error: 'No messageId provided' });
-  }
-
-  try {
-    // Get CCIP message data
-    const messageData = await fetchCCIPMessageData(messageId);
-
-    if (!messageData) {
-      return res.status(404).json({
-        error: `Failed to fetch CCIP data for messageId: ${messageId}`
-      });
-    }
-
-    // Use messageId as transaction hash if none is available
-    const txHash = messageId;
-
-    // Create bridging transaction
-    const bridgingTransaction: db.Transaction = {
-      txHash: txHash,
-      messageId: messageId,
-      timestamp: Math.floor(Date.now() / 1000),
-      type: 'bridgingWithdrawalToL2',
-      status: 'pending',
-      from: messageData.sender || '0x0000000000000000000000000000000000000000',
-      to: messageData.receiver || '0x0000000000000000000000000000000000000000',
-      receiptTransactionHash: messageData.receiptTransactionHash || null,
-      isComplete: messageData.receiptTransactionHash ? true : false,
-      sourceChainId: messageData.sourceChainId || ETH_CHAINID,
-      destinationChainId: messageData.destChainId || L2_CHAINID,
-      user: messageData.sender || '0x0000000000000000000000000000000000000000',
-    };
-
-    // Check if transaction already exists
-    const existingTxIndex = db.getAllTransactions().findIndex(tx => tx.txHash === txHash);
-
-    if (existingTxIndex !== -1) {
-      // Update existing transaction
-      db.updateTransaction(txHash, bridgingTransaction);
-      console.log(`Updated existing bridging transaction: ${txHash}`);
-    } else {
-      // Add new transaction
-      db.addTransaction(bridgingTransaction);
-      console.log(`Added new bridging transaction: ${txHash}`);
-    }
-
-    // If original transaction hash is provided, update it too
-    if (originalTxHash) {
-      const originalTxIndex = db.getAllTransactions().findIndex(tx => tx.txHash === originalTxHash);
-      if (originalTxIndex !== -1) {
-        db.updateTransaction(originalTxHash, {
-          status: 'confirmed',
-          receiptTransactionHash: messageData.receiptTransactionHash as string
-        });
-        console.log(`Updated original transaction: ${originalTxHash}`);
-      }
-    }
-
-    return res.json({
-      success: true,
-      bridgingTransaction,
-      originalTxUpdated: originalTxHash ? true : false
-    });
-  } catch (error) {
-    console.error('Error creating bridging transaction:', error);
-    return res.status(500).json({
-      error: 'Failed to create bridging transaction',
-      details: error.message
-    });
-  }
-});
-
-// Helper function to determine transaction type based on chain IDs
 function getTransactionTypeFromChainIds(sourceChainId: string | number, destChainId: string | number): 'deposit' | 'withdrawal' | 'completeWithdrawal' | 'bridgingWithdrawalToL2' | 'bridgingRewardsToL2' | 'other' {
   const source = sourceChainId;
   const dest = destChainId;
@@ -868,61 +655,6 @@ function getTransactionTypeFromChainIds(sourceChainId: string | number, destChai
   // Default case when chain IDs don't match known patterns
   return 'other';
 }
-
-// POST /api/bridging-transaction-ccip
-app.post('/api/bridging-transaction-ccip', async (req, res) => {
-  try {
-    const { messageId } = req.body;
-    const messageData = await fetchCCIPMessageData(messageId);
-
-    if (!messageData) {
-      return res.status(404).json({ error: 'CCIP message not found' });
-    }
-
-    // Use messageId as the transaction hash
-    const txHash = messageId;
-
-    // Create a new transaction for this CCIP message
-    const bridgingTransaction: db.Transaction = {
-      txHash,
-      messageId: messageId,
-      timestamp: Date.now(),
-      type: getTransactionTypeFromChainIds(messageData.sourceChainId, messageData.destChainId),
-      status: 'pending', // Use a valid status from the enum
-      from: messageData.sender || '0x0000000000000000000000000000000000000000',
-      to: messageData.receiver || '0x0000000000000000000000000000000000000000',
-      receiptTransactionHash: null,
-      isComplete: false,
-      sourceChainId: messageData.sourceChainId,
-      destinationChainId: messageData.destChainId,
-      user: messageData.sender || '0x0000000000000000000000000000000000000000',
-    };
-
-    // Add the transaction
-    db.addTransaction(bridgingTransaction);
-
-    // If original transaction hash is provided, update it too
-    const originalTxHash = req.body.originalTxHash;
-    if (originalTxHash) {
-      const originalTx = db.getTransactionByHash(originalTxHash);
-      if (originalTx) {
-        db.updateTransaction(originalTxHash, {
-          isComplete: true
-        });
-        console.log(`Updated original transaction: ${originalTxHash}`);
-      }
-    }
-
-    // Return the newly created transaction
-    res.status(201).json({
-      transaction: bridgingTransaction,
-      originalTxUpdated: originalTxHash ? true : false
-    });
-  } catch (error) {
-    console.error('Error creating bridging transaction:', error);
-    res.status(500).json({ error: 'Failed to create bridging transaction' });
-  }
-});
 
 // Serve static files from the 'dist' directory (for production)
 if (process.env.NODE_ENV === 'production') {
@@ -1155,16 +887,6 @@ try {
                 if (validTransactions.length > 0) {
                   db.addTransactions(validTransactions);
                   console.log(`Migrated ${validTransactions.length} transactions to SQLite database`);
-
-                  // // Create backup of the JSON file
-                  // const backupPath = path.join(dataDir, `transactions_backup_${Date.now()}.json`);
-                  // fs.copyFile(path.join(dataDir, 'transactions.json'), backupPath, (err) => {
-                  //   if (err) {
-                  //     console.error('Error creating backup of transactions.json:', err);
-                  //   } else {
-                  //     console.log(`Created backup of transactions.json at ${backupPath}`);
-                  //   }
-                  // });
                 }
               } else {
                 console.log('No transactions to migrate');
