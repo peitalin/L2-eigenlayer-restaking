@@ -1,33 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useClientsContext } from './ClientsContext';
+import { CCIPTransaction, SERVER_BASE_URL, TransactionTypes } from '../utils/ccipEventListener';
 
-// Define the structure for a CCIP transaction
-export interface CCIPTransaction {
-  txHash: string;
-  messageId: string;
-  timestamp: number; // Unix timestamp
-  type: 'deposit' | 'withdrawal' | 'completeWithdrawal' | 'processClaim' | 'bridgingWithdrawalToL2' | 'bridgingRewardsToL2' | 'other';
-  status: 'pending' | 'confirmed' | 'failed';
-  from: string;
-  to: string; // target contract
-  receiptTransactionHash?: string; // Optional field for tracking the receipt transaction hash for CCIP messages
-  isComplete?: boolean; // Optional field for tracking the completion status of bridgingWithdrawalToL2 transactions
-  sourceChainId?: string | number;
-  destinationChainId?: string | number;
-  user: string;
-}
-
-// Define server base URL
-const SERVER_BASE_URL = 'http://localhost:3001';
-
-export type TransactionTypes =
-  | 'deposit'
-  | 'withdrawal'
-  | 'completeWithdrawal'
-  | 'claim'
-  | 'depositToL2'
-  | 'bridgingWithdrawalToL2'
-  | 'bridgingRewardsToL2';
 
 interface TransactionHistoryContextType {
   transactions: CCIPTransaction[];
@@ -163,13 +137,13 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
       const confirmedTransaction: CCIPTransaction = {
         ...transaction,
         status: 'confirmed',
-        // Make sure these fields are included even if undefined to ensure consistency
         receiptTransactionHash: transaction.receiptTransactionHash,
         isComplete: transaction.isComplete || false,
         sourceChainId: transaction.sourceChainId,
         destinationChainId: transaction.destinationChainId
       };
 
+      console.log("Adding transaction:", confirmedTransaction);
       const response = await fetch(`${SERVER_BASE_URL}/api/transactions/add`, {
         method: 'POST',
         headers: {

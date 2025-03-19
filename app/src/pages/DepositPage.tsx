@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { formatEther, parseEther } from 'viem';
 import { encodeDepositIntoStrategyMsg } from '../utils/encoders';
-import { CHAINLINK_CONSTANTS, STRATEGY_MANAGER_ADDRESS, STRATEGY, SENDER_CCIP_ADDRESS } from '../addresses';
+import { CHAINLINK_CONSTANTS, STRATEGY_MANAGER_ADDRESS, STRATEGY, SENDER_CCIP_ADDRESS, REWARDS_COORDINATOR_ADDRESS } from '../addresses';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { useToast } from '../utils/toast';
+import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 
 
 const DepositPage: React.FC = () => {
@@ -24,6 +25,7 @@ const DepositPage: React.FC = () => {
 
   // State for transaction details
   const [transactionAmount, setTransactionAmount] = useState<string>('0.11');
+  const { addTransaction } = useTransactionHistory();
 
   // Memoize the parsed amount to update whenever transactionAmount changes
   const amount = useMemo(() => {
@@ -73,8 +75,23 @@ const DepositPage: React.FC = () => {
       amount
     },
     expiryMinutes: 45, // expiry for refunds on reverts, max is 3 days.
-    onSuccess: (txHash) => {
-      // No need to call addTransaction - the hook already does this
+    onSuccess: (txHash, receipt) => {
+      if (txHash && receipt) {
+        addTransaction({
+          txHash,
+          messageId: "", // Server will extract the real messageId if needed
+          timestamp: Math.floor(Date.now() / 1000),
+          txType: 'deposit',
+          status: 'confirmed',
+          from: receipt.from,
+          to: receipt.to || '',
+          user: l1Wallet.account || '',
+          isComplete: false,
+          sourceChainId: CHAINLINK_CONSTANTS.baseSepolia.chainId.toString(),
+          destinationChainId: CHAINLINK_CONSTANTS.ethSepolia.chainId.toString()
+        });
+        showToast('Transaction recorded in history!', 'success');
+      }
       showToast(`Transaction sent! Hash: ${txHash}`, 'success');
     },
     onError: (err) => {

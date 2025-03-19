@@ -39,24 +39,23 @@ const RewardsComponent: React.FC = () => {
   } = useEigenLayerOperation({
     targetContractAddr: REWARDS_COORDINATOR_ADDRESS,
     amount: 0n, // No value to send with the transaction
-    onSuccess: (txHash) => {
+    onSuccess: (txHash, receipt) => {
       showToast('Rewards claim transaction submitted!', 'success');
-      console.log('Transaction hash:', txHash);
 
       // Add the processClaim transaction to the history
-      if (txHash && eigenAgentInfo?.eigenAgentAddress) {
+      if (txHash && receipt) {
         addTransaction({
           txHash,
-          messageId: txHash, // Server will extract the real messageId if needed
+          messageId: "", // Server will extract the real messageId if needed
           timestamp: Math.floor(Date.now() / 1000),
-          type: 'processClaim',
+          txType: 'processClaim',
           status: 'confirmed',
-          from: l1Wallet.account || '',
-          to: REWARDS_COORDINATOR_ADDRESS,
+          from: receipt.from,
+          to: receipt.to || '',
           user: l1Wallet.account || '',
-          sourceChainId: ETH_CHAINID, // Sepolia L1 chain ID
-          destinationChainId: ETH_CHAINID, // Also Sepolia since this is an L1-only transaction
-          isComplete: true
+          isComplete: false,
+          sourceChainId: CHAINLINK_CONSTANTS.baseSepolia.chainId.toString(),
+          destinationChainId: CHAINLINK_CONSTANTS.ethSepolia.chainId.toString()
         });
         showToast('Transaction recorded in history!', 'success');
       }

@@ -21,9 +21,9 @@ const TransactionsPage: React.FC = () => {
   const getTransactionTypeLabel = (type: string): string => {
     switch (type) {
       case 'deposit': return 'Deposit';
-      case 'withdrawal': return 'Queue Withdrawal';
+      case 'queueWithdrawal': return 'Queue Withdrawal';
       case 'completeWithdrawal': return 'Complete Withdrawal';
-      case 'processClaim': return 'Process Claim';
+      case 'processClaim': return 'Rewards Claim';
       case 'bridgingWithdrawalToL2': return 'Bridge Withdrawal to L2';
       case 'bridgingRewardsToL2': return 'Bridge Rewards to L2';
       default: return type.charAt(0).toUpperCase() + type.slice(1);
@@ -103,7 +103,7 @@ const TransactionsPage: React.FC = () => {
                   <div key={index} className="transaction-row">
                     <div className="table-col col-type">
                       <div className="transaction-type-label">
-                        {getTransactionTypeLabel(tx.type)}
+                        {getTransactionTypeLabel(tx.txType)}
                       </div>
                     </div>
                     <div className="table-col col-status">
@@ -132,7 +132,7 @@ const TransactionsPage: React.FC = () => {
                       {isValidMessageId(tx.messageId) && !!tx.txHash ? (
                         <CCIPStatusChecker
                           messageId={tx.messageId}
-                          txType={tx.type}
+                          txType={tx.txType}
                         />
                       ) : (
                         <span className="ccip-pending">

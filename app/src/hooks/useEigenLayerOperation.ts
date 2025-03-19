@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Address, Hex,  encodeAbiParameters } from 'viem';
+import { Address, Hex,  encodeAbiParameters, keccak256, TransactionReceipt } from 'viem';
 import { baseSepolia } from '../hooks/useClients';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { signMessageForEigenAgentExecution } from '../utils/signers';
@@ -7,8 +7,7 @@ import { CHAINLINK_CONSTANTS, SENDER_CCIP_ADDRESS, STRATEGY_MANAGER_ADDRESS } fr
 import { getRouterFeesL2 } from '../utils/routerFees';
 import { RECEIVER_CCIP_ADDRESS } from '../addresses';
 import { IERC20ABI } from '../abis';
-import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
-import { watchCCIPTransaction } from '../utils/ccipEventListener';
+import { TransactionTypes, useTransactionHistory } from '../contexts/TransactionHistoryContext';
 
 // Define function selector constants for better maintainability
 // These are the first 4 bytes of the keccak256 hash of the function signature
@@ -30,7 +29,7 @@ interface EigenLayerOperationConfig {
   // Optional token approval details
   tokenApproval?: TokenApproval;
   // Function to call after successful operation
-  onSuccess?: (txHash: string) => void;
+  onSuccess?: (txHash: string, receipt: TransactionReceipt) => void;
   // Function to call after failure
   onError?: (error: Error) => void;
   // Minutes until the signature expires
@@ -175,7 +174,11 @@ export function useEigenLayerOperation({
   };
 
   // Function to dispatch CCIP transaction
-  const dispatchTransaction = async (messageWithSignature: Hex, originalMessage: Hex): Promise<string> => {
+  const dispatchTransaction = async (
+    messageWithSignature: Hex,
+    originalMessage: Hex
+  ): Promise<{ txHash: `0x${string}`; receipt: TransactionReceipt }> => {
+
     try {
       setIsExecuting(true); // Ensure we set this flag when starting execution
 
@@ -236,7 +239,7 @@ export function useEigenLayerOperation({
       console.log("Sending transaction to CCIP sender contract:", SENDER_CCIP_ADDRESS);
 
       // Send the transaction
-      const hash = await l2Wallet.client.sendTransaction({
+      const txHash = await l2Wallet.client.sendTransaction({
         account: l2Wallet.account,
         to: SENDER_CCIP_ADDRESS,
         data: data,
@@ -244,84 +247,31 @@ export function useEigenLayerOperation({
         chain: l2Wallet.publicClient.chain ?? baseSepolia,
       });
 
-      console.log("Transaction sent, hash:", hash);
+      console.log("Transaction sent, hash:", txHash);
 
       // Determine transaction type based on the original message
       const txType = (
         targetContractAddr === STRATEGY_MANAGER_ADDRESS ? 'deposit' :
-        originalMessage.startsWith(QUEUE_WITHDRAWAL_SELECTOR) ? 'withdrawal' :
+        originalMessage.startsWith(QUEUE_WITHDRAWAL_SELECTOR) ? 'queueWithdrawal' :
         originalMessage.startsWith(COMPLETE_WITHDRAWAL_SELECTOR) ? 'completeWithdrawal' :
         'other'
-      ) as 'deposit' | 'withdrawal' | 'completeWithdrawal' | 'other';
+      ) as TransactionTypes;
 
       console.log(`Detected transaction type: ${txType}`);
-
-      // Create a pending transaction entry with properly typed status
-      const initialTransaction = {
-        txHash: hash,
-        messageId: '', // Will be updated when CCIP event is processed
-        timestamp: Math.floor(Date.now() / 1000),
-        type: txType,
-        status: 'pending' as 'pending' | 'confirmed' | 'failed',
-        from: l2Wallet.account,
-        to: targetContractAddr,
-        user: l2Wallet.account
-      };
 
       // Wait for transaction to be mined before adding to history
       // This ensures we don't add failed transactions
       console.log("Waiting for transaction receipt...");
       const receipt = await l2Wallet.publicClient.waitForTransactionReceipt({
-        hash
+        hash: txHash
       });
 
       if (receipt.status === 'success') {
         console.log('Transaction successfully mined! Receipt:', receipt.transactionHash);
-
-        console.log("Adding successful transaction to history:", initialTransaction);
-        try {
-          // Only add transaction to history if it succeeded
-          await addTransaction(initialTransaction);
-        } catch (addTxError) {
-          console.error("Error adding transaction to history:", addTxError);
-          // Continue execution since this is non-critical
+        return {
+          txHash: txHash,
+          receipt: receipt
         }
-
-        // Watch for CCIP events and update the transaction history
-        console.log("Starting CCIP event watcher for transaction:", hash);
-        watchCCIPTransaction(
-          l2Wallet.publicClient,
-          hash,
-          l2Wallet.account,
-          targetContractAddr,
-          txType,
-          l2Wallet.account,
-          async (ccipTransaction) => {
-            if (ccipTransaction) {
-              console.log("CCIP transaction data received:", ccipTransaction);
-
-              // Ensure we update transaction with messageId correctly
-              if (ccipTransaction.messageId) {
-                console.log(`Updating transaction ${hash} with messageId: ${ccipTransaction.messageId}`);
-
-                // Update the transaction with the new data by adding it (replaces existing by txHash)
-                try {
-                  await addTransaction(ccipTransaction);
-                } catch (updateTxError) {
-                  console.error("Error updating transaction with CCIP data:", updateTxError);
-                }
-              } else {
-                console.log("No messageId found in CCIP transaction data");
-              }
-            } else {
-              console.warn("CCIP event watcher returned null");
-            }
-          }
-        ).catch(err => {
-          console.error('Error watching for CCIP events:', err);
-        });
-
-        return hash;
       } else {
         console.error("Transaction failed on-chain");
         throw new Error('Transaction failed on-chain');
@@ -478,11 +428,11 @@ export function useEigenLayerOperation({
         }
 
         setInfo("Please confirm the transaction in your wallet...");
-        const txHash = await dispatchTransaction(messageWithSignature, directMessage);
+        const { txHash, receipt } = await dispatchTransaction(messageWithSignature, directMessage);
         setInfo("Transaction submitted successfully");
 
         // Call onSuccess if provided
-        if (onSuccess) onSuccess(txHash);
+        if (onSuccess) onSuccess(txHash, receipt);
       } catch (txError) {
         // Handle transaction rejection
         const errorMessage = txError instanceof Error ? txError.message : String(txError);

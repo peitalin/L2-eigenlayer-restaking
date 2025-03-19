@@ -51,8 +51,9 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
       case 'deposit': return 'Deposit';
       case 'bridgingWithdrawalToL2': return 'Bridging Withdrawal to L2';
       case 'bridgingRewardsToL2': return 'Bridging Rewards to L2';
-      case 'withdrawal': return 'Queue Withdrawal';
+      case 'queueWithdrawal': return 'Queue Withdrawal';
       case 'completeWithdrawal': return 'Complete Withdrawal';
+      case 'processClaim': return 'Rewards Claim';
       default: return 'Transaction';
     }
   };
@@ -100,7 +101,7 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
                 return (
                   <div key={index} className="transaction-history-item">
                     <div className="transaction-type">
-                      {getTransactionTypeLabel(tx.type)}
+                      {getTransactionTypeLabel(tx.txType)}
                     </div>
                     <div className="transaction-details">
                       <div className="transaction-hash">
@@ -120,7 +121,7 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
                         {isValidMessageId(tx.messageId) ? (
                           <CCIPStatusChecker
                             messageId={tx.messageId}
-                            txType={tx.type}
+                            txType={tx.txType}
                           />
                         ) : (
                           <span className="ccip-pending">Pending...</span>

@@ -1,7 +1,4 @@
-import React, { useState } from 'react';
-import { getCCIPMessageStatusText } from '../utils/ccipEventListener';
-import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
-import { useToast } from '../utils/toast';
+import React from 'react';
 import { getCCIPExplorerUrl } from '../utils/ccipEventListener';
 
 interface CCIPStatusCheckerProps {
@@ -15,74 +12,6 @@ const CCIPStatusChecker: React.FC<CCIPStatusCheckerProps> = ({
   txType,
   showExplorerLink = true,
 }) => {
-
-  const {
-    fetchCCIPMessageDetails,
-    fetchTransactions,
-  } = useTransactionHistory();
-  const { showToast } = useToast();
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
-  const [isConfirmed, setIsConfirmed] = useState(false);
-  const [checkingStatus, setCheckingStatus] = useState(false);
-
-  // CCIP status check function
-  const checkCCIPStatus = async () => {
-    if (!messageId) return;
-
-    setCheckingStatus(true);
-    setStatus('Checking...');
-
-    try {
-      // Fetch message details from CCIP API via server
-      const messageData = await fetchCCIPMessageDetails(messageId);
-
-      if (!messageData) {
-        setStatus('Unknown');
-        setCheckingStatus(false);
-        return;
-      }
-
-      // Get status text based on state
-      const statusText = getCCIPMessageStatusText(messageData.state);
-      setStatus(statusText);
-
-      // Use appropriate toast type based on status
-      if (messageData.state === 3) { // Failed
-        showToast(`CCIP Status: ${statusText}`, 'error');
-      } else {
-        showToast(`CCIP Status: ${statusText}`, 'info');
-      }
-
-      // Update transaction status in history
-      if (messageData.state !== undefined) {
-        // Map CCIP state to our transaction status
-        let txStatus: 'pending' | 'confirmed' | 'failed';
-        let isComplete = false;
-
-        if (messageData.state === 2) { // Confirmed
-          txStatus = 'confirmed';
-          isComplete = !!messageData.receiptTransactionHash;
-        } else if (messageData.state === 3) { // Failed
-          txStatus = 'failed';
-        } else {
-          txStatus = 'pending';
-        }
-
-        if (txStatus === 'confirmed') {
-          setIsConfirmed(true);
-        }
-      }
-
-      setCheckingStatus(false);
-    } catch (error) {
-      console.error('Error checking CCIP message status:', error);
-      setStatus('Error');
-      showToast(`Error checking CCIP status: ${(error as Error).message}`, 'error');
-      setCheckingStatus(false);
-    }
-  };
 
   const formatMessageId = (id: string): string => {
     if (!id) return '';
