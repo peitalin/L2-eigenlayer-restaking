@@ -3,11 +3,16 @@ import { Address, formatEther } from 'viem';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { encodeProcessClaimMsg } from '../utils/encoders';
-import { REWARDS_COORDINATOR_ADDRESS } from '../addresses';
+import { CHAINLINK_CONSTANTS, REWARDS_COORDINATOR_ADDRESS } from '../addresses';
 import { createClaim, REWARDS_AMOUNT, simulateRewardClaim } from '../utils/rewards';
 import { RewardsMerkleClaim } from '../abis/RewardsCoordinatorTypes';
 import { RewardsCoordinatorABI } from '../abis';
 import { useToast } from '../utils/toast';
+import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
+
+// Chain ID constants
+const ETH_CHAINID = '11155111'; // Ethereum Sepolia
+const L2_CHAINID = '84532';     // Base Sepolia
 
 const RewardsComponent: React.FC = () => {
   const {
@@ -17,6 +22,7 @@ const RewardsComponent: React.FC = () => {
     isLoadingEigenAgent
   } = useClientsContext();
   const { showToast } = useToast();
+  const { addTransaction } = useTransactionHistory();
 
   const [currentDistRootIndex, setCurrentDistRootIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -36,6 +42,24 @@ const RewardsComponent: React.FC = () => {
     onSuccess: (txHash) => {
       showToast('Rewards claim transaction submitted!', 'success');
       console.log('Transaction hash:', txHash);
+
+      // Add the processClaim transaction to the history
+      if (txHash && eigenAgentInfo?.eigenAgentAddress) {
+        addTransaction({
+          txHash,
+          messageId: txHash, // Server will extract the real messageId if needed
+          timestamp: Math.floor(Date.now() / 1000),
+          type: 'processClaim',
+          status: 'confirmed',
+          from: l1Wallet.account || '',
+          to: REWARDS_COORDINATOR_ADDRESS,
+          user: l1Wallet.account || '',
+          sourceChainId: ETH_CHAINID, // Sepolia L1 chain ID
+          destinationChainId: ETH_CHAINID, // Also Sepolia since this is an L1-only transaction
+          isComplete: true
+        });
+        showToast('Transaction recorded in history!', 'success');
+      }
     },
     onError: (err) => {
       showToast(`Error claiming rewards: ${err.message}`, 'error');
@@ -232,8 +256,8 @@ const RewardsComponent: React.FC = () => {
                 loading ||
                 isLoadingEigenAgent ||
                 currentDistRootIndex === null ||
-                !eigenAgentInfo?.eigenAgentAddress ||
-                (simulationResult !== null && !simulationResult)
+                !eigenAgentInfo?.eigenAgentAddress
+                // || (simulationResult !== null && !simulationResult)
               }
             >
               {isExecuting ? 'Processing...' : 'Claim Rewards'}

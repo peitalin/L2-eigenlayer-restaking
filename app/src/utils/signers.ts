@@ -196,14 +196,6 @@ export async function signMessageForEigenAgentExecution(
     formattedSignature = `0x0${signature.slice(2)}` as Hex;
   }
 
-  // match the Solidity implementation:
-  // messageWithSignature = abi.encodePacked(
-  //   messageToEigenlayer,
-  //   bytes32(abi.encode(vm.addr(signerKey))), // AgentOwner. Pad signer to 32byte word
-  //   expiry,
-  //   signatureEigenAgent
-  // );
-
   console.log("targetContractAddr", targetContractAddr);
   console.log("eigenAgentAddr", eigenAgentAddr);
   console.log("messageToEigenlayer", messageToEigenlayer);
@@ -220,16 +212,23 @@ export async function signMessageForEigenAgentExecution(
   console.log("\ndigestHash", digestHash);
   console.log("signature", formattedSignature);
 
-    // encodePacked(
-    //   ['uint8', 'address', 'bytes32'],
-    //   [EARNER_LEAF_SALT, earnerLeaf.earner, earnerLeaf.earnerTokenRoot]
-    // )
+  // match the Solidity implementation:
+  // messageWithSignature = abi.encodePacked(
+  //   messageToEigenlayer,
+  //   bytes32(abi.encode(vm.addr(signerKey))), // AgentOwner. Pad signer to 32byte word
+  //   expiry,
+  //   signatureEigenAgent
+  // );
   const messageWithSignature = concat([
     messageToEigenlayer,
     encodedSigner,
     encodedExpiry,
     formattedSignature
   ]) as Hex;
+  // const messageWithSignature = encodePacked(
+  //   ['bytes', 'address', 'uint256', 'bytes'],
+  //   [messageToEigenlayer, signer, expiry, signatureEigenAgent]
+  // )
 
   return {
     signature: formattedSignature,

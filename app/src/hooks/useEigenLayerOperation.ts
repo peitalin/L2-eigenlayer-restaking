@@ -1,15 +1,14 @@
-import { useState, useEffect } from 'react';
-import { Address, Hex, formatEther, encodeAbiParameters } from 'viem';
+import { useState } from 'react';
+import { Address, Hex,  encodeAbiParameters } from 'viem';
 import { baseSepolia } from '../hooks/useClients';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { signMessageForEigenAgentExecution } from '../utils/signers';
 import { CHAINLINK_CONSTANTS, SENDER_CCIP_ADDRESS, STRATEGY_MANAGER_ADDRESS } from '../addresses';
 import { getRouterFeesL2 } from '../utils/routerFees';
-import { RECEIVER_CCIP_ADDRESS } from '../addresses/ethSepoliaContracts';
+import { RECEIVER_CCIP_ADDRESS } from '../addresses';
 import { IERC20ABI } from '../abis';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import { watchCCIPTransaction } from '../utils/ccipEventListener';
-import { useToast } from '../utils/toast';
 
 // Define function selector constants for better maintainability
 // These are the first 4 bytes of the keccak256 hash of the function signature

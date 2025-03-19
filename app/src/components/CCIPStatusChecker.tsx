@@ -19,7 +19,6 @@ const CCIPStatusChecker: React.FC<CCIPStatusCheckerProps> = ({
   const {
     fetchCCIPMessageDetails,
     fetchTransactions,
-    updateTransaction
   } = useTransactionHistory();
   const { showToast } = useToast();
 
@@ -27,37 +26,6 @@ const CCIPStatusChecker: React.FC<CCIPStatusCheckerProps> = ({
   const [status, setStatus] = useState<string | null>(null);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
-
-  const isWithdrawal = txType === 'completeWithdrawal'
-    || txType === 'bridgingWithdrawalToL2'
-    || txType === 'bridgingRewardsToL2'
-    || txType === 'withdrawal';
-
-  const handleCheckStatus = async () => {
-    if (!messageId) {
-      showToast('No messageId provided', 'error');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      // Check CCIP message status
-      await checkCCIPStatus();
-
-      // Fetch updated transactions to reflect any server-side updates
-      try {
-        await fetchTransactions();
-      } catch (error) {
-        console.error('Error fetching transactions:', error);
-      }
-    } catch (error) {
-      console.error('Error checking status:', error);
-      showToast('Error checking status', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // CCIP status check function
   const checkCCIPStatus = async () => {
@@ -102,15 +70,6 @@ const CCIPStatusChecker: React.FC<CCIPStatusCheckerProps> = ({
           txStatus = 'pending';
         }
 
-        // Update transaction with CCIP message details
-        await updateTransaction(messageId, {
-          status: txStatus,
-          isComplete,
-          receiptTransactionHash: messageData.receiptTransactionHash || undefined,
-          sourceChainId: messageData.sourceChainId,
-          destinationChainId: messageData.destChainId,
-        });
-
         if (txStatus === 'confirmed') {
           setIsConfirmed(true);
         }
@@ -144,14 +103,14 @@ const CCIPStatusChecker: React.FC<CCIPStatusCheckerProps> = ({
             {formatMessageId(messageId)}
           </a>
         )}
-        <button
+        {/* <button
           className="ccip-check-button"
           onClick={handleCheckStatus}
           disabled={isLoading || !messageId}
           title={isWithdrawal ? "Check Withdrawal Status" : "Check CCIP Status"}
         >
           {isLoading ? '...' : '⟳'}
-        </button>
+        </button> */}
       </div>
     </div>
   );

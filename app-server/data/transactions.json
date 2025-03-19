@@ -7,10 +7,11 @@
     "status": "confirmed",
     "from": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c",
     "to": "0x2604e5a6b77b5Ab95e38b6fA6fc1F5db5585F562",
+    "user": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c",
     "receiptTransactionHash": "0x1bda567f1dcaa7e28b143669b7bf484fc6d61f9809424224fdbfafcd05009bc7",
     "isComplete": true,
-    "sourceChainId": 84532,
-    "destinationChainId": 11155111
+    "sourceChainId": "84532",
+    "destinationChainId": "11155111"
   },
   {
     "txHash": "0x1bda567f1dcaa7e28b143669b7bf484fc6d61f9809424224fdbfafcd05009bc7",
@@ -20,10 +21,11 @@
     "status": "confirmed",
     "from": "0x08832066a18b3108a613970a24e816cb10bf76c3",
     "to": "0xaa1ffb25606a449c5b03ea0433b0541c36fe8903",
+    "user": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c",
     "isComplete": true,
     "receiptTransactionHash": "0x9bac65db25fcdb5942da26fd49d76cd66caea0522c30d531e60d9a6a7c4794e4",
-    "sourceChainId": 11155111,
-    "destinationChainId": 84532
+    "sourceChainId": "11155111",
+    "destinationChainId": "84532"
   },
   {
     "txHash": "0x72488f6f80595eb887f9d2e73dbd6b7ba893f64da0b8b329031be5175c522ea2",
@@ -105,6 +107,8 @@
     "to": "0x2604e5a6b77b5Ab95e38b6fA6fc1F5db5585F562",
     "user": "0x8454d149Beb26E3E3FC5eD1C87Fb0B2a1b7B6c2c",
     "isComplete": true,
-    "receiptTransactionHash": "0xb0b82376c6ace6cf1f47760e7974578807fbc5fbc48016e933dbe51fabfddcc7"
+    "receiptTransactionHash": "0xb0b82376c6ace6cf1f47760e7974578807fbc5fbc48016e933dbe51fabfddcc7",
+    "sourceChainId": "84532",
+    "destinationChainId": "11155111"
   }
 ]
