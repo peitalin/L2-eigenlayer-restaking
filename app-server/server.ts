@@ -72,7 +72,10 @@ interface CCIPMessageData {
   data?: string;
   sender?: string;
   receiver?: string;
+  blessBlockNumber?: boolean;
 }
+// See:
+// https://ccip.chain.link/api/h/atlas/message/0x405715b39feb8ce9771064ea9f9ad42b837c1e73dd811ab87f1e86ffa3d93f8c
 
 // Define the transaction history interface (now we use the one from db.ts)
 type CCIPTransaction = db.Transaction;
@@ -149,7 +152,10 @@ function getStatusFromState(state: number, data: any): string {
       if (data.receiptTransactionHash) {
         return 'SUCCESS';
       }
-      return 'UNKNOWN';
+      if (data.blessBlockNumber) {
+        return 'BLESSED';
+      }
+      return 'PENDING';
   }
 }
 
