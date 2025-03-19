@@ -35,8 +35,6 @@ interface TransactionHistoryContextType {
   error: string | null;
   fetchTransactions: () => Promise<void>;
   addTransaction: (transaction: CCIPTransaction) => Promise<void>;
-  updateTransaction: (messageId: string, updates: Partial<CCIPTransaction>) => Promise<void>;
-  clearHistory: () => Promise<void>;
   fetchCCIPMessageDetails: (messageId: string) => Promise<any>;
 }
 
@@ -46,7 +44,7 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
   const [transactions, setTransactions] = useState<CCIPTransaction[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const { l2Wallet } = useClientsContext();
+  const { l2Wallet, l1Wallet } = useClientsContext();
 
   // Refs for transaction polling
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -54,21 +52,22 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
 
   // Function to fetch all transactions from the server
   const fetchTransactions = async () => {
-    // Don't set loading to true if already loading (prevents multiple concurrent requests)
-    if (isLoading) {
-      console.log('Already fetching transactions, skipping');
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
 
-    try {
-      console.log('Fetching transactions from server');
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
+    // Set a timeout to abort the request if it takes too long
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      const response = await fetch(`${SERVER_BASE_URL}/api/transactions`, {
+    try {
+      // Use user-specific endpoint if wallet is connected
+      const endpoint = l1Wallet.account
+        ? `${SERVER_BASE_URL}/api/transactions/user/${l1Wallet.account}`
+        : `${SERVER_BASE_URL}/api/transactions`;
+
+      console.log(`Fetching transactions from ${endpoint}`);
+
+      const response = await fetch(endpoint, {
         signal: controller.signal
       });
 
@@ -212,86 +211,6 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
     }
   };
 
-  // Update an existing transaction by messageId
-  const updateTransaction = async (messageId: string, updates: Partial<CCIPTransaction>) => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // Ensure the updates include all necessary fields
-      const completeUpdates = {
-        ...updates,
-        // If the transaction is being marked as complete, ensure these fields are set properly
-        ...(updates.status === 'confirmed' && {
-          isComplete: updates.isComplete !== undefined ? updates.isComplete : true,
-        }),
-      };
-
-      const response = await fetch(`${SERVER_BASE_URL}/api/transactions/messageId/${messageId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(completeUpdates),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update transaction: ${response.status} ${response.statusText}`);
-      }
-
-      // Update local state
-      setTransactions(prevTransactions => {
-        const updatedTransactions = prevTransactions.map(tx =>
-          tx.messageId === messageId ? { ...tx, ...completeUpdates } : tx
-        );
-
-        return updatedTransactions;
-      });
-    } catch (err: any) {
-      console.error('Error updating transaction:', err);
-      setError(err.message || 'Failed to update transaction');
-
-      // Update local state even if server request fails
-      setTransactions(prevTransactions => {
-        const updatedTransactions = prevTransactions.map(tx =>
-          tx.messageId === messageId ? { ...tx, ...updates } : tx
-        );
-
-        return updatedTransactions;
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Clear transaction history
-  const clearHistory = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`${SERVER_BASE_URL}/api/transactions`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to clear transaction history: ${response.status} ${response.statusText}`);
-      }
-
-      // Clear local state
-      setTransactions([]);
-    } catch (err: any) {
-      console.error('Error clearing transaction history:', err);
-      setError(err.message || 'Failed to clear transaction history');
-
-      // Clear local state even if server request fails
-      setTransactions([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Fetch CCIP message details
   const fetchCCIPMessageDetails = async (messageId: string) => {
     if (!messageId) {
       return null;
@@ -319,8 +238,6 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
         error,
         fetchTransactions,
         addTransaction,
-        updateTransaction,
-        clearHistory,
         fetchCCIPMessageDetails,
       }}
     >

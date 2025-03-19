@@ -108,7 +108,7 @@
 
 .transactions-table-header {
   display: grid;
-  grid-template-columns: 15% 10% 10% 20% 20% 15% 10%;
+  grid-template-columns: 15% 10% 15% 5% 15% 5% 15% 20%;
   background-color: var(--color-bg-tertiary);
   padding: 14px 20px;
   font-weight: 600;
@@ -125,7 +125,7 @@
 
 .transaction-row {
   display: grid;
-  grid-template-columns: 15% 10% 10% 20% 20% 15% 10%;
+  grid-template-columns: 15% 10% 15% 5% 15% 5% 15% 20%;
   padding: 10px;
   border-bottom: 1px solid var(--color-border-primary);
   align-items: center;
@@ -142,7 +142,7 @@
 
 /* Table Column Styling */
 .table-col {
-  padding-right: 10px;
+  justify-content: center;
 }
 
 .col-type {
@@ -178,6 +178,7 @@
   width: fit-content;
   min-width: 40px;
   text-align: center;
+  margin-bottom: 4px;
 }
 
 .chain-base {
@@ -185,7 +186,7 @@
   color: white;
 }
 
-.chain-eth {
+.chain-ethereum {
   background-color: #627EEA;
   color: white;
 }
@@ -233,10 +234,13 @@
 
 /* Directional Arrows */
 .directional-arrow {
-  margin-left: 8px;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--color-text-secondary);
   font-weight: bold;
+}
+
+.directional-arrow.dim {
+  opacity: 0.3;
 }
 
 /* CCIP Message */
@@ -311,11 +315,26 @@
   font-size: 14px;
 }
 
+/* Source & Destination Hash Styling */
+.source-hash, .dest-hash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Arrow Column */
+.col-arrow {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 /* Media Queries for Responsiveness */
 @media (max-width: 1024px) {
   .transactions-table-header,
   .transaction-row {
-    grid-template-columns: 15% 10% 10% 20% 25% 20%;
+    grid-template-columns: 15% 10% 20% 5% 15% 5% 20% 10%;
   }
 
   .col-time {
@@ -329,45 +348,48 @@
   }
 
   .transaction-row {
-    grid-template-columns: 1fr;
-    grid-gap: 12px;
+    display: flex;
+    flex-direction: column;
     padding: 16px;
   }
 
   .table-col {
+    width: 100%;
     display: flex;
     align-items: center;
-    padding: 6px 0;
   }
 
-  .col-type, .col-source, .col-status, .col-hash, .col-ccip, .col-l1hash, .col-time {
-    position: relative;
-    padding-left: 120px;
+  .col-type, .col-status, .col-hash, .col-ccip, .col-arrow, .col-time {
+    margin-bottom: 8px;
   }
 
-  .col-type:before, .col-source:before, .col-status:before, .col-hash:before, .col-ccip:before, .col-l1hash:before, .col-time:before {
-    position: absolute;
-    left: 0;
-    width: 110px;
-    content: attr(class);
+  .col-type:before, .col-status:before, .col-hash:before, .col-ccip:before, .col-arrow:before, .col-time:before {
+    content: "";
+    width: 120px;
     font-weight: 600;
-    font-size: 12px;
     color: var(--color-text-secondary);
-    text-transform: uppercase;
+    font-size: 14px;
   }
 
-  .col-type:before { content: "Type:"; }
-  .col-source:before { content: "Source:"; }
+  .source-hash:before { content: "Source TX:"; }
+  .dest-hash:before { content: "Destination TX:"; }
   .col-status:before { content: "Status:"; }
-  .col-hash:before { content: "L2 Tx:"; }
+  .col-type:before { content: "Type:"; }
   .col-ccip:before { content: "CCIP:"; }
-  .col-l1hash:before { content: "L1 Tx:"; }
   .col-time:before { content: "Time:"; }
 
-  .directional-arrow {
-    transform: rotate(90deg);
-    display: inline-block;
-    margin-left: 4px;
+  .col-arrow {
+    display: none; /* Hide arrows on mobile */
+  }
+
+  .source-hash, .dest-hash {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .source-chain-badge {
+    margin-right: 8px;
   }
 
   .transactions-form-header {
