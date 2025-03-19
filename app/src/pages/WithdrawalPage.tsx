@@ -25,7 +25,7 @@ interface ProcessedWithdrawal {
 const WithdrawalPage: React.FC = () => {
   // Always call useTransactionHistory at the top level, even if you don't use it directly
   // This ensures consistent hook ordering because useEigenLayerOperation uses it internally
-  const txHistory = useTransactionHistory();
+  const { addTransaction } = useTransactionHistory();
   // Access toast notifications
   const { showToast } = useToast();
 
@@ -138,8 +138,22 @@ const WithdrawalPage: React.FC = () => {
     targetContractAddr: DELEGATION_MANAGER_ADDRESS,
     amount: 0n,
     expiryMinutes: 45,
-    onSuccess: (txHash) => {
-      // No need to call addTransaction - the hook already does this
+    onSuccess: (txHash, receipt) => {
+      if (txHash && receipt) {
+        addTransaction({
+          txHash,
+          messageId: "", // Server will extract the real messageId if needed
+          timestamp: Math.floor(Date.now() / 1000),
+          txType: 'queueWithdrawal',
+          status: 'confirmed',
+          from: receipt.from,
+          to: receipt.to || '',
+          user: l1Wallet.account || '',
+          isComplete: false,
+          sourceChainId: CHAINLINK_CONSTANTS.baseSepolia.chainId.toString(),
+          destinationChainId: CHAINLINK_CONSTANTS.ethSepolia.chainId.toString()
+        });
+      }
       showToast(`Withdrawal queued! Transaction hash: ${txHash}`, 'success');
     },
     onError: (err) => {
@@ -156,7 +170,22 @@ const WithdrawalPage: React.FC = () => {
     targetContractAddr: DELEGATION_MANAGER_ADDRESS,
     amount: 0n,
     expiryMinutes: 45,
-    onSuccess: (txHash) => {
+    onSuccess: (txHash, receipt) => {
+      if (txHash && receipt) {
+        addTransaction({
+          txHash,
+          messageId: "", // Server will extract the real messageId if needed
+          timestamp: Math.floor(Date.now() / 1000),
+          txType: 'completeWithdrawal',
+          status: 'confirmed',
+          from: receipt.from,
+          to: receipt.to || '',
+          user: l1Wallet.account || '',
+          isComplete: false,
+          sourceChainId: CHAINLINK_CONSTANTS.baseSepolia.chainId.toString(),
+          destinationChainId: CHAINLINK_CONSTANTS.ethSepolia.chainId.toString()
+        });
+      }
       showToast(`Withdrawal completed! Transaction hash: ${txHash}`, 'success');
       setIsCompletingWithdrawal(false);
     },

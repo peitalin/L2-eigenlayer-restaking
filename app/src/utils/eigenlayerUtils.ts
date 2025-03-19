@@ -148,35 +148,30 @@ export async function getEigenAgentAndExecNonce(userAddress: Address): Promise<{
   execNonce: bigint;
 } | null> {
   try {
-    // Create contract instances
-    const agentFactory = getContract({
+    // Get the EigenAgent address for the user using readContract
+    const eigenAgentAddress = await publicClient.readContract({
       address: AGENT_FACTORY_ADDRESS,
       abi: agentFactoryAbi,
-      publicClient,
-    });
-
-    // Get the EigenAgent address for the user
-    const eigenAgentAddress = await agentFactory.read.getEigenAgent([userAddress]) as Address;
-    // console.log('EigenAgent address:', eigenAgentAddress);
+      functionName: 'getEigenAgent',
+      args: [userAddress]
+    }) as Address;
 
     // If user has no EigenAgent, return null
     if (eigenAgentAddress === ZeroAddress) {
       return null;
     }
 
-    // Create contract instance for the EigenAgent
-    const eigenAgent = getContract({
-      address: eigenAgentAddress as Address,
-      abi: eigenAgentAbi,
-      publicClient,
-    });
-
     // Get the current execution nonce
-    const execNonce = await eigenAgent.read.execNonce();
+    const execNonce = await publicClient.readContract({
+      address: eigenAgentAddress,
+      abi: eigenAgentAbi,
+      functionName: 'execNonce',
+      args: []
+    }) as bigint;
 
     return {
-      eigenAgentAddress: eigenAgentAddress,
-      execNonce: execNonce as bigint,
+      eigenAgentAddress,
+      execNonce,
     };
   } catch (error) {
     console.error('Error in getEigenAgentAndExecNonce:', error);

@@ -16,7 +16,7 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.3.0",
     "react-toastify": "^11.0.5",
-    "viem": "^1.19.5"
+    "viem": "^2.23.12"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^5.16.5",
