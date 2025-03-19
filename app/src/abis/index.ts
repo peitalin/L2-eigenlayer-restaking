@@ -35,3 +35,6 @@ export {
   validateABI,
   ensureAbiHasFunctions
 } from './abiUtils';
+
+// Export RewardsCoordinator ABI
+export { RewardsCoordinatorABI } from './generated/RewardsCoordinatorABI';

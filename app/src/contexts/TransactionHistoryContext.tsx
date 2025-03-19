@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { useClientsContext } from './ClientsContext';
 
 // Define the structure for a CCIP transaction
 export interface CCIPTransaction {
@@ -45,11 +46,11 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
   const [transactions, setTransactions] = useState<CCIPTransaction[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const { l2Wallet } = useClientsContext();
 
-  // Fetch transaction history from server on component mount
-  useEffect(() => {
-    fetchTransactions();
-  }, []);
+  // Refs for transaction polling
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isPollingRef = useRef(false);
 
   // Function to fetch all transactions from the server
   const fetchTransactions = async () => {
@@ -86,6 +87,72 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
       setIsLoading(false);
     }
   };
+
+  // Function to start polling for transaction updates
+  const startPolling = useCallback(() => {
+    if (isPollingRef.current) return; // Already polling
+
+    console.log('Starting transaction polling');
+
+    // Clear any existing interval first
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
+    // Run once immediately
+    fetchTransactions().catch(err => console.error('Error in initial transaction fetch:', err));
+
+    // Set up polling with a reasonable interval (every 2 minutes)
+    intervalRef.current = setInterval(() => {
+      console.log('Polling for transaction updates...');
+      fetchTransactions().catch(err => console.error('Error polling transactions:', err));
+    }, 120000); // 2 minutes
+
+    isPollingRef.current = true;
+  }, []);
+
+  // Function to stop polling
+  const stopPolling = useCallback(() => {
+    console.log('Stopping transaction polling');
+
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
+    isPollingRef.current = false;
+  }, []);
+
+  // Start/stop polling based on l2Wallet.publicClient availability
+  useEffect(() => {
+    if (l2Wallet.publicClient) {
+      console.log('L2 wallet client detected, starting transaction history polling...');
+      startPolling();
+
+      return () => {
+        console.log('Stopping transaction history polling...');
+        stopPolling();
+      };
+    }
+  }, [l2Wallet.publicClient, startPolling, stopPolling]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      console.log('Cleaning up transaction polling');
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      isPollingRef.current = false;
+    };
+  }, []);
+
+  // Fetch transaction history from server on component mount
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
 
   // Add a new transaction to the history
   const addTransaction = async (transaction: CCIPTransaction) => {
@@ -269,96 +336,4 @@ export const useTransactionHistory = (): TransactionHistoryContextType => {
     throw new Error('useTransactionHistory must be used within a TransactionHistoryProvider');
   }
   return context;
-};
-
-// Custom hook for polling transaction history at regular intervals
-export const useTransactionHistoryPolling = () => {
-  const { fetchTransactions } = useTransactionHistory();
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
-
-  // Use a ref to store stable function references
-  const stableCallbacks = useRef({
-    startPolling: () => {
-      if (isPollingRef.current) return; // Already polling
-
-      console.log('Starting transaction polling');
-
-      // Clear any existing interval first
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-
-      // Run once immediately
-      fetchTransactions().catch(err => console.error('Error in initial transaction fetch:', err));
-
-      // Set up polling with a reasonable interval (every 2 minutes)
-      intervalRef.current = setInterval(() => {
-        console.log('Polling for transaction updates...');
-        fetchTransactions().catch(err => console.error('Error polling transactions:', err));
-      }, 120000); // 2 minutes
-
-      isPollingRef.current = true;
-      setIsPolling(true);
-    },
-
-    stopPolling: () => {
-      console.log('Stopping transaction polling');
-
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-
-      isPollingRef.current = false;
-      setIsPolling(false);
-    }
-  });
-
-  // Use a ref to track polling state that persists through renders
-  const isPollingRef = useRef(false);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      console.log('Cleaning up transaction polling');
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      isPollingRef.current = false;
-    };
-  }, []);
-
-  // Initialize callbacks with access to the current fetchTransactions
-  useEffect(() => {
-    // Update the fetchTransactions reference in the callbacks
-    const originalStartPolling = stableCallbacks.current.startPolling;
-    stableCallbacks.current.startPolling = () => {
-      if (isPollingRef.current) return; // Already polling
-
-      console.log('Starting transaction polling');
-
-      // Clear any existing interval first
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-
-      // Run once immediately
-      fetchTransactions().catch(err => console.error('Error in initial transaction fetch:', err));
-
-      // Set up polling with a reasonable interval (every 2 minutes)
-      intervalRef.current = setInterval(() => {
-        console.log('Polling for transaction updates...');
-        fetchTransactions().catch(err => console.error('Error polling transactions:', err));
-      }, 120000); // 2 minutes
-
-      isPollingRef.current = true;
-      setIsPolling(true);
-    };
-  }, [fetchTransactions]);
-
-  return stableCallbacks.current;
 };

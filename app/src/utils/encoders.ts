@@ -1,5 +1,6 @@
 import { Address, Hex, encodeFunctionData } from 'viem';
 import { DelegationManagerABI } from '../abis';
+import { RewardsMerkleClaim } from '../abis/generated/RewardsCoordinatorTypes';
 
 // Constant for zero address
 export const ZeroAddress: Address = "0x0000000000000000000000000000000000000000";
@@ -124,5 +125,75 @@ export function encodeCompleteWithdrawalMsg(
       tokensToWithdraw,
       receiveAsTokens
     ]
+  });
+}
+
+/**
+ * Encodes a processClaim call for IRewardsCoordinator
+ * TypeScript equivalent of the Solidity function:
+ *
+ * function encodeProcessClaimMsg(
+ *     IRewardsCoordinator.RewardsMerkleClaim memory claim,
+ *     address recipient
+ * ) public pure returns (bytes memory) {
+ *     return abi.encodeCall(
+ *         IRewardsCoordinator.processClaim,
+ *         (claim, recipient)
+ *     );
+ * }
+ *
+ * @param claim The RewardsMerkleClaim structure with claim details
+ * @param recipient The address that will receive the rewards
+ * @returns Encoded function call as a hex string
+ */
+export function encodeProcessClaimMsg(
+  claim: RewardsMerkleClaim,
+  recipient: Address
+): Hex {
+  // Function signature: processClaim((uint32,uint32,bytes,(address,bytes32),uint32[],bytes[],(address,uint256)[]),address)
+  const abi = [
+    {
+      name: 'processClaim',
+      type: 'function',
+      inputs: [
+        {
+          name: 'claim',
+          type: 'tuple',
+          components: [
+            { name: 'rootIndex', type: 'uint32' },
+            { name: 'earnerIndex', type: 'uint32' },
+            { name: 'earnerTreeProof', type: 'bytes' },
+            {
+              name: 'earnerLeaf',
+              type: 'tuple',
+              components: [
+                { name: 'earner', type: 'address' },
+                { name: 'earnerTokenRoot', type: 'bytes32' }
+              ]
+            },
+            { name: 'tokenIndices', type: 'uint32[]' },
+            { name: 'tokenTreeProofs', type: 'bytes[]' },
+            {
+              name: 'tokenLeaves',
+              type: 'tuple[]',
+              components: [
+                { name: 'token', type: 'address' },
+                { name: 'cumulativeEarnings', type: 'uint256' }
+              ]
+            }
+          ]
+        },
+        { name: 'recipient', type: 'address' }
+      ],
+      outputs: [],
+      stateMutability: 'nonpayable'
+    }
+  ] as const;
+
+  // Encode the function call
+  return encodeFunctionData({
+    abi,
+    functionName: 'processClaim',
+    args: [claim, recipient]
   });
 }

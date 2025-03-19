@@ -29,3 +29,7 @@ export * from './eigenlayerContracts';
 export * from './baseSepoliaContracts';
 
 // Re-export any other address-related constants here
+
+// Add the REWARDS_COORDINATOR_ADDRESS to existing exports
+
+export const REWARDS_COORDINATOR_ADDRESS = '0x3c64d44E8be466F9894f0Dc2b7C3434A1c983826' as const; // Replace with the actual address

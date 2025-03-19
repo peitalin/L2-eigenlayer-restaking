@@ -225,10 +225,42 @@ const QueuedWithdrawals: React.FC<QueuedWithdrawalsProps> = ({
     }
   };
 
+  // When rendering a withdrawal root, check if it's in the on-chain roots and style accordingly
+  const renderWithdrawalRoot = (root: string | undefined) => {
+    if (!root) {
+      return <span className="no-root">Not available</span>;
+    }
+
+    // Check if this root is in the on-chain roots list
+    const isOnChain = withdrawalRoots.includes(root);
+
+    return (
+      <div
+        className={`withdrawal-root-hash-compact ${isOnChain ? 'on-chain' : 'not-on-chain'}`}
+        title={root}
+      >
+        {truncateWithdrawalRoot(root)}
+      </div>
+    );
+  };
+
+  // Update the button text to show "Ready in X time" instead of "Not Ready"
+  const renderButtonText = (withdrawal: ProcessedWithdrawal, index: number) => {
+    if (completingWithdrawalIndex === index) {
+      return 'Processing...';
+    }
+
+    if (canCompleteWithdrawal(withdrawal)) {
+      return 'Complete';
+    }
+
+    return `Ready in ${renderWithdrawalTime(withdrawal)}`;
+  };
+
   if (!isConnected) {
     return (
       <div className="queued-withdrawals">
-        <h3>On-Chain Queued Withdrawals</h3>
+        <h3>On-Chain Withdrawals</h3>
         <p className="no-withdrawals-message">Connect your wallet to view queued withdrawals.</p>
       </div>
     );
@@ -237,7 +269,7 @@ const QueuedWithdrawals: React.FC<QueuedWithdrawalsProps> = ({
   return (
     <div className="queued-withdrawals">
       <div className="queued-withdrawals-header">
-        <h3>Queued Withdrawals</h3>
+        <h3>On-Chain Withdrawals</h3>
         <button
           onClick={fetchQueuedWithdrawals}
           disabled={isLoading}
@@ -280,16 +312,7 @@ const QueuedWithdrawals: React.FC<QueuedWithdrawalsProps> = ({
                   </td>
                   <td className="withdrawal-withdrawer">{formatAddress(withdrawal.withdrawer)}</td>
                   <td className="withdrawal-root-cell">
-                    {withdrawal.withdrawalRoot ?
-                      <div
-                        className="withdrawal-root-hash-compact"
-                        onClick={() => withdrawal.withdrawalRoot && handleWithdrawalRootClick(withdrawal.withdrawalRoot)}
-                        title={withdrawal.withdrawalRoot}
-                      >
-                        {truncateWithdrawalRoot(withdrawal.withdrawalRoot)}
-                      </div> :
-                      <span className="no-root">Not available</span>
-                    }
+                    {renderWithdrawalRoot(withdrawal.withdrawalRoot)}
                   </td>
                   {onSelectWithdrawal && (
                     <td>
@@ -298,11 +321,7 @@ const QueuedWithdrawals: React.FC<QueuedWithdrawalsProps> = ({
                         disabled={!canCompleteWithdrawal(withdrawal) || completingWithdrawalIndex === index}
                         className="complete-withdrawal-button"
                       >
-                        {completingWithdrawalIndex === index
-                          ? 'Processing...'
-                          : canCompleteWithdrawal(withdrawal)
-                            ? 'Complete'
-                            : 'Not Ready'}
+                        {renderButtonText(withdrawal, index)}
                       </button>
                     </td>
                   )}
@@ -310,19 +329,6 @@ const QueuedWithdrawals: React.FC<QueuedWithdrawalsProps> = ({
               ))}
             </tbody>
           </table>
-
-          {withdrawalRoots.length > 0 && (
-            <>
-              <h4>On-Chain Withdrawal Roots</h4>
-              <div className="withdrawal-roots">
-                {withdrawalRoots.map((root, index) => (
-                  <div key={index} className="withdrawal-root">
-                    {root}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
         </div>
       ) : (
         <p className="no-withdrawals-message">No queued withdrawals found on-chain.</p>
