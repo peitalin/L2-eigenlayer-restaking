@@ -1,4 +1,3 @@
-
 //  Declaration for implicit type library
 declare module 'testing-library__jest-dom' {
   // Re-export types from @testing-library/jest-dom

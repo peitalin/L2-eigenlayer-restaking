@@ -4,11 +4,6 @@ Server for tracking transaction history and CCIP message history for the EigenLa
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js (v18 or higher)
-- npm or pnpm
-
 ### Installation
 
 1. Install dependencies:
@@ -26,7 +21,6 @@ npm run start:watch
 The server will migrate some `transactions.json` demo data first.
 
 Then it will receive CCIP transactions/messages from the frontend and poll them to see when the finish on L1, and check whether there are follow-up CCIP messages that it needs to track for the frontend (e.g claiming rewards, withdrawals)
-
 
 
 ## API Endpoints

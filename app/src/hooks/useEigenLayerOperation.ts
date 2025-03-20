@@ -3,17 +3,23 @@ import { Address, Hex,  encodeAbiParameters, keccak256, TransactionReceipt } fro
 import { baseSepolia } from '../hooks/useClients';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { signMessageForEigenAgentExecution } from '../utils/signers';
-import { CHAINLINK_CONSTANTS, SENDER_CCIP_ADDRESS, STRATEGY_MANAGER_ADDRESS } from '../addresses';
+import { EthSepolia, BaseSepolia, SENDER_CCIP_ADDRESS, STRATEGY_MANAGER_ADDRESS } from '../addresses';
 import { getRouterFeesL2 } from '../utils/routerFees';
 import { RECEIVER_CCIP_ADDRESS } from '../addresses';
 import { IERC20ABI } from '../abis';
-import { TransactionTypes, useTransactionHistory } from '../contexts/TransactionHistoryContext';
+import { TransactionTypes } from '../utils/ccipEventListener';
+
 
 // Define function selector constants for better maintainability
 // These are the first 4 bytes of the keccak256 hash of the function signature
+const SEND_MESSAGE_PAY_NATIVE_SELECTOR = '0x7132732a' as Hex; // sendMessagePayNative(uint64,address,bytes,tuple[],uint256)
+const DEPOSIT_SELECTOR = '0xe7a050aa' as Hex; // deposit(address,address,uint256)
 const QUEUE_WITHDRAWAL_SELECTOR = '0x0dd8dd02' as Hex; // queueWithdrawals((address[],uint256[],address)[])
 const COMPLETE_WITHDRAWAL_SELECTOR = '0xe4cc3f90' as Hex; // completeQueuedWithdrawal((address,address,address,uint256,uint32,address[],uint256[]),address[],bool)
-const SEND_MESSAGE_PAY_NATIVE_SELECTOR = '0x7132732a' as Hex; // sendMessagePayNative(uint64,address,bytes,tuple[],uint256)
+const PROCESS_CLAIM_SELECTOR = '0x3ccc861d' as Hex; // processClaim(bytes32,address)
+const DELEGATE_TO_SELECTOR = '0xeea9064b' as Hex; // delegateTo(address,(bytes,uint256),bytes32)
+const UNDELEGATE_SELECTOR = '0xda8be864' as Hex; // undelegate(address)
+const MINT_EIGEN_AGENT_SELECTOR = '0xcc15a557' as Hex; // mintEigenAgent(bytes)
 
 type TokenApproval = {
   tokenAddress: Address;
@@ -34,6 +40,8 @@ interface EigenLayerOperationConfig {
   onError?: (error: Error) => void;
   // Minutes until the signature expires
   expiryMinutes?: number;
+  // Optional custom gas limit for L2->L1 transactions
+  customGasLimit?: bigint;
 }
 
 interface UseEigenLayerOperationResult {
@@ -61,16 +69,15 @@ export function useEigenLayerOperation({
   onSuccess,
   onError,
   expiryMinutes = 60,
+  customGasLimit,
 }: EigenLayerOperationConfig): UseEigenLayerOperationResult {
   const {
     l1Wallet,
     l2Wallet,
     switchChain,
     eigenAgentInfo,
+    predictedEigenAgentAddress,
   } = useClientsContext();
-
-  // Get transaction history context
-  const { addTransaction } = useTransactionHistory();
 
   const [isExecuting, setIsExecuting] = useState(false);
   const [signature, setSignature] = useState<Hex | null>(null);
@@ -189,20 +196,25 @@ export function useEigenLayerOperation({
       // Format token amounts for CCIP
       const formattedTokenAmounts = [
         [
-          CHAINLINK_CONSTANTS.baseSepolia.bridgeToken as Address,
+          BaseSepolia.bridgeToken as Address,
           amount
         ] as const
       ];
+
+      // Use custom gas limit if provided, otherwise use default
+      // gasLimit = 0 means the contract decides the gas limit
+      const txGasLimit = customGasLimit || BigInt(0);
+      console.log("txGasLimit", txGasLimit);
 
       // Get fee estimate
       const estimatedFee = await getRouterFeesL2(
         targetContractAddr,
         messageWithSignature,
         amount > 0n ? [{
-          token: CHAINLINK_CONSTANTS.baseSepolia.bridgeToken as Address,
+          token: BaseSepolia.bridgeToken as Address,
           amount: amount
         }] : [],
-        BigInt(860_000) // gasLimit
+        txGasLimit
       );
 
       // Encode the function parameters
@@ -224,11 +236,11 @@ export function useEigenLayerOperation({
           { type: 'uint256' } // gasLimit
         ],
         [
-          BigInt(CHAINLINK_CONSTANTS.ethSepolia.chainSelector),
+          BigInt(EthSepolia.chainSelector),
           RECEIVER_CCIP_ADDRESS,
           messageWithSignature,
           amount > 0n ? formattedTokenAmounts : [],
-          BigInt(860_000) // gasLimit
+          txGasLimit
         ]
       );
 
@@ -249,13 +261,30 @@ export function useEigenLayerOperation({
 
       console.log("Transaction sent, hash:", txHash);
 
-      // Determine transaction type based on the original message
-      const txType = (
-        targetContractAddr === STRATEGY_MANAGER_ADDRESS ? 'deposit' :
-        originalMessage.startsWith(QUEUE_WITHDRAWAL_SELECTOR) ? 'queueWithdrawal' :
-        originalMessage.startsWith(COMPLETE_WITHDRAWAL_SELECTOR) ? 'completeWithdrawal' :
-        'other'
-      ) as TransactionTypes;
+      let txType: TransactionTypes;
+
+      switch (true) {
+        case originalMessage.startsWith(DEPOSIT_SELECTOR):
+          txType = 'deposit';
+          break;
+        case originalMessage.startsWith(QUEUE_WITHDRAWAL_SELECTOR):
+          txType = 'queueWithdrawal';
+          break;
+        case originalMessage.startsWith(COMPLETE_WITHDRAWAL_SELECTOR):
+          txType = 'completeWithdrawal';
+          break;
+        case originalMessage.startsWith(DELEGATE_TO_SELECTOR):
+          txType = 'delegateTo';
+          break;
+        case originalMessage.startsWith(UNDELEGATE_SELECTOR):
+          txType = 'undelegate';
+          break;
+        case originalMessage.startsWith(PROCESS_CLAIM_SELECTOR):
+          txType = 'processClaim';
+          break;
+        default:
+          txType = 'other';
+      }
 
       console.log(`Detected transaction type: ${txType}`);
 
@@ -292,11 +321,34 @@ export function useEigenLayerOperation({
     let messageWithSignature: Hex | undefined = undefined;
 
     try {
-      // Step 1: Check that we have eigenAgentInfo
-      if (!eigenAgentInfo) {
+      // Check if this is a deposit transaction (only type allowed for first-time users)
+      const isDeposit = targetContractAddr === STRATEGY_MANAGER_ADDRESS;
+
+      // For deposits, we can use either eigenAgentInfo,
+      // or predictedEigenAgentAddress for first time users.
+      // For other transaction types, we require eigenAgentInfo
+      if ((!eigenAgentInfo && !predictedEigenAgentAddress && isDeposit) ||
+          (!eigenAgentInfo && !isDeposit)) {
         setIsExecuting(false);
-        throw new Error("EigenAgent info not available. Please connect your wallet and ensure you have a registered agent.");
+        if (isDeposit) {
+          throw new Error("EigenAgent info not available. Please connect your wallet and ensure you have a registered agent.");
+        } else {
+          throw new Error("This operation requires an existing EigenAgent. Please deposit funds first to create your EigenAgent.");
+        }
       }
+
+      // Use the actual or predicted EigenAgent address only for deposits
+      // For other transaction types, we must have eigenAgentInfo
+      const agentAddress = eigenAgentInfo?.eigenAgentAddress ||
+                           (isDeposit ? predictedEigenAgentAddress as Address : null);
+
+      // If agentAddress is null, we can't proceed
+      if (!agentAddress) {
+        setIsExecuting(false);
+        throw new Error("EigenAgent address not available. Please create an EigenAgent by depositing funds first.");
+      }
+
+      const execNonceValue = eigenAgentInfo?.execNonce || 0n; // Use 0 for first-time users
 
       // Step 2a: Check if we need to handle token approval
       if (tokenApproval) {
@@ -311,7 +363,7 @@ export function useEigenLayerOperation({
           // Get current allowance
           const currentAllowance = await checkTokenAllowance(
             tokenApproval.tokenAddress,
-            eigenAgentInfo.eigenAgentAddress,
+            agentAddress,
             tokenApproval.spenderAddress
           );
 
@@ -357,7 +409,7 @@ export function useEigenLayerOperation({
 
       // Step 2b: Switch to Ethereum Sepolia for signing
       setInfo("Temporarily switching to Ethereum Sepolia for signing...");
-      await switchChain(l1Wallet.publicClient.chain?.id ?? 11155111);
+      await switchChain(l1Wallet.publicClient.chain?.id ?? EthSepolia.chainId);
 
       // Wait a moment for the switch to take effect
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -371,10 +423,10 @@ export function useEigenLayerOperation({
         const result = await signMessageForEigenAgentExecution(
           l1Wallet.client!,
           l1Wallet.account!,
-          eigenAgentInfo.eigenAgentAddress,
+          agentAddress,
           targetContractAddr,
           directMessage,
-          eigenAgentInfo.execNonce,
+          execNonceValue,
           expiryTime
         );
 
@@ -401,7 +453,7 @@ export function useEigenLayerOperation({
 
           // Make sure we switch back to Base Sepolia
           try {
-            await switchChain(l2Wallet.publicClient.chain?.id ?? 84532);
+            await switchChain(l2Wallet.publicClient.chain?.id ?? BaseSepolia.chainId);
           } catch (switchBackError) {
             console.error('Error switching back to Base Sepolia:', switchBackError);
           }
@@ -416,7 +468,7 @@ export function useEigenLayerOperation({
 
       // Step 5: Switch back to Base Sepolia
       setInfo("Switching back to Base Sepolia...");
-      await switchChain(l2Wallet.publicClient.chain?.id ?? 84532);
+      await switchChain(l2Wallet.publicClient.chain?.id ?? BaseSepolia.chainId);
 
       // Wait for the switch to complete
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -432,7 +484,10 @@ export function useEigenLayerOperation({
         setInfo("Transaction submitted successfully");
 
         // Call onSuccess if provided
-        if (onSuccess) onSuccess(txHash, receipt);
+        if (onSuccess) {
+          onSuccess(txHash, receipt);
+        }
+
       } catch (txError) {
         // Handle transaction rejection
         const errorMessage = txError instanceof Error ? txError.message : String(txError);
@@ -462,7 +517,7 @@ export function useEigenLayerOperation({
     } catch (err) {
       // Make sure we always switch back to Base Sepolia if there's an error
       try {
-        await switchChain(l2Wallet.publicClient.chain?.id ?? 84532);
+        await switchChain(l2Wallet.publicClient.chain?.id ?? BaseSepolia.chainId);
       } catch (switchBackError) {
         console.error('Error switching back to Base Sepolia:', switchBackError);
       }

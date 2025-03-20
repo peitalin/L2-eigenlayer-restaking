@@ -20,9 +20,10 @@ import {
 import { sepolia } from 'viem/chains';
 import dotenv from 'dotenv';
 import { calculateTokenLeafHash, calculateEarnerLeafHash, createClaim, REWARDS_AMOUNT } from '../utils/rewards';
-import { CHAINLINK_CONSTANTS } from '../addresses';
+import { EthSepolia } from '../addresses';
 import { encodeProcessClaimMsg } from '../utils/encoders';
 import { RewardsMerkleClaim } from '../abis/RewardsCoordinatorTypes';
+import { createEarnerTreeOneToken } from '../utils/rewards';
 
 // Load environment variables at the beginning of the test file
 dotenv.config();
@@ -306,7 +307,7 @@ describe('EigenAgent Signature Functions', () => {
 
     // Create token leaf
     const tokenLeaf = {
-      token: CHAINLINK_CONSTANTS.ethSepolia.bridgeToken,
+      token: EthSepolia.bridgeToken,
       cumulativeEarnings: amount
     };
 
@@ -323,7 +324,7 @@ describe('EigenAgent Signature Functions', () => {
 
     // First create and calculate the token leaf hash
     const tokenLeaf = {
-      token: CHAINLINK_CONSTANTS.ethSepolia.bridgeToken,
+      token: EthSepolia.bridgeToken,
       cumulativeEarnings: amount
     };
 
@@ -359,7 +360,7 @@ describe('EigenAgent Signature Functions', () => {
 
     // Recipient is the EigenAgent address
     const recipient: Address = '0xabac0ee51946b38a02ad8150fa85e9147bc8851f';
-    const bridgeToken: Address = CHAINLINK_CONSTANTS.ethSepolia.bridgeToken;
+    const bridgeToken: Address = EthSepolia.bridgeToken;
 
     // Create the claim object similar to what's done in RewardsComponent.tsx
     const claim: RewardsMerkleClaim = createClaim(
@@ -384,5 +385,37 @@ describe('EigenAgent Signature Functions', () => {
 
     // Verify the message contains the function selector for processClaim
     expect(message.startsWith('0x3ccc861d')).toBe(true);
+  });
+});
+
+describe('Rewards Merkle Tree Tests', () => {
+  it('should create correct RewardsMerkle tree for one token with expected root', () => {
+    // Setup test parameters
+    const earners: [Address, Address, Address, Address] = [
+      '0x1111111111111111111111111111111111111111',
+      '0x2222222222222222222222222222222222222222',
+      '0x3333333333333333333333333333333333333333',
+      '0x4444444444444444444444444444444444444444'
+    ];
+
+    const tokenAddress = EthSepolia.bridgeToken as Address;
+
+    // Using exact values that will generate the expected root
+    const rewardAmounts: [bigint, bigint, bigint, bigint] = [
+      100000000000000000n, // 0.1 ETH
+      200000000000000000n, // 0.2 ETH
+      300000000000000000n, // 0.3 ETH
+      400000000000000000n  // 0.4 ETH
+    ];
+
+    // Create the Merkle tree
+    const tree = createEarnerTreeOneToken(
+      earners,
+      tokenAddress,
+      rewardAmounts
+    );
+
+    // Assert that the root matches the expected value (from solidity test)
+    expect(tree.root).toBe('0x3e37fe74c0db1b3246a76c3d7ef75b725bef138ea50230bf8486ba1d5693882d');
   });
 });

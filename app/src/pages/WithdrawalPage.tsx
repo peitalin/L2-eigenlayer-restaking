@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { baseSepolia } from '../hooks/useClients';
-import { formatEther, parseEther, Hex, Address } from 'viem';
-import { encodeQueueWithdrawalMsg, encodeCompleteWithdrawalMsg, ZeroAddress, WithdrawalStruct } from '../utils/encoders';
-import { CHAINLINK_CONSTANTS, STRATEGY_MANAGER_ADDRESS, STRATEGY, SENDER_CCIP_ADDRESS, DELEGATION_MANAGER_ADDRESS, ERC20_TOKEN_ADDRESS } from '../addresses';
-import { useClientsContext } from '../contexts/ClientsContext';
-import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
+import { parseEther, Address } from 'viem';
+import { encodeQueueWithdrawalMsg, encodeCompleteWithdrawalMsg, WithdrawalStruct } from '../utils/encoders';
+import { STRATEGY, DELEGATION_MANAGER_ADDRESS } from '../addresses';
+import { EthSepolia, BaseSepolia } from '../addresses';
 import { DelegationManagerABI } from '../abis';
-import QueuedWithdrawals from '../components/QueuedWithdrawals';
+
+import { useClientsContext } from '../contexts/ClientsContext';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
+import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { useToast } from '../utils/toast';
 import UserDeposits from '../components/UserDeposits';
 import Expandable from '../components/Expandable';
+import QueuedWithdrawals from '../components/QueuedWithdrawals';
 
 // Extend the ProcessedWithdrawal interface from QueuedWithdrawals component
 interface ProcessedWithdrawal {
@@ -150,8 +151,8 @@ const WithdrawalPage: React.FC = () => {
           to: receipt.to || '',
           user: l1Wallet.account || '',
           isComplete: false,
-          sourceChainId: CHAINLINK_CONSTANTS.baseSepolia.chainId.toString(),
-          destinationChainId: CHAINLINK_CONSTANTS.ethSepolia.chainId.toString()
+          sourceChainId: BaseSepolia.chainId.toString(),
+          destinationChainId: EthSepolia.chainId.toString()
         });
       }
       showToast(`Withdrawal queued! Transaction hash: ${txHash}`, 'success');
@@ -182,8 +183,8 @@ const WithdrawalPage: React.FC = () => {
           to: receipt.to || '',
           user: l1Wallet.account || '',
           isComplete: false,
-          sourceChainId: CHAINLINK_CONSTANTS.baseSepolia.chainId.toString(),
-          destinationChainId: CHAINLINK_CONSTANTS.ethSepolia.chainId.toString()
+          sourceChainId: BaseSepolia.chainId.toString(),
+          destinationChainId: EthSepolia.chainId.toString()
         });
       }
       showToast(`Withdrawal completed! Transaction hash: ${txHash}`, 'success');
@@ -244,7 +245,7 @@ const WithdrawalPage: React.FC = () => {
       };
 
       // Create tokens to withdraw array (tokens, not strategies)
-      const tokensToWithdraw: Address[] = [CHAINLINK_CONSTANTS.ethSepolia.bridgeToken as Address];
+      const tokensToWithdraw: Address[] = [EthSepolia.bridgeToken as Address];
 
       // Create the complete withdrawal message
       const message = encodeCompleteWithdrawalMsg(

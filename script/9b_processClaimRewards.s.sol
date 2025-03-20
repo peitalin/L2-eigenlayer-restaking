@@ -6,12 +6,18 @@ import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IReward
 import {Client} from "@chainlink/ccip/libraries/Client.sol";
 import {IEigenAgent6551} from "../src/6551/IEigenAgent6551.sol";
 
-import {REWARDS_AMOUNT} from "./9_submitRewards.s.sol";
 import {BaseScript} from "./BaseScript.sol";
 import {EthSepolia} from "./Addresses.sol";
+import {RewardsUtils, TestRewardsTree} from "./RewardsUtils.sol";
+import {
+    REWARDS_AMOUNT_1,
+    REWARDS_AMOUNT_2,
+    REWARDS_AMOUNT_3,
+    REWARDS_AMOUNT_4
+} from "./9_submitRewards.s.sol";
 
 
-contract ProcessClaimRewardsScript is BaseScript {
+contract ProcessClaimRewardsScript is BaseScript, RewardsUtils {
 
     uint256 deployerKey;
     address deployer;
@@ -20,6 +26,11 @@ contract ProcessClaimRewardsScript is BaseScript {
     uint256 execNonce; // EigenAgent execution nonce
     uint256 expiry;
     IEigenAgent6551 eigenAgent;
+
+    address[4] EARNERS;
+    uint256[4] REWARDS_AMOUNTS;
+
+    mapping(address => uint32) public earnerIndexes;
 
     function run() public {
         return _run(false);
@@ -50,15 +61,51 @@ contract ProcessClaimRewardsScript is BaseScript {
         require(address(eigenAgent) != address(0), "User must have an EigenAgent");
         expiry = block.timestamp + 1 hours;
 
+        // same addresses as from 9b_processClaimRewards.s.sol
+        EARNERS = [
+            address(eigenAgent),
+            address(0xAbAc0Ee51946B38a02AD8150fa85E9147bC8851F), // predicted eigen agent1
+            address(0x1Ceb858C292Db256EF7E378dD85D8b23D7D96E63), // predicted eigen agent2
+            address(4)
+        ];
+
+        REWARDS_AMOUNTS = [
+            REWARDS_AMOUNT_1,
+            REWARDS_AMOUNT_2,
+            REWARDS_AMOUNT_3,
+            REWARDS_AMOUNT_4
+        ];
+
+        earnerIndexes[EARNERS[0]] = 0;
+        earnerIndexes[EARNERS[1]] = 1;
+        earnerIndexes[EARNERS[2]] = 2;
+        earnerIndexes[EARNERS[3]] = 3;
+
         IRewardsCoordinator.DistributionRoot memory distRoot = rewardsCoordinator.getCurrentDistributionRoot();
         uint32 currentDistRootIndex = uint32(rewardsCoordinator.getDistributionRootsLength()) - 1;
 
-        IRewardsCoordinator.RewardsMerkleClaim memory claim = createClaim(
+        // In production, get earnerIndex and proof for user from some database (from Eigenlayer)
+        // where they were stored when submitting the rewards tree
+        // For testing, we simply re-create the rewards tree, and generate the proofs from it
+        TestRewardsTree memory tree = createEarnerTreeOneToken(
+            rewardsCoordinator,
+            EARNERS,
+            address(tokenL1),
+            REWARDS_AMOUNTS
+        );
+
+        uint32 earnerIndex = earnerIndexes[address(eigenAgent)];
+        require(earnerIndex != 0, "User's EigenAgent not eligible for rewards claim");
+        bytes memory proof = generateClaimProof(tree, earnerIndex);
+
+        IRewardsCoordinator.RewardsMerkleClaim memory claim = createClaimOneToken(
+            rewardsCoordinator,
             currentDistRootIndex,
             address(eigenAgent),
-            REWARDS_AMOUNT, // amount to claim
-            hex"", // proof is empty as theres only 1 claim (root)
-            0 // earnerIndex
+            earnerIndex,
+            proof,
+            address(tokenL1),
+            REWARDS_AMOUNTS[earnerIndex]
         );
 
         // Simulate claiming via EigenAgent on L1
@@ -111,51 +158,4 @@ contract ProcessClaimRewardsScript is BaseScript {
 
         vm.stopBroadcast();
     }
-
-    /*
-     *
-     *
-     *             Rewards Claims
-     *
-     *
-     */
-
-	function createClaim(
-        uint32 rootIndex,
-        address earner,
-        uint256 _amount,
-        bytes memory proof,
-        uint32 earnerIndex
-    ) public view returns (IRewardsCoordinator.RewardsMerkleClaim memory claim) {
-
-		IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves;
-        tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](1);
-		tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
-            token: tokenL1,
-            cumulativeEarnings: _amount
-        });
-
-		IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf memory earnerLeaf;
-        earnerLeaf = IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf({
-			earner: earner,
-			earnerTokenRoot: rewardsCoordinator.calculateTokenLeafHash(tokenLeaves[0])
-		});
-
-        uint32[] memory tokenIndices = new uint32[](1);
-        tokenIndices[0] = 0;
-		// Only 1 claims entries in the TokenClaim tree, so proof is empty (just the root)
-        bytes[] memory tokenTreeProofs = new bytes[](1);
-        tokenTreeProofs[0] = hex"";
-
-		return IRewardsCoordinatorTypes.RewardsMerkleClaim({
-			rootIndex: rootIndex,
-			earnerIndex: earnerIndex,
-			earnerTreeProof: proof,
-			earnerLeaf: earnerLeaf,
-			tokenIndices: tokenIndices,
-			tokenTreeProofs: tokenTreeProofs,
-			tokenLeaves: tokenLeaves
-		});
-	}
-
 }

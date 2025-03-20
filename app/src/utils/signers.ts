@@ -5,7 +5,7 @@ import {
   verifyMessage, SignableMessage, verifyTypedData,
   stringToHex, hexToBytes, bytesToHex, hexToString
 } from 'viem';
-import { CHAINLINK_CONSTANTS } from '../addresses';
+import { EthSepolia } from '../addresses';
 import { ZeroAddress } from './encoders';
 
 // Constants from ClientSigners.sol
@@ -158,7 +158,7 @@ export async function signMessageForEigenAgentExecution(
   if (eigenAgentAddr === ZeroAddress) {
     throw new Error('EigenAgent cannot be zero address');
   }
-  let targetChainId = Number(CHAINLINK_CONSTANTS.ethSepolia.chainId);
+  let targetChainId = Number(EthSepolia.chainId);
   if (TREASURE_RESTAKING_VERSION.substring(0, 2) !== 'v1') {
     throw new Error('Invalid TREASURE_RESTAKING_VERSION');
   }
@@ -207,7 +207,7 @@ export async function signMessageForEigenAgentExecution(
 
   // encode and pad signer to 32byte word
   const encodedExpiry = encodeAbiParameters([{ type: 'uint256' }], [expiry]);
-  const encodedSigner = encodeAbiParameters([{ type: 'address' }], [signer]);
+  const paddedSigner = encodeAbiParameters([{ type: 'address' }], [signer]);
 
   console.log("\ndigestHash", digestHash);
   console.log("signature", formattedSignature);
@@ -219,16 +219,22 @@ export async function signMessageForEigenAgentExecution(
   //   expiry,
   //   signatureEigenAgent
   // );
-  const messageWithSignature = concat([
-    messageToEigenlayer,
-    encodedSigner,
-    encodedExpiry,
-    formattedSignature
-  ]) as Hex;
-  // const messageWithSignature = encodePacked(
-  //   ['bytes', 'address', 'uint256', 'bytes'],
-  //   [messageToEigenlayer, signer, expiry, signatureEigenAgent]
-  // )
+  const messageWithSignature = encodePacked(
+    ['bytes', 'bytes32', 'uint256', 'bytes'],
+    [messageToEigenlayer, paddedSigner, expiry, formattedSignature]
+  )
+  // const messageWithSignature2 = concat([
+  //   messageToEigenlayer,
+  //   paddedSigner, // pad signer to 32byte word
+  //   encodedExpiry,
+  //   formattedSignature
+  // ]) as Hex;
+
+  // if (messageWithSignature !== messageWithSignature2) {
+  //   console.log("messageWithSignature", messageWithSignature);
+  //   console.log("messageWithSignature2", messageWithSignature2);
+  //   throw new Error("messageWithSignature mismatch");
+  // }
 
   return {
     signature: formattedSignature,

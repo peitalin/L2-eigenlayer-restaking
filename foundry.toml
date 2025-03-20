@@ -6,6 +6,8 @@ ffi = true
 fs_permissions = [
   { access = "read-write", path = "./"},
 ]
+solc = "0.8.28"
+auto_detect_solc = true
 evm_version = "Cancun"
 # optimizer is disabled by default
 # it can produce different bytecode and mess with contract verification

@@ -6,6 +6,11 @@ import {
 } from 'viem';
 import { sepolia } from 'viem/chains';
 
+const BASE_SEPOLIA_RPC_URL = 'https://base-sepolia.gateway.tenderly.co';
+// const BASE_SEPOLIA_RPC_URL = 'https://base-sepolia-rpc.publicnode.com'
+// const BASE_SEPOLIA_RPC_URL = 'https://base-sepolia.drpc.org';
+const ETH_SEPOLIA_RPC_URL = 'https://sepolia.gateway.tenderly.co';
+
 // Define Base Sepolia chain
 export const baseSepolia = defineChain({
   id: 84_532,
@@ -18,10 +23,10 @@ export const baseSepolia = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://base-sepolia.gateway.tenderly.co'],
+      http: [BASE_SEPOLIA_RPC_URL]
     },
     public: {
-      http: ['https://base-sepolia.gateway.tenderly.co'],
+      http: [BASE_SEPOLIA_RPC_URL]
     },
   },
   blockExplorers: {
@@ -43,7 +48,7 @@ export const chains: { [key: string]: Chain } = {
 export const publicClients: Record<number, PublicClient> = {
   [sepolia.id]: createPublicClient({
     chain: sepolia,
-    transport: http('https://sepolia.gateway.tenderly.co', {
+    transport: http(ETH_SEPOLIA_RPC_URL, {
       // Add reasonable batching
       batch: true,
       fetchOptions: {
@@ -53,7 +58,7 @@ export const publicClients: Record<number, PublicClient> = {
   }),
   [baseSepolia.id]: createPublicClient({
     chain: baseSepolia,
-    transport: http('https://base-sepolia.gateway.tenderly.co', {
+    transport: http(BASE_SEPOLIA_RPC_URL, {
       // Add reasonable batching
       batch: true,
       fetchOptions: {
@@ -157,11 +162,22 @@ export function useClients(): ClientsState {
   }, [l1Wallet.account, l2Wallet.account, fetchBalances]);
 
   // Connect to wallet and initialize clients
+  // This supports all EIP-1193 compliant wallet providers including:
+  // - MetaMask
+  // - Rabby
+  // - Coinbase Wallet
+  // - And other browser wallets that inject the ethereum provider into window.ethereum
   const connect = async () => {
     try {
-      // Check if MetaMask is installed
+      // Try to detect different wallet providers and assign to window.ethereum if needed
+      // This allows Rabby to work even if it injects itself differently
+      if ((window as any).rabby && !window.ethereum) {
+        window.ethereum = (window as any).rabby;
+      }
+
+      // Check if any provider is available
       if (!window.ethereum) {
-        throw new Error('No Ethereum wallet detected. Please install MetaMask or another wallet.');
+        throw new Error('No Ethereum wallet detected. Please install MetaMask, Rabby, or another wallet.');
       }
 
       // Create wallet clients for both chains
@@ -220,6 +236,96 @@ export function useClients(): ClientsState {
     }));
   };
 
+  // Listen for accountsChanged event from wallet
+  useEffect(() => {
+    // Try to detect different wallet providers
+    if ((window as any).rabby && !window.ethereum) {
+      window.ethereum = (window as any).rabby;
+    }
+
+    if (!window.ethereum) return;
+
+    const handleAccountsChanged = async (accounts: string[]) => {
+      console.log('Accounts changed:', accounts);
+
+      if (accounts.length === 0) {
+        // User disconnected all accounts, clear wallet state
+        disconnect();
+      } else if (accounts[0] !== l1Wallet.account) {
+        // Account changed, update wallet state
+        const address = accounts[0] as Address;
+
+        // Create wallet clients for both chains
+        const baseClient = createWalletClient({
+          chain: baseSepolia,
+          transport: custom(window.ethereum)
+        });
+
+        const sepoliaClient = createWalletClient({
+          chain: sepolia,
+          transport: custom(window.ethereum)
+        });
+
+        // Update L1 and L2 wallet states with new account and clients
+        setL1Wallet(prev => ({
+          ...prev,
+          client: sepoliaClient,
+          account: address
+        }));
+
+        setL2Wallet(prev => ({
+          ...prev,
+          client: baseClient,
+          account: address
+        }));
+
+        // Refresh balances with the new account
+        fetchBalances();
+      }
+    };
+
+    window.ethereum.on('accountsChanged', handleAccountsChanged);
+
+    // Clean up the event listener when component unmounts
+    return () => {
+      window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+    };
+  }, [l1Wallet.account, disconnect, fetchBalances]);
+
+  // Listen for chainChanged event from wallet
+  useEffect(() => {
+    // Try to detect different wallet providers
+    if ((window as any).rabby && !window.ethereum) {
+      window.ethereum = (window as any).rabby;
+    }
+
+    if (!window.ethereum) return;
+
+    const handleChainChanged = (chainIdHex: string) => {
+      console.log('Chain changed:', chainIdHex);
+
+      // Convert hex chainId to number
+      const chainId = parseInt(chainIdHex, 16);
+
+      // Find matching chain configuration
+      const chainConfig = Object.values(chains).find(c => c.id === chainId);
+
+      if (chainConfig) {
+        setSelectedChain(chainConfig);
+
+        // Refresh balances after chain switch
+        fetchBalances();
+      }
+    };
+
+    window.ethereum.on('chainChanged', handleChainChanged);
+
+    // Clean up the event listener when component unmounts
+    return () => {
+      window.ethereum.removeListener('chainChanged', handleChainChanged);
+    };
+  }, [fetchBalances]);
+
   // Switch the active chain
   const switchChain = async (chainId: number) => {
     try {
@@ -235,7 +341,7 @@ export function useClients(): ClientsState {
         setSelectedChain(chainConfig);
       }
     } catch (error: any) {
-      // This error code indicates that the chain has not been added to MetaMask
+      // This error code indicates that the chain has not been added to the wallet
       if (error.code === 4902 && chainId === baseSepolia.id) {
         try {
           await window.ethereum.request({
