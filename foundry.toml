@@ -43,12 +43,17 @@ remappings = [
 
 [rpc_endpoints]
 localhost = "http://localhost:8545"
+
 # Note: Free RPCs may sometimes fail
 # ethsepolia = "https://sepolia.drpc.org"
-# ethsepolia = "https://sepolia.gateway.tenderly.co"
-ethsepolia = "https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
+ethsepolia = "https://sepolia.gateway.tenderly.co"
+# ethsepolia = "https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}"
 # ethsepolia = "https://rpc-sepolia.rockx.com"
-# ethsepolia = "https://eth-sepolia.public.blastapi.io"
+
+## Holesky RPCs breaking with Pectra upgrade
+# holesky = "https://holesky.drpc.org"
+# holesky = "https://rpc-holesky.rockx.com"
+holesky = "https://holesky.gateway.tenderly.co"
 
 basesepolia = "https://sepolia.base.org"
 # basesepolia = "https://base-sepolia.drpc.org"
