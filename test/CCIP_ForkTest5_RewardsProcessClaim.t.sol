@@ -14,12 +14,12 @@ import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoor
 import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {IRewardsCoordinatorEvents} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {Merkle} from "@eigenlayer-contracts/libraries/Merkle.sol";
-import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 
+import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
-
+import {RewardsUtils} from "../script/9_submitRewards.s.sol";
 
 
 contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterFees {
@@ -41,20 +41,11 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         uint256 claimedAmount
     );
 
-    struct TestRewardsTree {
-        bytes32 root;
-        bytes32 h1;
-        bytes32 h2;
-        bytes32 h3;
-        bytes32 h4;
-        bytes32 h5;
-        bytes32 h6;
-    }
-
-    TestRewardsTree public tree;
-    address[4] earners;
-    uint256[4] amounts;
+    RewardsUtils.TestRewardsTree public tree;
     bytes32[] leaves;
+    address[4] EARNERS;
+    uint256[4] REWARDS_AMOUNTS1;
+    uint256[4] REWARDS_AMOUNTS2;
     IERC20 memecoin;
 
     uint256 execNonce;
@@ -76,6 +67,25 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
 
         vm.startBroadcast(deployer);
         eigenAgent = agentFactory.spawnEigenAgentOnlyOwner(deployer);
+
+        EARNERS = [
+            address(eigenAgent),
+            bob,
+            charlie,
+            dani
+        ];
+        REWARDS_AMOUNTS1 = [
+            0.11 ether,
+            0.12 ether,
+            0.13 ether,
+            0.14 ether
+        ];
+        REWARDS_AMOUNTS2 = [
+            0.21 ether,
+            0.22 ether,
+            0.23 ether,
+            0.24 ether
+        ];
 
         // Create a second memecoin ERC20 token for multi-token rewards claims
         memecoin = IERC20(payable(address(
@@ -114,139 +124,28 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
      *
      */
 
-    function _createEarnerTreeMerkleLeaves() internal returns (TestRewardsTree memory) {
-
-        earners = [
-            address(eigenAgent),
-            bob,
-            charlie,
-            dani
-        ];
-        amounts = [0.1 ether, 0.15 ether, 0.2 ether, 0.05 ether];
-        leaves = new bytes32[](4);
-        // create earner leaf hashes for each user
-        for (uint32 i = 0; i < earners.length; ++i) {
-
-            bytes32 earnerTokenRoot = keccak256(abi.encode(
-                rewardsCoordinator.calculateTokenLeafHash(
-                    IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
-                        token: tokenL1,
-                        cumulativeEarnings: amounts[i]
-                    })
-                ),
-                rewardsCoordinator.calculateTokenLeafHash(
-                    IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
-                        token: memecoin,
-                        cumulativeEarnings: amounts[i] * 2
-                    })
-                )
-            ));
-
-            leaves[i] = rewardsCoordinator.calculateEarnerLeafHash(
-                IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf({
-                    earner: earners[i],
-                    earnerTokenRoot: earnerTokenRoot
-                })
-            );
-        }
-
-        bytes32 h4 = leaves[0];
-        bytes32 h3 = leaves[1];
-        bytes32 h6 = leaves[2];
-        bytes32 h5 = leaves[3];
-        // Create the rest of the Earner merkle tree:
-        // Hashed leafs are stored back-to-front and alphabetized
-        // So you need to: concat(right, left) = concat(leaf6, leaf5)
-        // see: https://github.com/OpenZeppelin/merkle-tree/issues/26
-        bytes32 h1 = keccak256(bytes.concat(h4, h3));
-        bytes32 h2 = keccak256(bytes.concat(h6, h5));
-        bytes32 root = keccak256(bytes.concat(h1, h2));
-        // Return merkle tree top-down, left-to-right:
-        //       root
-        //      /     \
-        //    h1       h2
-        //  /   \     /  \
-        // h4    h3  h6   h5
-        return TestRewardsTree({
-            root: root,
-            h1: h1,
-            h2: h2,
-            h4: h4,
-            h3: h3,
-            h6: h6,
-            h5: h5
-        });
-    }
-
-	function createClaim(
-        address earner,
-        uint256 amount,
-        bytes memory proof,
-        uint32 earnerIndex
-    ) public view returns (IRewardsCoordinator.RewardsMerkleClaim memory claim) {
-
-		IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves;
-        tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](2);
-		tokenLeaves[0] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
-            token: tokenL1,
-            cumulativeEarnings: amount
-        });
-		tokenLeaves[1] = IRewardsCoordinatorTypes.TokenTreeMerkleLeaf({
-            token: memecoin,
-            cumulativeEarnings: amount * 2
-        });
-
-        bytes32 leaf1 = rewardsCoordinator.calculateTokenLeafHash(tokenLeaves[0]);
-        bytes32 leaf2 = rewardsCoordinator.calculateTokenLeafHash(tokenLeaves[1]);
-
-		IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf memory earnerLeaf;
-        earnerLeaf = IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf({
-			earner: earner,
-			earnerTokenRoot: keccak256(abi.encode(
-                leaf1,
-                leaf2
-            ))
-		});
-
-        uint32[] memory tokenIndices = new uint32[](2);
-        tokenIndices[0] = 0;
-        tokenIndices[1] = 1;
-
-		// Only 2 claims entries in the TokenClaim tree, so proof is just the other leaf (h(l1, l2) = root):
-        bytes[] memory tokenTreeProofs = new bytes[](2);
-        tokenTreeProofs[0] = abi.encode(leaf2); // proof for leaf1 is the other leaf2
-        tokenTreeProofs[1] = abi.encode(leaf1); // proof for leaf2 is the other leaf1
-
-		return IRewardsCoordinatorTypes.RewardsMerkleClaim({
-			rootIndex: 0,
-			earnerIndex: earnerIndex,
-			earnerTreeProof: proof,
-			earnerLeaf: earnerLeaf,
-			tokenIndices: tokenIndices,
-			tokenTreeProofs: tokenTreeProofs,
-			tokenLeaves: tokenLeaves
-		});
-	}
-
-    function _setupL1State_RewardsMerkleRoots() internal returns (bytes memory, uint32) {
+    function setupRewardsMerkleTree() internal returns (RewardsUtils.TestRewardsTree memory tree) {
 
         // Rewind back to the start of last week:
         vm.warp(startOfLastWeek);
         // NOTE: we need to rewind time otherwise fork tests with CCIP's router do not work.
         // CCIP router's are time-sensitive when fetching fees/prices and fails if warping into future.
 
-        //// Setup reward merkle roots mock users
-        tree = _createEarnerTreeMerkleLeaves();
-        //       root
-        //      /     \
-        //    h1       h2
-        //  /   \     /  \
-        // h4    h3  h6   h5
-        // Generate proof for deployer's claim h4:[h3, h2] as hash(hash(h4, h3), h2) = root
-        bytes memory proof = bytes.concat(tree.h3, tree.h2);
-        uint32 earnerIndex = 0; // 0-th element in the bottom of the tree, left-to-right
-        bytes32 generatedRoot = Merkle.processInclusionProofKeccak(proof, tree.h4, earnerIndex);
-        vm.assertEq(tree.root, generatedRoot);
+        //// Setup reward merkle roots with mock users
+        tree = RewardsUtils.createEarnerTreeTwoTokens(
+            rewardsCoordinator,
+            EARNERS,
+            address(tokenL1),
+            address(memecoin),
+            REWARDS_AMOUNTS1,
+            REWARDS_AMOUNTS2
+        );
+
+        // validate earners claims, and see if their proofs are ok.
+        RewardsUtils.generateClaimProof(tree, 0);
+        RewardsUtils.generateClaimProof(tree, 1);
+        RewardsUtils.generateClaimProof(tree, 2);
+        RewardsUtils.generateClaimProof(tree, 3);
 
         uint32 startTimestamp = startOfLastWeek; // startTimestamp, must be a multiple of 604800 (7 days)
         uint32 duration = 604800; // duration, must be a multiple of 604800
@@ -259,8 +158,10 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
 		// Submit Rewards Merkle Root
 		/////////////////////////////////////////////////////////////////
         vm.prank(deployer);
+
+        uint32 rootIndex = 0; // first rewards root submitted
         vm.expectEmit(true, true, true, false);
-        emit IRewardsCoordinatorEvents.DistributionRootSubmitted(earnerIndex, tree.root, rewardsCalculationEndTimestamp, 0);
+        emit IRewardsCoordinatorEvents.DistributionRootSubmitted(rootIndex, tree.root, rewardsCalculationEndTimestamp, 0);
         rewardsCoordinator.submitRoot(tree.root, rewardsCalculationEndTimestamp);
 
         // There should be 1 DistributionRoot now.
@@ -273,7 +174,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
 		// Fast forward to present time
         vm.warp(timeNow + 7 days);
 
-        return (proof, earnerIndex);
+        return tree;
     }
 
     /*
@@ -288,19 +189,24 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
 
         vm.selectFork(ethForkId);
 
-        (
-            bytes memory proof,
-            uint32 earnerIndex
-        ) = _setupL1State_RewardsMerkleRoots();
+        tree = setupRewardsMerkleTree();
+
+        uint32 earnerIndex = 0;
+        bytes memory proof = RewardsUtils.generateClaimProof(tree, earnerIndex);
 
         /////////////////////////////////////////////////////////////////
         // Create claim for Alice: earners[0], amounts[0]
 		/////////////////////////////////////////////////////////////////
-        IRewardsCoordinator.RewardsMerkleClaim memory claim = createClaim(
-            earners[0],
-            amounts[0],
+        IRewardsCoordinator.RewardsMerkleClaim memory claim = RewardsUtils.createClaimTwoTokens(
+            rewardsCoordinator,
+            0, // currentDistRootIndex
+            EARNERS[earnerIndex],
+            earnerIndex,
             proof,
-            earnerIndex
+            address(tokenL1),
+            address(memecoin),
+            REWARDS_AMOUNTS1[earnerIndex],
+            REWARDS_AMOUNTS2[earnerIndex]
         );
 
 		require(rewardsCoordinator.checkClaim(claim), "checkClaim(claim) failed, invalid claim.");
@@ -314,12 +220,12 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
             address(eigenAgent),
             EthSepolia.ChainId, // destination chainid where EigenAgent lives
             address(rewardsCoordinator),
-            encodeProcessClaimMsg(claim, earners[0]),
+            encodeProcessClaimMsg(claim, EARNERS[0]),
             execNonce,
             expiry
         );
 
-        rewardsAmount = amounts[0];
+        rewardsAmount = REWARDS_AMOUNTS1[0];
         rewardsToken = address(tokenL1);
 
         ///////////////////////////////////////////////
