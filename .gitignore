@@ -24,7 +24,7 @@ docs/
 /app/node_modules
 /app/.env
 /app/.vite
-
+/app/dist
 /app-server/node_modules
 /app-server/.env
 
