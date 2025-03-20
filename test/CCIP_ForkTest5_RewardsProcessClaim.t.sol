@@ -19,10 +19,14 @@ import {ReceiverCCIP} from "../src/ReceiverCCIP.sol";
 import {EthSepolia, BaseSepolia} from "../script/Addresses.sol";
 import {RouterFees} from "../script/RouterFees.sol";
 import {AgentFactory} from "../src/6551/AgentFactory.sol";
-import {RewardsUtils} from "../script/9_submitRewards.s.sol";
+import {RewardsUtils, TestRewardsTree} from "../script/RewardsUtils.sol";
 
 
-contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterFees {
+contract CCIP_ForkTest_RewardsProcessClaim_Tests is
+    BaseTestEnvironment,
+    RouterFees,
+    RewardsUtils
+{
 
     // SenderHooks.RewardsTransferRootCommitted
     event RewardsTransferRootCommitted(
@@ -41,7 +45,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         uint256 claimedAmount
     );
 
-    RewardsUtils.TestRewardsTree public tree;
+    TestRewardsTree public tree;
     bytes32[] leaves;
     address[4] EARNERS;
     uint256[4] REWARDS_AMOUNTS1;
@@ -124,7 +128,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
      *
      */
 
-    function setupRewardsMerkleTree() internal returns (RewardsUtils.TestRewardsTree memory tree) {
+    function setupRewardsMerkleTree() internal returns (TestRewardsTree memory) {
 
         // Rewind back to the start of last week:
         vm.warp(startOfLastWeek);
@@ -132,7 +136,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         // CCIP router's are time-sensitive when fetching fees/prices and fails if warping into future.
 
         //// Setup reward merkle roots with mock users
-        tree = RewardsUtils.createEarnerTreeTwoTokens(
+        TestRewardsTree memory tree = createEarnerTreeTwoTokens(
             rewardsCoordinator,
             EARNERS,
             address(tokenL1),
@@ -142,10 +146,10 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         );
 
         // validate earners claims, and see if their proofs are ok.
-        RewardsUtils.generateClaimProof(tree, 0);
-        RewardsUtils.generateClaimProof(tree, 1);
-        RewardsUtils.generateClaimProof(tree, 2);
-        RewardsUtils.generateClaimProof(tree, 3);
+        generateClaimProof(tree, 0);
+        generateClaimProof(tree, 1);
+        generateClaimProof(tree, 2);
+        generateClaimProof(tree, 3);
 
         uint32 startTimestamp = startOfLastWeek; // startTimestamp, must be a multiple of 604800 (7 days)
         uint32 duration = 604800; // duration, must be a multiple of 604800
@@ -192,12 +196,12 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         tree = setupRewardsMerkleTree();
 
         uint32 earnerIndex = 0;
-        bytes memory proof = RewardsUtils.generateClaimProof(tree, earnerIndex);
+        bytes memory proof = generateClaimProof(tree, earnerIndex);
 
         /////////////////////////////////////////////////////////////////
         // Create claim for Alice: earners[0], amounts[0]
 		/////////////////////////////////////////////////////////////////
-        IRewardsCoordinator.RewardsMerkleClaim memory claim = RewardsUtils.createClaimTwoTokens(
+        IRewardsCoordinator.RewardsMerkleClaim memory claim = createClaimTwoTokens(
             rewardsCoordinator,
             0, // currentDistRootIndex
             EARNERS[earnerIndex],
@@ -233,6 +237,7 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
         ///////////////////////////////////////////////
         vm.selectFork(l2ForkId);
 
+        //// NOTE: Fork tests may fail when the network is down (Chainlink/testnet issues)
         routerFees = getRouterFeesL2(
             address(receiverContract),
             string(messageWithSignature_ProcessClaim),
@@ -241,7 +246,8 @@ contract CCIP_ForkTest_RewardsProcessClaim_Tests is BaseTestEnvironment, RouterF
             // gasLimit
         );
 
-        senderContract.sendMessagePayNative{value: routerFees}(
+        vm.prank(deployer);
+        senderContract.sendMessagePayNative{value: 1 ether}(
             EthSepolia.ChainSelector, // destination chain
             address(receiverContract),
             string(messageWithSignature_ProcessClaim),

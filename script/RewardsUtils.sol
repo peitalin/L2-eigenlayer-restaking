@@ -6,18 +6,17 @@ import {IRewardsCoordinator} from "@eigenlayer-contracts/interfaces/IRewardsCoor
 import {IRewardsCoordinatorTypes} from "@eigenlayer-contracts/interfaces/IRewardsCoordinator.sol";
 import {Merkle} from "@eigenlayer-contracts/libraries/Merkle.sol";
 
+struct TestRewardsTree {
+    bytes32 root;
+    bytes32 h1;
+    bytes32 h2;
+    bytes32 h3;
+    bytes32 h4;
+    bytes32 h5;
+    bytes32 h6;
+}
 
-library RewardsUtils {
-
-    struct TestRewardsTree {
-        bytes32 root;
-        bytes32 h1;
-        bytes32 h2;
-        bytes32 h3;
-        bytes32 h4;
-        bytes32 h5;
-        bytes32 h6;
-    }
+contract RewardsUtils {
 
     /**
      * @param earners Users eligible to claim rewards for this epoch
@@ -210,7 +209,7 @@ library RewardsUtils {
         bytes memory proof,
         address token1, // tokenL1
         uint256 amount1
-    ) public view returns (IRewardsCoordinator.RewardsMerkleClaim memory claim) {
+    ) public pure returns (IRewardsCoordinator.RewardsMerkleClaim memory claim) {
 
 		IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves;
         tokenLeaves = new IRewardsCoordinatorTypes.TokenTreeMerkleLeaf[](1);
@@ -255,7 +254,7 @@ library RewardsUtils {
         address token2, // memecoin
         uint256 amount1,
         uint256 amount2
-    ) public view returns (IRewardsCoordinator.RewardsMerkleClaim memory claim) {
+    ) public pure returns (IRewardsCoordinator.RewardsMerkleClaim memory claim) {
 
 		IRewardsCoordinator.TokenTreeMerkleLeaf[] memory tokenLeaves;
 		IRewardsCoordinatorTypes.EarnerTreeMerkleLeaf memory earnerLeaf;
