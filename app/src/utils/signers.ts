@@ -207,7 +207,7 @@ export async function signMessageForEigenAgentExecution(
 
   // encode and pad signer to 32byte word
   const encodedExpiry = encodeAbiParameters([{ type: 'uint256' }], [expiry]);
-  const encodedSigner = encodeAbiParameters([{ type: 'address' }], [signer]);
+  const paddedSigner = encodeAbiParameters([{ type: 'address' }], [signer]);
 
   console.log("\ndigestHash", digestHash);
   console.log("signature", formattedSignature);
@@ -219,16 +219,22 @@ export async function signMessageForEigenAgentExecution(
   //   expiry,
   //   signatureEigenAgent
   // );
-  const messageWithSignature = concat([
-    messageToEigenlayer,
-    encodedSigner,
-    encodedExpiry,
-    formattedSignature
-  ]) as Hex;
-  // const messageWithSignature = encodePacked(
-  //   ['bytes', 'address', 'uint256', 'bytes'],
-  //   [messageToEigenlayer, encodedSigner, encodedExpiry, formattedSignature]
-  // )
+  const messageWithSignature = encodePacked(
+    ['bytes', 'bytes32', 'uint256', 'bytes'],
+    [messageToEigenlayer, paddedSigner, expiry, formattedSignature]
+  )
+  // const messageWithSignature2 = concat([
+  //   messageToEigenlayer,
+  //   paddedSigner, // pad signer to 32byte word
+  //   encodedExpiry,
+  //   formattedSignature
+  // ]) as Hex;
+
+  // if (messageWithSignature !== messageWithSignature2) {
+  //   console.log("messageWithSignature", messageWithSignature);
+  //   console.log("messageWithSignature2", messageWithSignature2);
+  //   throw new Error("messageWithSignature mismatch");
+  // }
 
   return {
     signature: formattedSignature,
