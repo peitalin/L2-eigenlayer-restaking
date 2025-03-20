@@ -619,48 +619,6 @@ app.put('/api/transactions/messageId/:messageId', (req, res) => {
   }
 });
 
-// GET /api/reset - clear all transactions (dev only)
-app.get("/api/reset", async (req, res) => {
-  try {
-    await fsPromises.mkdir(dataDir, { recursive: true });
-    db.clearTransactions();
-    res.status(200).send("Transaction history cleared");
-  } catch (error) {
-    console.error("Error clearing transaction history:", error);
-    res.status(500).send("Failed to clear transaction history");
-  }
-});
-
-// POST /api/loadTransactionHistory - save transaction history (dev/demo only)
-app.post("/api/loadTransactionHistory", async (req, res) => {
-  try {
-    const transactions = req.body;
-    await fsPromises.mkdir(dataDir, { recursive: true });
-
-    db.clearTransactions();
-    db.addTransactions(transactions);
-
-    res.status(200).send("Transaction history saved successfully");
-  } catch (error) {
-    console.error("Error saving transaction history:", error);
-    res.status(500).send("Failed to save transaction history");
-  }
-});
-
-function getTransactionTypeFromChainIds(sourceChainId: string | number, destChainId: string | number): 'deposit' | 'withdrawal' | 'completeWithdrawal' | 'bridgingWithdrawalToL2' | 'bridgingRewardsToL2' | 'other' {
-  const source = sourceChainId;
-  const dest = destChainId;
-
-  // For Sepolia and Base Sepolia chains
-  if (source === ETH_CHAINID && dest === L2_CHAINID) {
-    return 'bridgingWithdrawalToL2'; // From Sepolia (L1) to Base Sepolia (L2)
-  } else if (source === L2_CHAINID && dest === ETH_CHAINID) {
-    return 'deposit'; // From Base Sepolia (L2) to Sepolia (L1)
-  }
-
-  // Default case when chain IDs don't match known patterns
-  return 'other';
-}
 
 // Serve static files from the 'dist' directory (for production)
 if (process.env.NODE_ENV === 'production') {
@@ -910,26 +868,3 @@ try {
 } catch (error) {
   console.error('Error initializing database:', error);
 }
-
-// GET /api/reset-database - Reset the database (rerun initialization)
-app.get("/api/reset-database", async (req, res) => {
-  try {
-    console.log("Resetting and reinitializing database...");
-
-    // Drop existing table if it exists
-    try {
-      db.db.prepare("DROP TABLE IF EXISTS transactions").run();
-      console.log("Dropped existing transactions table");
-    } catch (dropError) {
-      console.error("Error dropping table:", dropError);
-    }
-
-    // Reinitialize the database
-    db.initDatabase();
-
-    res.status(200).send("Database reset and reinitialized successfully");
-  } catch (error) {
-    console.error("Error resetting database:", error);
-    res.status(500).send(`Failed to reset database: ${error.message}`);
-  }
-});
