@@ -4,6 +4,8 @@ export const SERVER_BASE_URL = 'http://localhost:3001';
 
 export type TransactionTypes =
   | 'deposit'
+  | 'depositAndMintEigenAgent'
+  | 'mintEigenAgent'
   | 'queueWithdrawal'
   | 'completeWithdrawal'
   | 'processClaim'
@@ -11,7 +13,8 @@ export type TransactionTypes =
   | 'bridgingRewardsToL2'
   | 'delegateTo'
   | 'undelegate'
-  | 'redelegate';
+  | 'redelegate'
+  | 'other';
 
 // Define the structure for a CCIP transaction
 export interface CCIPTransaction {
