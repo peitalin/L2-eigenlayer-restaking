@@ -3,11 +3,12 @@ import { Address, Hex,  encodeAbiParameters, keccak256, TransactionReceipt } fro
 import { baseSepolia } from '../hooks/useClients';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { signMessageForEigenAgentExecution } from '../utils/signers';
-import { CHAINLINK_CONSTANTS, SENDER_CCIP_ADDRESS, STRATEGY_MANAGER_ADDRESS } from '../addresses';
+import { EthSepolia, BaseSepolia, SENDER_CCIP_ADDRESS, STRATEGY_MANAGER_ADDRESS } from '../addresses';
 import { getRouterFeesL2 } from '../utils/routerFees';
 import { RECEIVER_CCIP_ADDRESS } from '../addresses';
 import { IERC20ABI } from '../abis';
-import { TransactionTypes, useTransactionHistory } from '../contexts/TransactionHistoryContext';
+import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
+import { TransactionTypes } from '../utils/ccipEventListener';
 
 // Define function selector constants for better maintainability
 // These are the first 4 bytes of the keccak256 hash of the function signature
@@ -34,6 +35,8 @@ interface EigenLayerOperationConfig {
   onError?: (error: Error) => void;
   // Minutes until the signature expires
   expiryMinutes?: number;
+  // Optional custom gas limit for L2->L1 transactions
+  customGasLimit?: bigint;
 }
 
 interface UseEigenLayerOperationResult {
@@ -61,12 +64,14 @@ export function useEigenLayerOperation({
   onSuccess,
   onError,
   expiryMinutes = 60,
+  customGasLimit,
 }: EigenLayerOperationConfig): UseEigenLayerOperationResult {
   const {
     l1Wallet,
     l2Wallet,
     switchChain,
     eigenAgentInfo,
+    predictedEigenAgentAddress,
   } = useClientsContext();
 
   // Get transaction history context
@@ -189,20 +194,25 @@ export function useEigenLayerOperation({
       // Format token amounts for CCIP
       const formattedTokenAmounts = [
         [
-          CHAINLINK_CONSTANTS.baseSepolia.bridgeToken as Address,
+          BaseSepolia.bridgeToken as Address,
           amount
         ] as const
       ];
+
+      // Use custom gas limit if provided, otherwise use default
+      // gasLimit = 0 means the contract decides the gas limit
+      const txGasLimit = customGasLimit || BigInt(0);
+      console.log("txGasLimit", txGasLimit);
 
       // Get fee estimate
       const estimatedFee = await getRouterFeesL2(
         targetContractAddr,
         messageWithSignature,
         amount > 0n ? [{
-          token: CHAINLINK_CONSTANTS.baseSepolia.bridgeToken as Address,
+          token: BaseSepolia.bridgeToken as Address,
           amount: amount
         }] : [],
-        BigInt(860_000) // gasLimit
+        txGasLimit
       );
 
       // Encode the function parameters
@@ -224,11 +234,11 @@ export function useEigenLayerOperation({
           { type: 'uint256' } // gasLimit
         ],
         [
-          BigInt(CHAINLINK_CONSTANTS.ethSepolia.chainSelector),
+          BigInt(EthSepolia.chainSelector),
           RECEIVER_CCIP_ADDRESS,
           messageWithSignature,
           amount > 0n ? formattedTokenAmounts : [],
-          BigInt(860_000) // gasLimit
+          txGasLimit
         ]
       );
 
@@ -292,11 +302,34 @@ export function useEigenLayerOperation({
     let messageWithSignature: Hex | undefined = undefined;
 
     try {
-      // Step 1: Check that we have eigenAgentInfo
-      if (!eigenAgentInfo) {
+      // Check if this is a deposit transaction (only type allowed for first-time users)
+      const isDeposit = targetContractAddr === STRATEGY_MANAGER_ADDRESS;
+
+      // For deposits, we can use either eigenAgentInfo,
+      // or predictedEigenAgentAddress for first time users.
+      // For other transaction types, we require eigenAgentInfo
+      if ((!eigenAgentInfo && !predictedEigenAgentAddress && isDeposit) ||
+          (!eigenAgentInfo && !isDeposit)) {
         setIsExecuting(false);
-        throw new Error("EigenAgent info not available. Please connect your wallet and ensure you have a registered agent.");
+        if (isDeposit) {
+          throw new Error("EigenAgent info not available. Please connect your wallet and ensure you have a registered agent.");
+        } else {
+          throw new Error("This operation requires an existing EigenAgent. Please deposit funds first to create your EigenAgent.");
+        }
       }
+
+      // Use the actual or predicted EigenAgent address only for deposits
+      // For other transaction types, we must have eigenAgentInfo
+      const agentAddress = eigenAgentInfo?.eigenAgentAddress ||
+                           (isDeposit ? predictedEigenAgentAddress as Address : null);
+
+      // If agentAddress is null, we can't proceed
+      if (!agentAddress) {
+        setIsExecuting(false);
+        throw new Error("EigenAgent address not available. Please create an EigenAgent by depositing funds first.");
+      }
+
+      const execNonceValue = eigenAgentInfo?.execNonce || 0n; // Use 0 for first-time users
 
       // Step 2a: Check if we need to handle token approval
       if (tokenApproval) {
@@ -311,7 +344,7 @@ export function useEigenLayerOperation({
           // Get current allowance
           const currentAllowance = await checkTokenAllowance(
             tokenApproval.tokenAddress,
-            eigenAgentInfo.eigenAgentAddress,
+            agentAddress,
             tokenApproval.spenderAddress
           );
 
@@ -371,10 +404,10 @@ export function useEigenLayerOperation({
         const result = await signMessageForEigenAgentExecution(
           l1Wallet.client!,
           l1Wallet.account!,
-          eigenAgentInfo.eigenAgentAddress,
+          agentAddress,
           targetContractAddr,
           directMessage,
-          eigenAgentInfo.execNonce,
+          execNonceValue,
           expiryTime
         );
 

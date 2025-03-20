@@ -5,7 +5,7 @@ import {
   verifyMessage, SignableMessage, verifyTypedData,
   stringToHex, hexToBytes, bytesToHex, hexToString
 } from 'viem';
-import { CHAINLINK_CONSTANTS } from '../addresses';
+import { EthSepolia } from '../addresses';
 import { ZeroAddress } from './encoders';
 
 // Constants from ClientSigners.sol
@@ -158,7 +158,7 @@ export async function signMessageForEigenAgentExecution(
   if (eigenAgentAddr === ZeroAddress) {
     throw new Error('EigenAgent cannot be zero address');
   }
-  let targetChainId = Number(CHAINLINK_CONSTANTS.ethSepolia.chainId);
+  let targetChainId = Number(EthSepolia.chainId);
   if (TREASURE_RESTAKING_VERSION.substring(0, 2) !== 'v1') {
     throw new Error('Invalid TREASURE_RESTAKING_VERSION');
   }
@@ -227,7 +227,7 @@ export async function signMessageForEigenAgentExecution(
   ]) as Hex;
   // const messageWithSignature = encodePacked(
   //   ['bytes', 'address', 'uint256', 'bytes'],
-  //   [messageToEigenlayer, signer, expiry, signatureEigenAgent]
+  //   [messageToEigenlayer, encodedSigner, encodedExpiry, formattedSignature]
   // )
 
   return {

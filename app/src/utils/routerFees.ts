@@ -1,6 +1,6 @@
 import { Address, Hex, encodeAbiParameters, concat, toHex } from 'viem';
 import { ROUTER_ABI, EVMTokenAmount } from '../abis';
-import { CHAINLINK_CONSTANTS } from '../addresses';
+import { EthSepolia, BaseSepolia } from '../addresses';
 import { getL1Client, getL2Client } from './clients';
 import { ZeroAddress } from './encoders';
 
@@ -73,15 +73,15 @@ export async function getRouterFeesL1(
   try {
     // Call the getFee function on the router contract
     const fee = await client.readContract({
-      address: CHAINLINK_CONSTANTS.ethSepolia.router,
+      address: EthSepolia.router,
       abi: ROUTER_ABI,
       functionName: 'getFee',
       args: [
-        BigInt(CHAINLINK_CONSTANTS.baseSepolia.chainSelector),
+        BigInt(BaseSepolia.chainSelector),
         {
           receiver: receiverEncoded,
           data: dataEncoded,
-          tokenAmounts: tokenAmounts,
+          tokenAmounts: tokenAmounts as any,
           feeToken: ZeroAddress, // native token (ETH)
           extraArgs: extraArgs
         }
@@ -131,15 +131,15 @@ export async function getRouterFeesL2(
   try {
     // Call the getFee function on the router contract
     const fee = await client.readContract({
-      address: CHAINLINK_CONSTANTS.baseSepolia.router,
+      address: BaseSepolia.router,
       abi: ROUTER_ABI,
       functionName: 'getFee',
       args: [
-        BigInt(CHAINLINK_CONSTANTS.ethSepolia.chainSelector),
+        BigInt(EthSepolia.chainSelector),
         {
           receiver: receiverEncoded,
           data: dataEncoded,
-          tokenAmounts: tokenAmounts,
+          tokenAmounts: tokenAmounts as any,
           feeToken: ZeroAddress, // native token (ETH)
           extraArgs: extraArgs
         }

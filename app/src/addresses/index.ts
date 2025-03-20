@@ -1,23 +1,21 @@
 import { Address } from 'viem';
 
-// Chain constants from script/Addresses.sol
-export const CHAINLINK_CONSTANTS = {
-  ethSepolia: {
-    router: '0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59' as Address,
-    chainSelector: '16015286601757825753',
-    bridgeToken: '0xAf03f2a302A2C4867d622dE44b213b8F870c0f1a' as Address,
-    link: '0x779877A7B0D9E8603169DdbD7836e478b4624789' as Address,
-    chainId: 11155111,
-    poolAddress: '0xa0f5588fa098b56f28a8ae65caaa43fefcaf608c' as Address
-  },
-  baseSepolia: {
-    router: '0xD3b06cEbF099CE7DA4AcCf578aaebFDBd6e88a93' as Address,
-    chainSelector: '10344971235874465080',
-    bridgeToken: '0x886330448089754e998BcEfa2a56a91aD240aB60' as Address,
-    link: '0xE4aB69C077896252FAFBD49EFD26B5D171A32410' as Address,
-    chainId: 84532,
-    poolAddress: '0x369a189bE07f42DE9767fBb6d0327eedC129CC15' as Address
-  }
+// Chainlink constants from script/Addresses.sol
+export const EthSepolia = {
+  router: '0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59' as Address,
+  chainSelector: '16015286601757825753',
+  bridgeToken: '0xAf03f2a302A2C4867d622dE44b213b8F870c0f1a' as Address,
+  link: '0x779877A7B0D9E8603169DdbD7836e478b4624789' as Address,
+  chainId: 11155111,
+  poolAddress: '0xa0f5588fa098b56f28a8ae65caaa43fefcaf608c' as Address
+};
+export const BaseSepolia = {
+  router: '0xD3b06cEbF099CE7DA4AcCf578aaebFDBd6e88a93' as Address,
+  chainSelector: '10344971235874465080',
+  bridgeToken: '0x886330448089754e998BcEfa2a56a91aD240aB60' as Address,
+  link: '0xE4aB69C077896252FAFBD49EFD26B5D171A32410' as Address,
+  chainId: 84532,
+  poolAddress: '0x369a189bE07f42DE9767fBb6d0327eedC129CC15' as Address
 };
 
 import bridgeContractsL2 from './basesepolia/bridgeContractsL2.config.json';
