@@ -206,6 +206,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             // allowlist receiverContract chains and senders
             receiverContract.allowlistSourceChain(BaseSepolia.ChainSelector, true);
             receiverContract.allowlistDestinationChain(EthSepolia.ChainSelector, true);
+            receiverContract.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
 
             receiverContract.allowlistSender(BaseSepolia.ChainSelector, deployer, true);
             receiverContract.allowlistSender(BaseSepolia.ChainSelector, address(senderContract), true);
@@ -287,6 +288,7 @@ contract BaseTestEnvironment is Test, ClientSigners, ClientEncoders, GasLimits {
             // allowlist receiverContract chains and senders
             receiverContract.allowlistSourceChain(BaseSepolia.ChainSelector, true);
             receiverContract.allowlistDestinationChain(EthSepolia.ChainSelector, true);
+            receiverContract.allowlistDestinationChain(BaseSepolia.ChainSelector, true);
 
             receiverContract.allowlistSender(BaseSepolia.ChainSelector, deployer, true);
             receiverContract.allowlistSender(BaseSepolia.ChainSelector, address(senderContract), true);

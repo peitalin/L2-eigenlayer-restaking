@@ -10,9 +10,6 @@ import { RewardsCoordinatorABI } from '../abis';
 import { useToast } from '../utils/toast';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 
-// Chain ID constants
-const ETH_CHAINID = '11155111'; // Ethereum Sepolia
-const L2_CHAINID = '84532';     // Base Sepolia
 
 const RewardsComponent: React.FC = () => {
   const {
