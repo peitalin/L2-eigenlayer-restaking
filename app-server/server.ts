@@ -788,8 +788,8 @@ let pendingTxIntervalId: NodeJS.Timeout | null = null;
 
 function startPendingTransactionChecker() {
   if (pendingTxIntervalId === null) {
-    // Check every 2 minutes
-    pendingTxIntervalId = setInterval(updatePendingTransactions, 2 * 60 * 1000);
+    // Check every 30 seconds
+    pendingTxIntervalId = setInterval(updatePendingTransactions, 30 * 1000);
     console.log('Started pending transaction checker');
 
     // Also run immediately
@@ -878,7 +878,7 @@ try {
                   // Set reasonable defaults for missing fields
                   tx.messageId = tx.messageId || tx.txHash;
                   tx.timestamp = tx.timestamp || Math.floor(Date.now() / 1000);
-                  tx.type = tx.type || 'other';
+                  tx.txType = tx.txType || 'other';
                   tx.status = tx.status || 'pending';
                   tx.from = tx.from || '0x0000000000000000000000000000000000000000';
                   tx.to = tx.to || '0x0000000000000000000000000000000000000000';

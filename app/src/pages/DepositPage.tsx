@@ -281,14 +281,6 @@ const DepositPage: React.FC = () => {
           </div>
         )}
 
-        {eigenAgentInfo && (
-          <div className="info-banner existing-user">
-            <h3>Existing User</h3>
-            <p>Using your existing EigenAgent at {eigenAgentInfo.eigenAgentAddress}</p>
-            <p>Current exec nonce: {eigenAgentInfo.execNonce.toString()}</p>
-          </div>
-        )}
-
         <div className="form-group">
           <label htmlFor="amount">Amount to deposit (MAGIC):</label>
           <input
@@ -307,7 +299,7 @@ const DepositPage: React.FC = () => {
           disabled={isInputDisabled || (!eigenAgentInfo?.eigenAgentAddress && !predictedEigenAgentAddress)}
           onClick={handleDepositIntoStrategy}
         >
-          {isExecuting ? 'Processing...' : isFirstTimeUser ? 'Create EigenAgent & Deposit' : 'Sign Strategy Deposit'}
+          {isExecuting ? 'Processing...' : isFirstTimeUser ? 'Mint EigenAgent & Deposit' : 'Deposit'}
         </button>
 
         {/* Token Approval Status */}
