@@ -1,6 +1,6 @@
 import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
 import { useClients, ClientsState, baseSepolia } from '../hooks/useClients';
-import { getEigenAgentAndExecNonce } from '../utils/eigenlayerUtils';
+import { getEigenAgentAndExecNonce, predictEigenAgentAddress } from '../utils/eigenlayerUtils';
 import { Address } from 'viem';
 
 // Extend the ClientsState with EigenAgent info
@@ -10,6 +10,8 @@ interface ExtendedClientsState extends ClientsState {
     execNonce: bigint;
   } | null;
   isLoadingEigenAgent: boolean;
+  predictedEigenAgentAddress: Address | null;
+  isFirstTimeUser: boolean;
   fetchEigenAgentInfo: () => Promise<void>;
   handleConnect: () => Promise<void>;
   isConnecting: boolean;
@@ -34,6 +36,7 @@ export const ClientsProvider: React.FC<ClientsProviderProps> = ({ children }) =>
     eigenAgentAddress: Address;
     execNonce: bigint;
   } | null>(null);
+  const [predictedEigenAgentAddress, setPredictedEigenAgentAddress] = useState<Address | null>(null);
   const [isLoadingEigenAgent, setIsLoadingEigenAgent] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -51,8 +54,17 @@ export const ClientsProvider: React.FC<ClientsProviderProps> = ({ children }) =>
 
     setIsLoadingEigenAgent(true);
     try {
+      // Fetch current EigenAgent info
       const info = await getEigenAgentAndExecNonce(l1Wallet.account);
       setEigenAgentInfo(info);
+
+      // If user doesn't have an EigenAgent, predict what it will be
+      if (!info) {
+        const predicted = await predictEigenAgentAddress(l1Wallet.account);
+        setPredictedEigenAgentAddress(predicted);
+      } else {
+        setPredictedEigenAgentAddress(null);
+      }
     } catch (err) {
       console.error('Error checking EigenAgent:', err);
       setEigenAgentInfo(null);
@@ -76,11 +88,16 @@ export const ClientsProvider: React.FC<ClientsProviderProps> = ({ children }) =>
     }
   };
 
+  // Determine if this is a first-time user (no EigenAgent yet)
+  const isFirstTimeUser = eigenAgentInfo === null && !isLoadingEigenAgent && isConnected;
+
   // Combine the client state with EigenAgent info and connection handlers
   const extendedState: ExtendedClientsState = {
     ...clientsState,
     eigenAgentInfo,
     isLoadingEigenAgent,
+    predictedEigenAgentAddress,
+    isFirstTimeUser,
     fetchEigenAgentInfo,
     handleConnect,
     isConnecting,

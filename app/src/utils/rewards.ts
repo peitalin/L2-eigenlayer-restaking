@@ -5,7 +5,7 @@ import {
   EarnerTreeMerkleLeaf
 } from '../abis/RewardsCoordinatorTypes';
 import {encodeProcessClaimMsg} from "./encoders";
-import {CHAINLINK_CONSTANTS} from "../addresses";
+import {EthSepolia} from "../addresses";
 
 export const REWARDS_AMOUNT = 100000000000000000n;
 // 0.1 ETH in wei, defined in 9_submitRewards.s.sol
@@ -86,7 +86,7 @@ export function createClaim(
 
   // Create token leaf
   const tokenLeaf: TokenTreeMerkleLeaf = {
-    token: CHAINLINK_CONSTANTS.ethSepolia.bridgeToken,
+    token: EthSepolia.bridgeToken,
     cumulativeEarnings: amount
   };
 

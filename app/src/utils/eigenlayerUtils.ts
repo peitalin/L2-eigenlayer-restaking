@@ -202,3 +202,25 @@ export async function checkAgentFactoryContract(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Predicts the EigenAgent address for a user before it's minted
+ * This is equivalent to agentFactory.predictEigenAgentAddress(staker, 0) in Solidity
+ */
+export async function predictEigenAgentAddress(userAddress: Address): Promise<Address> {
+  try {
+    // Call the predictEigenAgentAddress function on the AgentFactory contract
+    const predictedAddress = await publicClient.readContract({
+      address: AGENT_FACTORY_ADDRESS,
+      abi: agentFactoryAbi,
+      functionName: 'predictEigenAgentAddress',
+      args: [userAddress, 0n] // Use 0 as salt/nonce for first-time users
+    }) as Address;
+
+    console.log('Predicted EigenAgent address:', predictedAddress);
+    return predictedAddress;
+  } catch (error) {
+    console.error('Error predicting EigenAgent address:', error);
+    throw new Error('Failed to predict EigenAgent address');
+  }
+}

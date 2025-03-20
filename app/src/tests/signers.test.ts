@@ -20,7 +20,7 @@ import {
 import { sepolia } from 'viem/chains';
 import dotenv from 'dotenv';
 import { calculateTokenLeafHash, calculateEarnerLeafHash, createClaim, REWARDS_AMOUNT } from '../utils/rewards';
-import { CHAINLINK_CONSTANTS } from '../addresses';
+import { EthSepolia } from '../addresses';
 import { encodeProcessClaimMsg } from '../utils/encoders';
 import { RewardsMerkleClaim } from '../abis/RewardsCoordinatorTypes';
 
@@ -306,7 +306,7 @@ describe('EigenAgent Signature Functions', () => {
 
     // Create token leaf
     const tokenLeaf = {
-      token: CHAINLINK_CONSTANTS.ethSepolia.bridgeToken,
+      token: EthSepolia.bridgeToken,
       cumulativeEarnings: amount
     };
 
@@ -323,7 +323,7 @@ describe('EigenAgent Signature Functions', () => {
 
     // First create and calculate the token leaf hash
     const tokenLeaf = {
-      token: CHAINLINK_CONSTANTS.ethSepolia.bridgeToken,
+      token: EthSepolia.bridgeToken,
       cumulativeEarnings: amount
     };
 
@@ -359,7 +359,7 @@ describe('EigenAgent Signature Functions', () => {
 
     // Recipient is the EigenAgent address
     const recipient: Address = '0xabac0ee51946b38a02ad8150fa85e9147bc8851f';
-    const bridgeToken: Address = CHAINLINK_CONSTANTS.ethSepolia.bridgeToken;
+    const bridgeToken: Address = EthSepolia.bridgeToken;
 
     // Create the claim object similar to what's done in RewardsComponent.tsx
     const claim: RewardsMerkleClaim = createClaim(

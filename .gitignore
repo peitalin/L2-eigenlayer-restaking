@@ -23,6 +23,7 @@ docs/
 # Ignore frontend app
 /app/node_modules
 /app/.env
+/app/.vite
 
 /app-server/node_modules
 /app-server/.env

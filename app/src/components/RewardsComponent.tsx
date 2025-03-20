@@ -3,7 +3,7 @@ import { Address, formatEther } from 'viem';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { encodeProcessClaimMsg } from '../utils/encoders';
-import { CHAINLINK_CONSTANTS, REWARDS_COORDINATOR_ADDRESS } from '../addresses';
+import { BaseSepolia, EthSepolia, REWARDS_COORDINATOR_ADDRESS } from '../addresses';
 import { createClaim, REWARDS_AMOUNT, simulateRewardClaim } from '../utils/rewards';
 import { RewardsMerkleClaim } from '../abis/RewardsCoordinatorTypes';
 import { RewardsCoordinatorABI } from '../abis';
@@ -54,8 +54,8 @@ const RewardsComponent: React.FC = () => {
           to: receipt.to || '',
           user: l1Wallet.account || '',
           isComplete: false,
-          sourceChainId: CHAINLINK_CONSTANTS.baseSepolia.chainId.toString(),
-          destinationChainId: CHAINLINK_CONSTANTS.ethSepolia.chainId.toString()
+          sourceChainId: BaseSepolia.chainId.toString(),
+          destinationChainId: EthSepolia.chainId.toString()
         });
         showToast('Transaction recorded in history!', 'success');
       }

@@ -1,13 +1,13 @@
 import { Abi } from 'viem';
 
 // Import ABIs from JSON files
-import DelegationManagerAbiRaw from './DelegationManager.json';
-import StrategyManagerAbiRaw from './StrategyManager.json';
+import DelegationManagerAbiRaw from './IDelegationManager.json';
+import StrategyManagerAbiRaw from './IStrategyManager.json';
 import IERC20AbiRaw from './IERC20.json';
-import SenderCCIPAbiRaw from './SenderCCIP.json';
-import EigenAgent6551AbiRaw from './EigenAgent6551.json';
-import AgentFactoryAbiRaw from './AgentFactory.json';
-import RewardsCoordinatorAbiRaw from './RewardsCoordinator.json';
+import SenderCCIPAbiRaw from './ISenderCCIP.json';
+import EigenAgent6551AbiRaw from './IEigenAgent6551.json';
+import AgentFactoryAbiRaw from './IAgentFactory.json';
+import RewardsCoordinatorAbiRaw from './IRewardsCoordinator.json';
 
 // Export the ABIs with proper typing
 export const DelegationManagerABI = DelegationManagerAbiRaw.abi as Abi;
