@@ -7,9 +7,6 @@ import {
 import {encodeProcessClaimMsg} from "./encoders";
 import {EthSepolia} from "../addresses";
 
-export const REWARDS_AMOUNT = 100000000000000000n;
-// 0.1 ETH in wei, defined in 9_submitRewards.s.sol
-// Hardcoded here until we switch to Eigenlayer's RewardsCoordinator
 
 /**
  * Calculate the token leaf hash equivalent to the Solidity implementation

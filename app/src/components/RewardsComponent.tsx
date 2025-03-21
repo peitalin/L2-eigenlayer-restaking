@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Address, formatEther } from 'viem';
+import { Address, formatEther, parseEther } from 'viem';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { encodeProcessClaimMsg } from '../utils/encoders';
 import { BaseSepolia, EthSepolia, REWARDS_COORDINATOR_ADDRESS } from '../addresses';
-import { createClaim, REWARDS_AMOUNT, simulateRewardClaim } from '../utils/rewards';
+import { createClaim, simulateRewardClaim } from '../utils/rewards';
 import { RewardsMerkleClaim } from '../abis/RewardsCoordinatorTypes';
 import { RewardsCoordinatorABI } from '../abis';
 import { useToast } from '../utils/toast';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
+import { generateClaimProof, createEarnerTreeOneToken} from '../utils/rewards';
 
 
 const RewardsComponent: React.FC = () => {
@@ -25,6 +26,20 @@ const RewardsComponent: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [simulationResult, setSimulationResult] = useState<boolean | null>(null);
+
+  const [earnerIndex, setEarnerIndex] = useState<number>(0);
+  const [rewardsAmounts, setRewardsAmounts] = useState<[bigint, bigint, bigint, bigint]>([
+    parseEther('0.1'),
+    parseEther('0.2'),
+    parseEther('0.3'),
+    parseEther('0.4')
+  ]);
+  const [earners, setEarners] = useState<[Address, Address, Address, Address]>([
+    "0xAbAc0Ee51946B38a02AD8150fa85E9147bC8851F" as Address, // replaced when EigenAgent loads
+    "0xAbAc0Ee51946B38a02AD8150fa85E9147bC8851F" as Address, // predicted eigen agent1
+    "0x1Ceb858C292Db256EF7E378dD85D8b23D7D96E63" as Address, // predicted eigen agent2
+    "0x0000000000000000000000000000000000000004" as Address // Address in viem (always 0x + 40 hex characters)
+  ]);
 
   // Set up the EigenLayer operation hook
   const {
@@ -108,13 +123,24 @@ const RewardsComponent: React.FC = () => {
     try {
       setLoading(true);
 
+      // Replicate 9_submitRewards.s.sol
+      // In production, we should get proofs & earnerIndexes from Eigenlayer's servers
+      // instead of replicating the rewards merkle tree to generate proofs
+      const tree = createEarnerTreeOneToken(
+        earners,
+        EthSepolia.bridgeToken, // Rewards token
+        rewardsAmounts,
+      );
+      const earnerIndex = 0;
+      const proof = generateClaimProof(tree, earnerIndex);
+
       // Create the claim object
       const claim: RewardsMerkleClaim = createClaim(
         currentDistRootIndex,
         eigenAgentInfo.eigenAgentAddress as Address,
-        REWARDS_AMOUNT,
-        '0x', // proof is empty as theres only 1 claim (just the merkle root)
-        0,    // Earner index
+        rewardsAmounts[earnerIndex],
+        proof,
+        earnerIndex,    // Earner index
       );
 
       // Simulate the claim
@@ -152,12 +178,23 @@ const RewardsComponent: React.FC = () => {
 
     try {
       // Create the claim object
+
+      // Replicate 9_submitRewards.s.sol
+      // In production, we should get proofs & earnerIndexes from Eigenlayer's servers
+      // instead of replicating the rewards merkle tree to generate proofs
+      const tree = createEarnerTreeOneToken(
+        earners,
+        EthSepolia.bridgeToken, // Rewards token
+        rewardsAmounts,
+      );
+      const earnerIndex = 0;
+      const proof = generateClaimProof(tree, earnerIndex);
       const claim: RewardsMerkleClaim = createClaim(
         currentDistRootIndex,
         eigenAgentInfo.eigenAgentAddress as Address,
-        REWARDS_AMOUNT,
-        '0x', // Empty proof for single claim
-        0     // Earner index
+        rewardsAmounts[earnerIndex],
+        proof,
+        earnerIndex,
       );
 
       // Encode the message for processing the claim
@@ -183,6 +220,15 @@ const RewardsComponent: React.FC = () => {
   useEffect(() => {
     // Reset any simulation results when eigenAgentInfo changes
     setSimulationResult(null);
+    if (eigenAgentInfo?.eigenAgentAddress) {
+      setEarners([
+        eigenAgentInfo?.eigenAgentAddress as Address,
+        "0xAbAc0Ee51946B38a02AD8150fa85E9147bC8851F" as Address, // predicted eigen agent1
+        "0x1Ceb858C292Db256EF7E378dD85D8b23D7D96E63" as Address, // predicted eigen agent2
+        "0x0000000000000000000000000000000000000004" as Address // Address in viem (always 0x + 40 hex characters)
+      ]);
+    }
+
   }, [eigenAgentInfo]);
 
   return (
@@ -205,7 +251,7 @@ const RewardsComponent: React.FC = () => {
 
           <div className="form-group">
             <label>MAGIC Reward Amount</label>
-            <p className="monospace-text">{formatEther(REWARDS_AMOUNT)} MAGIC</p>
+            <p className="monospace-text">{formatEther(rewardsAmounts[earnerIndex])} MAGIC</p>
           </div>
 
           {simulationResult !== null && (
