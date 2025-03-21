@@ -1,5 +1,5 @@
 import { Address, getContract, encodeAbiParameters, keccak256 } from 'viem';
-import { agentFactoryAbi, eigenAgentAbi } from '../abis';
+import { AgentFactoryABI, EigenAgent6551ABI } from '../abis';
 import bridgeContractsL1Config from '../addresses/ethsepolia/bridgeContractsL1.config.json';
 import { getL1Client } from './clients';
 import { ZeroAddress } from './encoders';
@@ -151,7 +151,7 @@ export async function getEigenAgentAndExecNonce(userAddress: Address): Promise<{
     // Get the EigenAgent address for the user using readContract
     const eigenAgentAddress = await publicClient.readContract({
       address: AGENT_FACTORY_ADDRESS,
-      abi: agentFactoryAbi,
+      abi: AgentFactoryABI,
       functionName: 'getEigenAgent',
       args: [userAddress]
     }) as Address;
@@ -164,7 +164,7 @@ export async function getEigenAgentAndExecNonce(userAddress: Address): Promise<{
     // Get the current execution nonce
     const execNonce = await publicClient.readContract({
       address: eigenAgentAddress,
-      abi: eigenAgentAbi,
+      abi: EigenAgent6551ABI,
       functionName: 'execNonce',
       args: []
     }) as bigint;
@@ -212,7 +212,7 @@ export async function predictEigenAgentAddress(userAddress: Address): Promise<Ad
     // Call the predictEigenAgentAddress function on the AgentFactory contract
     const predictedAddress = await publicClient.readContract({
       address: AGENT_FACTORY_ADDRESS,
-      abi: agentFactoryAbi,
+      abi: AgentFactoryABI,
       functionName: 'predictEigenAgentAddress',
       args: [userAddress, 0n] // Use 0 as salt/nonce for first-time users
     }) as Address;

@@ -4,6 +4,7 @@ import {
   StrategyManagerABI,
   IERC20ABI,
   SenderCCIPABI,
+  SenderHooksABI,
   EigenAgent6551ABI,
   AgentFactoryABI,
   RewardsCoordinatorABI
@@ -15,17 +16,11 @@ export {
   StrategyManagerABI,
   IERC20ABI,
   SenderCCIPABI,
+  SenderHooksABI,
   EigenAgent6551ABI,
   AgentFactoryABI,
   RewardsCoordinatorABI
 };
-
-// Keep backward compatibility with existing code
-export const agentFactoryAbi = AgentFactoryABI;
-export const eigenAgentAbi = EigenAgent6551ABI;
-export const senderCCIPAbi = SenderCCIPABI;
-export const strategyManagerAbi = StrategyManagerABI;
-export const ERC20_ABI = IERC20ABI;
 
 // Export chainlink ABIs
 export * from './Router';

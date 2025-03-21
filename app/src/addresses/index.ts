@@ -20,6 +20,7 @@ export const BaseSepolia = {
 
 import bridgeContractsL2 from './basesepolia/bridgeContractsL2.config.json';
 export const SENDER_CCIP_ADDRESS = bridgeContractsL2.contracts.senderCCIP as Address;
+export const SENDER_HOOKS_ADDRESS = bridgeContractsL2.contracts.senderHooks as Address;
 
 import eigenlayerContracts from './ethsepolia/eigenlayerContracts.config.json';
 export const STRATEGY_MANAGER_ADDRESS = eigenlayerContracts.addresses.StrategyManager as Address;

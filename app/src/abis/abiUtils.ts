@@ -5,6 +5,7 @@ import DelegationManagerAbiRaw from './IDelegationManager.json';
 import StrategyManagerAbiRaw from './IStrategyManager.json';
 import IERC20AbiRaw from './IERC20.json';
 import SenderCCIPAbiRaw from './ISenderCCIP.json';
+import SenderHooksAbiRaw from './ISenderHooks.json';
 import EigenAgent6551AbiRaw from './IEigenAgent6551.json';
 import AgentFactoryAbiRaw from './IAgentFactory.json';
 import RewardsCoordinatorAbiRaw from './IRewardsCoordinator.json';
@@ -14,6 +15,7 @@ export const DelegationManagerABI = DelegationManagerAbiRaw.abi as Abi;
 export const StrategyManagerABI = StrategyManagerAbiRaw.abi as Abi;
 export const IERC20ABI = IERC20AbiRaw.abi as Abi;
 export const SenderCCIPABI = SenderCCIPAbiRaw.abi as Abi;
+export const SenderHooksABI = SenderHooksAbiRaw.abi as Abi;
 export const EigenAgent6551ABI = EigenAgent6551AbiRaw.abi as Abi;
 export const AgentFactoryABI = AgentFactoryAbiRaw.abi as Abi;
 export const RewardsCoordinatorABI = RewardsCoordinatorAbiRaw.abi as Abi;
@@ -92,3 +94,15 @@ const requiredIERC20Functions = [
   'transferFrom'
 ];
 ensureAbiHasFunctions(IERC20ABI, requiredIERC20Functions);
+
+const requiredSenderHooksFunctions = [
+  'getGasLimitForFunctionSelector'
+];
+ensureAbiHasFunctions(SenderHooksABI, requiredSenderHooksFunctions);
+
+const requiredSenderCCIPFunctions = [
+  'sendMessagePayNative'
+];
+ensureAbiHasFunctions(SenderCCIPABI, requiredSenderCCIPFunctions);
+
+

@@ -156,6 +156,8 @@ const DepositPage: React.FC = () => {
       amount
     },
     expiryMinutes: 45, // expiry for refunds on reverts, max is 3 days.
+    customGasLimit: gasLimit, // isFirstTimeUser ? BigInt(860_000) : BigInt(560_000);
+    // For first time users, we automatically mint an EigenAgent which costs most gas
     onSuccess: (txHash, receipt) => {
       if (txHash && receipt) {
         addTransaction({
@@ -182,7 +184,6 @@ const DepositPage: React.FC = () => {
       console.error('Error in deposit operation:', err);
       showToast(`Error in deposit operation: ${err.message}`, 'error');
     },
-    customGasLimit: gasLimit
   });
 
   // Show toast when error occurs

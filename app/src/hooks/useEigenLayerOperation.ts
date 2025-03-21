@@ -3,11 +3,17 @@ import { Address, Hex,  encodeAbiParameters, keccak256, TransactionReceipt } fro
 import { baseSepolia } from '../hooks/useClients';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { signMessageForEigenAgentExecution } from '../utils/signers';
-import { EthSepolia, BaseSepolia, SENDER_CCIP_ADDRESS, STRATEGY_MANAGER_ADDRESS } from '../addresses';
 import { getRouterFeesL2 } from '../utils/routerFees';
-import { RECEIVER_CCIP_ADDRESS } from '../addresses';
-import { IERC20ABI } from '../abis';
 import { TransactionTypes } from '../utils/ccipEventListener';
+import {
+  EthSepolia,
+  BaseSepolia,
+  SENDER_HOOKS_ADDRESS,
+  RECEIVER_CCIP_ADDRESS,
+  SENDER_CCIP_ADDRESS,
+  STRATEGY_MANAGER_ADDRESS
+} from '../addresses';
+import { IERC20ABI, SenderHooksABI } from '../abis';
 
 
 // Define function selector constants for better maintainability
@@ -180,6 +186,34 @@ export function useEigenLayerOperation({
     }
   };
 
+  // Add this function in the useEigenLayerOperation hook
+  const getGasLimitFromSenderHooks = async (functionSelector: Hex): Promise<bigint> => {
+    try {
+      if (!l2Wallet.publicClient) {
+        throw new Error("Public client not available for Base Sepolia");
+      }
+
+      // Extract the first 4 bytes (function selector) if a full message is provided
+      const selector = functionSelector.length > 10
+        ? `0x${functionSelector.slice(2, 10)}` as Hex
+        : functionSelector;
+
+      const gasLimit = await l2Wallet.publicClient.readContract({
+        address: SENDER_HOOKS_ADDRESS,
+        abi: SenderHooksABI,
+        functionName: 'getGasLimitForFunctionSelector',
+        args: [selector]
+      });
+
+      console.log(`Gas limit from SenderHooks for selector ${selector}: ${gasLimit}`);
+      return gasLimit as bigint;
+    } catch (error) {
+      console.error('Error getting gas limit from SenderHooks:', error);
+      // Return a default gas limit as fallback
+      return BigInt(300000);
+    }
+  };
+
   // Function to dispatch CCIP transaction
   const dispatchTransaction = async (
     messageWithSignature: Hex,
@@ -203,7 +237,14 @@ export function useEigenLayerOperation({
 
       // Use custom gas limit if provided, otherwise use default
       // gasLimit = 0 means the contract decides the gas limit
-      const txGasLimit = customGasLimit || BigInt(0);
+      let txGasLimit: bigint;
+      if (customGasLimit) {
+        txGasLimit = customGasLimit;
+      } else {
+        // Extract the function selector from the original message
+        const selector = originalMessage.slice(0, 10) as Hex;
+        txGasLimit = await getGasLimitFromSenderHooks(selector);
+      }
       console.log("txGasLimit", txGasLimit);
 
       // Get fee estimate

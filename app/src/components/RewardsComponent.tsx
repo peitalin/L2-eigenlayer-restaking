@@ -36,6 +36,8 @@ const RewardsComponent: React.FC = () => {
   } = useEigenLayerOperation({
     targetContractAddr: REWARDS_COORDINATOR_ADDRESS,
     amount: 0n, // No value to send with the transaction
+    customGasLimit: 590_000n, // see GasLimits.sol
+    // you may need to increase this if claiming multiple rewards tokens
     onSuccess: (txHash, receipt) => {
       showToast('Rewards claim transaction submitted!', 'success');
 
