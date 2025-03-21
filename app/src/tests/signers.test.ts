@@ -19,7 +19,7 @@ import {
 } from 'viem';
 import { sepolia } from 'viem/chains';
 import dotenv from 'dotenv';
-import { calculateTokenLeafHash, calculateEarnerLeafHash, createClaim, REWARDS_AMOUNT } from '../utils/rewards';
+import { calculateTokenLeafHash, calculateEarnerLeafHash, createClaim } from '../utils/rewards';
 import { EthSepolia } from '../addresses';
 import { encodeProcessClaimMsg } from '../utils/encoders';
 import { RewardsMerkleClaim } from '../abis/RewardsCoordinatorTypes';
@@ -366,7 +366,7 @@ describe('EigenAgent Signature Functions', () => {
     const claim: RewardsMerkleClaim = createClaim(
       1, // rootIndex
       recipient, // earner
-      REWARDS_AMOUNT, // amount
+      100000000000000000n, // amount: 0.1 ether
       '0x', // proof is empty as there's only 1 claim
       0 // earnerIndex
     );
