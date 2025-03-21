@@ -134,7 +134,7 @@ const WithdrawalPage: React.FC = () => {
     info,
     isApprovingToken: isQueueApprovingToken,
     approvalHash: queueApprovalHash,
-    executeWithMessage: executeQueueWithdrawalMessage
+    executeWithMessage: executeQueueWithdrawalMessage,
   } = useEigenLayerOperation({
     targetContractAddr: DELEGATION_MANAGER_ADDRESS,
     amount: 0n,
@@ -160,7 +160,8 @@ const WithdrawalPage: React.FC = () => {
     onError: (err) => {
       console.error('Error in withdrawal operation:', err);
       showToast(`Error in withdrawal operation: ${err.message}`, 'error');
-    }
+    },
+    customGasLimit: 580_000n // see GasLimits.sol
   });
 
   const {
@@ -194,7 +195,8 @@ const WithdrawalPage: React.FC = () => {
       console.error('Error in completing withdrawal:', err);
       setCompleteError(err.message);
       setIsCompletingWithdrawal(false);
-    }
+    },
+    customGasLimit: 630_000n // see GasLimits.sol
   });
 
   // Update the completeError state when completeHookError changes
