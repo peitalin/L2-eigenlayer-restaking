@@ -289,14 +289,14 @@ const DepositPage: React.FC = () => {
             type="text"
             value={transactionAmount}
             onChange={handleAmountChange}
-            className="amount-input"
+            className="amount-input max-width-input"
             placeholder="0.11"
             disabled={isInputDisabled}
           />
         </div>
 
         <button
-          className="create-transaction-button"
+          className="create-transaction-button max-width-input"
           disabled={isInputDisabled || (!eigenAgentInfo?.eigenAgentAddress && !predictedEigenAgentAddress)}
           onClick={handleDepositIntoStrategy}
         >

@@ -338,21 +338,21 @@ const WithdrawalPage: React.FC = () => {
           <label htmlFor="amount">Amount to withdraw (MAGIC)</label>
           <input
             id="amount"
+            className="amount-input max-width-input"
             type="text"
             value={withdrawalAmount}
             onChange={handleAmountChange}
-            className="amount-input"
             placeholder="0.05"
             disabled={isInputDisabled}
           />
-          <button
-            className="create-transaction-button"
-            disabled={isInputDisabled || !eigenAgentInfo}
-            onClick={handleQueueWithdrawal}
-          >
-            {isQueueingWithdrawal ? 'Processing...' : isLoadingL1Data ? 'Loading L1 Data...' : 'Queue Withdrawal'}
-          </button>
         </div>
+        <button
+          className="create-transaction-button max-width-input"
+          disabled={isInputDisabled || !eigenAgentInfo}
+          onClick={handleQueueWithdrawal}
+        >
+          {isQueueingWithdrawal ? 'Processing...' : isLoadingL1Data ? 'Loading L1 Data...' : 'Queue Withdrawal'}
+        </button>
 
         <div className="withdrawal-info">
           <p>

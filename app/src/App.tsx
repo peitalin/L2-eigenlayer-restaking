@@ -8,6 +8,7 @@ import { useClientsContext } from './contexts/ClientsContext';
 import WithdrawalPage from './pages/WithdrawalPage';
 import DepositPage from './pages/DepositPage';
 import TransactionsPage from './pages/TransactionsPage';
+import DelegatePage from './pages/DelegatePage';
 // Layout Components
 import Navbar from './components/Navbar';
 import Navigation from './components/Navigation';
@@ -43,6 +44,11 @@ function App() {
             <Route path="/withdrawal" element={
               <Layout>
                 <WithdrawalPage />
+              </Layout>
+            } />
+            <Route path="/delegate" element={
+              <Layout>
+                <DelegatePage />
               </Layout>
             } />
             <Route path="/transactions" element={

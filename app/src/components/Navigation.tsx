@@ -16,6 +16,7 @@ const Navigation: React.FC<NavigationProps> = ({ links }) => {
   const defaultNavigationItems: NavigationItem[] = [
     { to: '/deposit', label: 'Deposit', exact: true },
     { to: '/withdrawal', label: 'Withdraw' },
+    { to: '/delegate', label: 'Delegate' },
     { to: '/transactions', label: 'Transactions' }
     // Add more navigation items here as the app grows
   ];
