@@ -217,3 +217,51 @@ export function encodeProcessClaimMsg(
     args: [claim, recipient]
   });
 }
+
+/**
+ * Interface for SignatureWithExpiry used in delegateTo
+ */
+export interface SignatureWithExpiry {
+  signature: Hex;
+  expiry: bigint;
+}
+
+/**
+ * Encodes a delegateTo call for IDelegationManager
+ * TypeScript equivalent of encodeDelegateTo in Solidity
+ *
+ * @param operator The operator address to delegate to
+ * @param approverSignatureAndExpiry The SignatureWithExpiry struct containing signature and expiry
+ * @param approverSalt A random salt for the approval
+ * @returns Encoded function call as a hex string
+ */
+export function encodeDelegateTo(
+  operator: Address,
+  approverSignatureAndExpiry: SignatureWithExpiry,
+  approverSalt: Hex
+): Hex {
+  return encodeFunctionData({
+    abi: DelegationManagerABI,
+    functionName: 'delegateTo',
+    args: [
+      operator,
+      approverSignatureAndExpiry,
+      approverSalt
+    ]
+  });
+}
+
+/**
+ * Encodes an undelegate call for IDelegationManager
+ * TypeScript equivalent of encodeUndelegateMsg in Solidity
+ *
+ * @param staker The staker address (usually the eigenAgent address)
+ * @returns Encoded function call as a hex string
+ */
+export function encodeUndelegateMsg(staker: Address): Hex {
+  return encodeFunctionData({
+    abi: DelegationManagerABI,
+    functionName: 'undelegate',
+    args: [staker]
+  });
+}

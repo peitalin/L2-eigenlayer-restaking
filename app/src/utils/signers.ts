@@ -3,9 +3,10 @@ import {
   encodeAbiParameters, keccak256, encodePacked,
   toBytes, WalletClient,
   verifyMessage, SignableMessage, verifyTypedData,
-  stringToHex, hexToBytes, bytesToHex, hexToString
+  stringToHex, hexToBytes, bytesToHex, hexToString,
+  domainSeparator
 } from 'viem';
-import { EthSepolia } from '../addresses';
+import { EthSepolia, DELEGATION_MANAGER_ADDRESS } from '../addresses';
 import { ZeroAddress } from './encoders';
 
 // Constants from ClientSigners.sol
@@ -16,6 +17,11 @@ export const EIP712_DOMAIN_TYPEHASH = keccak256(
   toBytes("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
 );
 export const TREASURE_RESTAKING_VERSION = "v1.0.0";
+
+// Delegation approval typehash
+export const DELEGATION_APPROVAL_TYPEHASH = keccak256(
+  toBytes("DelegationApproval(address delegationApprover,address staker,address operator,bytes32 salt,uint256 expiry)")
+);
 
 /**
  * Creates a domain separator for EigenAgent contract
@@ -55,6 +61,39 @@ export function domainSeparatorEigenAgent(contractAddr: Address, chainId: bigint
     )
   );
   return domainSeparator;
+}
+
+/**
+ * Calculates the domain separator for EigenLayer contracts
+ * @param contractAddress The address of the contract (e.g., DelegationManager)
+ * @param chainId The chain ID where the contract is deployed
+ * @returns The domain separator as bytes32
+ */
+export function domainSeparatorEigenlayer(
+  contractAddress: Address,
+  chainId: number
+): Hex {
+  // Major version of EigenLayer - 'v1'
+  const majorVersion = 'v1';
+
+  return keccak256(
+    encodeAbiParameters(
+      [
+        { type: 'bytes32' },
+        { type: 'bytes32' },
+        { type: 'bytes32' },
+        { type: 'uint256' },
+        { type: 'address' }
+      ],
+      [
+        EIP712_DOMAIN_TYPEHASH,
+        keccak256(encodePacked(['string'], ['EigenLayer'])),
+        keccak256(encodePacked(['string'], [majorVersion])),
+        BigInt(chainId),
+        contractAddress
+      ]
+    )
+  );
 }
 
 /**
@@ -129,6 +168,60 @@ export function createEigenAgentCallDigestHash(
       toBytes(structHash)
     ])
   );
+}
+
+/**
+ * Calculates the delegation approval digest hash
+ * Implementation of the Solidity function calculateDelegationApprovalDigestHash
+ * @param staker The staker address (eigenAgent address)
+ * @param operator The operator address
+ * @param delegationApprover The delegation approver address
+ * @param approverSalt A random salt for the approval
+ * @param expiry Expiry time for the signature
+ * @param delegationManagerAddr The address of the DelegationManager contract
+ * @param chainId The chain ID where the DelegationManager contract is deployed
+ * @returns The digest hash to be signed
+ */
+export function calculateDelegationApprovalDigestHash(
+  staker: Address,
+  operator: Address,
+  delegationApprover: Address,
+  approverSalt: Hex,
+  expiry: bigint,
+  delegationManagerAddr: Address = DELEGATION_MANAGER_ADDRESS,
+  chainId: number = EthSepolia.chainId
+): Hex {
+  // Create the approver struct hash
+  const approverStructHash = keccak256(
+    encodeAbiParameters(
+      [
+        { type: 'bytes32' },
+        { type: 'address' },
+        { type: 'address' },
+        { type: 'address' },
+        { type: 'bytes32' },
+        { type: 'uint256' }
+      ],
+      [
+        DELEGATION_APPROVAL_TYPEHASH,
+        delegationApprover,
+        staker,
+        operator,
+        approverSalt,
+        expiry
+      ]
+    )
+  );
+
+  // Create the approver digest hash
+  const approverDigestHash = keccak256(
+    encodePacked(
+      ['string', 'bytes32', 'bytes32'],
+      ['\x19\x01', domainSeparatorEigenlayer(delegationManagerAddr, chainId), approverStructHash]
+    )
+  );
+
+  return approverDigestHash;
 }
 
 /**
@@ -240,4 +333,49 @@ export async function signMessageForEigenAgentExecution(
     signature: formattedSignature,
     messageWithSignature: messageWithSignature
   };
+}
+
+/**
+ * Signs a delegation approval message using EIP-712 with personal_sign
+ * This method uses the raw keccak256 hash to generate a signature
+ * @param walletClient The wallet client to use for signing
+ * @param account The account address to sign with
+ * @param staker The staker address (eigenAgent address)
+ * @param operator The operator address
+ * @param delegationApprover The delegation approver address
+ * @param approverSalt A random salt for the approval
+ * @param expiry Expiry time for the signature
+ * @param delegationManagerAddr The address of the DelegationManager contract
+ * @param chainId The chain ID where the DelegationManager contract is deployed
+ * @returns The signature as a hex string
+ */
+export async function signDelegationApproval(
+  walletClient: WalletClient,
+  account: Address,
+  staker: Address,
+  operator: Address,
+  delegationApprover: Address,
+  approverSalt: Hex,
+  expiry: bigint,
+  delegationManagerAddr: Address = DELEGATION_MANAGER_ADDRESS,
+  chainId: number = EthSepolia.chainId
+): Promise<Hex> {
+  // Calculate the digest hash
+  const digestHash = calculateDelegationApprovalDigestHash(
+    staker,
+    operator,
+    delegationApprover,
+    approverSalt,
+    expiry,
+    delegationManagerAddr,
+    chainId
+  );
+
+  // Sign the digest hash using personal_sign
+  const signature = await walletClient.signMessage({
+    account,
+    message: { raw: digestHash }
+  });
+
+  return signature;
 }
