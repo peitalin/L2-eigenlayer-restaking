@@ -168,59 +168,59 @@ export function createEigenAgentCallDigestHash(
   );
 }
 
-/**
- * Calculates the delegation approval digest hash
- * Implementation of the Solidity function calculateDelegationApprovalDigestHash
- * @param staker The staker address (eigenAgent address)
- * @param operator The operator address
- * @param delegationApprover The delegation approver address
- * @param approverSalt A random salt for the approval
- * @param expiry Expiry time for the signature
- * @param delegationManagerAddr The address of the DelegationManager contract
- * @param chainId The chain ID where the DelegationManager contract is deployed
- * @returns The digest hash to be signed
- */
-export function calculateDelegationApprovalDigestHash(
-  staker: Address,
-  operator: Address,
-  delegationApprover: Address,
-  approverSalt: Hex,
-  expiry: bigint,
-  delegationManagerAddr: Address = DELEGATION_MANAGER_ADDRESS,
-  chainId: number = EthSepolia.chainId
-): Hex {
-  // Create the approver struct hash
-  const approverStructHash = keccak256(
-    encodeAbiParameters(
-      [
-        { type: 'bytes32' },
-        { type: 'address' },
-        { type: 'address' },
-        { type: 'address' },
-        { type: 'bytes32' },
-        { type: 'uint256' }
-      ],
-      [
-        DELEGATION_APPROVAL_TYPEHASH,
-        delegationApprover,
-        staker,
-        operator,
-        approverSalt,
-        expiry
-      ]
-    )
-  );
+// /**
+//  * Calculates the delegation approval digest hash
+//  * Implementation of the Solidity function calculateDelegationApprovalDigestHash
+//  * @param staker The staker address (eigenAgent address)
+//  * @param operator The operator address
+//  * @param delegationApprover The delegation approver address
+//  * @param approverSalt A random salt for the approval
+//  * @param expiry Expiry time for the signature
+//  * @param delegationManagerAddr The address of the DelegationManager contract
+//  * @param chainId The chain ID where the DelegationManager contract is deployed
+//  * @returns The digest hash to be signed
+//  */
+// export function calculateDelegationApprovalDigestHash(
+//   staker: Address,
+//   operator: Address,
+//   delegationApprover: Address,
+//   approverSalt: Hex,
+//   expiry: bigint,
+//   delegationManagerAddr: Address = DELEGATION_MANAGER_ADDRESS,
+//   chainId: number = EthSepolia.chainId
+// ): Hex {
+//   // Create the approver struct hash
+//   const approverStructHash = keccak256(
+//     encodeAbiParameters(
+//       [
+//         { type: 'bytes32' },
+//         { type: 'address' },
+//         { type: 'address' },
+//         { type: 'address' },
+//         { type: 'bytes32' },
+//         { type: 'uint256' }
+//       ],
+//       [
+//         DELEGATION_APPROVAL_TYPEHASH,
+//         delegationApprover,
+//         staker,
+//         operator,
+//         approverSalt,
+//         expiry
+//       ]
+//     )
+//   );
 
-  // Create the approver digest hash
-  const approverDigestHash = keccak256(
-    encodePacked(
-      ['string', 'bytes32', 'bytes32'],
-      ['\x19\x01', domainSeparatorEigenlayer(delegationManagerAddr, chainId), approverStructHash]
-    )
-  );
+//   // Create the approver digest hash
+//   const approverDigestHash = keccak256(
+//     encodePacked(
+//       ['string', 'bytes32', 'bytes32'],
+//       ['\x19\x01', domainSeparatorEigenlayer(delegationManagerAddr, chainId), approverStructHash]
+//     )
+//   );
 
-  return approverDigestHash;
-}
+//   return approverDigestHash;
+// }
 
 /**
  * Create a signature for EigenAgent execution
@@ -308,55 +308,64 @@ export async function signMessageForEigenAgentExecution(
   };
 }
 
-/**
- * Signs a delegation approval message using EIP-712 with personal_sign
- * This method uses the raw keccak256 hash to generate a signature
- * @param walletClient The wallet client to use for signing
- * @param account The account address to sign with
- * @param staker The staker address (eigenAgent address)
- * @param operator The operator address
- * @param delegationApprover The delegation approver address
- * @param approverSalt A random salt for the approval
- * @param expiry Expiry time for the signature
- * @param delegationManagerAddr The address of the DelegationManager contract
- * @param chainId The chain ID where the DelegationManager contract is deployed
- * @returns The signature as a hex string
- */
-export async function signDelegationApproval(
-  walletClient: WalletClient,
-  account: Address,
-  staker: Address,
-  operator: Address,
-  delegationApprover: Address,
-  approverSalt: Hex,
-  expiry: bigint,
-  delegationManagerAddr: Address = DELEGATION_MANAGER_ADDRESS,
-  chainId: number = EthSepolia.chainId
-): Promise<Hex> {
-  // Calculate the digest hash
-  const digestHash = calculateDelegationApprovalDigestHash(
-    staker,
-    operator,
-    delegationApprover,
-    approverSalt,
-    expiry,
-    delegationManagerAddr,
-    chainId
-  );
+// /**
+//  * Signs a delegation approval message using EIP-712 with personal_sign
+//  * This method uses the raw keccak256 hash to generate a signature
+//  * @param walletClient The wallet client to use for signing
+//  * @param account The account address to sign with
+//  * @param staker The staker address (eigenAgent address)
+//  * @param operator The operator address
+//  * @param delegationApprover The delegation approver address
+//  * @param approverSalt A random salt for the approval
+//  * @param expiry Expiry time for the signature
+//  * @param delegationManagerAddr The address of the DelegationManager contract
+//  * @param chainId The chain ID where the DelegationManager contract is deployed
+//  * @returns The signature as a hex string
+//  */
+// export async function signDelegationApproval(
+//   walletClient: WalletClient,
+//   account: Address,
+//   staker: Address,
+//   operator: Address,
+//   delegationApprover: Address,
+//   approverSalt: Hex,
+//   expiry: bigint,
+//   delegationManagerAddr: Address = DELEGATION_MANAGER_ADDRESS,
+//   chainId: number = EthSepolia.chainId
+// ): Promise<Hex> {
+//   // Calculate the digest hash
+//   const digestHash = calculateDelegationApprovalDigestHash(
+//     staker,
+//     operator,
+//     delegationApprover,
+//     approverSalt,
+//     expiry,
+//     delegationManagerAddr,
+//     chainId
+//   );
 
-  // Sign the digest hash using personal_sign
-  const signature = await walletClient.signMessage({
-    account,
-    message: { raw: digestHash }
-  });
+//   // Sign the digest hash using personal_sign
+//   const signature = await walletClient.signMessage({
+//     account,
+//     message: { raw: digestHash }
+//   });
 
-  return signature;
+//   return signature;
+// }
+
+interface SignDelegationApprovalResult {
+  signature: string;
+  digestHash: string;
+  salt: string;
+  expiry: string;
+  delegationManagerAddress: string;
+  chainId: string;
 }
 
 export async function signDelegationApprovalServer(
   staker: `0x${string}`,
   operator: `0x${string}`
-): Promise<{ signature: `0x${string}`; digestHash: `0x${string}` }> {
+): Promise<SignDelegationApprovalResult> {
   try {
     const response = await fetch(`${SERVER_BASE_URL}/api/delegation/sign`, {
       method: 'POST',
@@ -373,11 +382,8 @@ export async function signDelegationApprovalServer(
       throw new Error(`Server responded with status: ${response.status}`);
     }
 
-    const data = await response.json();
-    return {
-      signature: data.signature as `0x${string}`,
-      digestHash: data.digestHash as `0x${string}`,
-    };
+    const data = await response.json() as SignDelegationApprovalResult;
+    return data;
   } catch (error) {
     console.error('Error signing delegation approval:', error);
     throw new Error('Failed to sign delegation approval');

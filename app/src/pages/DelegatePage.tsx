@@ -4,11 +4,12 @@ import { useClientsContext } from '../contexts/ClientsContext';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { encodeUndelegateMsg, encodeDelegateTo, SignatureWithExpiry } from '../utils/encoders';
-import { calculateDelegationApprovalDigestHash, signDelegationApproval } from '../utils/signers';
+import { signDelegationApprovalServer } from '../utils/signers';
 import { DELEGATION_MANAGER_ADDRESS, EthSepolia, BaseSepolia } from '../addresses';
 import TransactionSuccessModal from '../components/TransactionSuccessModal';
 import { TransactionType } from '../types';
 import { SERVER_BASE_URL } from '../configs';
+import { useToast } from '../utils/toast';
 
 // Define the Operator type
 interface Operator {
@@ -24,6 +25,7 @@ interface Operator {
 const DelegatePage: React.FC = () => {
   const { l1Wallet, l2Wallet, eigenAgentInfo, predictedEigenAgentAddress } = useClientsContext();
   const { addTransaction } = useTransactionHistory();
+  const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [selectedOperator, setSelectedOperator] = useState<string>('');
   const [isCurrentlyDelegated, setIsCurrentlyDelegated] = useState<boolean>(false);
@@ -126,7 +128,18 @@ const DelegatePage: React.FC = () => {
       // Close the modal if there's an error
       setShowSuccessModal(false);
       setSuccessData(null);
-      setError(`Delegation failed: ${err.message}`);
+
+      // Check if it's a user rejection
+      const errorMessage = err.message.toLowerCase();
+      if (errorMessage.includes('rejected') ||
+          errorMessage.includes('denied') ||
+          errorMessage.includes('cancelled') ||
+          errorMessage.includes('user refused') ||
+          errorMessage.includes('declined')) {
+        showToast('Transaction was cancelled', 'info');
+      } else {
+        setError(`Delegation failed: ${err.message}`);
+      }
     }
   });
 
@@ -148,7 +161,7 @@ const DelegatePage: React.FC = () => {
         status: 'confirmed' as 'pending' | 'confirmed' | 'failed',
         from: receipt.from,
         to: receipt.to || '',
-        user: l1Wallet.account || '',
+        user: l2Wallet.account || '',
         isComplete: false,
         sourceChainId: BaseSepolia.chainId.toString(),
         destinationChainId: EthSepolia.chainId.toString(),
@@ -185,7 +198,18 @@ const DelegatePage: React.FC = () => {
       // Close the modal if there's an error
       setShowSuccessModal(false);
       setSuccessData(null);
-      setError(`Undelegation failed: ${err.message}`);
+
+      // Check if it's a user rejection
+      const errorMessage = err.message.toLowerCase();
+      if (errorMessage.includes('rejected') ||
+          errorMessage.includes('denied') ||
+          errorMessage.includes('cancelled') ||
+          errorMessage.includes('user refused') ||
+          errorMessage.includes('declined')) {
+        showToast('Transaction was cancelled', 'info');
+      } else {
+        setError(`Undelegation failed: ${err.message}`);
+      }
     }
   });
 
@@ -328,44 +352,29 @@ const DelegatePage: React.FC = () => {
       // Create a random salt as bytes32
       const randomSalt = bytesToHex(window.crypto.getRandomValues(new Uint8Array(32)));
 
-      // Set expiry to 1 hour from now (similar to the Solidity script)
-      const expiry = BigInt(Math.floor(Date.now() / 1000) + 3600);
-
       // The eigenAgent address is the staker from Eigenlayer's perspective
       const eigenAgentAddress = eigenAgentInfo?.eigenAgentAddress || predictedEigenAgentAddress as Address;
 
       // For the demo, we'll use the operator as both operator and delegationApprover
       // In a real scenario, the delegationApprover would be a separate entity that signs to approve delegation
-      const delegationApprover = getAddress(selectedOperator);
-
-      // Calculate the digest hash that needs to be signed
-      const digestHash = calculateDelegationApprovalDigestHash(
-        eigenAgentAddress,
-        getAddress(selectedOperator),
-        delegationApprover,
-        randomSalt as `0x${string}`,
-        expiry,
-        DELEGATION_MANAGER_ADDRESS,
-        EthSepolia.chainId
-      );
 
       // Get the signature from the connected wallet
       // NOTE: In a real implementation, the operator should provide this signature
       // For demo purposes, we're signing on behalf of the operator which isn't valid in practice
-      const signature = await signDelegationApproval(
-        l1Wallet.client,
-        l1Wallet.account,
+      const { signature, expiry } = await signDelegationApprovalServer(
         eigenAgentAddress,
         getAddress(selectedOperator),
-        delegationApprover,
-        randomSalt as `0x${string}`,
-        expiry
       );
+
+      if (!signature || !expiry) {
+        setError('Failed to sign delegation approval');
+        return;
+      }
 
       // Create the SignatureWithExpiry struct
       const approverSignatureAndExpiry: SignatureWithExpiry = {
-        signature,
-        expiry
+        signature: signature as `0x${string}`,
+        expiry: BigInt(expiry)
       };
 
       // Encode the delegateTo message
@@ -380,25 +389,6 @@ const DelegatePage: React.FC = () => {
 
       // Add the transaction with the execNonce
       if (result && result.execNonce !== undefined) {
-        // The execNonce was used for this transaction, store it
-        const txData = {
-          txHash: result.txHash,
-          messageId: "",
-          timestamp: Math.floor(Date.now() / 1000),
-          txType: 'delegateTo' as TransactionType,
-          status: 'confirmed' as 'pending' | 'confirmed' | 'failed',
-          from: result.receipt.from,
-          to: result.receipt.to || '',
-          user: eigenAgentAddress,
-          execNonce: result.execNonce,
-          isComplete: false,
-          sourceChainId: BaseSepolia.chainId.toString(),
-          destinationChainId: EthSepolia.chainId.toString(),
-          receiptTransactionHash: result.receipt.transactionHash
-        };
-
-        // Add transaction to history
-        await addTransaction(txData);
       }
 
     } catch (err) {
@@ -447,29 +437,6 @@ const DelegatePage: React.FC = () => {
 
       // Execute the undelegation operation
       const result = await undelegateOperation.executeWithMessage(undelegateMessage);
-
-      // Add the transaction with the execNonce
-      if (result && result.execNonce !== undefined) {
-        // The execNonce was used for this transaction, store it
-        const txData = {
-          txHash: result.txHash,
-          messageId: "",
-          timestamp: Math.floor(Date.now() / 1000),
-          txType: 'undelegate' as TransactionType,
-          status: 'confirmed' as 'pending' | 'confirmed' | 'failed',
-          from: result.receipt.from,
-          to: result.receipt.to || '',
-          user: eigenAgentAddress,
-          execNonce: result.execNonce,
-          isComplete: false,
-          sourceChainId: BaseSepolia.chainId.toString(),
-          destinationChainId: EthSepolia.chainId.toString(),
-          receiptTransactionHash: result.receipt.transactionHash
-        };
-
-        // Add transaction to history
-        await addTransaction(txData);
-      }
 
     } catch (err) {
       console.error('Error during undelegation:', err);
@@ -526,7 +493,7 @@ const DelegatePage: React.FC = () => {
         ) : (
           <div className="treasure-empty-state">
             <p className="treasure-empty-text">You are not currently delegated to any operator.</p>
-          </div>
+            </div>
         )}
       </div>
 

@@ -440,7 +440,7 @@ app.get('/api/execnonce/:agentAddress', (req, res) => {
 app.post('/api/transactions/add', async (req, res) => {
   try {
     const newTransaction: CCIPTransaction = req.body;
-    console.log('newTransaction: ', newTransaction);
+    console.log('inbound newTransaction: ', newTransaction);
 
     // Validate transaction type before proceeding
     const validTypes = [

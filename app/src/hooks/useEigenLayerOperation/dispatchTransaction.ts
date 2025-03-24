@@ -52,7 +52,7 @@ export async function dispatchTransaction(
   console.log("Sending transaction to CCIP sender contract:", SENDER_CCIP_ADDRESS);
 
   // Retry configuration
-  const maxRetries = 5;
+  const maxRetries = 2;
   let retryCount = 0;
   let txHash: `0x${string}` | undefined;
 

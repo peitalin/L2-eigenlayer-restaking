@@ -138,9 +138,8 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({
           <button
             className="modal-button"
             onClick={handleClose}
-            // Allow closing even while loading
           >
-            {isLoading ? 'Cancel' : 'Close'}
+            {"Close"}
           </button>
         </div>
       </div>

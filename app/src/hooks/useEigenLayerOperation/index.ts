@@ -49,7 +49,7 @@ export function useEigenLayerOperation({
     eigenAgentInfo,
     predictedEigenAgentAddress,
   } = useClientsContext();
-  const { fetchLatestExecNonce } = useTransactionHistory();
+  const { fetchLatestExecNonce, fetchTransactions } = useTransactionHistory();
 
   const [isExecuting, setIsExecuting] = useState(false);
   const [signature, setSignature] = useState<Hex | null>(null);
@@ -82,6 +82,15 @@ export function useEigenLayerOperation({
       execNonce,
       expiryTime
     );
+  }
+
+  // Helper function to get first sentence of error message
+  function getFirstSentence(message: string): string {
+    // First try to split by newline
+    const firstLine = message.split('\n')[0];
+    // Then try to split by period, if there is one
+    const firstSentence = firstLine.split('.')[0];
+    return firstSentence;
   }
 
   /**
@@ -202,7 +211,9 @@ export function useEigenLayerOperation({
             setError(`Error approving token: ${approvalErrorMsg}`);
           }
 
-          if (onError) onError(approvalError instanceof Error ? approvalError : new Error(String(approvalError)));
+          if (onError) onError(approvalError instanceof Error ?
+            new Error(getFirstSentence(approvalError.message)) :
+            new Error(getFirstSentence(String(approvalError))));
           return undefined;
         } finally {
           setIsApprovingToken(false);
@@ -254,7 +265,9 @@ export function useEigenLayerOperation({
             console.error('Error switching back to Base Sepolia:', switchBackError);
           }
 
-          if (onError) onError(signError instanceof Error ? signError : new Error(String(signError)));
+          if (onError) onError(signError instanceof Error ?
+            new Error(getFirstSentence(signError.message)) :
+            new Error(getFirstSentence(String(signError))));
           return undefined;
         }
 
@@ -292,6 +305,9 @@ export function useEigenLayerOperation({
           onSuccess(txHash, receipt, Number(execNonce));
         }
 
+        // Fetch latest transactions to update the UI
+        await fetchTransactions();
+
         // Return the result including execNonce
         return {
           txHash,
@@ -323,7 +339,9 @@ export function useEigenLayerOperation({
           // Show rejection as info, not error
           setInfo("Transaction was cancelled");
 
-          if (onError) onError(txError instanceof Error ? txError : new Error(String(txError)));
+          if (onError) onError(txError instanceof Error ?
+            new Error(getFirstSentence(txError.message)) :
+            new Error(getFirstSentence(String(txError))));
           return undefined;
         }
 
@@ -347,7 +365,9 @@ export function useEigenLayerOperation({
       if (typeof errorMessage === 'string' && errorMessage.includes('rate limit')) {
         setError(`RPC rate limit exceeded. Please try again in a few minutes.`);
         setInfo(`Your transaction may still be processing. Check your transaction history.`);
-        if (onError) onError(err instanceof Error ? err : new Error(String(err)));
+        if (onError) onError(err instanceof Error ?
+          new Error(getFirstSentence(err.message)) :
+          new Error(getFirstSentence(String(err))));
         return undefined;
       }
 
@@ -365,14 +385,18 @@ export function useEigenLayerOperation({
         // Show rejection as info, not error
         setInfo(`Operation was rejected: ${errorMessage}`);
 
-        if (onError) onError(err instanceof Error ? err : new Error(String(err)));
+        if (onError) onError(err instanceof Error ?
+          new Error(getFirstSentence(err.message)) :
+          new Error(getFirstSentence(String(err))));
         return undefined;
       }
 
       // For non-rejection errors, set the error message
       setError(`Error: ${errorMessage}`);
 
-      if (onError) onError(err instanceof Error ? err : new Error(String(err)));
+      if (onError) onError(err instanceof Error ?
+        new Error(getFirstSentence(err.message)) :
+        new Error(getFirstSentence(String(err))));
       return undefined;
     } finally {
       // Ensure isExecuting is always reset when the function completes

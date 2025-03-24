@@ -200,7 +200,22 @@ const WithdrawalPage: React.FC = () => {
     },
     onError: (err) => {
       console.error('Error in withdrawal operation:', err);
-      showToast(`Error in withdrawal operation: ${err.message}`, 'error');
+
+      // Check if it's a user rejection
+      const errorMessage = err.message.toLowerCase();
+      if (errorMessage.includes('rejected') ||
+          errorMessage.includes('denied') ||
+          errorMessage.includes('cancelled') ||
+          errorMessage.includes('user refused') ||
+          errorMessage.includes('declined')) {
+        showToast('Transaction was cancelled', 'info');
+      } else {
+        showToast(`Error in withdrawal operation: ${err.message}`, 'error');
+      }
+
+      // Clear modal state
+      setSuccessData(null);
+      setShowSuccessModal(false);
     },
   });
 
@@ -251,6 +266,23 @@ const WithdrawalPage: React.FC = () => {
     },
     onError: (err) => {
       console.error('Error in completing withdrawal:', err);
+
+      // Check if it's a user rejection
+      const errorMessage = err.message.toLowerCase();
+      if (errorMessage.includes('rejected') ||
+          errorMessage.includes('denied') ||
+          errorMessage.includes('cancelled') ||
+          errorMessage.includes('user refused') ||
+          errorMessage.includes('declined')) {
+        showToast('Transaction was cancelled', 'info');
+      } else {
+        showToast(`Error in completing withdrawal: ${err.message}`, 'error');
+      }
+
+      // Clear modal state
+      setSuccessData(null);
+      setShowSuccessModal(false);
+
       setCompleteError(err.message);
       setIsCompletingWithdrawal(false);
     },
@@ -410,6 +442,8 @@ const WithdrawalPage: React.FC = () => {
           errorMessage.toLowerCase().includes('declined')) {
         console.log('Transaction rejected by user, resetting states...');
         showToast('Transaction was rejected by user', 'info');
+      } else {
+        showToast(errorMessage, 'error');
       }
       // Clear modal on any error
       setSuccessData(null);

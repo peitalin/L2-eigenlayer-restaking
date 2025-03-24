@@ -2,6 +2,14 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { keccak256, toBytes, concat, encodeAbiParameters, Hex, Address } from 'viem';
 import { DELEGATION_MANAGER_ADDRESS, EIP712_DOMAIN_TYPEHASH } from './constants.js';
 
+interface SignDelegationApprovalResult {
+  signature: string;
+  digestHash: string;
+  salt: string;
+  expiry: string;
+  delegationManagerAddress: string;
+  chainId: string;
+}
 
 export async function signDelegationApproval(
   staker: string,
@@ -9,14 +17,7 @@ export async function signDelegationApproval(
   operatorKey: `0x${string}`,
   expiry: bigint,
   testSalt?: Hex | undefined,
-): Promise<{
-  signature: string;
-  digestHash: string;
-  salt: string;
-  expiry: string;
-  delegationManagerAddress: string;
-  chainId: string;
-}> {
+): Promise<SignDelegationApprovalResult> {
   try {
     // Create account from private key
     const operatorAccount = privateKeyToAccount(operatorKey);
