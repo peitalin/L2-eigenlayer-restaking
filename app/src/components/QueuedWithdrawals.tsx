@@ -259,21 +259,29 @@ const QueuedWithdrawals: React.FC<QueuedWithdrawalsProps> = ({
 
   if (!isConnected) {
     return (
-      <div className="queued-withdrawals">
-        <h3>On-Chain Withdrawals</h3>
-        <p className="no-withdrawals-message">Connect your wallet to view queued withdrawals.</p>
+      <div className="treasure-card">
+        <div className="treasure-card-header">
+          <div className="treasure-card-title">Queued Withdrawals</div>
+        </div>
+        <div className="treasure-empty-state">
+          <div className="treasure-empty-icon">
+            <span style={{ fontSize: '1.75rem' }}>🔌</span>
+          </div>
+          <div className="treasure-empty-text">Connect your wallet to view queued withdrawals.</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="queued-withdrawals">
-      <div className="queued-withdrawals-header">
-        <h3>On-Chain Withdrawals</h3>
+    <div className="treasure-card">
+      <div className="treasure-card-header">
+        <div className="treasure-card-title">Queued Withdrawals</div>
         <button
           onClick={fetchQueuedWithdrawals}
           disabled={isLoading}
-          className="refresh-withdrawals-button"
+          className="treasure-secondary-button"
+          style={{ padding: '4px 12px', minWidth: 'auto' }}
           title="Refresh queued withdrawals"
         >
           {isLoading ? '...' : '⟳'}
@@ -281,45 +289,56 @@ const QueuedWithdrawals: React.FC<QueuedWithdrawalsProps> = ({
       </div>
 
       {isLoading ? (
-        <div className="withdrawals-loading">Loading queued withdrawals...</div>
+        <div className="treasure-empty-state">
+          <div className="loading-spinner"></div>
+          <div className="treasure-empty-text">Loading queued withdrawals...</div>
+        </div>
       ) : queuedWithdrawals && queuedWithdrawals.withdrawals.length > 0 ? (
-        <div className="withdrawals-list">
-          <table className="withdrawals-table">
+        <div className="treasure-table-container">
+          <table className="treasure-table">
             <thead>
               <tr>
-                <th>Shares</th>
-                <th>End Block</th>
-                <th>Status</th>
-                <th>Withdrawer</th>
-                <th>Withdrawal Root</th>
-                {onSelectWithdrawal && <th>Actions</th>}
+                <th className="treasure-table-header">Shares</th>
+                <th className="treasure-table-header">End Block</th>
+                <th className="treasure-table-header">Status</th>
+                <th className="treasure-table-header">Withdrawer</th>
+                <th className="treasure-table-header">Withdrawal Root</th>
+                {onSelectWithdrawal && <th className="treasure-table-header">Actions</th>}
               </tr>
             </thead>
             <tbody>
               {queuedWithdrawals.withdrawals.map((withdrawal, index) => (
-                <tr key={index} className="withdrawal-item">
-                  <td className="withdrawal-shares">
+                <tr key={index} className="treasure-table-row">
+                  <td className="treasure-table-cell">
                     {queuedWithdrawals.shares[index].map((share, idx) => (
                       <div key={idx}>{formatEther(share)}</div>
                     ))}
                   </td>
-                  <td>{withdrawal.endBlock.toString()}</td>
-                  <td className="withdrawal-status">
-                    {canCompleteWithdrawal(withdrawal) ?
-                      <span className="ready">Ready</span> :
-                      <span className="pending">Pending</span>
-                    }
+                  <td className="treasure-table-cell">{withdrawal.endBlock.toString()}</td>
+                  <td className="treasure-table-cell">
+                    {canCompleteWithdrawal(withdrawal) ? (
+                      <span className="treasure-status-ready">Ready</span>
+                    ) : (
+                      <span className="treasure-status-pending">Pending</span>
+                    )}
                   </td>
-                  <td className="withdrawal-withdrawer">{formatAddress(withdrawal.withdrawer)}</td>
-                  <td className="withdrawal-root-cell">
-                    {renderWithdrawalRoot(withdrawal.withdrawalRoot)}
+                  <td className="treasure-table-cell font-mono">{formatAddress(withdrawal.withdrawer)}</td>
+                  <td className="treasure-table-cell">
+                    <div
+                      className="treasure-withdrawal-root"
+                      onClick={() => withdrawal.withdrawalRoot && handleWithdrawalRootClick(withdrawal.withdrawalRoot)}
+                      style={{ cursor: withdrawal.withdrawalRoot ? 'pointer' : 'default' }}
+                    >
+                      {renderWithdrawalRoot(withdrawal.withdrawalRoot)}
+                    </div>
                   </td>
                   {onSelectWithdrawal && (
-                    <td>
+                    <td className="treasure-table-cell">
                       <button
                         onClick={() => handleCompleteClick(withdrawal, queuedWithdrawals.shares[index], index)}
                         disabled={!canCompleteWithdrawal(withdrawal) || completingWithdrawalIndex === index}
-                        className="complete-withdrawal-button"
+                        className={`treasure-action-button ${!canCompleteWithdrawal(withdrawal) ? 'disabled' : ''}`}
+                        style={{ padding: '8px 16px' }}
                       >
                         {renderButtonText(withdrawal, index)}
                       </button>
@@ -331,7 +350,13 @@ const QueuedWithdrawals: React.FC<QueuedWithdrawalsProps> = ({
           </table>
         </div>
       ) : (
-        <p className="no-withdrawals-message">No queued withdrawals found on-chain.</p>
+        <div className="treasure-empty-state">
+          <div className="treasure-empty-icon">
+            <span style={{ fontSize: '1.75rem' }}>📋</span>
+          </div>
+          <div className="treasure-empty-text">No queued withdrawals found on-chain.</div>
+          <div className="treasure-empty-subtext">Queue a withdrawal to see it here.</div>
+        </div>
       )}
     </div>
   );

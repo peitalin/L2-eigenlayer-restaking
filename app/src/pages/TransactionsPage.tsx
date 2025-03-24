@@ -57,9 +57,12 @@ const TransactionsPage: React.FC = () => {
   };
 
   return (
-    <div className="transaction-form transactions-page">
-      <div className="transactions-form-header">
-        <h2>Transaction History</h2>
+    <div className="treasure-page-container">
+
+      <div className="treasure-header">
+        <div className="treasure-title">
+          <span>Transaction History</span>
+        </div>
       </div>
 
       <div className="transactions-form-content">

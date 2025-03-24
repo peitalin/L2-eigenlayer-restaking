@@ -1,5 +1,6 @@
 import React from 'react';
 import { useClientsContext } from '../contexts/ClientsContext';
+import { EIGEN_AGENT_OWNER_721_ADDRESS } from '../addresses';
 
 const EigenAgentInfo: React.FC = () => {
   const {
@@ -10,33 +11,108 @@ const EigenAgentInfo: React.FC = () => {
   } = useClientsContext();
 
   return (
-    <div className="eigenagent-info">
+    <div className="treasure-info-section">
+      <div style={{ position: "relative" }}>
+        <h2 style={{ margin: 0 }}>
+          Eigenlayer Staking from L2 <br/>
+          with ERC-6551
+        </h2>
+        <img
+          src="/assets/logos/treasure/eigenlayer-logo.webp"
+          alt="EigenLayer Logo"
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            padding: '4px',
+            backgroundColor: 'white',
+            objectFit: 'contain',
+            position: 'absolute',
+            top: '0',
+            right: '0'
+          }}
+        />
+      </div>
+
       {!isConnected ? (
         <p>Connect your wallet to view EigenAgent information</p>
       ) : isLoadingEigenAgent ? (
-        <p>Loading EigenAgent information...</p>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+          <div className="loading-spinner"></div>
+        </div>
       ) : !eigenAgentInfo?.eigenAgentAddress ? (
-        <div className="no-agent-warning">
+        <div style={{ padding: '12px', backgroundColor: 'rgba(247, 179, 0, 0.1)', borderRadius: '8px', fontSize: '0.9rem' }}>
           <p>You don't have an EigenAgent set up yet. Please create one to use EigenLayer operations.</p>
         </div>
       ) : (
         <>
-          <div className="info-item">
-            <strong>EigenAgent Address</strong>
-            <div className="eigenagent-address">{eigenAgentInfo.eigenAgentAddress}</div>
+          <div className="treasure-info-item">
+            <div className="treasure-info-label">EigenAgent NFT:</div>
+            <div className="treasure-info-value">
+              {eigenAgentInfo?.eigenAgentAddress && (
+                <>
+                  {EIGEN_AGENT_OWNER_721_ADDRESS.substring(0, 7)}...{EIGEN_AGENT_OWNER_721_ADDRESS.substring(eigenAgentInfo.eigenAgentAddress.length - 4)}
+                  <a
+                    href={`https://sepolia.etherscan.io/address/${EIGEN_AGENT_OWNER_721_ADDRESS}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="treasure-link-icon"
+                  >
+                    ↗
+                  </a>
+                </>
+              )}
+            </div>
           </div>
 
-          <div className="info-item">
-            <strong>Execution Nonce</strong>
-            <div className="execution-nonce">{eigenAgentInfo.execNonce.toString()}</div>
+          <div className="treasure-info-item">
+            <div className="treasure-info-label">EigenAgent Account:</div>
+            <div className="treasure-info-value">
+              {eigenAgentInfo?.eigenAgentAddress && (
+                <>
+                  {eigenAgentInfo.eigenAgentAddress.substring(0, 7)}...{eigenAgentInfo.eigenAgentAddress.substring(eigenAgentInfo.eigenAgentAddress.length - 4)}
+                  <a
+                    href={`https://sepolia.etherscan.io/address/${eigenAgentInfo.eigenAgentAddress}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="treasure-link-icon"
+                  >
+                    ↗
+                  </a>
+                </>
+              )}
+            </div>
           </div>
 
-          <button
-            className="eigenagent-check-button"
-            onClick={fetchEigenAgentInfo}
-          >
-            Refresh
-          </button>
+          <div className="treasure-info-item">
+            <div className="treasure-info-label">EigenAgent Nonce:</div>
+            <div className="treasure-info-value">
+              {eigenAgentInfo?.eigenAgentAddress && (
+                <>
+                  {Number(eigenAgentInfo.execNonce)}
+                  <div style={{ opacity: '0' }}>
+                    ↗
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+
+          <div className="treasure-info-item">
+            <div style={{ fontSize: '0.9rem', lineHeight: '1.5' }}>
+              <p>
+                Stake Magic into Eigenlayer on L1 directly from L2 Treasure Chain using
+                ERC-6551 EigenAgent accounts. Your Magic deposit is routed to L1 and to
+                your EigenAgent, who deposits it for you into Eigenlayer and handles
+                delegation, withdrawals and rewards claiming on your wallet's behalf.
+              </p>
+              <p>
+                Your wallet owns the EigenAgent NFT and it's associated ERC-6551
+                account, so don't lose the NFT!
+              </p>
+            </div>
+          </div>
         </>
       )}
     </div>

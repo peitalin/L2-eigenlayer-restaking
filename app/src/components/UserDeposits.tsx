@@ -69,52 +69,84 @@ const UserDeposits: React.FC = () => {
 
   if (!isConnected) {
     return (
-      <div className="user-deposits">
-        <h3>Your Deposits</h3>
-        <p className="no-deposits-message">Connect your wallet to view deposits.</p>
+      <div className="treasure-card" style={{ border: 'none', paddingLeft: '0px', paddingRight: '0px' }}>
+        <div className="treasure-card-header">
+          <div className="treasure-card-title" style={{ fontSize: '1.1rem' }}>Your Deposits</div>
+        </div>
+        <div className="treasure-empty-state">
+          <p className="treasure-empty-text">Connect your wallet to view deposits.</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="user-deposits">
-      <div className="user-deposits-header">
-        <h3>Your Deposits</h3>
+    <div className="treasure-card" style={{ border: 'none', paddingLeft: '0px', paddingRight: '0px' }}>
+      <div className="treasure-card-header">
+        <div className="treasure-card-title" style={{ fontSize: '1.1rem' }}>Your Deposits</div>
         <button
           onClick={fetchDeposits}
           disabled={isLoading}
-          className="refresh-deposits-button"
+          className="treasure-secondary-button"
           title="Refresh deposits"
+          style={{ padding: '8px', minWidth: '36px' }}
         >
-          {isLoading ? '...' : '⟳'}
+          {isLoading ? (
+            <div className="loading-spinner"></div>
+          ) : (
+            '⟳'
+          )}
         </button>
       </div>
 
-      {error && <div className="deposits-error">{error}</div>}
+      {error && (
+        <div style={{
+          backgroundColor: 'rgba(225, 30, 39, 0.1)',
+          color: 'var(--treasure-error)',
+          padding: '12px',
+          borderRadius: '8px',
+          marginBottom: '16px'
+        }}>
+          {error}
+        </div>
+      )}
 
       {isLoading ? (
-        <div className="deposits-loading">Loading deposits...</div>
+        <div className="treasure-empty-state">
+          <div className="loading-spinner"></div>
+          <p className="treasure-empty-text">Loading deposits...</p>
+        </div>
       ) : deposits.length > 0 ? (
-        <table className="deposits-table">
-          <thead>
-            <tr>
-              <th>Strategy</th>
-              <th>Shares</th>
-            </tr>
-          </thead>
-          <tbody>
-            {deposits.map((deposit, index) => (
-              <tr key={index} className="deposit-item">
-                <td className="strategy-address" title={deposit.strategy}>
-                  {getStrategyName(deposit.strategy)}
-                </td>
-                <td className="deposit-shares">{formatEther(deposit.shares)} MAGIC</td>
+        <div className="treasure-table-container">
+          <table className="treasure-table">
+            <thead>
+              <tr>
+                <th className="treasure-table-header">Strategy</th>
+                <th className="treasure-table-header">Shares</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {deposits.map((deposit, index) => (
+                <tr key={index} className="treasure-table-row">
+                  <td className="treasure-table-cell font-mono" title={deposit.strategy}>
+                    {getStrategyName(deposit.strategy)}
+                  </td>
+                  <td className="treasure-table-cell"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center'}}
+                  >
+                    <div className="magic-token-icon" style={{ marginRight: '8px' }}></div>
+                    <span>{formatEther(deposit.shares)} MAGIC</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
-        <p className="no-deposits-message">No deposits found. Deposit tokens first.</p>
+        <div className="treasure-empty-state">
+          <p className="treasure-empty-text">No deposits found.</p>
+          <p className="treasure-empty-subtext">Deposit tokens first to see them here.</p>
+        </div>
       )}
     </div>
   );

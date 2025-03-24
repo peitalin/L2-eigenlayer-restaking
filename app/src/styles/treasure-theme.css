@@ -1,0 +1,572 @@
+/* Treasure Theme CSS */
+:root {
+  /* Dark Theme Colors (Matching Treasure style) */
+  --treasure-bg-primary: #0a0c10;
+  --treasure-bg-secondary: #13151a;
+  --treasure-bg-tertiary: #1a1d23;
+  --treasure-bg-input: #13151a;
+  --treasure-border-primary: #2b2d33;
+  --treasure-border-secondary: #21262d;
+  --treasure-text-primary: #ffffff;
+  --treasure-text-secondary: #b0b3bb;
+  --treasure-accent-primary: #e11e27;
+  --treasure-accent-primary-hover: #cc1b23;
+  --treasure-accent-secondary: #1f6feb;
+  --treasure-accent-secondary-hover: #1a5dca;
+  --treasure-error: #e11e27;
+  --treasure-warning: #f7b300;
+  --treasure-success: #17bd8d;
+  --treasure-bg-table-header: #1e2128; /* New variable for table header background */
+
+  /* Update main theme colors */
+  --color-bg-primary: var(--treasure-bg-primary);
+  --color-bg-secondary: var(--treasure-bg-secondary);
+  --color-bg-tertiary: var(--treasure-bg-tertiary);
+  --color-bg-input: var(--treasure-bg-input);
+  --color-border-primary: var(--treasure-border-primary);
+  --color-border-secondary: var(--treasure-border-secondary);
+  --color-text-primary: var(--treasure-text-primary);
+  --color-text-secondary: var(--treasure-text-secondary);
+  --color-accent-primary: var(--treasure-accent-primary);
+  --color-accent-primary-hover: var(--treasure-accent-primary-hover);
+  --color-accent-secondary: var(--treasure-accent-secondary);
+  --color-accent-secondary-hover: var(--treasure-accent-secondary-hover);
+  --color-error: var(--treasure-error);
+  --color-warning: var(--treasure-warning);
+  --color-success: var(--treasure-success);
+}
+
+/* Treasure-style components */
+.treasure-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--treasure-border-primary);
+}
+
+.treasure-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--treasure-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.treasure-title .back-arrow {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: var(--treasure-bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--treasure-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.treasure-title .back-arrow:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Card styles */
+.treasure-card {
+  background-color: var(--treasure-bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--treasure-border-primary);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.treasure-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.treasure-card-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--treasure-text-primary);
+}
+
+/* Stat display */
+.treasure-stat-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.treasure-stat-label {
+  text-align: start;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--treasure-text-secondary);
+}
+
+.treasure-stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--treasure-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.magic-token-icon {
+  width: 24px;
+  height: 24px;
+  background-image: url('/assets/logos/treasure/magic-token.svg');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eth-token-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-image: url('/assets/logos/treasure/eth-token.svg');
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.smol-token-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-image: url('/assets/logos/treasure/smol-token.svg');
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.treasure-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 12px;
+}
+
+.treasure-table-header {
+  background-color: var(--treasure-bg-table-header);
+  color: var(--treasure-text-primary);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 16px;
+  text-align: center;
+}
+
+.treasure-table-header th {
+  border: none;
+  padding: 16px;
+}
+
+.treasure-table-row {
+  height: 40px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.treasure-table-row:nth-child(even) {
+  background-color: var(--treasure-bg-secondary);
+}
+
+.treasure-table-row:nth-child(odd) {
+  background-color: var(--treasure-bg-tertiary);
+}
+
+.treasure-table-row:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.treasure-table-cell {
+  padding: 12px 12px;
+  color: var(--treasure-text-secondary);
+  border: none;
+}
+
+.treasure-chain-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-image: url('/assets/logos/treasure/treasure-chain-logo.svg');
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.back-button-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-image: url('/assets/logos/treasure/back-button.svg');
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.magic-logo-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-image: url('/assets/logos/treasure/magic-logo-white.svg');
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.treasure-action-button {
+  background-color: var(--treasure-accent-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.treasure-action-button:hover {
+  background-color: var(--treasure-accent-primary-hover);
+}
+
+.treasure-action-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.treasure-secondary-button {
+  background-color: var(--treasure-bg-tertiary);
+  color: var(--treasure-text-primary);
+  border: 1px solid var(--treasure-border-primary);
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.treasure-secondary-button:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.treasure-input-container {
+  display: flex;
+  align-items: center;
+  background-color: var(--treasure-bg-tertiary);
+  border: 1px solid var(--treasure-border-primary);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.treasure-input {
+  background: transparent;
+  border: none;
+  color: var(--treasure-text-primary);
+  font-size: 1rem;
+  width: 100%;
+  outline: none;
+}
+
+.treasure-input::placeholder {
+  color: var(--treasure-text-secondary);
+}
+
+.treasure-max-button {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--treasure-text-primary);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 50px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.treasure-max-button:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Info section */
+.treasure-info-section {
+  background-color: var(--treasure-bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--treasure-border-primary);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.treasure-info-section h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--treasure-text-primary);
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.treasure-info-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--treasure-border-primary);
+}
+
+.treasure-info-item:last-child {
+  border-bottom: none;
+}
+
+.treasure-info-label {
+  color: var(--treasure-text-secondary);
+  font-size: 0.9rem;
+}
+
+.treasure-info-value {
+  color: var(--treasure-text-primary);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.treasure-copy-icon {
+  cursor: pointer;
+  color: var(--treasure-text-secondary);
+  transition: color 0.2s ease;
+}
+
+.treasure-copy-icon:hover {
+  color: var(--treasure-text-primary);
+}
+
+.treasure-link-icon {
+  cursor: pointer;
+  color: var(--treasure-text-secondary);
+  transition: color 0.2s ease;
+}
+
+.treasure-link-icon:hover {
+  color: var(--treasure-text-primary);
+}
+
+.navbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navbar-logo img {
+  height: 32px;
+  width: auto;
+}
+
+/* Transaction Row */
+.treasure-transaction-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr 2fr 1fr 1fr;
+  padding: 16px;
+  border-bottom: 1px solid var(--treasure-border-primary);
+  transition: background-color 0.2s ease;
+}
+
+.treasure-transaction-row:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.treasure-transaction-row:last-child {
+  border-bottom: none;
+}
+
+.treasure-tx-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.treasure-status-complete {
+  color: var(--treasure-success);
+}
+
+.treasure-status-processing {
+  color: var(--treasure-warning);
+}
+
+.treasure-chain-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.treasure-chain-badge img {
+  width: 16px;
+  height: 16px;
+}
+
+.treasure-tx-token {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Rewards section */
+.treasure-rewards-section {
+  background-color: var(--treasure-bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--treasure-border-primary);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.treasure-rewards-section h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--treasure-text-primary);
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.treasure-rewards-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.treasure-rewards-table th {
+  text-align: left;
+  color: var(--treasure-text-secondary);
+  font-weight: 500;
+  font-size: 0.9rem;
+  padding: 12px 0;
+}
+
+.treasure-rewards-table td {
+  padding: 12px 0;
+  border-top: 1px solid var(--treasure-border-primary);
+}
+
+.treasure-token-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.treasure-token-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.treasure-token-name {
+  font-weight: 500;
+}
+
+.treasure-token-symbol {
+  color: var(--treasure-text-secondary);
+  font-size: 0.9rem;
+}
+
+.treasure-token-amount {
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Empty state */
+.treasure-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.treasure-empty-icon {
+  font-size: 2rem;
+  margin-bottom: 16px;
+  color: var(--treasure-text-secondary);
+}
+
+.treasure-empty-text {
+  color: var(--treasure-text-secondary);
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+
+.treasure-empty-subtext {
+  color: var(--treasure-text-secondary);
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
+.treasure-page-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0 12px;
+  max-width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .treasure-page-container {
+    padding: 0 16px;
+  }
+
+  .treasure-transaction-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .treasure-card {
+    padding: 16px;
+  }
+}
+
+.navbar {
+  background-color: var(--treasure-bg-secondary);
+  border-bottom: 1px solid var(--treasure-border-primary);
+  color: var(--treasure-text-primary);
+}
+
+.navbar a {
+  color: var(--treasure-text-secondary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.navbar a:hover {
+  color: var(--treasure-text-primary);
+}

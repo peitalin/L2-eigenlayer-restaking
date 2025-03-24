@@ -236,23 +236,23 @@ const DelegatePage: React.FC = () => {
   const renderOperatorTable = () => {
     if (isLoadingOperators) {
       return (
-        <div className="loading-container">
+        <div className="treasure-empty-state">
           <div className="loading-spinner"></div>
-          <p>Loading operators...</p>
+          <p className="treasure-empty-text">Loading operators...</p>
         </div>
       );
     }
 
     return (
-      <div className="operator-table-container">
-        <table className="operator-table">
+      <div className="treasure-table-container">
+        <table className="treasure-table">
           <thead>
-            <tr>
+            <tr className="treasure-table-header">
               <th></th>
               <th>Operator Name</th>
               <th>Operator Address</th>
-              <th>Total MAGIC Staked</th>
-              <th>Total ETH Staked</th>
+              <th>MAGIC Staked</th>
+              <th>ETH Staked</th>
               <th>No. Stakers</th>
               <th>Operator Fee</th>
             </tr>
@@ -261,14 +261,14 @@ const DelegatePage: React.FC = () => {
             {operators.map((operator) => (
               <tr
                 key={operator.address}
-                className={`${selectedOperator === operator.address ? 'selected-operator' : ''} ${!operator.isActive ? 'inactive-operator' : ''}`}
+                className={`treasure-table-row ${selectedOperator === operator.address ? 'selected-operator' : ''} ${!operator.isActive ? 'inactive-operator' : ''}`}
                 onClick={() => {
                   if (!isCurrentlyDelegated && !isLoading && operator.isActive) {
                     setSelectedOperator(operator.address);
                   }
                 }}
               >
-                <td>
+                <td className="treasure-table-cell">
                   <input
                     type="radio"
                     name="operator"
@@ -281,12 +281,12 @@ const DelegatePage: React.FC = () => {
                     disabled={isCurrentlyDelegated || isLoading || !operator.isActive}
                   />
                 </td>
-                <td>{operator.name}</td>
-                <td className="font-mono address-cell">{operator.address.substring(0, 6)}...{operator.address.substring(operator.address.length - 4)}</td>
-                <td>{operator.magicStaked}</td>
-                <td>{operator.ethStaked}</td>
-                <td>{operator.stakers}</td>
-                <td>{operator.fee}</td>
+                <td className="treasure-table-cell">{operator.name}</td>
+                <td className="treasure-table-cell font-mono">{operator.address.substring(0, 6)}...{operator.address.substring(operator.address.length - 4)}</td>
+                <td className="treasure-table-cell">{operator.magicStaked}</td>
+                <td className="treasure-table-cell">{operator.ethStaked}</td>
+                <td className="treasure-table-cell">{operator.stakers}</td>
+                <td className="treasure-table-cell">{operator.fee}</td>
               </tr>
             ))}
           </tbody>
@@ -492,40 +492,55 @@ const DelegatePage: React.FC = () => {
   };
 
   return (
-    <div className="deposit-page">
-      <div className="transaction-form">
-        <h2>Current Delegation Status</h2>
+    <div className="treasure-page-container">
+      <div className="treasure-header">
+        <div className="treasure-title">
+          <span>Delegate</span>
+        </div>
+      </div>
+
+      <div className="treasure-card">
+        <div className="treasure-card-header">
+          <div className="treasure-card-title">Current Operator</div>
+        </div>
         {isLoading ? (
-          <div className="info-banner">
+          <div className="treasure-empty-state">
             <div className="loading-spinner"></div>
-            <p>Loading delegation status...</p>
+            <p className="treasure-empty-text">Loading delegation status...</p>
           </div>
         ) : isCurrentlyDelegated ? (
-          <div className="info-banner success">
-            <p>You are currently delegated to: <span className="font-mono">{currentDelegation}</span></p>
+          <div>
+            <div className="treasure-info-item">
+              <span className="treasure-info-label">Currently delegated to:</span>
+              <span className="treasure-info-value font-mono">{currentDelegation}</span>
+            </div>
             <button
               onClick={handleUndelegate}
               disabled={undelegateOperation.isExecuting || isLoading}
-              className="create-transaction-button danger max-width-input"
+              className="treasure-action-button"
+              style={{ marginTop: '16px', width: '100%' }}
             >
               {undelegateOperation.isExecuting ? 'Processing...' : 'Undelegate'}
             </button>
           </div>
         ) : (
-          <div className="info-banner">
-            You are not currently delegated to any operator.
+          <div className="treasure-empty-state">
+            <p className="treasure-empty-text">You are not currently delegated to any operator.</p>
           </div>
         )}
       </div>
 
-      <div className="transaction-form">
-        <h2>Delegate to Operator</h2>
+      <div className="treasure-card">
+        <div className="treasure-card-header">
+          <div className="treasure-card-title">Delegate to Operator</div>
+        </div>
         {!eigenAgentInfo?.eigenAgentAddress && !predictedEigenAgentAddress ? (
-          <div className="info-banner warning">
-            <p>You need to deposit funds first to create an EigenAgent.</p>
+          <div className="treasure-empty-state">
+            <p className="treasure-empty-text">You need to deposit funds first to create an EigenAgent.</p>
             <button
               onClick={() => window.location.href = '/deposit'}
-              className="create-transaction-button max-width-input"
+              className="treasure-action-button"
+              style={{ marginTop: '16px' }}
               disabled={isLoading}
             >
               Go to Deposit
@@ -533,22 +548,28 @@ const DelegatePage: React.FC = () => {
           </div>
         ) : (
           <>
-            <div className="form-group">
-              <h3>Select an operator to delegate to:</h3>
+            <div>
               {renderOperatorTable()}
             </div>
 
-            {selectedOperator && (
-              <div className="selected-operator-info">
-                <p>Selected Operator: <strong>{selectedOperatorDetails?.name}</strong></p>
-                <p>Fee: <strong>{selectedOperatorDetails?.fee}</strong></p>
+            {selectedOperator && selectedOperatorDetails && (
+              <div className="treasure-info-section" style={{ marginTop: '24px' }}>
+                <div className="treasure-info-item">
+                  <span className="treasure-info-label">Selected Operator:</span>
+                  <span className="treasure-info-value">{selectedOperatorDetails.name}</span>
+                </div>
+                <div className="treasure-info-item">
+                  <span className="treasure-info-label">Fee:</span>
+                  <span className="treasure-info-value">{selectedOperatorDetails.fee}</span>
+                </div>
               </div>
             )}
 
             <button
               onClick={handleDelegate}
               disabled={!selectedOperator || isCurrentlyDelegated || delegateOperation.isExecuting || isLoading}
-              className="create-transaction-button max-width-input"
+              className="treasure-action-button"
+              style={{ width: '100%', marginTop: '16px' }}
             >
               {isLoading ? (
                 <>
@@ -566,9 +587,11 @@ const DelegatePage: React.FC = () => {
             </button>
 
             {error && (
-              <div className="info-banner error" style={{ marginTop: '20px', maxWidth: '100%', overflow: 'hidden', wordBreak: 'break-word' }}>
-                {error}
-                <button onClick={() => setError(null)} className="close-button">×</button>
+              <div className="treasure-info-section error" style={{ marginTop: '20px' }}>
+                <div className="treasure-info-item">
+                  <span className="treasure-info-value error-text">{error}</span>
+                  <button onClick={() => setError(null)} className="treasure-secondary-button" style={{ padding: '4px 8px', marginLeft: '8px' }}>×</button>
+                </div>
               </div>
             )}
           </>

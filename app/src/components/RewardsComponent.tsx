@@ -209,86 +209,117 @@ const RewardsComponent: React.FC = () => {
   }, [eigenAgentInfo]);
 
   return (
-    <div className="transaction-form">
-      <h2>Claim Rewards</h2>
+    <div className="treasure-rewards-section">
+      <h2>Claimable Rewards</h2>
 
       {!isConnected ? (
-        <p>Please connect your wallet to claim rewards</p>
+        <p>Please connect your wallet to view rewards</p>
       ) : isLoadingEigenAgent ? (
-        <p>Loading your EigenAgent...</p>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+          <div className="loading-spinner"></div>
+        </div>
       ) : !eigenAgentInfo?.eigenAgentAddress ? (
-        <div className="no-agent-warning">
+        <div style={{ padding: '12px', backgroundColor: 'rgba(247, 179, 0, 0.1)', borderRadius: '8px', fontSize: '0.9rem' }}>
           <p>You need an EigenAgent to claim rewards. Please set up your EigenAgent first.</p>
         </div>
       ) : (
-        <>
-          <div className="form-group">
-            <label>Eigenlayer Distribution Root Index: {currentDistRootIndex}</label>
-          </div>
-
-          {rewardAmount > 0n && (
-            <div className="form-group">
-              <label>MAGIC Reward Amount</label>
-              <p className="monospace-text">{formatEther(rewardAmount)} MAGIC</p>
-            </div>
-          )}
-
-          {simulationResult !== null && (
-            <div className={`${simulationResult ? 'approval-status' : 'error-message'}`}>
-              <h3>{simulationResult ? 'Simulation Successful' : 'Simulation Failed'}</h3>
-              <p>
-                {simulationResult
-                  ? 'You can now proceed to claim your rewards.'
-                  : 'You may not be eligible for rewards or there might be an issue with your claim.'}
-              </p>
-            </div>
-          )}
-
-          {error && (
-            <div className="error-message">
-              <p>{error}</p>
-            </div>
-          )}
-
-          {operationError && (
-            <div className="error-message">
-              <p>{operationError}</p>
-            </div>
-          )}
-
-          {operationInfo && (
-            <div className="approval-status">
-              <p>{operationInfo}</p>
-            </div>
-          )}
-
-          <div className="rewards-button-container">
-            <button
-              className="eigenagent-check-button"
-              onClick={simulateClaim}
-              disabled={loading || isLoadingEigenAgent || currentDistRootIndex === null || !eigenAgentInfo?.eigenAgentAddress}
-            >
-              Simulate Claim
-            </button>
-
-            <button
-              className="create-transaction-button"
-              onClick={claimRewards}
-              disabled={
-                isExecuting ||
-                loading ||
-                isLoadingEigenAgent ||
-                currentDistRootIndex === null ||
-                !eigenAgentInfo?.eigenAgentAddress
-                // Uncomment to require successful simulation before claiming
-                // || (simulationResult !== null && !simulationResult)
+        <table className="treasure-rewards-table">
+          <thead>
+            <tr>
+              <th>Token</th>
+              <th style={{ textAlign: 'right' }}>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <div className="treasure-token-row">
+                  <div className="magic-token-icon"></div>
+                  <div>
+                    <div className="treasure-token-name">MAGIC</div>
+                    <div className="treasure-token-symbol"></div>
+                  </div>
+                </div>
+              </td>
+              {
+                rewardAmount > 0n ? (
+                  <td className="treasure-token-amount">{formatEther(rewardAmount)} MAGIC</td>
+                ) : (
+                  <td className="treasure-token-amount">0 MAGIC</td>
+                )
               }
-            >
-              {isExecuting ? 'Processing...' : 'Claim Rewards'}
-            </button>
-          </div>
-        </>
+            </tr>
+            <tr>
+              <td>
+                <div className="treasure-token-row">
+                  <div className="eth-token-icon"></div>
+                  <div>
+                    <div className="treasure-token-name">Ether</div>
+                    <div className="treasure-token-symbol"></div>
+                  </div>
+                </div>
+              </td>
+              <td className="treasure-token-amount">0 ETH</td>
+            </tr>
+          </tbody>
+        </table>
       )}
+
+      {/* Hidden original functionality but preserved for future use */}
+      <div>
+        {simulationResult !== null && (
+          <div className={`${simulationResult ? 'approval-status' : 'error-message'}`}>
+            <h3>{simulationResult ? 'Simulation Successful' : 'Simulation Failed'}</h3>
+            <p>
+              {simulationResult
+                ? 'You can now proceed to claim your rewards.'
+                : 'You may not be eligible for rewards or there might be an issue with your claim.'}
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <div className="error-message">
+            <p>{error}</p>
+          </div>
+        )}
+
+        {operationError && (
+          <div className="error-message">
+            <p>{operationError}</p>
+          </div>
+        )}
+
+        {operationInfo && (
+          <div className="approval-status">
+            <p>{operationInfo}</p>
+          </div>
+        )}
+
+        <div className="rewards-button-container">
+          <button
+            className="eigenagent-check-button"
+            onClick={simulateClaim}
+            disabled={loading || isLoadingEigenAgent || currentDistRootIndex === null || !eigenAgentInfo?.eigenAgentAddress}
+          >
+            Simulate Claim
+          </button>
+
+          <button
+            className="create-transaction-button"
+            onClick={claimRewards}
+            disabled={
+              isExecuting ||
+              loading ||
+              isLoadingEigenAgent ||
+              currentDistRootIndex === null ||
+              !eigenAgentInfo?.eigenAgentAddress
+            }
+          >
+            {isExecuting ? 'Processing...' : 'Claim Rewards'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

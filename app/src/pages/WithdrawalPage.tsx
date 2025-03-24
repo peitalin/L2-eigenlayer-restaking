@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { parseEther, Address } from 'viem';
 import { encodeQueueWithdrawalMsg, encodeCompleteWithdrawalMsg, WithdrawalStruct } from '../utils/encoders';
 import { STRATEGY, DELEGATION_MANAGER_ADDRESS } from '../addresses';
@@ -12,6 +12,7 @@ import { useToast } from '../utils/toast';
 import UserDeposits from '../components/UserDeposits';
 import Expandable from '../components/Expandable';
 import QueuedWithdrawals from '../components/QueuedWithdrawals';
+import TransactionSuccessModal from '../components/TransactionSuccessModal';
 
 // Extend the ProcessedWithdrawal interface from QueuedWithdrawals component
 interface ProcessedWithdrawal {
@@ -51,6 +52,29 @@ const WithdrawalPage: React.FC = () => {
   const receiveAsTokens = true;
   const [isCompletingWithdrawal, setIsCompletingWithdrawal] = useState<boolean>(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
+
+  // Add state for success modal
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successData, setSuccessData] = useState<{
+    txHash: string;
+    messageId: string;
+    operationType: 'withdrawal';
+    isLoading: boolean;
+  } | null>(null);
+
+  // Use a ref to track if the modal is currently showing
+  const modalVisibleRef = useRef(false);
+
+  // Update the ref when the modal visibility changes
+  useEffect(() => {
+    modalVisibleRef.current = showSuccessModal;
+  }, [showSuccessModal]);
+
+  // Handle closing the success modal
+  const handleCloseSuccessModal = () => {
+    setShowSuccessModal(false);
+    setSuccessData(null);
+  };
 
   // Memoize the parsed amount to update whenever withdrawalAmount changes
   const amount = useMemo(() => {
@@ -144,7 +168,7 @@ const WithdrawalPage: React.FC = () => {
       if (txHash && receipt) {
         addTransaction({
           txHash,
-          messageId: "", // Server will extract the real messageId if needed
+          messageId: "",
           timestamp: Math.floor(Date.now() / 1000),
           txType: 'queueWithdrawal',
           status: 'confirmed',
@@ -156,6 +180,21 @@ const WithdrawalPage: React.FC = () => {
           destinationChainId: EthSepolia.chainId.toString(),
           execNonce: execNonce
         });
+
+        // Update modal to show confirmed state
+        setSuccessData(prev => prev ? {
+          ...prev,
+          isLoading: false,
+          messageId: "" // Update if messageId becomes available
+        } : null);
+
+        showToast('Transaction recorded in history!', 'success');
+
+        // Auto-close modal after 5 seconds
+        setTimeout(() => {
+          setShowSuccessModal(false);
+          setSuccessData(null);
+        }, 5000);
       }
       showToast(`Withdrawal queued! Transaction hash: ${txHash}`, 'success');
     },
@@ -178,7 +217,7 @@ const WithdrawalPage: React.FC = () => {
       if (txHash && receipt) {
         addTransaction({
           txHash,
-          messageId: "", // Server will extract the real messageId if needed
+          messageId: "",
           timestamp: Math.floor(Date.now() / 1000),
           txType: 'completeWithdrawal',
           status: 'confirmed',
@@ -190,9 +229,25 @@ const WithdrawalPage: React.FC = () => {
           destinationChainId: EthSepolia.chainId.toString(),
           execNonce: execNonce
         });
+
+        // Update modal to show confirmed state
+        setSuccessData(prev => prev ? {
+          ...prev,
+          isLoading: false,
+          messageId: "" // Update if messageId becomes available
+        } : null);
+
+        showToast('Transaction recorded in history!', 'success');
+
+        // Auto-close modal after 5 seconds
+        setTimeout(() => {
+          setShowSuccessModal(false);
+          setSuccessData(null);
+        }, 5000);
+
+        setIsCompletingWithdrawal(false);
       }
       showToast(`Withdrawal completed! Transaction hash: ${txHash}`, 'success');
-      setIsCompletingWithdrawal(false);
     },
     onError: (err) => {
       console.error('Error in completing withdrawal:', err);
@@ -230,6 +285,15 @@ const WithdrawalPage: React.FC = () => {
       return;
     }
 
+    // Show modal immediately in loading state
+    setSuccessData({
+      txHash: "",
+      messageId: "",
+      operationType: 'withdrawal',
+      isLoading: true
+    });
+    setShowSuccessModal(true);
+
     try {
       setIsCompletingWithdrawal(true);
       setCompleteError(null);
@@ -259,7 +323,15 @@ const WithdrawalPage: React.FC = () => {
       );
 
       // Execute with the message directly
-      await executeCompleteWithdrawal(message);
+      const result = await executeCompleteWithdrawal(message);
+
+      // Update modal with transaction hash when available
+      if (result?.txHash) {
+        setSuccessData(prev => ({
+          ...prev!,
+          txHash: result.txHash
+        }));
+      }
     } catch (error) {
       console.error("Error preparing complete withdrawal:", error);
 
@@ -270,16 +342,17 @@ const WithdrawalPage: React.FC = () => {
           errorMessage.toLowerCase().includes('cancelled') ||
           errorMessage.toLowerCase().includes('user refused') ||
           errorMessage.toLowerCase().includes('declined')) {
-        // It's a rejection - immediately reset all states
         console.log('Transaction rejected by user, resetting states...');
         showToast('Transaction was rejected by user', 'info');
       } else {
-        // It's a different kind of error
         showToast(errorMessage, 'error');
       }
 
       setCompleteError(errorMessage);
       setIsCompletingWithdrawal(false);
+      // Clear modal on any error
+      setSuccessData(null);
+      setShowSuccessModal(false);
     }
   };
 
@@ -295,6 +368,15 @@ const WithdrawalPage: React.FC = () => {
       return;
     }
 
+    // Show modal immediately in loading state
+    setSuccessData({
+      txHash: "",
+      messageId: "",
+      operationType: 'withdrawal',
+      isLoading: true
+    });
+    setShowSuccessModal(true);
+
     // Show a signing notification
     showToast("Please sign the transaction in your wallet...", 'info');
 
@@ -307,11 +389,31 @@ const WithdrawalPage: React.FC = () => {
 
     // Execute with the message directly
     try {
-      await executeQueueWithdrawalMessage(queueWithdrawalMessage);
+      const result = await executeQueueWithdrawalMessage(queueWithdrawalMessage);
+
+      // Update modal with transaction hash when available
+      if (result?.txHash) {
+        setSuccessData(prev => ({
+          ...prev!,
+          txHash: result.txHash
+        }));
+      }
     } catch (error) {
       console.error("Error queueing withdrawal:", error);
 
-      // No need to show toast here as it's already handled by onError callback
+      // If this contains 'rejected', it's likely a user cancellation
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.toLowerCase().includes('rejected') ||
+          errorMessage.toLowerCase().includes('denied') ||
+          errorMessage.toLowerCase().includes('cancelled') ||
+          errorMessage.toLowerCase().includes('user refused') ||
+          errorMessage.toLowerCase().includes('declined')) {
+        console.log('Transaction rejected by user, resetting states...');
+        showToast('Transaction was rejected by user', 'info');
+      }
+      // Clear modal on any error
+      setSuccessData(null);
+      setShowSuccessModal(false);
     }
   };
 
@@ -319,39 +421,52 @@ const WithdrawalPage: React.FC = () => {
   const isInputDisabled = !isConnected || isQueueingWithdrawal || isLoadingL1Data;
 
   return (
-    <div className="withdrawal-page-layout">
-      {/* Top section: Queued Withdrawals */}
-      <div className="transaction-form">
-        <h2>Queued Withdrawals</h2>
-        <QueuedWithdrawals
-          onSelectWithdrawal={handleCompleteWithdrawal}
-          isCompletingWithdrawal={isCompletingWithdrawal}
-        />
+    <div className="treasure-page-container">
+
+      <div className="treasure-header">
+        <div className="treasure-title">
+          <span>Withdraw</span>
+        </div>
       </div>
 
+      {/* Top section: Queued Withdrawals */}
+      <QueuedWithdrawals
+        onSelectWithdrawal={handleCompleteWithdrawal}
+        isCompletingWithdrawal={isCompletingWithdrawal}
+      />
+
       {/* Bottom section: Withdraw from Strategy */}
-      <div className="transaction-form">
-        <h2>Withdraw from Strategy</h2>
+      <div className="treasure-card">
+        <div className="treasure-card-header">
+          <div className="treasure-card-title">Withdraw from Strategy</div>
+        </div>
 
         {/* Display user deposits */}
         <UserDeposits />
 
-        <div className="form-group">
-          <label htmlFor="amount">Amount to withdraw (MAGIC)</label>
+        <div className="treasure-stat-label">
+          <label htmlFor="amount">
+            Amount to withdraw (MAGIC)
+          </label>
+        </div>
+        <div className="treasure-input-container">
           <input
             id="amount"
-            className="amount-input max-width-input"
+            className="treasure-input"
             type="text"
             value={withdrawalAmount}
             onChange={handleAmountChange}
             placeholder="0.05"
             disabled={isInputDisabled}
           />
+          <button className="treasure-max-button">Max</button>
         </div>
+
         <button
-          className="create-transaction-button max-width-input"
+          className="treasure-action-button"
           disabled={isInputDisabled || !eigenAgentInfo}
           onClick={handleQueueWithdrawal}
+          style={{ width: '100%', marginTop: '16px' }}
         >
           {isQueueingWithdrawal ? (
             <>
@@ -368,7 +483,7 @@ const WithdrawalPage: React.FC = () => {
           )}
         </button>
 
-        <div className="withdrawal-info">
+        <div className="treasure-info-section" style={{ marginTop: '24px' }}>
           <p>
             Queue a withdrawal to start the withdrawal process. After queueing,
             you'll need to wait for the unbonding period to complete before you can complete the withdrawal.
@@ -380,43 +495,63 @@ const WithdrawalPage: React.FC = () => {
 
         {isConnected && eigenAgentInfo && (
           <Expandable title="Withdrawal Details" initialExpanded={false}>
-            <div className="info-item">
-              <strong>Target Address:</strong> {DELEGATION_MANAGER_ADDRESS}
-              <div className="input-note">Using DelegationManager for Queue Withdrawals</div>
-            </div>
-            <div className="info-item">
-              <strong>Current Withdrawal Nonce:</strong>
-              {isLoadingL1Data ? (
-                <span>
-                  <span className="loading-spinner spinner-small"></span>
-                  Loading...
-                </span>
-              ) : (
-                withdrawalNonce.toString()
-              )}
-            </div>
-            <div className="info-item">
-              <strong>Delegated To:</strong>
-              {isLoadingL1Data ? (
-                <span>
-                  <span className="loading-spinner spinner-small"></span>
-                  Loading...
-                </span>
-              ) : (
-                delegatedTo ? delegatedTo : 'Not delegated'
-              )}
-            </div>
-            <div className="info-item">
-              <strong>Withdrawer Address:</strong> {eigenAgentInfo.eigenAgentAddress}
-              <div className="input-note">Your EigenAgent will be set as the withdrawer</div>
-            </div>
-            <div className="info-item">
-              <strong>Transaction Expiry:</strong> 45 minutes from signing
+            <div className="treasure-info-section">
+              <div className="treasure-info-item">
+                <span className="treasure-info-label">Target Address:</span>
+                <span className="treasure-info-value font-mono">{DELEGATION_MANAGER_ADDRESS}</span>
+                <div className="input-note">Using DelegationManager for Queue Withdrawals</div>
+              </div>
+              <div className="treasure-info-item">
+                <span className="treasure-info-label">Current Withdrawal Nonce:</span>
+                {isLoadingL1Data ? (
+                  <span className="treasure-info-value">
+                    <span className="loading-spinner spinner-small"></span>
+                    Loading...
+                  </span>
+                ) : (
+                  <span className="treasure-info-value">{withdrawalNonce.toString()}</span>
+                )}
+              </div>
+              <div className="treasure-info-item">
+                <span className="treasure-info-label">Delegated To:</span>
+                {isLoadingL1Data ? (
+                  <span className="treasure-info-value">
+                    <span className="loading-spinner spinner-small"></span>
+                    Loading...
+                  </span>
+                ) : (
+                  <span className="treasure-info-value font-mono">
+                    {delegatedTo ? delegatedTo : 'Not delegated'}
+                  </span>
+                )}
+              </div>
+              <div className="treasure-info-item">
+                <span className="treasure-info-label">Withdrawer Address:</span>
+                <span className="treasure-info-value font-mono">{eigenAgentInfo.eigenAgentAddress}</span>
+                <div className="input-note">Your EigenAgent will be set as the withdrawer</div>
+              </div>
+              <div className="treasure-info-item">
+                <span className="treasure-info-label">Transaction Expiry:</span>
+                <span className="treasure-info-value">45 minutes from signing</span>
+              </div>
             </div>
           </Expandable>
         )}
-
       </div>
+
+      {/* Transaction Success Modal */}
+      {successData && (
+        <TransactionSuccessModal
+          isOpen={showSuccessModal}
+          onClose={handleCloseSuccessModal}
+          txHash={successData.txHash}
+          messageId={successData.messageId}
+          operationType={successData.operationType}
+          sourceChainId={BaseSepolia.chainId.toString()}
+          destinationChainId={EthSepolia.chainId.toString()}
+          isLoading={successData.isLoading}
+        />
+      )}
     </div>
   );
 };

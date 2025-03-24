@@ -62,11 +62,10 @@ pnpm test
 src/
   abis/             # Smart contract ABIs and types
   components/       # UI components
-  config/           # Configs for networks, addresses, etc.
-  contexts/         # React context providers
+  addresses/        # network addresses, constants.
+  contexts/         # React context providers / state
   hooks/            # React hooks
-  pages/            # Page components
-  services/         # API services and data fetching
+  pages/            # Pages for routes
   styles/           # CSS styling
   tests/            # Contract signing tests
   types/            # type definitions

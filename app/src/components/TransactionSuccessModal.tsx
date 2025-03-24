@@ -9,7 +9,7 @@ interface TransactionSuccessModalProps {
   onClose: () => void;
   txHash: string;
   messageId?: string;
-  operationType: 'delegate' | 'undelegate';
+  operationType: 'delegate' | 'undelegate' | 'deposit' | 'withdrawal';
   sourceChainId: string;
   destinationChainId: string;
   isLoading?: boolean;
@@ -47,9 +47,16 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({
 
   // Format the title based on operation type
   const getTitle = () => {
-    return operationType === 'delegate'
-      ? (isLoading ? 'Delegating...' : 'Successfully Delegated!')
-      : (isLoading ? 'Undelegating...' : 'Successfully Undelegated!');
+    switch (operationType) {
+      case 'delegate':
+        return isLoading ? 'Delegating...' : 'Successfully Delegated!';
+      case 'undelegate':
+        return isLoading ? 'Undelegating...' : 'Successfully Undelegated!';
+      case 'deposit':
+        return isLoading ? 'Depositing...' : 'Successfully Deposited!';
+      case 'withdrawal':
+        return isLoading ? 'Withdrawing...' : 'Successfully Withdrawn!';
+    }
   };
 
   // Handle close button click - ensure the parent component's onClose gets called
