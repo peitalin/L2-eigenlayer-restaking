@@ -31,44 +31,42 @@ const Navbar: React.FC<NavbarProps> = () => {
   return (
     <div className="navbar">
       <div className="navbar-title">
-        {isConnected && (
-          <div className="navbar-balances">
-            <div className="navbar-logo">
-              <div style={{ position: 'relative', width: '120px', height: '32px' }}>
-                <img
-                  src="/assets/logos/treasure/eigenlayer-logo.webp"
-                  alt="EigenLayer Logo"
-                  style={{
-                    position: 'absolute',
-                    left: '0',
-                    top: '2px',
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '8px',
-                    padding: '2px',
-                    backgroundColor: 'white',
-                    objectFit: 'contain',
-                    zIndex: 1
-                  }}
-                />
-                <img
-                  src="/assets/logos/treasure/treasure-logo.svg"
-                  alt="Treasure"
-                  style={{
-                    position: 'absolute',
-                    left: '24px',
-                    height: '32px',
-                    zIndex: 2
-                  }}
-                />
-              </div>
+        <div className="navbar-balances">
+          <div className="navbar-logo">
+            <div style={{ position: 'relative', width: '120px', height: '32px' }}>
+              <img
+                src="/assets/logos/treasure/eigenlayer-logo.webp"
+                alt="EigenLayer Logo"
+                style={{
+                  position: 'absolute',
+                  left: '0',
+                  top: '2px',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '8px',
+                  padding: '2px',
+                  backgroundColor: 'white',
+                  objectFit: 'contain',
+                  zIndex: 1
+                }}
+              />
+              <img
+                src="/assets/logos/treasure/treasure-logo.svg"
+                alt="Treasure"
+                style={{
+                  position: 'absolute',
+                  left: '24px',
+                  height: '32px',
+                  zIndex: 2
+                }}
+              />
             </div>
           </div>
-        )}
+        </div>
       </div>
       <div className="navbar-actions">
         <div className="navbar-transactions">
-          <TransactionHistoryDropdown />
+          {isConnected && <TransactionHistoryDropdown />}
         </div>
         {isConnected ? (
           <div className="navbar-wallet-info">

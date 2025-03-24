@@ -378,7 +378,7 @@ const DepositPage: React.FC = () => {
           </div>
           <div>
             <div className="treasure-stat-label">MAGIC Price</div>
-            <div className="treasure-stat-value">$0.23</div>
+            <div className="treasure-stat-value">$0.143</div>
           </div>
         </div>
       </div>
