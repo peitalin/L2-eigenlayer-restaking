@@ -7,10 +7,22 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { promises as fsPromises } from 'fs';
 import { createPublicClient, http, decodeEventLog, PublicClient, keccak256, toBytes, toHex } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import { encodeAbiParameters, concat } from 'viem/utils';
 import { sepolia } from 'viem/chains';
 import { parseAbi } from 'viem/utils';
 import { toEventSignature } from 'viem'
 import * as db from './db.js';
+
+// Load environment variables
+config();
+
+// Validate required environment variables
+const requiredEnvVars = ['DELEGATION_MANAGER_ADDRESS'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingEnvVars.length > 0) {
+  throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
+}
 
 // Chain ID constants
 const ETH_CHAINID = "11155111"; // Ethereum Sepolia
@@ -38,9 +50,6 @@ const L2_CHAINID = "84532";     // Base Sepolia
  * - GET /api/transactions/messageId/:messageId - Get a transaction by message ID
  * - POST /api/transactions/add - Add a new transaction
  */
-
-// Load environment variables
-config();
 
 // Get the directory name
 const __filename = fileURLToPath(import.meta.url);
@@ -658,6 +667,255 @@ app.put('/api/transactions/messageId/:messageId', (req, res) => {
   }
 });
 
+// Load operator keys from environment variables
+const OPERATOR_KEYS: { [key: string]: string | undefined } = {};
+for (let i = 1; i <= 10; i++) {
+  const keyName = `OPERATOR_KEY${i}`;
+  if (process.env[keyName]) {
+    OPERATOR_KEYS[keyName] = process.env[keyName];
+  }
+}
+
+// Validate that at least one operator key is set
+if (Object.keys(OPERATOR_KEYS).length === 0) {
+  console.warn('Warning: No operator keys found in environment variables (OPERATOR_KEY1 through OPERATOR_KEY10)');
+}
+
+// Create a map of operator addresses to their private keys
+const operatorAddressToKey = new Map<string, string>();
+
+// Get delegation manager address from environment variables
+const DELEGATION_MANAGER_ADDRESS = process.env.DELEGATION_MANAGER_ADDRESS as string;
+
+// Initialize operator addresses
+Object.entries(OPERATOR_KEYS).forEach(([keyName, privateKey]) => {
+  if (privateKey) {
+    try {
+      const account = privateKeyToAccount(privateKey as `0x${string}`);
+      operatorAddressToKey.set(account.address.toLowerCase(), privateKey);
+      console.log(`Initialized operator ${keyName} with address ${account.address}`);
+    } catch (error) {
+      console.error(`Error initializing operator account for ${keyName}:`, error);
+    }
+  }
+});
+
+// Add this helper function after the imports
+async function signDelegationApproval(
+  staker: string,
+  operator: string
+): Promise<{
+  signature: string;
+  digestHash: string;
+  salt: string;
+  expiry: string;
+  delegationManagerAddress: string;
+  chainId: string;
+}> {
+  try {
+    // Check if the operator address matches any of our operator keys
+    const operatorKey = operatorAddressToKey.get(operator.toLowerCase());
+    if (!operatorKey) {
+      throw new Error('Unauthorized operator address');
+    }
+
+    // Create account from private key
+    const account = privateKeyToAccount(operatorKey as `0x${string}`);
+
+    // Generate a random salt
+    const salt = keccak256(toBytes(Date.now().toString() + Math.random().toString()));
+
+    // Set expiry to 7 days from now
+    const expiry = BigInt(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60);
+
+    // Use the EthSepolia chain ID and delegation manager address
+    const chainId = 11155111; // Ethereum Sepolia
+    const delegationManagerAddress = DELEGATION_MANAGER_ADDRESS;
+
+    // Calculate the digest hash
+    const encodedData = encodeAbiParameters(
+      [
+        { name: 'staker', type: 'address' },
+        { name: 'operator', type: 'address' },
+        { name: 'salt', type: 'bytes32' },
+        { name: 'expiry', type: 'uint256' }
+      ],
+      [staker as `0x${string}`, operator as `0x${string}`, salt as `0x${string}`, expiry]
+    );
+
+    const delegationTypehash = keccak256(
+      toBytes('DelegationApproval(address staker,address operator,bytes32 salt,uint256 expiry)')
+    );
+
+    const domainSeparator = keccak256(
+      encodeAbiParameters(
+        [
+          { name: 'name', type: 'string' },
+          { name: 'version', type: 'string' },
+          { name: 'chainId', type: 'uint256' },
+          { name: 'verifyingContract', type: 'address' }
+        ],
+        [
+          'EigenLayer',
+          '1.0.0',
+          BigInt(chainId),
+          delegationManagerAddress as `0x${string}`
+        ]
+      )
+    );
+
+    const digestHash = keccak256(
+      concat([
+        toBytes('0x1901'),
+        toBytes(domainSeparator),
+        keccak256(
+          concat([
+            toBytes(delegationTypehash),
+            toBytes(encodedData)
+          ])
+        )
+      ])
+    );
+
+    // Sign the digest
+    const signature = await account.signMessage({
+      message: { raw: digestHash }
+    });
+
+    return {
+      signature,
+      digestHash,
+      salt,
+      expiry: expiry.toString(),
+      delegationManagerAddress,
+      chainId: chainId.toString()
+    };
+  } catch (error) {
+    console.error('Error signing delegation approval:', error);
+    throw error;
+  }
+}
+
+// Update the endpoint before starting the server
+app.post('/api/delegation/sign', async (req, res) => {
+  try {
+    const { staker, operator } = req.body;
+
+    // Validate input parameters
+    if (!staker || !operator) {
+      return res.status(400).json({
+        error: 'Missing required parameters'
+      });
+    }
+
+    // Validate addresses
+    if (!staker.startsWith('0x') || !operator.startsWith('0x')) {
+      return res.status(400).json({
+        error: 'Invalid address format'
+      });
+    }
+
+    const result = await signDelegationApproval(staker, operator);
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error in delegation signing endpoint:', error);
+
+    // Return a 401 status if the operator is not authorized
+    if (error.message === 'Unauthorized operator address') {
+      return res.status(401).json({
+        error: 'Unauthorized operator address'
+      });
+    }
+
+    res.status(500).json({
+      error: 'Failed to sign delegation approval',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+// Define the Operator type
+interface Operator {
+  name: string;
+  address: string;
+  magicStaked: string;
+  ethStaked: string;
+  stakers: number;
+  fee: string;
+  isActive: boolean;
+}
+
+// Operator data
+const OPERATORS_DATA: Operator[] = [
+  {
+    address: '0xA4D423ED017F063AaF65f6B6B9C6Bc59f97d5164',
+    name: 'Treasure Node 1',
+    magicStaked: '1,250,000',
+    ethStaked: '432.5',
+    stakers: 42,
+    fee: '1%',
+    isActive: true
+  },
+  {
+    address: '0xaA61cC14ac3e048f26b9312E57ECf8156D9D27e3',
+    name: 'Treasure Node2',
+    magicStaked: '890,500',
+    ethStaked: '122.2',
+    stakers: 36,
+    fee: '2%',
+    isActive: true
+  },
+  {
+    address: '0x3d2FB9D26c5C66D0CA55247E4d40Cb4FBe0f5C03',
+    name: "Inactive Operator",
+    magicStaked: '2,100,000',
+    ethStaked: '95.8',
+    stakers: 65,
+    fee: '4%',
+    isActive: false
+  }
+];
+
+// Create a map to quickly look up operators by address
+const operatorsByAddress = new Map<string, Operator>();
+OPERATORS_DATA.forEach(operator => {
+  operatorsByAddress.set(operator.address.toLowerCase(), operator);
+});
+
+// Add endpoint to get all operators
+app.get('/api/operators', (req, res) => {
+  try {
+    // Return only active operators by default
+    const showInactive = req.query.showInactive === 'true';
+    const operators = showInactive
+      ? OPERATORS_DATA
+      : OPERATORS_DATA.filter(op => op.isActive);
+
+    res.json(operators);
+  } catch (error) {
+    console.error('Error fetching operators:', error);
+    res.status(500).json({ error: 'Failed to fetch operators' });
+  }
+});
+
+// Add endpoint to get operator by address
+app.get('/api/operators/:address', (req, res) => {
+  try {
+    const { address } = req.params;
+    const operator = operatorsByAddress.get(address.toLowerCase());
+
+    if (!operator) {
+      return res.status(404).json({ error: 'Operator not found' });
+    }
+
+    res.json(operator);
+  } catch (error) {
+    console.error('Error fetching operator:', error);
+    res.status(500).json({ error: 'Failed to fetch operator' });
+  }
+});
+
 
 // Serve static files from the 'dist' directory (for production)
 if (process.env.NODE_ENV === 'production') {
@@ -785,8 +1043,8 @@ let pendingTxIntervalId: NodeJS.Timeout | null = null;
 
 function startPendingTransactionChecker() {
   if (pendingTxIntervalId === null) {
-    // Check every 30 seconds
-    pendingTxIntervalId = setInterval(updatePendingTransactions, 30 * 1000);
+    // Check every 20 seconds
+    pendingTxIntervalId = setInterval(updatePendingTransactions, 20 * 1000);
     console.log('Started pending transaction checker');
 
     // Also run immediately

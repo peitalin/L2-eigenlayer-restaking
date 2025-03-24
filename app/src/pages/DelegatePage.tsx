@@ -8,6 +8,7 @@ import { calculateDelegationApprovalDigestHash, signDelegationApproval } from '.
 import { DELEGATION_MANAGER_ADDRESS, EthSepolia, BaseSepolia } from '../addresses';
 import TransactionSuccessModal from '../components/TransactionSuccessModal';
 import { TransactionType } from '../types';
+import { SERVER_BASE_URL } from '../configs';
 
 // Define the Operator type
 interface Operator {
@@ -20,40 +21,6 @@ interface Operator {
   isActive: boolean;
 }
 
-// Mock data for operators
-const OPERATORS_DATA: Operator[] = [
-  {
-    address: '0xA4D423ED017F063AaF65f6B6B9C6Bc59f97d5164',
-    name: 'Treasure Node 1',
-    magicStaked: '1,250,000',
-    ethStaked: '432.5',
-    stakers: 42,
-    fee: '1%',
-    isActive: true
-  },
-  {
-    address: '0xaA61cC14ac3e048f26b9312E57ECf8156D9D27e3',
-    name: 'Treasure Node2',
-    magicStaked: '890,500',
-    ethStaked: '122.2',
-    stakers: 36,
-    fee: '2%',
-    isActive: true
-  },
-  {
-    address: '0x3d2FB9D26c5C66D0CA55247E4d40Cb4FBe0f5C03',
-    name: "Inactive Operator",
-    magicStaked: '2,100,000',
-    ethStaked: '95.8',
-    stakers: 65,
-    fee: '4%',
-    isActive: false
-  }
-];
-
-// Get addresses for backward compatibility
-const SAMPLE_OPERATORS = OPERATORS_DATA.map(op => op.address);
-
 const DelegatePage: React.FC = () => {
   const { l1Wallet, l2Wallet, eigenAgentInfo, predictedEigenAgentAddress } = useClientsContext();
   const { addTransaction } = useTransactionHistory();
@@ -62,6 +29,8 @@ const DelegatePage: React.FC = () => {
   const [isCurrentlyDelegated, setIsCurrentlyDelegated] = useState<boolean>(false);
   const [currentDelegation, setCurrentDelegation] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [operators, setOperators] = useState<Operator[]>([]);
+  const [isLoadingOperators, setIsLoadingOperators] = useState<boolean>(false);
 
   // Add state for success modal
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -79,6 +48,28 @@ const DelegatePage: React.FC = () => {
   useEffect(() => {
     modalVisibleRef.current = showSuccessModal;
   }, [showSuccessModal]);
+
+  // Fetch operators from the server
+  useEffect(() => {
+    const fetchOperators = async () => {
+      setIsLoadingOperators(true);
+      try {
+        const response = await fetch(`${SERVER_BASE_URL}/api/operators?showInactive=true`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch operators');
+        }
+        const data = await response.json();
+        setOperators(data);
+      } catch (err) {
+        console.error('Error fetching operators:', err);
+        setError('Failed to load operators');
+      } finally {
+        setIsLoadingOperators(false);
+      }
+    };
+
+    fetchOperators();
+  }, []);
 
   // Use useEigenLayerOperation for delegation
   const delegateOperation = useEigenLayerOperation({
@@ -143,8 +134,8 @@ const DelegatePage: React.FC = () => {
   const undelegateOperation = useEigenLayerOperation({
     targetContractAddr: DELEGATION_MANAGER_ADDRESS,
     amount: 0n, // No tokens sent for undelegation
-    customGasLimit: 300000n, // Less gas required for undelegation
-    onSuccess: (txHash, receipt) => {
+    customGasLimit: 650000n,
+    onSuccess: (txHash, receipt, execNonce) => {
       setIsCurrentlyDelegated(false);
       setCurrentDelegation(null);
 
@@ -157,12 +148,12 @@ const DelegatePage: React.FC = () => {
         status: 'confirmed' as 'pending' | 'confirmed' | 'failed',
         from: receipt.from,
         to: receipt.to || '',
-        user: eigenAgentInfo?.eigenAgentAddress || l1Wallet.account || '',
-        execNonce: (receipt as any).execNonce || null,
+        user: l1Wallet.account || '',
         isComplete: false,
         sourceChainId: BaseSepolia.chainId.toString(),
         destinationChainId: EthSepolia.chainId.toString(),
-        receiptTransactionHash: receipt.transactionHash
+        receiptTransactionHash: receipt.transactionHash,
+        execNonce: execNonce
       };
 
       // Add transaction to history
@@ -239,10 +230,19 @@ const DelegatePage: React.FC = () => {
   }, [l1Wallet.publicClient, eigenAgentInfo?.eigenAgentAddress]);
 
   // Find the currently selected operator details
-  const selectedOperatorDetails = OPERATORS_DATA.find(op => op.address === selectedOperator);
+  const selectedOperatorDetails = operators.find(op => op.address === selectedOperator);
 
   // Render the operator selection table
   const renderOperatorTable = () => {
+    if (isLoadingOperators) {
+      return (
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Loading operators...</p>
+        </div>
+      );
+    }
+
     return (
       <div className="operator-table-container">
         <table className="operator-table">
@@ -258,7 +258,7 @@ const DelegatePage: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {OPERATORS_DATA.map((operator) => (
+            {operators.map((operator) => (
               <tr
                 key={operator.address}
                 className={`${selectedOperator === operator.address ? 'selected-operator' : ''} ${!operator.isActive ? 'inactive-operator' : ''}`}

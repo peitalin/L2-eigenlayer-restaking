@@ -5,6 +5,7 @@ import {
 } from 'viem';
 import { EthSepolia, DELEGATION_MANAGER_ADDRESS } from '../addresses';
 import { ZeroAddress } from './encoders';
+import { SERVER_BASE_URL } from '../configs';
 
 // Constants from ClientSigners.sol
 export const EIGEN_AGENT_EXEC_TYPEHASH = keccak256(
@@ -350,4 +351,35 @@ export async function signDelegationApproval(
   });
 
   return signature;
+}
+
+export async function signDelegationApprovalServer(
+  staker: `0x${string}`,
+  operator: `0x${string}`
+): Promise<{ signature: `0x${string}`; digestHash: `0x${string}` }> {
+  try {
+    const response = await fetch(`${SERVER_BASE_URL}/api/delegation/sign`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        staker,
+        operator
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Server responded with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      signature: data.signature as `0x${string}`,
+      digestHash: data.digestHash as `0x${string}`,
+    };
+  } catch (error) {
+    console.error('Error signing delegation approval:', error);
+    throw new Error('Failed to sign delegation approval');
+  }
 }
