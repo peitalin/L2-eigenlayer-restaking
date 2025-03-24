@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useClientsContext } from './ClientsContext';
-import { CCIPTransaction, SERVER_BASE_URL, TransactionTypes } from '../utils/ccipEventListener';
+import { CCIPTransaction, TransactionTypes } from '../utils/ccipEventListener';
+import { SERVER_BASE_URL } from '../configs';
 
 
 interface TransactionHistoryContextType {

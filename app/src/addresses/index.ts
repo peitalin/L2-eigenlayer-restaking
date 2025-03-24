@@ -1,21 +1,56 @@
 import { Address } from 'viem';
 
+export interface ChainlinkConfig {
+  router: Address;
+  chainSelector: string;
+  bridgeToken: Address;
+  link: Address;
+  chainId: number;
+  poolAddress: Address;
+  // extra frontend fields
+  name: string;
+  rpcUrl: string;
+  explorerUrl: string;
+}
+
 // Chainlink constants from script/Addresses.sol
-export const EthSepolia = {
+export const EthSepolia: ChainlinkConfig = {
   router: '0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59' as Address,
   chainSelector: '16015286601757825753',
   bridgeToken: '0xAf03f2a302A2C4867d622dE44b213b8F870c0f1a' as Address,
   link: '0x779877A7B0D9E8603169DdbD7836e478b4624789' as Address,
   chainId: 11155111,
-  poolAddress: '0xa0f5588fa098b56f28a8ae65caaa43fefcaf608c' as Address
+  poolAddress: '0xa0f5588fa098b56f28a8ae65caaa43fefcaf608c' as Address,
+  // extra frontend fields
+  name: 'Ethereum Sepolia',
+  rpcUrl: import.meta.env?.VITE_ETHSEPOLIA_RPC_URL || 'https://sepolia.infura.io/v3/',
+  explorerUrl: 'https://sepolia.etherscan.io',
 };
-export const BaseSepolia = {
+
+export const BaseSepolia: ChainlinkConfig = {
   router: '0xD3b06cEbF099CE7DA4AcCf578aaebFDBd6e88a93' as Address,
   chainSelector: '10344971235874465080',
   bridgeToken: '0x886330448089754e998BcEfa2a56a91aD240aB60' as Address,
   link: '0xE4aB69C077896252FAFBD49EFD26B5D171A32410' as Address,
   chainId: 84532,
-  poolAddress: '0x369a189bE07f42DE9767fBb6d0327eedC129CC15' as Address
+  poolAddress: '0x369a189bE07f42DE9767fBb6d0327eedC129CC15' as Address,
+  // extra frontend fields
+  name: 'Base Sepolia',
+  rpcUrl: import.meta.env?.VITE_BASESEPOLIA_RPC_URL || 'https://sepolia.base.org',
+  explorerUrl: 'https://sepolia.basescan.org',
+};
+
+export const TreasureTopaz: ChainlinkConfig = {
+  router: '' as Address,
+  chainSelector: '',
+  bridgeToken: '' as Address,
+  link: '' as Address,
+  chainId: 978658,
+  poolAddress: '0x369a189bE07f42DE9767fBb6d0327eedC129CC15' as Address,
+  // extra frontend fields
+  name: 'Treasure Topaz',
+  rpcUrl: 'https://rpc.topaz.treasure.lol',
+  explorerUrl: 'https://topaz.treasurescan.io/',
 };
 
 import bridgeContractsL2 from './basesepolia/bridgeContractsL2.config.json';

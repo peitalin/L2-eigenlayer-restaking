@@ -1,15 +1,8 @@
-import { Address, getContract, encodeAbiParameters, keccak256 } from 'viem';
+import { Address, encodeAbiParameters, keccak256 } from 'viem';
 import { AgentFactoryABI, EigenAgent6551ABI } from '../abis';
-import bridgeContractsL1Config from '../addresses/ethsepolia/bridgeContractsL1.config.json';
 import { getL1Client } from './clients';
 import { ZeroAddress } from './encoders';
-import { DELEGATION_MANAGER_ADDRESS } from '../addresses';
-
-// Get agent factory address from the correct config file
-const AGENT_FACTORY_ADDRESS = bridgeContractsL1Config.contracts.agentFactory as Address;
-
-// Log the address we're using for debugging
-// console.log('Using AgentFactory address:', AGENT_FACTORY_ADDRESS);
+import { DELEGATION_MANAGER_ADDRESS, AGENT_FACTORY_ADDRESS } from '../addresses';
 
 // Get the L1 client from the clients utility
 const publicClient = getL1Client();

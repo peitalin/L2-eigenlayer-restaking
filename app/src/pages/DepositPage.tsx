@@ -8,6 +8,7 @@ import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { useToast } from '../utils/toast';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import { publicClients } from '../hooks/useClients';
+import { EXPLORER_URLS } from '../configs';
 
 // Add the Strategy ABI for the functions we need
 const strategyAbi = [
@@ -300,7 +301,12 @@ const DepositPage: React.FC = () => {
           disabled={isInputDisabled || (!eigenAgentInfo?.eigenAgentAddress && !predictedEigenAgentAddress)}
           onClick={handleDepositIntoStrategy}
         >
-          {isExecuting ? 'Processing...' : isFirstTimeUser ? 'Mint EigenAgent & Deposit' : 'Deposit'}
+          {isExecuting ? (
+            <>
+              <span className="loading-spinner"></span>
+              <span>{info === "Sending message to L1 Ethereum..." ? "Sending to L1..." : "Processing..."}</span>
+            </>
+          ) : isFirstTimeUser ? 'Mint EigenAgent & Deposit' : 'Deposit'}
         </button>
 
         {/* Token Approval Status */}
@@ -312,9 +318,10 @@ const DepositPage: React.FC = () => {
               <p>
                 Approval Transaction:
                 <a
-                  href={`https://sepolia.basescan.org/tx/${approvalHash}`}
+                  href={`${EXPLORER_URLS.basescan}/tx/${approvalHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
+                  className="approval-hash"
                 >
                   {approvalHash.substring(0, 10)}...
                 </a>

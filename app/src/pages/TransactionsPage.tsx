@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import CCIPStatusChecker from '../components/CCIPStatusChecker';
 import { useToast } from '../utils/toast';
+import { EXPLORER_URLS } from '../configs';
 
 const TransactionsPage: React.FC = () => {
   const { transactions, isLoading, error } = useTransactionHistory();
@@ -60,6 +61,14 @@ const TransactionsPage: React.FC = () => {
     return `chain-${chainName.toLowerCase()}`;
   };
 
+  const getExplorerUrl = (chainId: string, txHash: string): string => {
+    const chainExplorerMap: Record<string, string> = {
+      'Base': EXPLORER_URLS.basescan + '/tx/',
+      'Ethereum': EXPLORER_URLS.etherscan + '/tx/',
+    };
+    return chainExplorerMap[chainId] || chainExplorerMap['Ethereum'];
+  };
+
   return (
     <div className="transaction-form transactions-page">
       <div className="transactions-form-header">
@@ -94,10 +103,6 @@ const TransactionsPage: React.FC = () => {
 
                 const sourceChainName = getChainName(tx.sourceChainId);
                 const destChainName = getChainName(tx.destinationChainId);
-                const blockExplorerUrls: Record<string, string> = {
-                  'Base': 'https://sepolia.basescan.org/tx/',
-                  'Ethereum': 'https://sepolia.etherscan.io/tx/',
-                };
 
                 return (
                   <div key={index} className="transaction-row">
@@ -116,7 +121,7 @@ const TransactionsPage: React.FC = () => {
                         {sourceChainName}
                       </div>
                       <a
-                        href={`${blockExplorerUrls[sourceChainName] || blockExplorerUrls['Ethereum']}${tx.txHash}`}
+                        href={getExplorerUrl(sourceChainName, tx.txHash)}
                         target="_blank"
                         rel="noopener noreferrer"
                         title={`View on ${sourceChainName}Scan`}
@@ -150,7 +155,7 @@ const TransactionsPage: React.FC = () => {
                             {destChainName}
                           </div>
                           <a
-                            href={`${blockExplorerUrls[destChainName] || blockExplorerUrls['Ethereum']}${tx.receiptTransactionHash}`}
+                            href={`${getExplorerUrl(destChainName, tx.receiptTransactionHash)}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             title={`View on ${destChainName}Scan`}

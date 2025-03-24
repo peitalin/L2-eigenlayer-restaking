@@ -1,14 +1,12 @@
 import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
-import { useClients, ClientsState, baseSepolia } from '../hooks/useClients';
+import { useClients, ClientsState } from '../hooks/useClients';
 import { getEigenAgentAndExecNonce, predictEigenAgentAddress } from '../utils/eigenlayerUtils';
 import { Address } from 'viem';
+import { EigenAgentInfo } from '../types';
 
 // Extend the ClientsState with EigenAgent info
 interface ExtendedClientsState extends ClientsState {
-  eigenAgentInfo: {
-    eigenAgentAddress: Address;
-    execNonce: bigint;
-  } | null;
+  eigenAgentInfo: EigenAgentInfo | null;
   isLoadingEigenAgent: boolean;
   predictedEigenAgentAddress: Address | null;
   isFirstTimeUser: boolean;
@@ -32,10 +30,7 @@ interface ClientsProviderProps {
 export const ClientsProvider: React.FC<ClientsProviderProps> = ({ children }) => {
   const clientsState = useClients();
   const { isConnected, l1Wallet, connect } = clientsState;
-  const [eigenAgentInfo, setEigenAgentInfo] = useState<{
-    eigenAgentAddress: Address;
-    execNonce: bigint;
-  } | null>(null);
+  const [eigenAgentInfo, setEigenAgentInfo] = useState<EigenAgentInfo | null>(null);
   const [predictedEigenAgentAddress, setPredictedEigenAgentAddress] = useState<Address | null>(null);
   const [isLoadingEigenAgent, setIsLoadingEigenAgent] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);

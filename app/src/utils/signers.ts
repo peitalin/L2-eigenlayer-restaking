@@ -1,10 +1,7 @@
 import {
   Address, Hex, Hash, concat,
   encodeAbiParameters, keccak256, encodePacked,
-  toBytes, WalletClient,
-  verifyMessage, SignableMessage, verifyTypedData,
-  stringToHex, hexToBytes, bytesToHex, hexToString,
-  domainSeparator
+  toBytes, WalletClient
 } from 'viem';
 import { EthSepolia, DELEGATION_MANAGER_ADDRESS } from '../addresses';
 import { ZeroAddress } from './encoders';
@@ -289,21 +286,8 @@ export async function signMessageForEigenAgentExecution(
     formattedSignature = `0x0${signature.slice(2)}` as Hex;
   }
 
-  console.log("targetContractAddr", targetContractAddr);
-  console.log("eigenAgentAddr", eigenAgentAddr);
-  console.log("messageToEigenlayer", messageToEigenlayer);
-  console.log("execNonce", execNonce);
-  console.log("chainid", targetChainId);
-  console.log("expiry", expiry);
-  console.log("--------------");
-  console.log("agentOwner/signer", signer);
-
   // encode and pad signer to 32byte word
-  const encodedExpiry = encodeAbiParameters([{ type: 'uint256' }], [expiry]);
   const paddedSigner = encodeAbiParameters([{ type: 'address' }], [signer]);
-
-  console.log("\ndigestHash", digestHash);
-  console.log("signature", formattedSignature);
 
   // match the Solidity implementation:
   // messageWithSignature = abi.encodePacked(
@@ -315,19 +299,7 @@ export async function signMessageForEigenAgentExecution(
   const messageWithSignature = encodePacked(
     ['bytes', 'bytes32', 'uint256', 'bytes'],
     [messageToEigenlayer, paddedSigner, expiry, formattedSignature]
-  )
-  // const messageWithSignature2 = concat([
-  //   messageToEigenlayer,
-  //   paddedSigner, // pad signer to 32byte word
-  //   encodedExpiry,
-  //   formattedSignature
-  // ]) as Hex;
-
-  // if (messageWithSignature !== messageWithSignature2) {
-  //   console.log("messageWithSignature", messageWithSignature);
-  //   console.log("messageWithSignature2", messageWithSignature2);
-  //   throw new Error("messageWithSignature mismatch");
-  // }
+  );
 
   return {
     signature: formattedSignature,

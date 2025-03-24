@@ -7,6 +7,8 @@ import { encodeUndelegateMsg, encodeDelegateTo, SignatureWithExpiry } from '../u
 import { calculateDelegationApprovalDigestHash, signDelegationApproval } from '../utils/signers';
 import { DELEGATION_MANAGER_ADDRESS, EthSepolia, BaseSepolia } from '../addresses';
 import Expandable from '../components/Expandable';
+import TransactionSuccessModal from '../components/TransactionSuccessModal';
+import { TransactionType } from '../types';
 
 // Hardcoded operator address for sample demonstration
 // This should be replaced with a list of valid operators from a database or contract
@@ -26,6 +28,15 @@ const DelegatePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Add state for success modal
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successData, setSuccessData] = useState<{
+    txHash: string;
+    messageId: string;
+    operationType: 'delegate' | 'undelegate';
+    isLoading: boolean;
+  } | null>(null);
+
   // Use useEigenLayerOperation for delegation
   const delegateOperation = useEigenLayerOperation({
     targetContractAddr: DELEGATION_MANAGER_ADDRESS,
@@ -35,13 +46,13 @@ const DelegatePage: React.FC = () => {
       setIsCurrentlyDelegated(true);
       setCurrentOperator(selectedOperator);
 
-      // Add transaction to history
-      addTransaction({
+      // Prepare transaction data for history
+      const txData = {
         txHash,
         messageId: "", // Server will extract the real messageId if needed
         timestamp: Math.floor(Date.now() / 1000),
-        txType: 'delegateTo',
-        status: 'confirmed',
+        txType: 'delegateTo' as TransactionType,
+        status: 'confirmed' as 'pending' | 'confirmed' | 'failed',
         from: receipt.from,
         to: receipt.to || '',
         user: l1Wallet.account || '',
@@ -49,11 +60,25 @@ const DelegatePage: React.FC = () => {
         sourceChainId: BaseSepolia.chainId.toString(),
         destinationChainId: EthSepolia.chainId.toString(),
         receiptTransactionHash: receipt.transactionHash
-      });
+      };
 
-      alert('Successfully delegated!');
+      // Add transaction to history
+      addTransaction(txData);
+
+      // Update the existing success modal with transaction data
+      if (successData) {
+        setSuccessData({
+          ...successData,
+          txHash,
+          messageId: txData.messageId || "",
+          isLoading: false
+        });
+      }
     },
     onError: (err) => {
+      // Close the modal if there's an error
+      setShowSuccessModal(false);
+      setSuccessData(null);
       setError(`Delegation failed: ${err.message}`);
     }
   });
@@ -67,13 +92,13 @@ const DelegatePage: React.FC = () => {
       setIsCurrentlyDelegated(false);
       setCurrentOperator(null);
 
-      // Add transaction to history
-      addTransaction({
+      // Prepare transaction data for history
+      const txData = {
         txHash,
         messageId: "", // Server will extract the real messageId if needed
         timestamp: Math.floor(Date.now() / 1000),
-        txType: 'undelegate',
-        status: 'confirmed',
+        txType: 'undelegate' as TransactionType,
+        status: 'confirmed' as 'pending' | 'confirmed' | 'failed',
         from: receipt.from,
         to: receipt.to || '',
         user: l1Wallet.account || '',
@@ -81,11 +106,25 @@ const DelegatePage: React.FC = () => {
         sourceChainId: BaseSepolia.chainId.toString(),
         destinationChainId: EthSepolia.chainId.toString(),
         receiptTransactionHash: receipt.transactionHash
-      });
+      };
 
-      alert('Successfully undelegated!');
+      // Add transaction to history
+      addTransaction(txData);
+
+      // Update the existing success modal with transaction data
+      if (successData) {
+        setSuccessData({
+          ...successData,
+          txHash,
+          messageId: txData.messageId || "",
+          isLoading: false
+        });
+      }
     },
     onError: (err) => {
+      // Close the modal if there's an error
+      setShowSuccessModal(false);
+      setSuccessData(null);
       setError(`Undelegation failed: ${err.message}`);
     }
   });
@@ -150,6 +189,15 @@ const DelegatePage: React.FC = () => {
     try {
       setIsLoading(true);
 
+      // Show the modal with loading state first
+      setSuccessData({
+        txHash: '',
+        messageId: '',
+        operationType: 'delegate',
+        isLoading: true
+      });
+      setShowSuccessModal(true);
+
       // Create a random salt as bytes32
       const randomSalt = bytesToHex(window.crypto.getRandomValues(new Uint8Array(32)));
 
@@ -206,6 +254,8 @@ const DelegatePage: React.FC = () => {
     } catch (err) {
       console.error('Error during delegation:', err);
       setError(`Delegation error: ${err instanceof Error ? err.message : String(err)}`);
+      setShowSuccessModal(false);
+      setSuccessData(null);
     } finally {
       setIsLoading(false);
     }
@@ -226,6 +276,15 @@ const DelegatePage: React.FC = () => {
     try {
       setIsLoading(true);
 
+      // Show the modal with loading state first
+      setSuccessData({
+        txHash: '',
+        messageId: '',
+        operationType: 'undelegate',
+        isLoading: true
+      });
+      setShowSuccessModal(true);
+
       // Encode the undelegate message
       const undelegateMessage = encodeUndelegateMsg(eigenAgentInfo.eigenAgentAddress);
 
@@ -235,8 +294,18 @@ const DelegatePage: React.FC = () => {
     } catch (err) {
       console.error('Error during undelegation:', err);
       setError(`Undelegation error: ${err instanceof Error ? err.message : String(err)}`);
+      setShowSuccessModal(false);
+      setSuccessData(null);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCloseSuccessModal = () => {
+    // Only allow closing if not loading or if we have an error
+    if (!successData?.isLoading || error) {
+      setShowSuccessModal(false);
+      setSuccessData(null);
     }
   };
 
@@ -342,6 +411,20 @@ const DelegatePage: React.FC = () => {
           </>
         )}
       </div>
+
+      {/* Transaction Success Modal */}
+      {successData && (
+        <TransactionSuccessModal
+          isOpen={showSuccessModal}
+          onClose={handleCloseSuccessModal}
+          txHash={successData.txHash}
+          messageId={successData.messageId}
+          operationType={successData.operationType}
+          sourceChainId={BaseSepolia.chainId.toString()}
+          destinationChainId={EthSepolia.chainId.toString()}
+          isLoading={successData.isLoading}
+        />
+      )}
     </div>
   );
 };

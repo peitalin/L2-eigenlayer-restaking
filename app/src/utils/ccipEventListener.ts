@@ -1,6 +1,4 @@
-
-// Define server base URL
-export const SERVER_BASE_URL = 'http://localhost:3001';
+import { EXPLORER_URLS, SERVER_BASE_URL } from '../configs';
 
 export type TransactionTypes =
   | 'deposit'
@@ -37,11 +35,11 @@ export interface CCIPTransaction {
  * @param messageId The CCIP message ID
  * @returns A URL to the CCIP explorer
  */
-export function getCCIPExplorerUrl(messageId: string): string {
+export function getCCIPExplorerUrl(messageId?: string): string {
   if (!messageId || messageId === '') {
-    return 'https://ccip.chain.link';
+    return EXPLORER_URLS.ccip;
   }
-  return `https://ccip.chain.link/#/side-drawer/msg/${messageId}`;
+  return `${EXPLORER_URLS.ccip}/msg/${messageId}`;
 }
 
 // Define the structure of the CCIP message data from the API

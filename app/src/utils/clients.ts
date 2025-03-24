@@ -1,9 +1,6 @@
 import { createPublicClient, http, PublicClient, Chain } from 'viem';
 import { sepolia, baseSepolia } from 'viem/chains';
-
-// RPC URLs
-const SEPOLIA_RPC_URL = 'https://sepolia.gateway.tenderly.co';
-const BASE_SEPOLIA_RPC_URL = 'https://base-sepolia.gateway.tenderly.co';
+import { SEPOLIA_RPC_URL, BASE_SEPOLIA_RPC_URL } from '../configs';
 
 /**
  * Creates a public client for Ethereum Sepolia (L1)

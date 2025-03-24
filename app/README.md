@@ -37,11 +37,62 @@ pnpm build
 pnpm preview
 ```
 
+
 ## Connecting to the Backend
 
 Make sure the app-server is running on http://localhost:3001 for the frontend to communicate with CCIP explorer API.
 
 
+## Testing
+Run tests with:
+
+```bash
+pnpm test
+```
+
+
 ## Current Networks
 - Ethereum Sepolia (Chain ID: 11155111)
 - Base Sepolia (Chain ID: 84532)
+
+
+## Project Structure
+
+```
+src/
+  abis/             # Smart contract ABIs and types
+  components/       # UI components
+  config/           # Configs for networks, addresses, etc.
+  contexts/         # React context providers
+  hooks/            # React hooks
+  pages/            # Page components
+  services/         # API services and data fetching
+  styles/           # CSS styling
+  tests/            # Contract signing tests
+  types/            # type definitions
+  utils/            # utility functions
+```
+
+
+### Configuration
+
+Configuration is in the `src/config` directory:
+
+- `networks.ts`: Network definitions (ChainIDs, RPC URLs, etc.)
+- `contracts.ts`: Smart contract addresses by network
+- `index.ts`: App-wide constants like gas limits and timeouts
+
+### State Management
+
+The app uses React Context for state management:
+
+- `ClientsContext`: Manages wallet connections and client instances
+- `TransactionHistoryContext`: Tracks transaction history (syncs with `app-server/server.ts`)
+
+### Eigenlayer Operations
+
+The EigenAgent calls are split into the following modules:
+1. `useEigenLayerOperation`: The main hook that orchestrates signing EigenAgent messages, approvals, estimating fees, and dispatching CCIP messages
+2. `tokenApproval`: Handles token approvals
+3. `dispatchTransaction`: Handles CCIP cross-chain transactions
+4. `utils`: Common utilities for EigenLayer operations

@@ -351,7 +351,19 @@ const WithdrawalPage: React.FC = () => {
           disabled={isInputDisabled || !eigenAgentInfo}
           onClick={handleQueueWithdrawal}
         >
-          {isQueueingWithdrawal ? 'Processing...' : isLoadingL1Data ? 'Loading L1 Data...' : 'Queue Withdrawal'}
+          {isQueueingWithdrawal ? (
+            <>
+              <span className="loading-spinner"></span>
+              <span>Processing...</span>
+            </>
+          ) : isLoadingL1Data ? (
+            <>
+              <span className="loading-spinner"></span>
+              <span>Loading L1 Data...</span>
+            </>
+          ) : (
+            'Queue Withdrawal'
+          )}
         </button>
 
         <div className="withdrawal-info">
@@ -371,10 +383,26 @@ const WithdrawalPage: React.FC = () => {
               <div className="input-note">Using DelegationManager for Queue Withdrawals</div>
             </div>
             <div className="info-item">
-              <strong>Current Withdrawal Nonce:</strong> {isLoadingL1Data ? 'Loading...' : withdrawalNonce.toString()}
+              <strong>Current Withdrawal Nonce:</strong>
+              {isLoadingL1Data ? (
+                <span>
+                  <span className="loading-spinner spinner-small"></span>
+                  Loading...
+                </span>
+              ) : (
+                withdrawalNonce.toString()
+              )}
             </div>
             <div className="info-item">
-              <strong>Delegated To:</strong> {isLoadingL1Data ? 'Loading...' : (delegatedTo ? delegatedTo : 'Not delegated')}
+              <strong>Delegated To:</strong>
+              {isLoadingL1Data ? (
+                <span>
+                  <span className="loading-spinner spinner-small"></span>
+                  Loading...
+                </span>
+              ) : (
+                delegatedTo ? delegatedTo : 'Not delegated'
+              )}
             </div>
             <div className="info-item">
               <strong>Withdrawer Address:</strong> {eigenAgentInfo.eigenAgentAddress}

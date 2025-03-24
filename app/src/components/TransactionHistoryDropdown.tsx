@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import { useToast } from '../utils/toast';
 import CCIPStatusChecker from './CCIPStatusChecker';
+import { EXPLORER_URLS } from '../configs';
 
 interface TransactionHistoryDropdownProps {}
 
@@ -62,6 +63,14 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
     return !!messageId && messageId !== '';
   };
 
+  const getExplorerUrl = (chainName: string, hash: string): string => {
+    const chainExplorerMap: Record<string, string> = {
+      'Base': EXPLORER_URLS.basescan + '/tx/',
+      'Ethereum': EXPLORER_URLS.etherscan + '/tx/',
+    };
+    return `${chainExplorerMap[chainName] || chainExplorerMap['Ethereum']}${hash}`;
+  };
+
   return (
     <div className="transaction-history-dropdown">
       <button
@@ -90,13 +99,8 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
           ) : (
             <div className="transaction-history-list">
               {transactions.map((tx, index) => {
-
                 const sourceChain = tx.sourceChainId === "84532" ? 'Base' : 'Ethereum';
                 const destinationChain = tx.destinationChainId === "84532" ? 'Base' : 'Ethereum';
-                const blockExplorerUrls = {
-                  Base: 'https://sepolia.basescan.org/tx/',
-                  Ethereum: 'https://sepolia.etherscan.io/tx/',
-                };
 
                 return (
                   <div key={index} className="transaction-history-item">
@@ -107,7 +111,7 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
                       <div className="transaction-hash">
                         <span className="transaction-label">{sourceChain}:</span>
                         <a
-                          href={`${blockExplorerUrls[sourceChain]}${tx.txHash}`}
+                          href={getExplorerUrl(sourceChain, tx.txHash)}
                           target="_blank"
                           rel="noopener noreferrer"
                           title="View on BaseScan"
@@ -133,7 +137,7 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
                         <div className="receipt-hash">
                           <span className="transaction-label">{destinationChain}:</span>
                           <a
-                            href={`${blockExplorerUrls[destinationChain]}${tx.receiptTransactionHash}`}
+                            href={getExplorerUrl(destinationChain, tx.receiptTransactionHash)}
                             target="_blank"
                             rel="noopener noreferrer"
                           >

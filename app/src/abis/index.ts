@@ -1,4 +1,4 @@
-// Import ABIs from abiUtils.ts
+// Import ABIs from abiImporter.ts
 import {
   DelegationManagerABI,
   StrategyManagerABI,
@@ -8,7 +8,7 @@ import {
   EigenAgent6551ABI,
   AgentFactoryABI,
   RewardsCoordinatorABI
-} from './abiUtils';
+} from './abiImporter';
 
 // Export the ABIs
 export {
@@ -26,9 +26,9 @@ export {
 export * from './Router';
 
 /**
- * Re-export validation functions from abiUtils
+ * Re-export validation functions
  */
 export {
   validateABI,
   ensureAbiHasFunctions
-} from './abiUtils';
+} from './abiImporter';
