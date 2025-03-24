@@ -13,7 +13,7 @@ export const BASE_SEPOLIA_RPC_URL = 'https://base-sepolia.gateway.tenderly.co';
 export const APP_CONFIG = {
   // App settings
   APP_NAME: 'EigenLayer Restaking',
-  DEFAULT_EXPIRY_MINUTES: 60,
+  DEFAULT_EXPIRY_MINUTES: 45,
 
   // UI settings
   TOAST_TIMEOUT: 4000,

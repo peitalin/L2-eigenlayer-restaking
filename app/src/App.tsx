@@ -70,7 +70,7 @@ function App() {
           draggable
           pauseOnHover
         />
-      </TransactionHistoryProvider>
+        </TransactionHistoryProvider>
     </ClientsProvider>
   );
 }

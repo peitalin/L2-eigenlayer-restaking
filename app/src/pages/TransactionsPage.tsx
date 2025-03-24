@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import CCIPStatusChecker from '../components/CCIPStatusChecker';
-import { useToast } from '../utils/toast';
 import { EXPLORER_URLS } from '../configs';
+import { getTransactionTypeLabel } from '../components/TransactionHistoryDropdown';
 
 const TransactionsPage: React.FC = () => {
   const { transactions, isLoading, error } = useTransactionHistory();
@@ -16,19 +16,6 @@ const TransactionsPage: React.FC = () => {
   // Helper function to format timestamp
   const formatTimestamp = (timestamp: number): string => {
     return new Date(timestamp * 1000).toLocaleString();
-  };
-
-  // Helper function to get a label for the transaction type
-  const getTransactionTypeLabel = (type: string): string => {
-    switch (type) {
-      case 'deposit': return 'Deposit';
-      case 'queueWithdrawal': return 'Queue Withdrawal';
-      case 'completeWithdrawal': return 'Complete Withdrawal';
-      case 'processClaim': return 'Rewards Claim';
-      case 'bridgingWithdrawalToL2': return 'Bridge Withdrawal to L2';
-      case 'bridgingRewardsToL2': return 'Bridge Rewards to L2';
-      default: return type.charAt(0).toUpperCase() + type.slice(1);
-    }
   };
 
   // Helper to determine if a messageId is valid

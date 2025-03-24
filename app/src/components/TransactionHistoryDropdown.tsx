@@ -6,6 +6,21 @@ import { EXPLORER_URLS } from '../configs';
 
 interface TransactionHistoryDropdownProps {}
 
+// Helper function to get a label for the transaction type
+export const getTransactionTypeLabel = (type: string): string => {
+  switch (type) {
+    case 'deposit': return 'Deposit';
+    case 'queueWithdrawal': return 'Queue Withdrawal';
+    case 'completeWithdrawal': return 'Complete Withdrawal';
+    case 'processClaim': return 'Rewards Claim';
+    case 'bridgingWithdrawalToL2': return 'Bridge Withdrawal to L2';
+    case 'bridgingRewardsToL2': return 'Bridge Rewards to L2';
+    case 'delegateTo': return 'Delegate';
+    case 'undelegate': return 'Undelegate';
+    default: return type.charAt(0).toUpperCase() + type.slice(1);
+  }
+};
+
 const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = () => {
   const { transactions, isLoading, error } = useTransactionHistory();
   const [isOpen, setIsOpen] = useState(false);
@@ -45,18 +60,6 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
 
   const formatTimestamp = (timestamp: number): string => {
     return new Date(timestamp * 1000).toLocaleString();
-  };
-
-  const getTransactionTypeLabel = (type: string): string => {
-    switch (type) {
-      case 'deposit': return 'Deposit';
-      case 'bridgingWithdrawalToL2': return 'Bridging Withdrawal to L2';
-      case 'bridgingRewardsToL2': return 'Bridging Rewards to L2';
-      case 'queueWithdrawal': return 'Queue Withdrawal';
-      case 'completeWithdrawal': return 'Complete Withdrawal';
-      case 'processClaim': return 'Rewards Claim';
-      default: return 'Transaction';
-    }
   };
 
   const isValidMessageId = (messageId: string): boolean => {

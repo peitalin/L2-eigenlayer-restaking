@@ -52,12 +52,22 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({
       : (isLoading ? 'Undelegating...' : 'Successfully Undelegated!');
   };
 
+  // Handle close button click - ensure the parent component's onClose gets called
+  const handleClose = () => {
+    onClose();
+  };
+
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay" onClick={(e) => {
+      // Close when clicking outside the modal
+      if (e.target === e.currentTarget) {
+        handleClose();
+      }
+    }}>
       <div className="modal-content">
         <div className="modal-header">
           <h2>{getTitle()}</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <button className="modal-close" onClick={handleClose}>×</button>
         </div>
 
         <div className="modal-body">
@@ -118,8 +128,12 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({
         </div>
 
         <div className="modal-footer">
-          <button className="modal-button" onClick={onClose} disabled={isLoading}>
-            {isLoading ? 'Please wait...' : 'Close'}
+          <button
+            className="modal-button"
+            onClick={handleClose}
+            // Allow closing even while loading
+          >
+            {isLoading ? 'Cancel' : 'Close'}
           </button>
         </div>
       </div>

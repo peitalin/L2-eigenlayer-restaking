@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Address, Hex, getAddress, toHex, bytesToHex } from 'viem';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
@@ -6,26 +6,61 @@ import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { encodeUndelegateMsg, encodeDelegateTo, SignatureWithExpiry } from '../utils/encoders';
 import { calculateDelegationApprovalDigestHash, signDelegationApproval } from '../utils/signers';
 import { DELEGATION_MANAGER_ADDRESS, EthSepolia, BaseSepolia } from '../addresses';
-import Expandable from '../components/Expandable';
 import TransactionSuccessModal from '../components/TransactionSuccessModal';
 import { TransactionType } from '../types';
 
-// Hardcoded operator address for sample demonstration
-// This should be replaced with a list of valid operators from a database or contract
-const SAMPLE_OPERATORS = [
-  '0x0000000000000000000000000000000000000004', // address(4) converted
-  '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045', // vitalik.eth
-  '0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B', // Another example address
+// Define the Operator type
+interface Operator {
+  name: string;
+  address: string;
+  magicStaked: string;
+  ethStaked: string;
+  stakers: number;
+  fee: string;
+  isActive: boolean;
+}
+
+// Mock data for operators
+const OPERATORS_DATA: Operator[] = [
+  {
+    address: '0xA4D423ED017F063AaF65f6B6B9C6Bc59f97d5164',
+    name: 'Treasure Node 1',
+    magicStaked: '1,250,000',
+    ethStaked: '432.5',
+    stakers: 42,
+    fee: '1%',
+    isActive: true
+  },
+  {
+    address: '0xaA61cC14ac3e048f26b9312E57ECf8156D9D27e3',
+    name: 'Treasure Node2',
+    magicStaked: '890,500',
+    ethStaked: '122.2',
+    stakers: 36,
+    fee: '2%',
+    isActive: true
+  },
+  {
+    address: '0x3d2FB9D26c5C66D0CA55247E4d40Cb4FBe0f5C03',
+    name: "Inactive Operator",
+    magicStaked: '2,100,000',
+    ethStaked: '95.8',
+    stakers: 65,
+    fee: '4%',
+    isActive: false
+  }
 ];
+
+// Get addresses for backward compatibility
+const SAMPLE_OPERATORS = OPERATORS_DATA.map(op => op.address);
 
 const DelegatePage: React.FC = () => {
   const { l1Wallet, l2Wallet, eigenAgentInfo, predictedEigenAgentAddress } = useClientsContext();
   const { addTransaction } = useTransactionHistory();
-
-  const [selectedOperator, setSelectedOperator] = useState<Address | null>(SAMPLE_OPERATORS[0] as Address);
-  const [isCurrentlyDelegated, setIsCurrentlyDelegated] = useState(false);
-  const [currentOperator, setCurrentOperator] = useState<Address | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [selectedOperator, setSelectedOperator] = useState<string>('');
+  const [isCurrentlyDelegated, setIsCurrentlyDelegated] = useState<boolean>(false);
+  const [currentDelegation, setCurrentDelegation] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Add state for success modal
@@ -37,6 +72,14 @@ const DelegatePage: React.FC = () => {
     isLoading: boolean;
   } | null>(null);
 
+  // Use a ref to track if the modal is currently showing
+  const modalVisibleRef = useRef(false);
+
+  // Update the ref when the modal visibility changes
+  useEffect(() => {
+    modalVisibleRef.current = showSuccessModal;
+  }, [showSuccessModal]);
+
   // Use useEigenLayerOperation for delegation
   const delegateOperation = useEigenLayerOperation({
     targetContractAddr: DELEGATION_MANAGER_ADDRESS,
@@ -44,7 +87,7 @@ const DelegatePage: React.FC = () => {
     customGasLimit: 400000n, // Fixed gas limit for delegateTo as specified
     onSuccess: (txHash, receipt) => {
       setIsCurrentlyDelegated(true);
-      setCurrentOperator(selectedOperator);
+      setCurrentDelegation(selectedOperator);
 
       // Prepare transaction data for history
       const txData = {
@@ -56,6 +99,7 @@ const DelegatePage: React.FC = () => {
         from: receipt.from,
         to: receipt.to || '',
         user: l1Wallet.account || '',
+        execNonce: (receipt as any).execNonce || null,
         isComplete: false,
         sourceChainId: BaseSepolia.chainId.toString(),
         destinationChainId: EthSepolia.chainId.toString(),
@@ -65,14 +109,26 @@ const DelegatePage: React.FC = () => {
       // Add transaction to history
       addTransaction(txData);
 
-      // Update the existing success modal with transaction data
-      if (successData) {
-        setSuccessData({
-          ...successData,
-          txHash,
-          messageId: txData.messageId || "",
-          isLoading: false
-        });
+      // Force create a new modal state object to ensure React notices the change
+      const updatedData = {
+        txHash: txHash,
+        messageId: txData.messageId || "",
+        operationType: 'delegate' as const,
+        isLoading: false
+      };
+
+      // Only update if modal is still visible (to prevent state updates after component unmounted)
+      if (modalVisibleRef.current) {
+        // Completely replace the state (don't use the previous state)
+        setSuccessData(updatedData);
+
+        // Auto-close the modal after 5 seconds
+        setTimeout(() => {
+          if (modalVisibleRef.current) {
+            setShowSuccessModal(false);
+            setSuccessData(null);
+          }
+        }, 5000);
       }
     },
     onError: (err) => {
@@ -90,7 +146,7 @@ const DelegatePage: React.FC = () => {
     customGasLimit: 300000n, // Less gas required for undelegation
     onSuccess: (txHash, receipt) => {
       setIsCurrentlyDelegated(false);
-      setCurrentOperator(null);
+      setCurrentDelegation(null);
 
       // Prepare transaction data for history
       const txData = {
@@ -101,7 +157,8 @@ const DelegatePage: React.FC = () => {
         status: 'confirmed' as 'pending' | 'confirmed' | 'failed',
         from: receipt.from,
         to: receipt.to || '',
-        user: l1Wallet.account || '',
+        user: eigenAgentInfo?.eigenAgentAddress || l1Wallet.account || '',
+        execNonce: (receipt as any).execNonce || null,
         isComplete: false,
         sourceChainId: BaseSepolia.chainId.toString(),
         destinationChainId: EthSepolia.chainId.toString(),
@@ -111,14 +168,26 @@ const DelegatePage: React.FC = () => {
       // Add transaction to history
       addTransaction(txData);
 
-      // Update the existing success modal with transaction data
-      if (successData) {
-        setSuccessData({
-          ...successData,
-          txHash,
-          messageId: txData.messageId || "",
-          isLoading: false
-        });
+      // Force create a new modal state object to ensure React notices the change
+      const updatedData = {
+        txHash: txHash,
+        messageId: txData.messageId || "",
+        operationType: 'undelegate' as const,
+        isLoading: false
+      };
+
+      // Only update if modal is still visible (to prevent state updates after component unmounted)
+      if (modalVisibleRef.current) {
+        // Completely replace the state (don't use the previous state)
+        setSuccessData(updatedData);
+
+        // Auto-close the modal after 5 seconds
+        setTimeout(() => {
+          if (modalVisibleRef.current) {
+            setShowSuccessModal(false);
+            setSuccessData(null);
+          }
+        }, 5000);
       }
     },
     onError: (err) => {
@@ -157,7 +226,7 @@ const DelegatePage: React.FC = () => {
         const isZeroAddress = operatorAddress === '0x0000000000000000000000000000000000000000';
 
         setIsCurrentlyDelegated(!isZeroAddress);
-        setCurrentOperator(isZeroAddress ? null : operatorAddress);
+        setCurrentDelegation(isZeroAddress ? null : operatorAddress.toString());
       } catch (err) {
         console.error('Error checking delegation status:', err);
         setError('Could not check delegation status');
@@ -168,6 +237,63 @@ const DelegatePage: React.FC = () => {
 
     checkDelegationStatus();
   }, [l1Wallet.publicClient, eigenAgentInfo?.eigenAgentAddress]);
+
+  // Find the currently selected operator details
+  const selectedOperatorDetails = OPERATORS_DATA.find(op => op.address === selectedOperator);
+
+  // Render the operator selection table
+  const renderOperatorTable = () => {
+    return (
+      <div className="operator-table-container">
+        <table className="operator-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Operator Name</th>
+              <th>Operator Address</th>
+              <th>Total MAGIC Staked</th>
+              <th>Total ETH Staked</th>
+              <th>No. Stakers</th>
+              <th>Operator Fee</th>
+            </tr>
+          </thead>
+          <tbody>
+            {OPERATORS_DATA.map((operator) => (
+              <tr
+                key={operator.address}
+                className={`${selectedOperator === operator.address ? 'selected-operator' : ''} ${!operator.isActive ? 'inactive-operator' : ''}`}
+                onClick={() => {
+                  if (!isCurrentlyDelegated && !isLoading && operator.isActive) {
+                    setSelectedOperator(operator.address);
+                  }
+                }}
+              >
+                <td>
+                  <input
+                    type="radio"
+                    name="operator"
+                    checked={selectedOperator === operator.address}
+                    onChange={() => {
+                      if (operator.isActive) {
+                        setSelectedOperator(operator.address);
+                      }
+                    }}
+                    disabled={isCurrentlyDelegated || isLoading || !operator.isActive}
+                  />
+                </td>
+                <td>{operator.name}</td>
+                <td className="font-mono address-cell">{operator.address.substring(0, 6)}...{operator.address.substring(operator.address.length - 4)}</td>
+                <td>{operator.magicStaked}</td>
+                <td>{operator.ethStaked}</td>
+                <td>{operator.stakers}</td>
+                <td>{operator.fee}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
 
   // Handle delegation to selected operator
   const handleDelegate = async () => {
@@ -190,12 +316,13 @@ const DelegatePage: React.FC = () => {
       setIsLoading(true);
 
       // Show the modal with loading state first
-      setSuccessData({
+      const initialModalData = {
         txHash: '',
         messageId: '',
-        operationType: 'delegate',
+        operationType: 'delegate' as const,
         isLoading: true
-      });
+      };
+      setSuccessData(initialModalData);
       setShowSuccessModal(true);
 
       // Create a random salt as bytes32
@@ -209,14 +336,14 @@ const DelegatePage: React.FC = () => {
 
       // For the demo, we'll use the operator as both operator and delegationApprover
       // In a real scenario, the delegationApprover would be a separate entity that signs to approve delegation
-      const delegationApprover = selectedOperator;
+      const delegationApprover = getAddress(selectedOperator);
 
       // Calculate the digest hash that needs to be signed
       const digestHash = calculateDelegationApprovalDigestHash(
         eigenAgentAddress,
-        selectedOperator,
+        getAddress(selectedOperator),
         delegationApprover,
-        randomSalt,
+        randomSalt as `0x${string}`,
         expiry,
         DELEGATION_MANAGER_ADDRESS,
         EthSepolia.chainId
@@ -229,9 +356,9 @@ const DelegatePage: React.FC = () => {
         l1Wallet.client,
         l1Wallet.account,
         eigenAgentAddress,
-        selectedOperator,
+        getAddress(selectedOperator),
         delegationApprover,
-        randomSalt,
+        randomSalt as `0x${string}`,
         expiry
       );
 
@@ -243,19 +370,46 @@ const DelegatePage: React.FC = () => {
 
       // Encode the delegateTo message
       const delegateToMessage = encodeDelegateTo(
-        selectedOperator,
+        getAddress(selectedOperator),
         approverSignatureAndExpiry,
-        randomSalt
+        randomSalt as `0x${string}`
       );
 
       // Execute the delegation operation
-      await delegateOperation.executeWithMessage(delegateToMessage);
+      const result = await delegateOperation.executeWithMessage(delegateToMessage);
+
+      // Add the transaction with the execNonce
+      if (result && result.execNonce !== undefined) {
+        // The execNonce was used for this transaction, store it
+        const txData = {
+          txHash: result.txHash,
+          messageId: "",
+          timestamp: Math.floor(Date.now() / 1000),
+          txType: 'delegateTo' as TransactionType,
+          status: 'confirmed' as 'pending' | 'confirmed' | 'failed',
+          from: result.receipt.from,
+          to: result.receipt.to || '',
+          user: eigenAgentAddress,
+          execNonce: result.execNonce,
+          isComplete: false,
+          sourceChainId: BaseSepolia.chainId.toString(),
+          destinationChainId: EthSepolia.chainId.toString(),
+          receiptTransactionHash: result.receipt.transactionHash
+        };
+
+        // Add transaction to history
+        await addTransaction(txData);
+      }
 
     } catch (err) {
       console.error('Error during delegation:', err);
       setError(`Delegation error: ${err instanceof Error ? err.message : String(err)}`);
-      setShowSuccessModal(false);
-      setSuccessData(null);
+
+      // Only update modal state if it's still visible
+      if (modalVisibleRef.current) {
+        setShowSuccessModal(false);
+        setSuccessData(null);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -273,40 +427,68 @@ const DelegatePage: React.FC = () => {
       return;
     }
 
+    const eigenAgentAddress = eigenAgentInfo.eigenAgentAddress;
+
     try {
       setIsLoading(true);
 
       // Show the modal with loading state first
-      setSuccessData({
+      const initialModalData = {
         txHash: '',
         messageId: '',
-        operationType: 'undelegate',
+        operationType: 'undelegate' as const,
         isLoading: true
-      });
+      };
+      setSuccessData(initialModalData);
       setShowSuccessModal(true);
 
       // Encode the undelegate message
-      const undelegateMessage = encodeUndelegateMsg(eigenAgentInfo.eigenAgentAddress);
+      const undelegateMessage = encodeUndelegateMsg(eigenAgentAddress);
 
       // Execute the undelegation operation
-      await undelegateOperation.executeWithMessage(undelegateMessage);
+      const result = await undelegateOperation.executeWithMessage(undelegateMessage);
+
+      // Add the transaction with the execNonce
+      if (result && result.execNonce !== undefined) {
+        // The execNonce was used for this transaction, store it
+        const txData = {
+          txHash: result.txHash,
+          messageId: "",
+          timestamp: Math.floor(Date.now() / 1000),
+          txType: 'undelegate' as TransactionType,
+          status: 'confirmed' as 'pending' | 'confirmed' | 'failed',
+          from: result.receipt.from,
+          to: result.receipt.to || '',
+          user: eigenAgentAddress,
+          execNonce: result.execNonce,
+          isComplete: false,
+          sourceChainId: BaseSepolia.chainId.toString(),
+          destinationChainId: EthSepolia.chainId.toString(),
+          receiptTransactionHash: result.receipt.transactionHash
+        };
+
+        // Add transaction to history
+        await addTransaction(txData);
+      }
 
     } catch (err) {
       console.error('Error during undelegation:', err);
       setError(`Undelegation error: ${err instanceof Error ? err.message : String(err)}`);
-      setShowSuccessModal(false);
-      setSuccessData(null);
+
+      // Only update modal state if it's still visible
+      if (modalVisibleRef.current) {
+        setShowSuccessModal(false);
+        setSuccessData(null);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleCloseSuccessModal = () => {
-    // Only allow closing if not loading or if we have an error
-    if (!successData?.isLoading || error) {
-      setShowSuccessModal(false);
-      setSuccessData(null);
-    }
+    // Remove the condition - allow closing the modal anytime the button is clicked
+    setShowSuccessModal(false);
+    setSuccessData(null);
   };
 
   return (
@@ -320,7 +502,7 @@ const DelegatePage: React.FC = () => {
           </div>
         ) : isCurrentlyDelegated ? (
           <div className="info-banner success">
-            <p>You are currently delegated to: <span className="font-mono">{currentOperator}</span></p>
+            <p>You are currently delegated to: <span className="font-mono">{currentDelegation}</span></p>
             <button
               onClick={handleUndelegate}
               disabled={undelegateOperation.isExecuting || isLoading}
@@ -352,25 +534,16 @@ const DelegatePage: React.FC = () => {
         ) : (
           <>
             <div className="form-group">
-              <label htmlFor="operator">Select an operator to delegate to:</label>
-              <select
-                id="operator"
-                className="amount-input operator-select"
-                value={selectedOperator || ''}
-                onChange={(e) => setSelectedOperator(e.target.value as Address)}
-                disabled={isCurrentlyDelegated || isLoading}
-              >
-                <option value="">-- Select an operator --</option>
-                {SAMPLE_OPERATORS.map((op) => (
-                  <option
-                    key={op}
-                    value={op}
-                  >
-                    {op}
-                  </option>
-                ))}
-              </select>
+              <h3>Select an operator to delegate to:</h3>
+              {renderOperatorTable()}
             </div>
+
+            {selectedOperator && (
+              <div className="selected-operator-info">
+                <p>Selected Operator: <strong>{selectedOperatorDetails?.name}</strong></p>
+                <p>Fee: <strong>{selectedOperatorDetails?.fee}</strong></p>
+              </div>
+            )}
 
             <button
               onClick={handleDelegate}
@@ -391,16 +564,6 @@ const DelegatePage: React.FC = () => {
                 'Delegate'
               )}
             </button>
-
-            <Expandable title="Delegation Information" initialExpanded={false}>
-              <h3>Notes:</h3>
-              <ul>
-                <li>Delegation requires the operator's approval via signature</li>
-                <li>This demo uses simplified logic; in production, the operator would need to provide their signature</li>
-                <li>Once delegated, you must undelegate before delegating to a different operator</li>
-                <li>Undelegation initiates a withdrawal queue for your funds with a 7-day waiting period</li>
-              </ul>
-            </Expandable>
 
             {error && (
               <div className="info-banner error" style={{ marginTop: '20px', maxWidth: '100%', overflow: 'hidden', wordBreak: 'break-word' }}>

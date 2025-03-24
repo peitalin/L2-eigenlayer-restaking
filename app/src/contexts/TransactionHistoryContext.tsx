@@ -3,6 +3,12 @@ import { useClientsContext } from './ClientsContext';
 import { CCIPTransaction, TransactionTypes } from '../utils/ccipEventListener';
 import { SERVER_BASE_URL } from '../configs';
 
+// Update CCIPTransaction interface to include execNonce
+interface ExecNonceResponse {
+  agentAddress: string;
+  latestNonce: number | null;
+  nextNonce: number;
+}
 
 interface TransactionHistoryContextType {
   transactions: CCIPTransaction[];
@@ -11,6 +17,7 @@ interface TransactionHistoryContextType {
   fetchTransactions: () => Promise<void>;
   addTransaction: (transaction: CCIPTransaction) => Promise<void>;
   fetchCCIPMessageDetails: (messageId: string) => Promise<any>;
+  fetchLatestExecNonce: (agentAddress: string) => Promise<ExecNonceResponse>;
 }
 
 const TransactionHistoryContext = createContext<TransactionHistoryContextType | null>(null);
@@ -35,6 +42,30 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
+      // Log the server URL to help debug connection issues
+      console.log(`Using server URL: ${SERVER_BASE_URL}`);
+
+      // First check if server is reachable
+      try {
+        const healthCheck = await fetch(`${SERVER_BASE_URL}/api/health`, {
+          method: 'GET',
+          signal: controller.signal,
+          // Shorter timeout for health check
+          cache: 'no-cache',
+        }).catch(err => {
+          console.error('Server health check failed:', err);
+          throw new Error(`Server connection failed. Please ensure the server is running at ${SERVER_BASE_URL}`);
+        });
+      } catch (healthErr) {
+        // Clear the timeout to prevent memory leaks
+        clearTimeout(timeoutId);
+        // Display a user-friendly error message
+        console.error('Server health check failed:', healthErr);
+        setError(`Cannot connect to the transaction server at ${SERVER_BASE_URL}. Is the server running?`);
+        setIsLoading(false);
+        return;
+      }
+
       // Use user-specific endpoint if wallet is connected
       const endpoint = l1Wallet.account
         ? `${SERVER_BASE_URL}/api/transactions/user/${l1Wallet.account}`
@@ -43,7 +74,8 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
       console.log(`Fetching transactions from ${endpoint}`);
 
       const response = await fetch(endpoint, {
-        signal: controller.signal
+        signal: controller.signal,
+        cache: 'no-cache',
       });
 
       clearTimeout(timeoutId);
@@ -56,7 +88,13 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
       setTransactions(data);
     } catch (err: any) {
       console.error('Error fetching transactions:', err);
-      setError(err.message || 'Failed to fetch transactions');
+
+      // Check for specific network error
+      if (err.message?.includes('Failed to fetch') || err.name === 'TypeError') {
+        setError(`Cannot connect to the transaction server at ${SERVER_BASE_URL}. Please make sure the server is running.`);
+      } else {
+        setError(err.message || 'Failed to fetch transactions');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -79,9 +117,9 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
 
     // Set up polling with a reasonable interval (every 2 minutes)
     intervalRef.current = setInterval(() => {
-      console.log('Polling for transaction updates...');
+      // console.log('Polling for transaction updates...');
       fetchTransactions().catch(err => console.error('Error polling transactions:', err));
-    }, 120000); // 2 minutes
+    }, 60000); // 1 minutes
 
     isPollingRef.current = true;
   }, []);
@@ -101,11 +139,11 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
   // Start/stop polling based on l2Wallet.publicClient availability
   useEffect(() => {
     if (l2Wallet.publicClient) {
-      console.log('L2 wallet client detected, starting transaction history polling...');
+      // console.log('L2 wallet client detected, starting transaction history polling...');
       startPolling();
 
       return () => {
-        console.log('Stopping transaction history polling...');
+        // console.log('Stopping transaction history polling...');
         stopPolling();
       };
     }
@@ -141,7 +179,8 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
         receiptTransactionHash: transaction.receiptTransactionHash,
         isComplete: transaction.isComplete || false,
         sourceChainId: transaction.sourceChainId,
-        destinationChainId: transaction.destinationChainId
+        destinationChainId: transaction.destinationChainId,
+        execNonce: transaction.execNonce || null
       };
 
       console.log("Adding transaction:", confirmedTransaction);
@@ -205,6 +244,21 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
     }
   };
 
+  const fetchLatestExecNonce = async (agentAddress: string): Promise<ExecNonceResponse> => {
+    try {
+      const response = await fetch(`${SERVER_BASE_URL}/api/execnonce/${agentAddress}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch execNonce: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (err: any) {
+      console.error(`Error fetching execNonce for ${agentAddress}:`, err);
+      throw new Error(err.message || 'Failed to fetch execNonce');
+    }
+  };
+
   return (
     <TransactionHistoryContext.Provider
       value={{
@@ -214,6 +268,7 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
         fetchTransactions,
         addTransaction,
         fetchCCIPMessageDetails,
+        fetchLatestExecNonce,
       }}
     >
       {children}

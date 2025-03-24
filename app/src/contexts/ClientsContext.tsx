@@ -35,6 +35,7 @@ export const ClientsProvider: React.FC<ClientsProviderProps> = ({ children }) =>
   const [isLoadingEigenAgent, setIsLoadingEigenAgent] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [connectionAttempted, setConnectionAttempted] = useState(false);
 
   // Fetch EigenAgent info whenever L1 account changes
   useEffect(() => {
@@ -72,6 +73,7 @@ export const ClientsProvider: React.FC<ClientsProviderProps> = ({ children }) =>
   const handleConnect = async () => {
     setIsConnecting(true);
     setConnectionError(null);
+    setConnectionAttempted(true);
 
     try {
       await connect();

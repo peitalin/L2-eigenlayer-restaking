@@ -11,6 +11,9 @@ const BASE_SEPOLIA_RPC_URL = 'https://base-sepolia.gateway.tenderly.co';
 // const BASE_SEPOLIA_RPC_URL = 'https://base-sepolia.drpc.org';
 const ETH_SEPOLIA_RPC_URL = 'https://sepolia.gateway.tenderly.co';
 
+// Constants for localStorage
+const WALLET_CONNECTED_KEY = 'eigenLayerWalletConnected';
+
 // Define Base Sepolia chain
 export const baseSepolia = defineChain({
   id: 84_532,
@@ -161,6 +164,20 @@ export function useClients(): ClientsState {
     }
   }, [l1Wallet.account, l2Wallet.account, fetchBalances]);
 
+  // Try to auto-connect on initial load
+  useEffect(() => {
+    const isWalletPreviouslyConnected = localStorage.getItem(WALLET_CONNECTED_KEY) === 'true';
+
+    if (isWalletPreviouslyConnected && !isConnected && window.ethereum) {
+      console.log('Auto-connecting previously connected wallet...');
+      connect().catch(err => {
+        console.error('Failed to auto-connect wallet:', err);
+        // Remove the stored value if auto-connect fails
+        localStorage.removeItem(WALLET_CONNECTED_KEY);
+      });
+    }
+  }, []);
+
   // Connect to wallet and initialize clients
   // This supports all EIP-1193 compliant wallet providers including:
   // - MetaMask
@@ -213,6 +230,9 @@ export function useClients(): ClientsState {
       });
 
       setSelectedChain(baseSepolia);
+
+      // Store connection state in localStorage
+      localStorage.setItem(WALLET_CONNECTED_KEY, 'true');
     } catch (error) {
       console.error('Error connecting wallet:', error);
       throw error;
@@ -234,6 +254,9 @@ export function useClients(): ClientsState {
       account: null,
       balance: null
     }));
+
+    // Remove connection state from localStorage
+    localStorage.removeItem(WALLET_CONNECTED_KEY);
   };
 
   // Listen for accountsChanged event from wallet
@@ -302,7 +325,6 @@ export function useClients(): ClientsState {
     if (!window.ethereum) return;
 
     const handleChainChanged = (chainIdHex: string) => {
-      console.log('Chain changed:', chainIdHex);
 
       // Convert hex chainId to number
       const chainId = parseInt(chainIdHex, 16);

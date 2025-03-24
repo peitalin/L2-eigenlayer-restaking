@@ -18,7 +18,7 @@ export async function dispatchTransaction(
   originalMessage: Hex,
   amount: bigint,
   customGasLimit?: bigint,
-  setInfo?: (info: string) => void
+  setInfo?: (info: string) => void,
 ): Promise<{ txHash: `0x${string}`; receipt: TransactionReceipt }> {
   if (!l2Wallet.client || !l2Wallet.account) {
     throw new Error("Wallet client not available for Base Sepolia");
@@ -123,7 +123,7 @@ export async function dispatchTransaction(
       console.log('Transaction successfully mined! Receipt:', receipt.transactionHash);
       return {
         txHash: txHash,
-        receipt: receipt
+        receipt: receipt,
       };
     } else {
       console.error("Transaction failed on-chain");

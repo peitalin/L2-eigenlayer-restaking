@@ -14,7 +14,7 @@ import {
   STRATEGY_MANAGER_ADDRESS
 } from '../../addresses';
 import { APP_CONFIG } from '../../configs';
-
+import { useTransactionHistory } from '../../contexts/TransactionHistoryContext';
 interface UseEigenLayerOperationResult {
   isExecuting: boolean;
   signature: Hex | null;
@@ -22,7 +22,7 @@ interface UseEigenLayerOperationResult {
   info: string | null;
   isApprovingToken: boolean;
   approvalHash: string | null;
-  executeWithMessage: (message: Hex) => Promise<void>;
+  executeWithMessage: (message: Hex) => Promise<{ txHash: string; receipt: any; execNonce?: number } | undefined>;
 }
 
 /**
@@ -49,6 +49,7 @@ export function useEigenLayerOperation({
     eigenAgentInfo,
     predictedEigenAgentAddress,
   } = useClientsContext();
+  const { fetchLatestExecNonce } = useTransactionHistory();
 
   const [isExecuting, setIsExecuting] = useState(false);
   const [signature, setSignature] = useState<Hex | null>(null);
@@ -62,7 +63,7 @@ export function useEigenLayerOperation({
    */
   async function signMessage(
     wallet: any, // Using 'any' to avoid type conflicts
-    agentAddress: Address,
+    eigenAgentAddress: Address,
     message: Hex,
     execNonce: bigint
   ): Promise<{ signature: Hex, messageWithSignature: Hex }> {
@@ -75,7 +76,7 @@ export function useEigenLayerOperation({
     return signMessageForEigenAgentExecution(
       wallet.client,
       wallet.account,
-      agentAddress,
+      eigenAgentAddress,
       targetContractAddr,
       message,
       execNonce,
@@ -86,11 +87,12 @@ export function useEigenLayerOperation({
   /**
    * Main function to execute a transaction with a message
    */
-  const executeWithMessage = async (directMessage: Hex): Promise<void> => {
+  const executeWithMessage = async (directMessage: Hex): Promise<{ txHash: string; receipt: any; execNonce?: number } | undefined> => {
     setError(null);
     setSignature(null);
     setIsExecuting(true);
     let messageWithSignature: Hex | undefined = undefined;
+    let execNonce: bigint | undefined = undefined;
 
     try {
       // Check if this is a deposit transaction (only type allowed for first-time users)
@@ -120,7 +122,51 @@ export function useEigenLayerOperation({
         throw new Error("EigenAgent address not available. Please create an EigenAgent by depositing funds first.");
       }
 
-      const execNonceValue = eigenAgentInfo?.execNonce || 0n; // Use 0 for first-time users
+      // Get the latest execution nonce for this agent
+      if (predictedEigenAgentAddress) {
+        // First time users: EigenAgent execNone is zero
+        execNonce = 0n;
+      } else {
+
+        const [serverNonce, onchainNonce] = await Promise.all([
+          (async () => {
+            try {
+              const nonce = await fetchLatestExecNonce(agentAddress);
+              return BigInt(nonce.nextNonce);
+            } catch (error) {
+              console.error('Error fetching server nonce:', error);
+              return 0n;
+            }
+          })(),
+          (async () => {
+            try {
+              const nonce = await l1Wallet.publicClient?.readContract({
+                address: agentAddress,
+                abi: [{
+                  name: 'execNonce',
+                  type: 'function',
+                  inputs: [],
+                  outputs: [{ name: '', type: 'uint256' }],
+                  stateMutability: 'view'
+                }],
+                functionName: 'execNonce'
+              })
+              return BigInt(nonce || 0);
+            } catch (error) {
+              console.error('Error fetching on-chain nonce:', error);
+              return 0n;
+            }
+          })()
+        ]);
+
+        if (serverNonce < onchainNonce) {
+          console.log(`Using on-chain execNonce ${onchainNonce}`);
+          execNonce = onchainNonce;
+        } else {
+          console.log(`Using server execNonce ${serverNonce}`);
+          execNonce = serverNonce;
+        }
+      }
 
       // Handle token approval if needed
       if (tokenApproval) {
@@ -157,7 +203,7 @@ export function useEigenLayerOperation({
           }
 
           if (onError) onError(approvalError instanceof Error ? approvalError : new Error(String(approvalError)));
-          return;
+          return undefined;
         } finally {
           setIsApprovingToken(false);
         }
@@ -177,7 +223,7 @@ export function useEigenLayerOperation({
           l1Wallet,
           agentAddress,
           directMessage,
-          execNonceValue
+          execNonce || 0n
         );
 
         setSignature(result.signature);
@@ -209,7 +255,7 @@ export function useEigenLayerOperation({
           }
 
           if (onError) onError(signError instanceof Error ? signError : new Error(String(signError)));
-          return;
+          return undefined;
         }
 
         // For other signature errors, rethrow
@@ -237,7 +283,7 @@ export function useEigenLayerOperation({
           directMessage,
           amount,
           customGasLimit,
-          setInfo
+          setInfo,
         );
         setInfo("Transaction submitted successfully");
 
@@ -245,6 +291,12 @@ export function useEigenLayerOperation({
         if (onSuccess) {
           onSuccess(txHash, receipt);
         }
+
+        // Return the result including execNonce
+        return {
+          txHash,
+          receipt,
+        };
 
       } catch (txError) {
         // Handle transaction rejection or rate limit error
@@ -271,7 +323,7 @@ export function useEigenLayerOperation({
           setInfo("Transaction was cancelled");
 
           if (onError) onError(txError instanceof Error ? txError : new Error(String(txError)));
-          return;
+          return undefined;
         }
 
         // For other transaction errors, rethrow
@@ -295,7 +347,7 @@ export function useEigenLayerOperation({
         setError(`RPC rate limit exceeded. Please try again in a few minutes.`);
         setInfo(`Your transaction may still be processing. Check your transaction history.`);
         if (onError) onError(err instanceof Error ? err : new Error(String(err)));
-        return;
+        return undefined;
       }
 
       // Check if this error is a user rejection that wasn't caught by the specific handlers
@@ -313,17 +365,20 @@ export function useEigenLayerOperation({
         setInfo(`Operation was rejected: ${errorMessage}`);
 
         if (onError) onError(err instanceof Error ? err : new Error(String(err)));
-        return;
+        return undefined;
       }
 
       // For non-rejection errors, set the error message
       setError(`Error: ${errorMessage}`);
 
       if (onError) onError(err instanceof Error ? err : new Error(String(err)));
+      return undefined;
     } finally {
       // Ensure isExecuting is always reset when the function completes
       setIsExecuting(false);
     }
+
+    return undefined;
   };
 
   return {
@@ -333,7 +388,7 @@ export function useEigenLayerOperation({
     info,
     isApprovingToken,
     approvalHash,
-    executeWithMessage
+    executeWithMessage,
   };
 }
 

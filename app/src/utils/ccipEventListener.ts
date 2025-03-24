@@ -24,10 +24,11 @@ export interface CCIPTransaction {
   from: string;
   to: string; // target contract
   receiptTransactionHash?: string; // Optional field for tracking the receipt transaction hash for CCIP messages
-  isComplete?: boolean; // Optional field for tracking the completion status of bridgingWithdrawalToL2 transactions
-  sourceChainId?: string | number;
-  destinationChainId?: string | number;
+  isComplete: boolean; // Optional field for tracking the completion status of bridgingWithdrawalToL2 transactions
+  sourceChainId: string | number;
+  destinationChainId: string | number;
   user: string;
+  execNonce: number | null;
 }
 
 /**

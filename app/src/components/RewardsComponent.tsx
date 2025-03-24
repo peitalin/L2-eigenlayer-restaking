@@ -11,7 +11,7 @@ import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import {
   getRewardsProofData,
   createRewardClaim
-} from '../utils/rewardsService';
+} from '../utils/rewardsMock';
 import {
   REWARDS_COORDINATOR_ADDRESS,
 } from '../addresses';
