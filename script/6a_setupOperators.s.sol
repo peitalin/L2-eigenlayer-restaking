@@ -16,8 +16,11 @@ contract SetupOperatorsScript is BaseScript {
     uint256 deployerKey;
     address deployer;
 
-    uint256 operatorKey;
-    address operator;
+    uint256 operatorKey1;
+    address operator1;
+    uint256 operatorKey2;
+    address operator2;
+
     address staker;
     address TARGET_CONTRACT; // Contract that EigenAgent forwards calls to
 
@@ -42,17 +45,57 @@ contract SetupOperatorsScript is BaseScript {
         //////////////////////////////////////////////////////////
         vm.selectFork(ethForkId);
 
-        operatorKey = vm.envUint("OPERATOR_KEY");
-        operator = vm.addr(operatorKey);
+        operatorKey1 = vm.envUint("OPERATOR_KEY1");
+        operator1 = vm.addr(operatorKey1);
 
-        if (!delegationManager.isOperator(operator) || isTest) {
-            vm.startBroadcast(operatorKey);
+        operatorKey2 = vm.envUint("OPERATOR_KEY2");
+        operator2 = vm.addr(operatorKey2);
+
+        console.log("operator1:", operator1);
+        console.log("operator2:", operator2);
+
+        if (operator1.balance == 0 ether) {
+            if (isTest) {
+                vm.deal(operator1, 0.05 ether);
+            } else {
+                revert("Operator1 has no balance");
+            }
+        }
+        if (operator2.balance == 0 ether) {
+            if (isTest) {
+                vm.deal(operator2, 0.05 ether);
+            } else {
+                revert("Operator2 has no balance");
+            }
+        }
+
+        if (!delegationManager.isOperator(operator1) || isTest) {
+            vm.startBroadcast(operatorKey1);
             {
-                string memory metadataURI = "some operator";
+                string memory metadataURI = "L2 Restaking Operator";
                 try delegationManager.registerAsOperator(
-                    operator,  // initDelegationApprover
+                    operator1,  // initDelegationApprover
                     10, // allocationDelay
                     metadataURI // metadataURI
+                ) {
+                    // success
+                } catch Panic(uint256 reason) {
+                    console.log(reason);
+                } catch Error(string memory reason) {
+                    console.log(reason); // registerAsOperator: caller is already actively delegated
+                }
+            }
+            vm.stopBroadcast();
+        }
+
+        if (!delegationManager.isOperator(operator2) || isTest) {
+            vm.startBroadcast(operatorKey2);
+            {
+                string memory metadataURI2 = "L2 Restaking Operator2";
+                try delegationManager.registerAsOperator(
+                    operator2,  // initDelegationApprover
+                    10, // allocationDelay
+                    metadataURI2 // metadataURI
                 ) {
                     // success
                 } catch Panic(uint256 reason) {

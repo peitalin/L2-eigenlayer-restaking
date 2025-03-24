@@ -61,8 +61,8 @@ contract DepositAndMintEigenAgentScript is BaseScript {
             vm.deal(staker, 1 ether);
             (bool success, ) = staker.call{value: 0.5 ether}("");
         } else {
-            if (staker.balance < 0.4 ether) {
-                (bool success, ) = staker.call{value: 0.157 ether}("");
+            if (staker.balance < 0.15 ether) {
+                (bool success, ) = staker.call{value: 0.1 ether}("");
             }
         }
         if (tokenL2.balanceOf(deployer) < 1 ether) {
