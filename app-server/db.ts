@@ -41,6 +41,7 @@ export interface Transaction {
   sourceChainId: string | number;
   destinationChainId: string | number;
   user: string;
+  execNonce: number | null;
 }
 
 // Define a type for the database row (column names match SQLite schema)
@@ -57,6 +58,7 @@ type TransactionRow = {
   sourceChainId: string;
   destinationChainId: string;
   user: string;
+  execNonce: number | null;
 };
 
 // Initialize the database with necessary tables
@@ -85,6 +87,33 @@ export function initDatabase() {
     db.prepare('CREATE INDEX IF NOT EXISTS idx_message_id ON transactions(messageId)').run();
     db.prepare('CREATE INDEX IF NOT EXISTS idx_user ON transactions(user)').run();
     db.prepare('CREATE INDEX IF NOT EXISTS idx_receipt_tx_hash ON transactions(receiptTransactionHash)').run();
+
+    // Check if we need to add the execNonce column
+    let hasExecNonceColumn = false;
+    try {
+      // Try to get table info to check if execNonce column exists
+      const tableInfo = db.prepare("PRAGMA table_info(transactions)").all();
+      hasExecNonceColumn = tableInfo.some((column: any) => column.name === 'execNonce');
+
+      if (!hasExecNonceColumn) {
+        console.log('Adding execNonce column to transactions table...');
+        db.prepare('ALTER TABLE transactions ADD COLUMN execNonce INTEGER').run();
+
+        // After adding the column, set NULL for all existing transactions
+        db.prepare('UPDATE transactions SET execNonce = NULL').run();
+
+        console.log('execNonce column added successfully');
+
+        // Create index for the new column
+        db.prepare('CREATE INDEX IF NOT EXISTS idx_eigen_agent_exec_nonce ON transactions(user, execNonce)').run();
+      } else {
+        // Create index if the column already exists but index might not
+        db.prepare('CREATE INDEX IF NOT EXISTS idx_eigen_agent_exec_nonce ON transactions(user, execNonce)').run();
+      }
+    } catch (error) {
+      console.error('Error checking or adding execNonce column:', error);
+      throw error;
+    }
 
     // Check if the table needs to be migrated (if it already exists but with old schema)
     try {
@@ -132,6 +161,7 @@ export function initDatabase() {
             sourceChainId TEXT,
             destinationChainId TEXT,
             user TEXT,
+            execNonce INTEGER,
             UNIQUE(messageId)
           )
         `).run();
@@ -146,6 +176,7 @@ export function initDatabase() {
         db.prepare('CREATE INDEX IF NOT EXISTS idx_message_id ON transactions(messageId)').run();
         db.prepare('CREATE INDEX IF NOT EXISTS idx_user ON transactions(user)').run();
         db.prepare('CREATE INDEX IF NOT EXISTS idx_receipt_tx_hash ON transactions(receiptTransactionHash)').run();
+        db.prepare('CREATE INDEX IF NOT EXISTS idx_eigen_agent_exec_nonce ON transactions(user, execNonce)').run();
 
         // 5. Drop old table
         db.prepare('DROP TABLE transactions_old').run();
@@ -178,7 +209,8 @@ function rowToTransaction(row: TransactionRow): Transaction {
     isComplete: Boolean(row.isComplete),
     sourceChainId: row.sourceChainId,
     destinationChainId: row.destinationChainId,
-    user: row.user
+    user: row.user,
+    execNonce: row.execNonce
   };
 }
 
@@ -197,18 +229,19 @@ export function addTransaction(transaction: Transaction): Transaction {
     isComplete: transaction.isComplete === undefined ? false : transaction.isComplete,
     sourceChainId: transaction.sourceChainId || ETH_CHAINID, // Default to Sepolia
     destinationChainId: transaction.destinationChainId || ETH_CHAINID, // Default to Sepolia
-    user: transaction.user || transaction.from || '0x0000000000000000000000000000000000000000'
+    user: transaction.user || transaction.from || '0x0000000000000000000000000000000000000000',
+    execNonce: transaction.execNonce || null
   };
 
   const stmt = db.prepare(`
     INSERT OR REPLACE INTO transactions (
       txHash, messageId, timestamp, txType, status,
       from_address, to_address, receiptTransactionHash,
-      isComplete, sourceChainId, destinationChainId, user
+      isComplete, sourceChainId, destinationChainId, user, execNonce
     ) VALUES (
       @txHash, @messageId, @timestamp, @txType, @status,
       @from, @to, @receiptTransactionHash,
-      @isComplete, @sourceChainId, @destinationChainId, @user
+      @isComplete, @sourceChainId, @destinationChainId, @user, @execNonce
     )
   `);
 
@@ -225,7 +258,8 @@ export function addTransaction(transaction: Transaction): Transaction {
     isComplete: safeTransaction.isComplete ? 1 : 0,
     sourceChainId: safeTransaction.sourceChainId.toString(),
     destinationChainId: safeTransaction.destinationChainId.toString(),
-    user: safeTransaction.user
+    user: safeTransaction.user,
+    execNonce: safeTransaction.execNonce || null
   });
 
   return safeTransaction;
@@ -237,7 +271,7 @@ export function getAllTransactions(): Transaction[] {
     SELECT
       txHash, messageId, timestamp, txType, status,
       from_address, to_address, receiptTransactionHash,
-      isComplete, sourceChainId, destinationChainId, user
+      isComplete, sourceChainId, destinationChainId, user, execNonce
     FROM transactions
     ORDER BY timestamp DESC
   `).all() as TransactionRow[];
@@ -252,7 +286,7 @@ export function getTransactionByHash(txHash: string): Transaction | undefined {
     SELECT
       txHash, messageId, timestamp, txType, status,
       from_address, to_address, receiptTransactionHash,
-      isComplete, sourceChainId, destinationChainId, user
+      isComplete, sourceChainId, destinationChainId, user, execNonce
     FROM transactions
     WHERE txHash = ?
   `).get(txHash) as TransactionRow | undefined;
@@ -268,7 +302,7 @@ export function getTransactionByMessageId(messageId: string): Transaction | unde
     SELECT
       txHash, messageId, timestamp, txType, status,
       from_address, to_address, receiptTransactionHash,
-      isComplete, sourceChainId, destinationChainId, user
+      isComplete, sourceChainId, destinationChainId, user, execNonce
     FROM transactions
     WHERE messageId = ?
   `).get(messageId) as TransactionRow | undefined;
@@ -284,7 +318,7 @@ export function getTransactionsByUser(userAddress: string): Transaction[] {
     SELECT
       txHash, messageId, timestamp, txType, status,
       from_address, to_address, receiptTransactionHash,
-      isComplete, sourceChainId, destinationChainId, user
+      isComplete, sourceChainId, destinationChainId, user, execNonce
     FROM transactions
     WHERE user = ?
     ORDER BY timestamp DESC
@@ -315,7 +349,8 @@ export function updateTransaction(txHash: string, updates: Partial<Transaction>)
       isComplete = @isComplete,
       sourceChainId = @sourceChainId,
       destinationChainId = @destinationChainId,
-      user = @user
+      user = @user,
+      execNonce = @execNonce
     WHERE txHash = @txHash
   `);
 
@@ -332,7 +367,8 @@ export function updateTransaction(txHash: string, updates: Partial<Transaction>)
     isComplete: updatedTx.isComplete ? 1 : 0,
     sourceChainId: updatedTx.sourceChainId.toString(),
     destinationChainId: updatedTx.destinationChainId.toString(),
-    user: updatedTx.user
+    user: updatedTx.user,
+    execNonce: updatedTx.execNonce || null
   });
 
   return updatedTx;
@@ -353,13 +389,37 @@ export function getPendingTransactions(): Transaction[] {
     SELECT
       txHash, messageId, timestamp, txType, status,
       from_address, to_address, receiptTransactionHash,
-      isComplete, sourceChainId, destinationChainId, user
+      isComplete, sourceChainId, destinationChainId, user, execNonce
     FROM transactions
     WHERE isComplete = 0
     ORDER BY timestamp DESC
   `).all() as TransactionRow[];
 
   return rows.map(row => rowToTransaction(row));
+}
+
+// Get the most recent execNonce for an EigenAgent (user address)
+export function getLatestExecNonceForAgent(agentAddress: string): number | null {
+  // First, check for pending transactions for this agent with the highest execNonce
+  const pendingRow = db.prepare(`
+    SELECT MAX(execNonce) as latestNonce
+    FROM transactions
+    WHERE user = ? AND isComplete = 0 AND execNonce IS NOT NULL
+  `).get(agentAddress) as { latestNonce: number | null } | undefined;
+
+  if (pendingRow?.latestNonce) {
+    return pendingRow.latestNonce;
+  }
+
+  // If no pending transactions, get the most recent completed transaction's execNonce
+  const completedRow = db.prepare(`
+    SELECT MAX(execNonce) as latestNonce
+    FROM transactions
+    WHERE user = ? AND execNonce IS NOT NULL
+    ORDER BY timestamp DESC
+  `).get(agentAddress) as { latestNonce: number | null } | undefined;
+
+  return completedRow?.latestNonce || null;
 }
 
 // Clear all transactions from the database
@@ -374,11 +434,11 @@ export function addTransactions(transactions: Transaction[]): Transaction[] {
     INSERT OR REPLACE INTO transactions (
       txHash, messageId, timestamp, txType, status,
       from_address, to_address, receiptTransactionHash,
-      isComplete, sourceChainId, destinationChainId, user
+      isComplete, sourceChainId, destinationChainId, user, execNonce
     ) VALUES (
       @txHash, @messageId, @timestamp, @txType, @status,
       @from, @to, @receiptTransactionHash,
-      @isComplete, @sourceChainId, @destinationChainId, @user
+      @isComplete, @sourceChainId, @destinationChainId, @user, @execNonce
     )
   `);
 
@@ -418,7 +478,8 @@ export function addTransactions(transactions: Transaction[]): Transaction[] {
         isComplete: tx.isComplete ? 1 : 0,
         sourceChainId: String(sourceChain),
         destinationChainId: String(destChain),
-        user: tx.user
+        user: tx.user,
+        execNonce: tx.execNonce || null
       });
     }
     return txs;

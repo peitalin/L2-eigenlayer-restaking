@@ -73,6 +73,7 @@ interface CCIPMessageData {
   sender?: string;
   receiver?: string;
   blessBlockNumber?: boolean;
+  execNonce?: number; // EigenAgent execution nonce
 }
 // See:
 // https://ccip.chain.link/api/h/atlas/message/0x405715b39feb8ce9771064ea9f9ad42b837c1e73dd811ab87f1e86ffa3d93f8c
@@ -128,7 +129,8 @@ async function fetchCCIPMessageData(messageId: string): Promise<CCIPMessageData 
       destTxHash: data.receiptTransactionHash || null, // Use receiptTransactionHash as destTxHash
       data: data.data,
       sender: data.sender,
-      receiver: data.receiver
+      receiver: data.receiver,
+      execNonce: data.execNonce
     };
   } catch (error) {
     console.error(`Error fetching CCIP message data for messageId ${messageId}:`, error);
@@ -312,6 +314,11 @@ const extractMessageIdFromReceipt = async (
 
 // API Routes
 
+// Simple health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', version: '1.0.0' });
+});
+
 // Fetch CCIP message data
 app.get('/api/ccip/message/:messageId', async (req, res) => {
   const { messageId } = req.params;
@@ -393,6 +400,31 @@ app.get('/api/transactions/messageId/:messageId', (req, res) => {
   }
 });
 
+// GET latest execNonce for an EigenAgent
+app.get('/api/execnonce/:agentAddress', (req, res) => {
+  try {
+    const { agentAddress } = req.params;
+
+    if (!agentAddress || !agentAddress.startsWith('0x')) {
+      return res.status(400).json({ error: 'Invalid EigenAgent address' });
+    }
+
+    const latestNonce = db.getLatestExecNonceForAgent(agentAddress.toLowerCase());
+
+    // If no nonce is found, return 0 as the starting nonce
+    const nextNonce = latestNonce !== null ? latestNonce + 1 : 0;
+
+    res.json({
+      agentAddress: agentAddress.toLowerCase(),
+      latestNonce: latestNonce,
+      nextNonce: nextNonce
+    });
+  } catch (error) {
+    console.error('Error fetching execNonce:', error);
+    res.status(500).json({ error: 'Failed to fetch execNonce' });
+  }
+});
+
 // POST a new transaction (client-facing endpoint)
 app.post('/api/transactions/add', async (req, res) => {
   try {
@@ -444,6 +476,13 @@ app.post('/api/transactions/add', async (req, res) => {
           : L2_CHAINID;
     }
 
+    // If an execNonce is provided, ensure it's a number
+    if (newTransaction.execNonce !== undefined) {
+      // Make sure it's a number
+      newTransaction.execNonce = Number(newTransaction.execNonce);
+      console.log(`Transaction includes execNonce: ${newTransaction.execNonce}`);
+    }
+
     // Continue with extracting messageId if needed
     if (!newTransaction.messageId && newTransaction.txHash) {
       try {
@@ -463,7 +502,7 @@ app.post('/api/transactions/add', async (req, res) => {
           if (agentOwner && (!newTransaction.user || newTransaction.user === '0x0000000000000000000000000000000000000000')) {
             newTransaction.user = agentOwner;
           }
-    } else {
+        } else {
           // If no messageId found, use txHash as the messageId
           console.log(`No messageId found for transaction ${newTransaction.txHash}, using txHash as messageId`);
           newTransaction.messageId = newTransaction.txHash;
