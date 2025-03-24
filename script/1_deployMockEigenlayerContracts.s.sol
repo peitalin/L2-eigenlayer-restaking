@@ -38,7 +38,6 @@ import {IBurnMintERC20} from "@chainlink/shared/token/ERC20/IBurnMintERC20.sol";
 import {EthSepolia} from "./Addresses.sol";
 
 
-// @dev must match EIGENLAYER_VERSION in EigenAgent6551.sol
 string constant EIGENLAYER_VERSION = "v1.3.0";
 // forge install git@github.com/Layr-Labs/eigenlayer-contracts@v1.3.0
 
