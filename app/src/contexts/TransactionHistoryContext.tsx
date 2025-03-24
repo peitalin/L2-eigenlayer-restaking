@@ -61,7 +61,7 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
         clearTimeout(timeoutId);
         // Display a user-friendly error message
         console.error('Server health check failed:', healthErr);
-        setError(`Cannot connect to the transaction server at ${SERVER_BASE_URL}. Is the server running?`);
+        setError(`Cannot connect to the CCIP transaction server: ${SERVER_BASE_URL}. Is the server running?`);
         setIsLoading(false);
         return;
       }

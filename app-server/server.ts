@@ -12,6 +12,7 @@ import { encodeAbiParameters, concat } from 'viem/utils';
 import { sepolia } from 'viem/chains';
 import { parseAbi } from 'viem/utils';
 import { toEventSignature } from 'viem'
+import { signDelegationApproval } from './signDelegationApproval.js';
 import * as db from './db.js';
 
 // Load environment variables
@@ -301,8 +302,9 @@ const extractMessageIdFromReceipt = async (
 
       return { messageId: foundMessageId, agentOwner: foundAgentOwner };
     } catch (error) {
+      const errorResponse = error as ErrorResponse;
       // Check if this is a TransactionReceiptNotFoundError (transaction not mined yet)
-      if (error.shortMessage && error.shortMessage.includes('could not be found') && retryCount < 3) {
+      if (errorResponse.shortMessage && errorResponse.shortMessage.includes('could not be found') && retryCount < 3) {
         // Transaction not mined yet, retry with exponential backoff if within retry limit
         const delayMs = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
         console.log(`Transaction ${receiptHash} not mined yet. Retrying in ${delayMs/1000} seconds... (attempt ${retryCount + 1}/3)`);
@@ -540,15 +542,16 @@ app.post('/api/transactions/add', async (req, res) => {
 
     res.json({ success: true, transaction: savedTransaction });
   } catch (error) {
+    const errorResponse = error as ErrorResponse;
     console.error('Error adding transaction:', error);
     // Provide more specific error message for constraint violations
-    if (error.code === 'SQLITE_CONSTRAINT_CHECK') {
+    if (errorResponse.code === 'SQLITE_CONSTRAINT_CHECK') {
       return res.status(400).json({
         error: 'Invalid transaction data. Check that the transaction type and status are valid values.',
-        details: error.message
+        details: errorResponse.message
       });
     }
-    res.status(500).json({ error: 'Failed to add transaction', details: error.message });
+    res.status(500).json({ error: 'Failed to add transaction', details: errorResponse.message });
   }
 });
 
@@ -684,9 +687,6 @@ if (Object.keys(OPERATOR_KEYS).length === 0) {
 // Create a map of operator addresses to their private keys
 const operatorAddressToKey = new Map<string, string>();
 
-// Get delegation manager address from environment variables
-const DELEGATION_MANAGER_ADDRESS = process.env.DELEGATION_MANAGER_ADDRESS as string;
-
 // Initialize operator addresses
 Object.entries(OPERATOR_KEYS).forEach(([keyName, privateKey]) => {
   if (privateKey) {
@@ -700,101 +700,6 @@ Object.entries(OPERATOR_KEYS).forEach(([keyName, privateKey]) => {
   }
 });
 
-// Add this helper function after the imports
-async function signDelegationApproval(
-  staker: string,
-  operator: string
-): Promise<{
-  signature: string;
-  digestHash: string;
-  salt: string;
-  expiry: string;
-  delegationManagerAddress: string;
-  chainId: string;
-}> {
-  try {
-    // Check if the operator address matches any of our operator keys
-    const operatorKey = operatorAddressToKey.get(operator.toLowerCase());
-    if (!operatorKey) {
-      throw new Error('Unauthorized operator address');
-    }
-
-    // Create account from private key
-    const account = privateKeyToAccount(operatorKey as `0x${string}`);
-
-    // Generate a random salt
-    const salt = keccak256(toBytes(Date.now().toString() + Math.random().toString()));
-
-    // Set expiry to 7 days from now
-    const expiry = BigInt(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60);
-
-    // Use the EthSepolia chain ID and delegation manager address
-    const chainId = 11155111; // Ethereum Sepolia
-    const delegationManagerAddress = DELEGATION_MANAGER_ADDRESS;
-
-    // Calculate the digest hash
-    const encodedData = encodeAbiParameters(
-      [
-        { name: 'staker', type: 'address' },
-        { name: 'operator', type: 'address' },
-        { name: 'salt', type: 'bytes32' },
-        { name: 'expiry', type: 'uint256' }
-      ],
-      [staker as `0x${string}`, operator as `0x${string}`, salt as `0x${string}`, expiry]
-    );
-
-    const delegationTypehash = keccak256(
-      toBytes('DelegationApproval(address staker,address operator,bytes32 salt,uint256 expiry)')
-    );
-
-    const domainSeparator = keccak256(
-      encodeAbiParameters(
-        [
-          { name: 'name', type: 'string' },
-          { name: 'version', type: 'string' },
-          { name: 'chainId', type: 'uint256' },
-          { name: 'verifyingContract', type: 'address' }
-        ],
-        [
-          'EigenLayer',
-          '1.0.0',
-          BigInt(chainId),
-          delegationManagerAddress as `0x${string}`
-        ]
-      )
-    );
-
-    const digestHash = keccak256(
-      concat([
-        toBytes('0x1901'),
-        toBytes(domainSeparator),
-        keccak256(
-          concat([
-            toBytes(delegationTypehash),
-            toBytes(encodedData)
-          ])
-        )
-      ])
-    );
-
-    // Sign the digest
-    const signature = await account.signMessage({
-      message: { raw: digestHash }
-    });
-
-    return {
-      signature,
-      digestHash,
-      salt,
-      expiry: expiry.toString(),
-      delegationManagerAddress,
-      chainId: chainId.toString()
-    };
-  } catch (error) {
-    console.error('Error signing delegation approval:', error);
-    throw error;
-  }
-}
 
 // Update the endpoint before starting the server
 app.post('/api/delegation/sign', async (req, res) => {
@@ -815,14 +720,26 @@ app.post('/api/delegation/sign', async (req, res) => {
       });
     }
 
-    const result = await signDelegationApproval(staker, operator);
+    // Get operator key from map. Only for testing purposes.
+    // In production we query Eigenlayer's API to sign the message.
+    const operatorKey = operatorAddressToKey.get(operator.toLowerCase());
+    if (!operatorKey) {
+      return res.status(401).json({
+        error: 'Unauthorized operator address'
+      });
+    }
+
+    // Set expiry to 7 days from now
+    const expiry = BigInt(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60);
+
+    const result = await signDelegationApproval(staker, operator, operatorKey as `0x${string}`, expiry);
 
     res.json(result);
   } catch (error) {
+    const errorResponse = error as ErrorResponse;
     console.error('Error in delegation signing endpoint:', error);
-
     // Return a 401 status if the operator is not authorized
-    if (error.message === 'Unauthorized operator address') {
+    if (errorResponse.message === 'Unauthorized operator address') {
       return res.status(401).json({
         error: 'Unauthorized operator address'
       });
@@ -830,10 +747,17 @@ app.post('/api/delegation/sign', async (req, res) => {
 
     res.status(500).json({
       error: 'Failed to sign delegation approval',
-      details: error instanceof Error ? error.message : String(error)
+      details: errorResponse.message
     });
   }
 });
+
+interface ErrorResponse {
+  message?: string;
+  details?: string;
+  code?: string;
+  shortMessage?: string;
+}
 
 // Define the Operator type
 interface Operator {

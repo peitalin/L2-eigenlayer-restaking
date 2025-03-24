@@ -15,7 +15,7 @@ const EigenAgentInfo: React.FC = () => {
       <div style={{ position: "relative" }}>
         <h2 style={{ margin: 0 }}>
           Eigenlayer Staking from L2 <br/>
-          with ERC-6551
+          with EigenAgent NFTs
         </h2>
         <img
           src="/assets/logos/treasure/eigenlayer-logo.webp"
@@ -103,9 +103,9 @@ const EigenAgentInfo: React.FC = () => {
             <div style={{ fontSize: '0.9rem', lineHeight: '1.5' }}>
               <p>
                 Stake Magic into Eigenlayer on L1 directly from L2 Treasure Chain using
-                ERC-6551 EigenAgent accounts. Your Magic deposit is routed to L1 and to
-                your EigenAgent, who deposits it for you into Eigenlayer and handles
-                delegation, withdrawals and rewards claiming on your wallet's behalf.
+                ERC-6551 EigenAgent accounts. Your Magic deposit is routed to
+                your EigenAgent on L1, who deposits it for you into Eigenlayer. It also handles
+                delegation, withdrawals and rewards claiming on your behalf.
               </p>
               <p>
                 Your wallet owns the EigenAgent NFT and it's associated ERC-6551
