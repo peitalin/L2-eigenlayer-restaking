@@ -140,7 +140,7 @@ const WithdrawalPage: React.FC = () => {
     amount: 0n,
     expiryMinutes: 45,
     customGasLimit: 580_000n, // see GasLimits.sol
-    onSuccess: (txHash, receipt) => {
+    onSuccess: (txHash, receipt, execNonce) => {
       if (txHash && receipt) {
         addTransaction({
           txHash,
@@ -153,7 +153,8 @@ const WithdrawalPage: React.FC = () => {
           user: l1Wallet.account || '',
           isComplete: false,
           sourceChainId: BaseSepolia.chainId.toString(),
-          destinationChainId: EthSepolia.chainId.toString()
+          destinationChainId: EthSepolia.chainId.toString(),
+          execNonce: execNonce
         });
       }
       showToast(`Withdrawal queued! Transaction hash: ${txHash}`, 'success');
@@ -173,7 +174,7 @@ const WithdrawalPage: React.FC = () => {
     amount: 0n,
     expiryMinutes: 45,
     customGasLimit: 630_000n, // see GasLimits.sol
-    onSuccess: (txHash, receipt) => {
+    onSuccess: (txHash, receipt, execNonce) => {
       if (txHash && receipt) {
         addTransaction({
           txHash,
@@ -186,7 +187,8 @@ const WithdrawalPage: React.FC = () => {
           user: l1Wallet.account || '',
           isComplete: false,
           sourceChainId: BaseSepolia.chainId.toString(),
-          destinationChainId: EthSepolia.chainId.toString()
+          destinationChainId: EthSepolia.chainId.toString(),
+          execNonce: execNonce
         });
       }
       showToast(`Withdrawal completed! Transaction hash: ${txHash}`, 'success');

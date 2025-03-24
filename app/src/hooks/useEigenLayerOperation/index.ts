@@ -289,13 +289,14 @@ export function useEigenLayerOperation({
 
         // Call onSuccess if provided
         if (onSuccess) {
-          onSuccess(txHash, receipt);
+          onSuccess(txHash, receipt, Number(execNonce));
         }
 
         // Return the result including execNonce
         return {
           txHash,
           receipt,
+          execNonce: Number(execNonce)
         };
 
       } catch (txError) {

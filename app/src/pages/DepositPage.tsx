@@ -159,7 +159,7 @@ const DepositPage: React.FC = () => {
     expiryMinutes: 45, // expiry for refunds on reverts, max is 3 days.
     customGasLimit: gasLimit, // isFirstTimeUser ? BigInt(860_000) : BigInt(560_000);
     // For first time users, we automatically mint an EigenAgent which costs most gas
-    onSuccess: (txHash, receipt) => {
+    onSuccess: (txHash, receipt, execNonce) => {
       if (txHash && receipt) {
         addTransaction({
           txHash,
@@ -172,7 +172,8 @@ const DepositPage: React.FC = () => {
           user: l1Wallet.account || '',
           isComplete: false,
           sourceChainId: BaseSepolia.chainId.toString(),
-          destinationChainId: EthSepolia.chainId.toString()
+          destinationChainId: EthSepolia.chainId.toString(),
+          execNonce: execNonce
         });
         showToast('Transaction recorded in history!', 'success');
 

@@ -20,13 +20,13 @@ export interface WalletState {
 }
 
 // Transaction Types
-export type TransactionType = 
-  | 'deposit' 
-  | 'queueWithdrawal' 
-  | 'completeWithdrawal' 
-  | 'delegateTo' 
-  | 'undelegate' 
-  | 'processClaim' 
+export type TransactionType =
+  | 'deposit'
+  | 'queueWithdrawal'
+  | 'completeWithdrawal'
+  | 'delegateTo'
+  | 'undelegate'
+  | 'processClaim'
   | 'other';
 
 export interface TransactionRecord {
@@ -59,7 +59,7 @@ export interface EigenLayerOperationConfig {
   // Optional token approval details
   tokenApproval?: TokenApproval;
   // Function to call after successful operation
-  onSuccess?: (txHash: string, receipt: TransactionReceipt) => void;
+  onSuccess?: (txHash: string, receipt: TransactionReceipt, execNonce: number | null) => void;
   // Function to call after failure
   onError?: (error: Error) => void;
   // Minutes until the signature expires

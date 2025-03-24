@@ -85,7 +85,7 @@ const DelegatePage: React.FC = () => {
     targetContractAddr: DELEGATION_MANAGER_ADDRESS,
     amount: 0n, // No tokens sent for delegation
     customGasLimit: 400000n, // Fixed gas limit for delegateTo as specified
-    onSuccess: (txHash, receipt) => {
+    onSuccess: (txHash, receipt, execNonce) => {
       setIsCurrentlyDelegated(true);
       setCurrentDelegation(selectedOperator);
 
@@ -99,11 +99,11 @@ const DelegatePage: React.FC = () => {
         from: receipt.from,
         to: receipt.to || '',
         user: l1Wallet.account || '',
-        execNonce: (receipt as any).execNonce || null,
         isComplete: false,
         sourceChainId: BaseSepolia.chainId.toString(),
         destinationChainId: EthSepolia.chainId.toString(),
-        receiptTransactionHash: receipt.transactionHash
+        receiptTransactionHash: receipt.transactionHash,
+        execNonce: execNonce
       };
 
       // Add transaction to history

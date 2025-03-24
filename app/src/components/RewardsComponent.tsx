@@ -49,7 +49,7 @@ const RewardsComponent: React.FC = () => {
     targetContractAddr: REWARDS_COORDINATOR_ADDRESS,
     amount: 0n, // No value to send with the transaction
     customGasLimit: APP_CONFIG.GAS_LIMITS.CLAIM_REWARDS,
-    onSuccess: (txHash, receipt) => {
+    onSuccess: (txHash, receipt, execNonce) => {
       showToast('Rewards claim transaction submitted!', 'success');
 
       // Add the processClaim transaction to the history
@@ -65,7 +65,8 @@ const RewardsComponent: React.FC = () => {
           user: l1Wallet.account || '',
           isComplete: false,
           sourceChainId: BaseSepolia.chainId.toString(),
-          destinationChainId: EthSepolia.chainId.toString()
+          destinationChainId: EthSepolia.chainId.toString(),
+          execNonce: execNonce
         });
         showToast('Transaction recorded in history!', 'success');
       }
