@@ -10,6 +10,7 @@ import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import { publicClients } from '../hooks/useClients';
 import { EXPLORER_URLS } from '../configs';
 import TransactionSuccessModal from '../components/TransactionSuccessModal';
+import { simulateDepositIntoStrategy, simulateOnEigenlayer } from '../utils/simulation';
 
 // Add the Strategy ABI for the functions we need
 const strategyAbi = [
@@ -64,6 +65,9 @@ const DepositPage: React.FC = () => {
   } = useClientsContext();
   const { showToast } = useToast();
 
+  // State for loading
+  const [isLoading, setIsLoading] = useState(false);
+
   // State for transaction details
   const [transactionAmount, setTransactionAmount] = useState<string>('0.11');
   const { addTransaction } = useTransactionHistory();
@@ -84,6 +88,7 @@ const DepositPage: React.FC = () => {
     messageId: string;
     operationType: 'deposit';
     isLoading: boolean;
+    simulationSuccess?: boolean;
   } | null>(null);
 
   // Use a ref to track if the modal is currently showing
@@ -228,35 +233,82 @@ const DepositPage: React.FC = () => {
       return;
     }
 
-    // Show modal immediately in loading state
-    setSuccessData({
-      txHash: "",
-      messageId: "",
-      operationType: 'deposit',
-      isLoading: true
-    });
-    setShowSuccessModal(true);
+    if (!l2Wallet.client || !l2Wallet.account || !l2Wallet.publicClient) {
+      showToast("Wallet not connected", 'error');
+      return;
+    }
 
-    // Show signing notification
-    showToast("Please sign the transaction in your wallet...", 'info');
+    // Determine the staker address (eigenAgent or predicted address for first-time users)
+    const stakerAddress = eigenAgentInfo?.eigenAgentAddress ||
+                          (predictedEigenAgentAddress as Address);
 
-    // Create the Eigenlayer depositIntoStrategy message
-    const depositMessage = encodeDepositIntoStrategyMsg(
-      STRATEGY,
-      EthSepolia.bridgeToken,
-      amount
-    );
+    if (!stakerAddress) {
+      showToast("Cannot determine EigenAgent address", 'error');
+      return;
+    }
 
-    // Execute with the message directly
     try {
+      setIsLoading(true);
+
+      // Show the modal with loading state first
+      const initialModalData = {
+        txHash: '',
+        messageId: '',
+        operationType: 'deposit' as const,
+        isLoading: true,
+        simulationSuccess: undefined
+      };
+      setSuccessData(initialModalData);
+      setShowSuccessModal(true);
+
+      // Run simulation with chain switching handled by wrapper
+      await simulateOnEigenlayer({
+        simulate: () => simulateDepositIntoStrategy(
+          STRATEGY as Address,
+          EthSepolia.bridgeToken,
+          amount,
+          stakerAddress
+        ),
+        switchChain,
+        onSuccess: () => {
+          console.log("Deposit simulation successful!");
+          showToast("Deposit simulation successful!", "success");
+          // Update modal with simulation success
+          if (modalVisibleRef.current) {
+            setSuccessData(prev => prev ? {
+              ...prev,
+              simulationSuccess: true
+            } : null);
+          }
+        },
+        onError: (error: string) => {
+          console.error("Deposit simulation failed:", error);
+          showToast(`Deposit simulation failed: ${error}`, "error");
+          // Close modal on simulation failure
+          setShowSuccessModal(false);
+          setSuccessData(null);
+          setIsLoading(false);
+          throw new Error(error); // Throw to prevent continuing with the deposit
+        }
+      });
+
+      // Create the Eigenlayer depositIntoStrategy message
+      const depositMessage = encodeDepositIntoStrategyMsg(
+        STRATEGY,
+        EthSepolia.bridgeToken,
+        amount
+      );
+
+      // Execute with the message directly
       const result = await executeDepositMessage(depositMessage);
 
       // Update modal with transaction hash when available
       if (result?.txHash) {
-        setSuccessData(prev => ({
-          ...prev!,
-          txHash: result.txHash
-        }));
+        setSuccessData(prev => prev ? {
+          ...prev,
+          txHash: result.txHash,
+          isLoading: false
+        } : null);
       }
     } catch (error) {
       console.error("Error depositing into strategy:", error);
@@ -268,13 +320,18 @@ const DepositPage: React.FC = () => {
           errorMessage.toLowerCase().includes('cancelled') ||
           errorMessage.toLowerCase().includes('user refused') ||
           errorMessage.toLowerCase().includes('declined')) {
-        // It's a rejection - immediately reset all states
-        console.log('Transaction rejected by user, resetting states...');
+        // It's a rejection - show info toast
+        console.log('Transaction rejected by user');
         showToast('Transaction was rejected by user', 'info');
+      } else {
+        showToast(errorMessage, 'error');
       }
-      // Clear modal on any error
-      setSuccessData(null);
+
+      // Close modal on any error
       setShowSuccessModal(false);
+      setSuccessData(null);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -315,20 +372,17 @@ const DepositPage: React.FC = () => {
           execNonce: execNonce
         });
 
-        // Update modal to show confirmed state
-        setSuccessData(prev => prev ? {
-          ...prev,
-          isLoading: false,
-          messageId: "" // Update if messageId becomes available
-        } : null);
+        // Update modal to show confirmed state while preserving simulation status
+        if (modalVisibleRef.current) {
+          setSuccessData(prev => prev ? {
+            ...prev,
+            isLoading: false,
+            txHash: txHash,
+            messageId: "" // Update if messageId becomes available
+          } : null);
+        }
 
         showToast('Transaction recorded in history!', 'success');
-
-        // Auto-close modal after 5 seconds
-        setTimeout(() => {
-          setShowSuccessModal(false);
-          setSuccessData(null);
-        }, 5000);
 
         // Refresh data
         setTimeout(() => {
@@ -341,9 +395,9 @@ const DepositPage: React.FC = () => {
     onError: (err) => {
       console.error('Error in deposit operation:', err);
       showToast(`Error in deposit operation: ${err.message}`, 'error');
-      // Clear modal state on error
-      setSuccessData(null);
+      // Close modal on operation error
       setShowSuccessModal(false);
+      setSuccessData(null);
     },
   });
 
@@ -482,6 +536,7 @@ const DepositPage: React.FC = () => {
           sourceChainId={BaseSepolia.chainId.toString()}
           destinationChainId={EthSepolia.chainId.toString()}
           isLoading={successData.isLoading}
+          simulationSuccess={successData.simulationSuccess}
         />
       )}
 

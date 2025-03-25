@@ -482,6 +482,7 @@ a:hover {
   cursor: pointer;
   transition: background-color 0.2s;
   margin-top: 10px;
+  height: 42px;
 }
 
 .eigenagent-check-button:hover {

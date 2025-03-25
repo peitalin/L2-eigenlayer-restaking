@@ -13,6 +13,7 @@ interface TransactionSuccessModalProps {
   sourceChainId: string;
   destinationChainId: string;
   isLoading?: boolean;
+  simulationSuccess?: boolean;
 }
 
 const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({
@@ -23,7 +24,8 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({
   operationType,
   sourceChainId,
   destinationChainId,
-  isLoading = false
+  isLoading = false,
+  simulationSuccess
 }) => {
   if (!isOpen) return null;
 
@@ -87,6 +89,18 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({
               ? 'Your transaction is being processed...'
               : 'Your transaction has been submitted and confirmed.'}</p>
 
+
+            <div className="detail-item">
+              <span className="detail-label">L1 Eigenlayer Simulation:</span>
+              {simulationSuccess === undefined ? (
+                <span className="detail-value"><div className="loading-spinner small"></div></span>
+              ) : (
+                <span className={`detail-value ${simulationSuccess ? 'status-success' : 'status-error'}`}>
+                  {simulationSuccess ? 'Success' : 'Failed'}
+                </span>
+              )}
+            </div>
+
             <div className="detail-item">
               <span className="detail-label">Transaction Hash:</span>
               {isLoading ? (
@@ -124,13 +138,6 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({
                 )}
               </div>
             )}
-
-            <div className="detail-item">
-              <span className="detail-label">Status:</span>
-              <span className={`detail-value ${isLoading ? 'status-pending' : 'status-success'}`}>
-                {isLoading ? 'Processing' : 'Confirmed'}
-              </span>
-            </div>
           </div>
         </div>
 

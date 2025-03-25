@@ -221,11 +221,11 @@ export function useEigenLayerOperation({
       }
 
       // Switch to Ethereum Sepolia for signing
-      setInfo("Temporarily switching to Ethereum Sepolia for signing...");
+      setInfo("Temporarily switching to Ethereum L1 for signing...");
       await switchChain(l1Wallet.publicClient?.chain?.id ?? EthSepolia.chainId);
 
       // Wait a moment for the switch to take effect
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       try {
         // Sign the message

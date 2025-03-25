@@ -178,16 +178,54 @@ export function useClients(): ClientsState {
     }
   }, []);
 
+  // Disconnect wallet
+  const disconnect = async () => {
+    try {
+      // Try to detect different wallet providers
+      if ((window as any).rabby && !window.ethereum) {
+        window.ethereum = (window as any).rabby;
+      }
+
+      // Clear wallet states first to ensure UI updates immediately
+      setL1Wallet(prev => ({
+        ...prev,
+        client: null,
+        account: null,
+        balance: null
+      }));
+
+      setL2Wallet(prev => ({
+        ...prev,
+        client: null,
+        account: null,
+        balance: null
+      }));
+
+      // Remove connection state from localStorage
+      localStorage.removeItem(WALLET_CONNECTED_KEY);
+
+      // Reset selected chain to Base Sepolia
+      setSelectedChain(baseSepolia);
+
+      if (window.ethereum) {
+        try {
+          // Just clear the accounts - this is more reliable than permissions
+          await window.ethereum.request({
+            method: 'eth_accounts'
+          });
+        } catch (e) {
+          console.error('Error clearing accounts:', e);
+        }
+      }
+    } catch (error) {
+      console.error('Error disconnecting wallet:', error);
+    }
+  };
+
   // Connect to wallet and initialize clients
-  // This supports all EIP-1193 compliant wallet providers including:
-  // - MetaMask
-  // - Rabby
-  // - Coinbase Wallet
-  // - And other browser wallets that inject the ethereum provider into window.ethereum
   const connect = async () => {
     try {
-      // Try to detect different wallet providers and assign to window.ethereum if needed
-      // This allows Rabby to work even if it injects itself differently
+      // Try to detect different wallet providers
       if ((window as any).rabby && !window.ethereum) {
         window.ethereum = (window as any).rabby;
       }
@@ -208,145 +246,42 @@ export function useClients(): ClientsState {
         transport: custom(window.ethereum)
       });
 
-      // Request accounts
-      const [address] = await baseClient.requestAddresses();
+      // Request accounts only if we don't have one
+      let address;
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      if (accounts.length === 0) {
+        [address] = await window.ethereum.request({
+          method: 'eth_requestAccounts'
+        });
+      } else {
+        address = accounts[0];
+      }
 
-      // Switch to Base Sepolia
-      await switchChain(baseSepolia.id);
-
-      // Update L1 and L2 wallet states
+      // Update L1 and L2 wallet states first
       setL1Wallet({
         client: sepoliaClient,
-        account: address,
+        account: address as Address,
         balance: null,
         publicClient: publicClients[sepolia.id]
       });
 
       setL2Wallet({
         client: baseClient,
-        account: address,
+        account: address as Address,
         balance: null,
         publicClient: publicClients[baseSepolia.id]
       });
 
-      setSelectedChain(baseSepolia);
-
       // Store connection state in localStorage
       localStorage.setItem(WALLET_CONNECTED_KEY, 'true');
+
+      // Switch to Base Sepolia last
+      await switchChain(baseSepolia.id);
     } catch (error) {
       console.error('Error connecting wallet:', error);
       throw error;
     }
   };
-
-  // Disconnect wallet
-  const disconnect = () => {
-    setL1Wallet(prev => ({
-      ...prev,
-      client: null,
-      account: null,
-      balance: null
-    }));
-
-    setL2Wallet(prev => ({
-      ...prev,
-      client: null,
-      account: null,
-      balance: null
-    }));
-
-    // Remove connection state from localStorage
-    localStorage.removeItem(WALLET_CONNECTED_KEY);
-  };
-
-  // Listen for accountsChanged event from wallet
-  useEffect(() => {
-    // Try to detect different wallet providers
-    if ((window as any).rabby && !window.ethereum) {
-      window.ethereum = (window as any).rabby;
-    }
-
-    if (!window.ethereum) return;
-
-    const handleAccountsChanged = async (accounts: string[]) => {
-      console.log('Accounts changed:', accounts);
-
-      if (accounts.length === 0) {
-        // User disconnected all accounts, clear wallet state
-        disconnect();
-      } else if (accounts[0] !== l1Wallet.account) {
-        // Account changed, update wallet state
-        const address = accounts[0] as Address;
-
-        // Create wallet clients for both chains
-        const baseClient = createWalletClient({
-          chain: baseSepolia,
-          transport: custom(window.ethereum)
-        });
-
-        const sepoliaClient = createWalletClient({
-          chain: sepolia,
-          transport: custom(window.ethereum)
-        });
-
-        // Update L1 and L2 wallet states with new account and clients
-        setL1Wallet(prev => ({
-          ...prev,
-          client: sepoliaClient,
-          account: address
-        }));
-
-        setL2Wallet(prev => ({
-          ...prev,
-          client: baseClient,
-          account: address
-        }));
-
-        // Refresh balances with the new account
-        fetchBalances();
-      }
-    };
-
-    window.ethereum.on('accountsChanged', handleAccountsChanged);
-
-    // Clean up the event listener when component unmounts
-    return () => {
-      window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-    };
-  }, [l1Wallet.account, disconnect, fetchBalances]);
-
-  // Listen for chainChanged event from wallet
-  useEffect(() => {
-    // Try to detect different wallet providers
-    if ((window as any).rabby && !window.ethereum) {
-      window.ethereum = (window as any).rabby;
-    }
-
-    if (!window.ethereum) return;
-
-    const handleChainChanged = (chainIdHex: string) => {
-
-      // Convert hex chainId to number
-      const chainId = parseInt(chainIdHex, 16);
-
-      // Find matching chain configuration
-      const chainConfig = Object.values(chains).find(c => c.id === chainId);
-
-      if (chainConfig) {
-        setSelectedChain(chainConfig);
-
-        // Refresh balances after chain switch
-        fetchBalances();
-      }
-    };
-
-    window.ethereum.on('chainChanged', handleChainChanged);
-
-    // Clean up the event listener when component unmounts
-    return () => {
-      window.ethereum.removeListener('chainChanged', handleChainChanged);
-    };
-  }, [fetchBalances]);
 
   // Switch the active chain
   const switchChain = async (chainId: number) => {
@@ -391,6 +326,100 @@ export function useClients(): ClientsState {
       }
     }
   };
+
+  // Listen for accountsChanged event from wallet
+  useEffect(() => {
+    if (!window.ethereum) return;
+
+    const handleAccountsChanged = async (accounts: string[]) => {
+      console.log('Accounts changed:', accounts);
+
+      if (accounts.length === 0) {
+        // Just disconnect if all accounts are removed
+        await disconnect();
+        return;
+      }
+
+      try {
+        // Create new wallet clients for both chains
+        const baseClient = createWalletClient({
+          chain: baseSepolia,
+          transport: custom(window.ethereum)
+        });
+
+        const sepoliaClient = createWalletClient({
+          chain: sepolia,
+          transport: custom(window.ethereum)
+        });
+
+        // Update wallet states with new account
+        const address = accounts[0] as Address;
+        setL1Wallet(prev => ({
+          ...prev,
+          client: sepoliaClient,
+          account: address,
+          balance: null
+        }));
+
+        setL2Wallet(prev => ({
+          ...prev,
+          client: baseClient,
+          account: address,
+          balance: null
+        }));
+
+        // Just refresh balances - don't switch chains
+        await fetchBalances();
+
+      } catch (error) {
+        console.error('Error handling account change:', error);
+        await disconnect();
+      }
+    };
+
+    // Add event listener
+    window.ethereum.on('accountsChanged', handleAccountsChanged);
+
+    // Clean up the event listener when component unmounts
+    return () => {
+      if (window.ethereum?.removeListener) {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+      }
+    };
+  }, [disconnect, fetchBalances]);
+
+  // Listen for chainChanged event from wallet
+  useEffect(() => {
+    // Try to detect different wallet providers
+    if ((window as any).rabby && !window.ethereum) {
+      window.ethereum = (window as any).rabby;
+    }
+
+    if (!window.ethereum) return;
+
+    const handleChainChanged = (chainIdHex: string) => {
+
+      // Convert hex chainId to number
+      const chainId = parseInt(chainIdHex, 16);
+
+      // Find matching chain configuration
+      const chainConfig = Object.values(chains).find(c => c.id === chainId);
+
+      if (chainConfig) {
+        setSelectedChain(chainConfig);
+
+        // Refresh balances after chain switch
+        fetchBalances();
+      }
+    };
+
+    window.ethereum.on('chainChanged', handleChainChanged);
+
+    // Clean up the event listener when component unmounts
+    return () => {
+      window.ethereum.removeListener('chainChanged', handleChainChanged);
+    };
+  }, [fetchBalances]);
 
   return {
     l1Wallet,

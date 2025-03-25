@@ -13,7 +13,7 @@ const EigenAgentInfo: React.FC = () => {
   return (
     <div className="treasure-info-section">
       <div style={{ position: "relative" }}>
-        <h2 style={{ margin: 0 }}>
+        <h2>
           Eigenlayer Staking from L2 <br/>
           with EigenAgent NFTs
         </h2>
@@ -28,8 +28,8 @@ const EigenAgentInfo: React.FC = () => {
             backgroundColor: 'white',
             objectFit: 'contain',
             position: 'absolute',
-            top: '0',
-            right: '0'
+            top: '8px',
+            right: '0px'
           }}
         />
       </div>

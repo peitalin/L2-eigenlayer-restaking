@@ -330,7 +330,7 @@
   font-weight: 600;
   color: var(--treasure-text-primary);
   margin-top: 0;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .treasure-info-item {

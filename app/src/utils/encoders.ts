@@ -231,13 +231,13 @@ export interface SignatureWithExpiry {
  * TypeScript equivalent of encodeDelegateTo in Solidity
  *
  * @param operator The operator address to delegate to
- * @param approverSignatureAndExpiry The SignatureWithExpiry struct containing signature and expiry
+ * @param approverSignatureWithExpiry The SignatureWithExpiry struct containing signature and expiry
  * @param approverSalt A random salt for the approval
  * @returns Encoded function call as a hex string
  */
 export function encodeDelegateTo(
   operator: Address,
-  approverSignatureAndExpiry: SignatureWithExpiry,
+  approverSignatureWithExpiry: SignatureWithExpiry,
   approverSalt: Hex
 ): Hex {
   return encodeFunctionData({
@@ -245,7 +245,7 @@ export function encodeDelegateTo(
     functionName: 'delegateTo',
     args: [
       operator,
-      approverSignatureAndExpiry,
+      approverSignatureWithExpiry,
       approverSalt
     ]
   });

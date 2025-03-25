@@ -1,11 +1,12 @@
 import {
   Address, Hex, Hash, concat,
   encodeAbiParameters, keccak256, encodePacked,
-  toBytes, WalletClient
+  toBytes, WalletClient,
 } from 'viem';
-import { EthSepolia, DELEGATION_MANAGER_ADDRESS } from '../addresses';
+import { EthSepolia, BaseSepolia, DELEGATION_MANAGER_ADDRESS, STRATEGY, STRATEGY_MANAGER_ADDRESS } from '../addresses';
 import { ZeroAddress } from './encoders';
 import { SERVER_BASE_URL } from '../configs';
+import { DelegationManagerABI, StrategyManagerABI } from '../abis';
 
 // Constants from ClientSigners.sol
 export const EIGEN_AGENT_EXEC_TYPEHASH = keccak256(
@@ -59,39 +60,6 @@ export function domainSeparatorEigenAgent(contractAddr: Address, chainId: bigint
     )
   );
   return domainSeparator;
-}
-
-/**
- * Calculates the domain separator for EigenLayer contracts
- * @param contractAddress The address of the contract (e.g., DelegationManager)
- * @param chainId The chain ID where the contract is deployed
- * @returns The domain separator as bytes32
- */
-export function domainSeparatorEigenlayer(
-  contractAddress: Address,
-  chainId: number
-): Hex {
-  // Major version of EigenLayer - 'v1'
-  const majorVersion = 'v1';
-
-  return keccak256(
-    encodeAbiParameters(
-      [
-        { type: 'bytes32' },
-        { type: 'bytes32' },
-        { type: 'bytes32' },
-        { type: 'uint256' },
-        { type: 'address' }
-      ],
-      [
-        EIP712_DOMAIN_TYPEHASH,
-        keccak256(encodePacked(['string'], ['EigenLayer'])),
-        keccak256(encodePacked(['string'], [majorVersion])),
-        BigInt(chainId),
-        contractAddress
-      ]
-    )
-  );
 }
 
 /**
@@ -168,58 +136,6 @@ export function createEigenAgentCallDigestHash(
   );
 }
 
-/**
- * Calls the calculateDelegationApprovalDigestHash function directly on the DelegationManager contract
- * @param staker The staker address
- * @param operator The operator address
- * @param delegationApprover The delegation approver address
- * @param salt The approval salt
- * @param expiry The expiry timestamp
- * @param publicClient The Ethereum public client
- * @returns Promise resolving to the digest hash from the contract
- */
-export async function callContractCalculateDelegationApprovalDigestHash(
-  staker: Address,
-  operator: Address,
-  delegationApprover: Address,
-  salt: Hex,
-  expiry: bigint,
-  publicClient: any
-): Promise<Hex> {
-  try {
-
-    if (staker === delegationApprover) {
-      throw new Error("Staker and approver cannot be the same");
-    }
-
-    // Call the contract's calculateDelegationApprovalDigestHash function
-    const digestHash = await publicClient.readContract({
-      address: DELEGATION_MANAGER_ADDRESS,
-      abi: [
-        {
-          name: 'calculateDelegationApprovalDigestHash',
-          type: 'function',
-          stateMutability: 'view',
-          inputs: [
-            { name: 'staker', type: 'address' },
-            { name: 'operator', type: 'address' },
-            { name: 'approver', type: 'address' },
-            { name: 'approverSalt', type: 'bytes32' },
-            { name: 'expiry', type: 'uint256' }
-          ],
-          outputs: [{ name: '', type: 'bytes32' }]
-        }
-      ],
-      functionName: 'calculateDelegationApprovalDigestHash',
-      args: [staker, operator, delegationApprover, salt, expiry]
-    });
-
-    return digestHash as Hex;
-  } catch (error) {
-    console.error('Error calling calculateDelegationApprovalDigestHash on contract:', error);
-    throw new Error('Failed to call calculateDelegationApprovalDigestHash on contract');
-  }
-}
 
 /**
  * Create a signature for EigenAgent execution
@@ -351,7 +267,6 @@ export async function signDelegationApprovalServer(
         BigInt(data.expiry),
         publicClient
       );
-
       // Log comparison of the digests
       if (data.digestHash !== contractDigestHash) {
         // Log detailed information for debugging
@@ -381,82 +296,41 @@ export async function signDelegationApprovalServer(
 }
 
 /**
- * Simulates a call to the DelegationManager's delegateTo function
- * This helps verify if the delegation would succeed before actually submitting the transaction
- *
- * @param operator The operator address to delegate to
- * @param signatureWithExpiry The signature struct containing signature and expiry
- * @param salt The salt used for the delegation approval
- * @param staker The staker address (sender of the transaction)
+ * Calls the calculateDelegationApprovalDigestHash function directly on the DelegationManager contract
+ * @param staker The staker address
+ * @param operator The operator address
+ * @param delegationApprover The delegation approver address
+ * @param salt The approval salt
+ * @param expiry The expiry timestamp
  * @param publicClient The Ethereum public client
- * @returns Result of the simulation (success/failure and any error message)
+ * @returns Promise resolving to the digest hash from the contract
  */
-export async function simulateDelegateTo(
-  operator: Address,
-  signatureWithExpiry: { signature: Hex, expiry: bigint },
-  salt: Hex,
+export async function callContractCalculateDelegationApprovalDigestHash(
   staker: Address,
+  operator: Address,
+  delegationApprover: Address,
+  salt: Hex,
+  expiry: bigint,
   publicClient: any
-): Promise<{ success: boolean, error?: string }> {
+): Promise<Hex> {
   try {
-    console.log("Simulating delegateTo with parameters:");
-    console.log("operator:", operator);
-    console.log("staker:", staker);
-    console.log("salt:", salt);
-    console.log("expiry:", signatureWithExpiry.expiry.toString());
-    console.log("signature:", signatureWithExpiry.signature);
 
-    // Simulate the call using eth_call
-    const result = await publicClient.simulateContract({
-      address: DELEGATION_MANAGER_ADDRESS,
-      abi: [
-        {
-          name: 'delegateTo',
-          type: 'function',
-          stateMutability: 'nonpayable',
-          inputs: [
-            { name: 'operator', type: 'address' },
-            {
-              name: 'approverSignatureAndExpiry',
-              type: 'tuple',
-              components: [
-                { name: 'signature', type: 'bytes' },
-                { name: 'expiry', type: 'uint256' }
-              ]
-            },
-            { name: 'approverSalt', type: 'bytes32' }
-          ],
-          outputs: []
-        }
-      ],
-      functionName: 'delegateTo',
-      args: [
-        operator,
-        {
-          signature: signatureWithExpiry.signature,
-          expiry: signatureWithExpiry.expiry
-        },
-        salt
-      ],
-      account: staker
-    });
-
-    console.log("Simulation successful:", result);
-    return { success: true };
-  } catch (error: any) {
-    console.error('Error simulating delegateTo:', error);
-    // Extract the revert reason if available
-    let errorMessage = 'Failed to simulate delegateTo';
-    if (error.cause?.reason) {
-      errorMessage = error.cause.reason;
-    } else if (error.message) {
-      errorMessage = error.message;
+    if (staker === delegationApprover) {
+      throw new Error("Staker and approver cannot be the same");
     }
 
-    return {
-      success: false,
-      error: errorMessage
-    };
+    // Call the contract's calculateDelegationApprovalDigestHash function
+    const digestHash = await publicClient.readContract({
+      address: DELEGATION_MANAGER_ADDRESS,
+      abi: DelegationManagerABI,
+      functionName: 'calculateDelegationApprovalDigestHash',
+      args: [staker, operator, delegationApprover, salt, expiry]
+    });
+
+    return digestHash as Hex;
+  } catch (error) {
+    console.error('Error calling calculateDelegationApprovalDigestHash on contract:', error);
+    throw new Error('Failed to call calculateDelegationApprovalDigestHash on contract');
   }
 }
 

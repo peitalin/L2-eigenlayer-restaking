@@ -5,14 +5,16 @@ import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { encodeUndelegateMsg, encodeDelegateTo, SignatureWithExpiry } from '../utils/encoders';
 import {
-  signDelegationApprovalServer,
-  simulateDelegateTo
-} from '../utils/signers';
+  simulateDelegateTo,
+  simulateUndelegate,
+  simulateOnEigenlayer
+} from '../utils/simulation';
 import { DELEGATION_MANAGER_ADDRESS, EthSepolia, BaseSepolia } from '../addresses';
 import TransactionSuccessModal from '../components/TransactionSuccessModal';
 import { TransactionType } from '../types';
 import { SERVER_BASE_URL } from '../configs';
 import { useToast } from '../utils/toast';
+import { signDelegationApprovalServer } from '../utils/signers';
 
 // Define the Operator type
 interface Operator {
@@ -26,7 +28,20 @@ interface Operator {
 }
 
 const DelegatePage: React.FC = () => {
-  const { l1Wallet, l2Wallet, eigenAgentInfo, predictedEigenAgentAddress } = useClientsContext();
+  const {
+    l1Wallet,
+    l2Wallet,
+    selectedChain,
+    isConnected,
+    switchChain,
+    isLoadingBalance,
+    refreshBalances,
+    eigenAgentInfo,
+    isLoadingEigenAgent,
+    fetchEigenAgentInfo,
+    predictedEigenAgentAddress,
+    isFirstTimeUser
+  } = useClientsContext();
   const { addTransaction } = useTransactionHistory();
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -44,6 +59,7 @@ const DelegatePage: React.FC = () => {
     messageId: string;
     operationType: 'delegate' | 'undelegate';
     isLoading: boolean;
+    simulationSuccess?: boolean;
   } | null>(null);
 
   // Use a ref to track if the modal is currently showing
@@ -322,53 +338,6 @@ const DelegatePage: React.FC = () => {
     );
   };
 
-  // Add a function to simulate delegation before proceeding with actual delegation
-  const simulateDelegation = async (
-    eigenAgentAddress: Address,
-    selectedOp: string,
-    signature: string,
-    expiry: string,
-    salt: string
-  ) => {
-    if (!l1Wallet.publicClient) {
-      console.error("Public client not available");
-      return false;
-    }
-
-    try {
-      // Convert parameters to the right format
-      const signatureWithExpiry = {
-        signature: signature as Hex,
-        expiry: BigInt(expiry)
-      };
-
-      // Run the simulation
-      const simulationResult = await simulateDelegateTo(
-        getAddress(selectedOp),
-        signatureWithExpiry,
-        salt as Hex,
-        eigenAgentAddress,
-        l1Wallet.publicClient
-      );
-
-      // Log the result
-      if (simulationResult.success) {
-        console.log("Delegation simulation successful!");
-        showToast("Delegation simulation successful!", "success");
-        return true;
-      } else {
-        console.error("Delegation simulation failed:", simulationResult.error);
-        showToast(`Delegation simulation failed: ${simulationResult.error}`, "error");
-        setError(`Delegation would fail: ${simulationResult.error}`);
-        return false;
-      }
-    } catch (error) {
-      console.error("Error in delegation simulation:", error);
-      showToast("Error simulating delegation", "error");
-      return false;
-    }
-  };
-
   // Handle delegation to selected operator
   const handleDelegate = async () => {
     if (!selectedOperator) {
@@ -399,9 +368,6 @@ const DelegatePage: React.FC = () => {
       setSuccessData(initialModalData);
       setShowSuccessModal(true);
 
-      // Create a random salt as bytes32
-      const randomSalt = bytesToHex(window.crypto.getRandomValues(new Uint8Array(32)));
-
       // The eigenAgent address is the staker from Eigenlayer's perspective
       const eigenAgentAddress = eigenAgentInfo?.eigenAgentAddress || predictedEigenAgentAddress as Address;
 
@@ -417,47 +383,64 @@ const DelegatePage: React.FC = () => {
         l1Wallet.publicClient
       );
 
-      if (!signature || !expiry) {
-        setError('Failed to sign delegation approval');
-        return;
-      }
+      const approverSalt = serverSalt as Hex;
 
-      // Simulate the delegation before proceeding
-      const simulationSuccess = await simulateDelegation(
-        eigenAgentAddress,
-        selectedOperator,
-        signature,
-        expiry,
-        serverSalt || randomSalt
-      );
-
-      if (!simulationSuccess) {
-        // If simulation fails, don't proceed with the actual delegation
-        setShowSuccessModal(false);
-        setSuccessData(null);
-        setIsLoading(false);
+      if (!signature || !approverSalt) {
+        setError('Failed to sign delegation approval server-side');
         return;
       }
 
       // Create the SignatureWithExpiry struct
-      const approverSignatureAndExpiry: SignatureWithExpiry = {
-        signature: signature as `0x${string}`,
+      const approverSignatureWithExpiry: SignatureWithExpiry = {
+        signature: signature as Hex,
         expiry: BigInt(expiry)
       };
+      // Run simulation with chain switching handled by wrapper
+      await simulateOnEigenlayer({
+        simulate: () => simulateDelegateTo(
+          getAddress(selectedOperator),
+          approverSignatureWithExpiry,
+          approverSalt,
+          eigenAgentAddress
+        ),
+        switchChain,
+        onSuccess: () => {
+          console.log("Delegation simulation successful!");
+          showToast("Delegation simulation successful!", "success");
+          // Update modal with simulation success
+          if (modalVisibleRef.current) {
+            setSuccessData(prev => prev ? {
+              ...prev,
+              simulationSuccess: true
+            } : null);
+          }
+        },
+        onError: (error: string) => {
+          console.error("Delegation simulation failed:", error);
+          showToast(`Delegation simulation failed: ${error}`, "error");
+          setError(`Delegation would fail: ${error}`);
+          // Update modal with simulation failure
+          if (modalVisibleRef.current && successData) {
+            setSuccessData({
+              ...successData,
+              simulationSuccess: false
+            });
+          }
+          // If simulation fails, don't proceed with the actual delegation
+          setIsLoading(false);
+          throw new Error(error); // Throw to prevent continuing with the delegation
+        }
+      });
 
       // Encode the delegateTo message
       const delegateToMessage = encodeDelegateTo(
         getAddress(selectedOperator),
-        approverSignatureAndExpiry,
-        (serverSalt || randomSalt) as `0x${string}`
+        approverSignatureWithExpiry,
+        approverSalt
       );
 
       // Execute the delegation operation
-      const result = await delegateOperation.executeWithMessage(delegateToMessage);
-
-      // Add the transaction with the execNonce
-      if (result && result.execNonce !== undefined) {
-      }
+      await delegateOperation.executeWithMessage(delegateToMessage);
 
     } catch (err) {
       console.error('Error during delegation:', err);
@@ -485,39 +468,65 @@ const DelegatePage: React.FC = () => {
       return;
     }
 
+    if (!l1Wallet.publicClient || !l1Wallet.account) {
+      setError('Wallet not connected');
+      return;
+    }
+
     const eigenAgentAddress = eigenAgentInfo.eigenAgentAddress;
 
-    try {
-      setIsLoading(true);
+    setIsLoading(true);
 
-      // Show the modal with loading state first
-      const initialModalData = {
-        txHash: '',
-        messageId: '',
-        operationType: 'undelegate' as const,
-        isLoading: true
-      };
-      setSuccessData(initialModalData);
-      setShowSuccessModal(true);
+    // Show the modal with loading state first
+    const initialModalData = {
+      txHash: '',
+      messageId: '',
+      operationType: 'undelegate' as const,
+      isLoading: true,
+      simulationSuccess: undefined
+    };
+    setSuccessData(initialModalData);
+    setShowSuccessModal(true);
 
-      // Encode the undelegate message
-      const undelegateMessage = encodeUndelegateMsg(eigenAgentAddress);
-
-      // Execute the undelegation operation
-      const result = await undelegateOperation.executeWithMessage(undelegateMessage);
-
-    } catch (err) {
-      console.error('Error during undelegation:', err);
-      setError(`Undelegation error: ${err instanceof Error ? err.message : String(err)}`);
-
-      // Only update modal state if it's still visible
-      if (modalVisibleRef.current) {
-        setShowSuccessModal(false);
-        setSuccessData(null);
+    // Simulate L1 undelegation before proceeding
+    await simulateOnEigenlayer({
+      simulate: () => simulateUndelegate(
+        eigenAgentAddress,
+        eigenAgentAddress,
+      ),
+      switchChain,
+      onSuccess: () => {
+        console.log("Undelegation simulation successful!");
+        showToast("Undelegation simulation successful!", "success");
+        // Update modal with simulation success
+        if (modalVisibleRef.current) {
+          setSuccessData(prev => prev ? {
+            ...prev,
+            simulationSuccess: true
+          } : null);
+        }
+      },
+      onError: (error: string) => {
+        console.error("Undelegation simulation failed:", error);
+        showToast(`Undelegation simulation failed: ${error}`, "error");
+        setError(`Undelegation may fail: ${error}`);
+        // Update modal with simulation failure
+        if (modalVisibleRef.current && successData) {
+          setSuccessData({
+            ...successData,
+            simulationSuccess: false
+          });
+        }
+        throw new Error(error); // Throw to prevent continuing with the undelegation
       }
-    } finally {
-      setIsLoading(false);
-    }
+    });
+
+
+    // Encode the undelegate message
+    const undelegateMessage = encodeUndelegateMsg(eigenAgentAddress);
+    // Execute the undelegation operation
+    await undelegateOperation.executeWithMessage(undelegateMessage);
+    setIsLoading(false);
   };
 
   const handleCloseSuccessModal = () => {
@@ -644,6 +653,7 @@ const DelegatePage: React.FC = () => {
           sourceChainId={BaseSepolia.chainId.toString()}
           destinationChainId={EthSepolia.chainId.toString()}
           isLoading={successData.isLoading}
+          simulationSuccess={successData.simulationSuccess}
         />
       )}
     </div>

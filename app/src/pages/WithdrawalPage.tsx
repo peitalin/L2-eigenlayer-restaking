@@ -13,16 +13,9 @@ import UserDeposits, { UserDeposit } from '../components/UserDeposits';
 import Expandable from '../components/Expandable';
 import QueuedWithdrawals from '../components/QueuedWithdrawals';
 import TransactionSuccessModal from '../components/TransactionSuccessModal';
+import { simulateQueueWithdrawal, simulateCompleteWithdrawal, simulateOnEigenlayer } from '../utils/simulation';
 
-// Extend the ProcessedWithdrawal interface from QueuedWithdrawals component
-interface ProcessedWithdrawal {
-  strategies: Address[];
-  nonce: bigint;
-  startBlock: bigint;
-  withdrawer: Address;
-  endBlock: bigint;
-  canWithdrawAfter: string | null;
-}
+
 
 const WithdrawalPage: React.FC = () => {
   // Always call useTransactionHistory at the top level, even if you don't use it directly
@@ -45,6 +38,8 @@ const WithdrawalPage: React.FC = () => {
   } = useClientsContext();
 
   // State for transaction details
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [withdrawalAmount, setWithdrawalAmount] = useState<string>('0.05');
   const [withdrawalNonce, setWithdrawalNonce] = useState<bigint>(0n);
   const [delegatedTo, setDelegatedTo] = useState<Address | null>(null);
@@ -61,6 +56,7 @@ const WithdrawalPage: React.FC = () => {
     messageId: string;
     operationType: 'withdrawal';
     isLoading: boolean;
+    simulationSuccess?: boolean;
   } | null>(null);
 
   // Use a ref to track if the modal is currently showing
@@ -70,12 +66,6 @@ const WithdrawalPage: React.FC = () => {
   useEffect(() => {
     modalVisibleRef.current = showSuccessModal;
   }, [showSuccessModal]);
-
-  // Handle closing the success modal
-  const handleCloseSuccessModal = () => {
-    setShowSuccessModal(false);
-    setSuccessData(null);
-  };
 
   // Handler for when deposits are loaded from the UserDeposits component
   const handleDepositsLoaded = (deposits: UserDeposit[]) => {
@@ -220,11 +210,11 @@ const WithdrawalPage: React.FC = () => {
       }
       showToast(`Withdrawal queued! Transaction hash: ${txHash}`, 'success');
     },
-    onError: (err) => {
-      console.error('Error in withdrawal operation:', err);
+    onError: (error: Error) => {
+      console.error('Error in withdrawal operation:', error);
 
       // Check if it's a user rejection
-      const errorMessage = err.message.toLowerCase();
+      const errorMessage = error.message.toLowerCase();
       if (errorMessage.includes('rejected') ||
           errorMessage.includes('denied') ||
           errorMessage.includes('cancelled') ||
@@ -232,7 +222,7 @@ const WithdrawalPage: React.FC = () => {
           errorMessage.includes('declined')) {
         showToast('Transaction was cancelled', 'info');
       } else {
-        showToast(`Error in withdrawal operation: ${err.message}`, 'error');
+        showToast(`Error in withdrawal operation: ${error.message}`, 'error');
       }
 
       // Clear modal state
@@ -286,11 +276,11 @@ const WithdrawalPage: React.FC = () => {
       }
       showToast(`Withdrawal completed! Transaction hash: ${txHash}`, 'success');
     },
-    onError: (err) => {
-      console.error('Error in completing withdrawal:', err);
+    onError: (error: Error) => {
+      console.error('Error in completing withdrawal:', error);
 
       // Check if it's a user rejection
-      const errorMessage = err.message.toLowerCase();
+      const errorMessage = error.message.toLowerCase();
       if (errorMessage.includes('rejected') ||
           errorMessage.includes('denied') ||
           errorMessage.includes('cancelled') ||
@@ -298,14 +288,14 @@ const WithdrawalPage: React.FC = () => {
           errorMessage.includes('declined')) {
         showToast('Transaction was cancelled', 'info');
       } else {
-        showToast(`Error in completing withdrawal: ${err.message}`, 'error');
+        showToast(`Error in completing withdrawal: ${error.message}`, 'error');
       }
 
       // Clear modal state
       setSuccessData(null);
       setShowSuccessModal(false);
 
-      setCompleteError(err.message);
+      setCompleteError(error.message);
       setIsCompletingWithdrawal(false);
     },
   });
@@ -313,7 +303,11 @@ const WithdrawalPage: React.FC = () => {
   // Update the completeError state when completeHookError changes
   useEffect(() => {
     if (completeHookError) {
-      setCompleteError(completeHookError);
+      // Handle both string and Error types
+      const errorMessage = typeof completeHookError === 'string'
+        ? completeHookError
+        : (completeHookError as Error).message;
+      setCompleteError(errorMessage);
       // Ensure the isCompletingWithdrawal state is reset when an error occurs
       setIsCompletingWithdrawal(false);
     }
@@ -328,46 +322,79 @@ const WithdrawalPage: React.FC = () => {
   }, [completeHookError, completeError]);
 
   // Handle completing a withdrawal
-  const handleCompleteWithdrawal = async (withdrawal: ProcessedWithdrawal, sharesArray: bigint[]) => {
+  const handleCompleteWithdrawal = async (withdrawal: WithdrawalStruct, sharesArray: bigint[]) => {
     if (!withdrawal) {
       showToast("No withdrawal selected", 'error');
       return;
     }
 
-    if (!eigenAgentInfo || !delegatedTo) {
+    if (!eigenAgentInfo) {
       showToast("EigenAgent info or delegated address not found", 'error');
       return;
     }
 
-    // Show modal immediately in loading state
-    setSuccessData({
-      txHash: "",
-      messageId: "",
-      operationType: 'withdrawal',
-      isLoading: true
-    });
+    if (!l1Wallet.account || !l1Wallet.publicClient) {
+      showToast("Wallet not connected", 'error');
+      return;
+    }
+
+    // Show the modal with loading state first
+    const initialModalData = {
+      txHash: '',
+      messageId: '',
+      operationType: 'withdrawal' as const,
+      isLoading: true,
+      simulationSuccess: undefined
+    };
+    setSuccessData(initialModalData);
     setShowSuccessModal(true);
 
     try {
       setIsCompletingWithdrawal(true);
       setCompleteError(null);
 
-      // Show a signing notification
-      showToast("Please sign the transaction in your wallet...", 'info');
-
       // Prepare the objects for the completeQueuedWithdrawal function
       const withdrawalStruct: WithdrawalStruct = {
-        staker: eigenAgentInfo.eigenAgentAddress,
-        delegatedTo: delegatedTo,
-        withdrawer: eigenAgentInfo.eigenAgentAddress,
-        nonce: withdrawal.nonce,
-        startBlock: withdrawal.startBlock,
-        strategies: withdrawal.strategies,
+        ...withdrawal,
         scaledShares: sharesArray
       };
 
       // Create tokens to withdraw array (tokens, not strategies)
       const tokensToWithdraw: Address[] = [EthSepolia.bridgeToken as Address];
+
+      // Run L1 simulation with chain switching handled by wrapper
+      await simulateOnEigenlayer({
+        simulate: () => simulateCompleteWithdrawal(
+          withdrawalStruct,
+          tokensToWithdraw,
+          receiveAsTokens,
+          eigenAgentInfo.eigenAgentAddress
+        ),
+        switchChain,
+        onSuccess: () => {
+          console.log("Withdrawal completion simulation successful");
+          showToast('Withdrawal completion simulation successful', 'success');
+          // Update modal with simulation success
+          if (modalVisibleRef.current) {
+            setSuccessData(prev => prev ? {
+              ...prev,
+              simulationSuccess: true
+            } : null);
+          }
+        },
+        onError: (error: string) => {
+          console.error('Complete withdrawal simulation failed:', error);
+          showToast(`Withdrawal completion may fail: ${error}`, 'error');
+          // Update modal with simulation failure
+          if (modalVisibleRef.current && successData) {
+            setSuccessData({
+              ...successData,
+              simulationSuccess: false
+            });
+          }
+          throw new Error(error); // Convert string error to Error object
+        }
+      });
 
       // Create the complete withdrawal message
       const message = encodeCompleteWithdrawalMsg(
@@ -422,54 +449,73 @@ const WithdrawalPage: React.FC = () => {
       return;
     }
 
-    // Show modal immediately in loading state
-    setSuccessData({
-      txHash: "",
-      messageId: "",
-      operationType: 'withdrawal',
-      isLoading: true
-    });
-    setShowSuccessModal(true);
+    if (!l2Wallet.account || !l2Wallet.publicClient) {
+      showToast("Wallet not connected", 'error');
+      return;
+    }
 
-    // Show a signing notification
-    showToast("Please sign the transaction in your wallet...", 'info');
-
-    // Create the withdraw message with the encoded parameters
-    const queueWithdrawalMessage = encodeQueueWithdrawalMsg(
-      STRATEGY,
-      amount,
-      eigenAgentInfo.eigenAgentAddress
-    );
-
-    // Execute with the message directly
     try {
-      const result = await executeQueueWithdrawalMessage(queueWithdrawalMessage);
+      setIsLoading(true);
 
-      // Update modal with transaction hash when available
-      if (result?.txHash) {
-        setSuccessData(prev => ({
-          ...prev!,
-          txHash: result.txHash
-        }));
-      }
-    } catch (error) {
-      console.error("Error queueing withdrawal:", error);
+      // Show the modal with loading state first
+      const initialModalData = {
+        txHash: '',
+        messageId: '',
+        operationType: 'withdrawal' as const,
+        isLoading: true,
+        simulationSuccess: undefined
+      };
+      setSuccessData(initialModalData);
+      setShowSuccessModal(true);
 
-      // If this contains 'rejected', it's likely a user cancellation
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.toLowerCase().includes('rejected') ||
-          errorMessage.toLowerCase().includes('denied') ||
-          errorMessage.toLowerCase().includes('cancelled') ||
-          errorMessage.toLowerCase().includes('user refused') ||
-          errorMessage.toLowerCase().includes('declined')) {
-        console.log('Transaction rejected by user, resetting states...');
-        showToast('Transaction was rejected by user', 'info');
-      } else {
-        showToast(errorMessage, 'error');
-      }
-      // Clear modal on any error
-      setSuccessData(null);
-      setShowSuccessModal(false);
+      // Run simulation with chain switching handled by wrapper
+      await simulateOnEigenlayer({
+        simulate: () => simulateQueueWithdrawal(
+          STRATEGY as Address,
+          amount,
+          eigenAgentInfo.eigenAgentAddress
+        ),
+        switchChain,
+        onSuccess: () => {
+          console.log("Queue withdrawal simulation successful!");
+          showToast("Queue withdrawal simulation successful!", "success");
+          // Update modal with simulation success
+          if (modalVisibleRef.current) {
+            setSuccessData(prev => prev ? {
+              ...prev,
+              simulationSuccess: true
+            } : null);
+          }
+        },
+        onError: (error: string) => {
+          console.error("Queue withdrawal simulation failed:", error);
+          showToast(`Queue withdrawal simulation failed: ${error}`, "error");
+          // Update modal with simulation failure
+          if (modalVisibleRef.current && successData) {
+            setSuccessData({
+              ...successData,
+              simulationSuccess: false
+            });
+          }
+          setIsLoading(false);
+          throw new Error(error); // Throw to prevent continuing with the withdrawal
+        }
+      });
+
+      // Create the withdraw message with the encoded parameters
+      const queueWithdrawalMessage = encodeQueueWithdrawalMsg(
+        STRATEGY,
+        amount,
+        eigenAgentInfo.eigenAgentAddress
+      );
+
+      // Execute the withdrawal operation
+      await executeQueueWithdrawalMessage(queueWithdrawalMessage);
+
+    } catch (err) {
+      console.error('Error during queue withdrawal:', err);
+      setError(`Queue withdrawal error: ${err instanceof Error ? err.message : String(err)}`);
+      setIsLoading(false);
     }
   };
 
@@ -605,13 +651,17 @@ const WithdrawalPage: React.FC = () => {
       {successData && (
         <TransactionSuccessModal
           isOpen={showSuccessModal}
-          onClose={handleCloseSuccessModal}
+          onClose={() => {
+            setShowSuccessModal(false);
+            setSuccessData(null);
+          }}
           txHash={successData.txHash}
           messageId={successData.messageId}
           operationType={successData.operationType}
           sourceChainId={BaseSepolia.chainId.toString()}
           destinationChainId={EthSepolia.chainId.toString()}
           isLoading={successData.isLoading}
+          simulationSuccess={successData.simulationSuccess}
         />
       )}
     </div>
