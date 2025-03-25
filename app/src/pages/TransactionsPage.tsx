@@ -53,7 +53,7 @@ const TransactionsPage: React.FC = () => {
       'Base': EXPLORER_URLS.basescan + '/tx/',
       'Ethereum': EXPLORER_URLS.etherscan + '/tx/',
     };
-    return chainExplorerMap[chainId] || chainExplorerMap['Ethereum'];
+    return `${chainExplorerMap[chainId]}${txHash}` || `${chainExplorerMap['Ethereum']}${txHash}`;
   };
 
   return (
