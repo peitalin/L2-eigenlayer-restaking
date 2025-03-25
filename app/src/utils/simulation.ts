@@ -458,3 +458,79 @@ export async function simulateOnEigenlayer(
     await callbacks.switchChain(BaseSepolia.chainId);
   }
 }
+
+/**
+ * Simulates a reward claim operation on EigenLayer
+ *
+ * @param l1Client The L1 client to use
+ * @param walletAddress The wallet address
+ * @param eigenAgentAddress The EigenAgent address
+ * @param rewardsCoordinatorAddress The RewardsCoordinator address
+ * @param claim The rewards claim data
+ * @param recipient The recipient address
+ * @returns Result of the simulation
+ */
+export async function simulateRewardsClaim(
+  l1Client: any,
+  walletAddress: Address,
+  eigenAgentAddress: Address,
+  rewardsCoordinatorAddress: Address,
+  claim: any, // RewardsMerkleClaim type
+  recipient: Address
+): Promise<{ success: boolean, error?: string }> {
+  try {
+    // Import the encoder for the message
+    const { encodeProcessClaimMsg } = await import('./encoders');
+
+    // Encode the call to processClaim
+    const calldata = encodeProcessClaimMsg(claim, recipient);
+    console.log("Calldata processedClaim: ", calldata);
+
+    // Log the wallet address for debugging
+    console.log("Simulating with account:", walletAddress);
+
+    // Simulate the call through the EigenAgent with the provided wallet address
+    await l1Client.simulateContract({
+      address: eigenAgentAddress,
+      abi: [
+        {
+          name: 'execute',
+          type: 'function',
+          inputs: [
+            { name: 'to', type: 'address' },
+            { name: 'value', type: 'uint256' },
+            { name: 'data', type: 'bytes' },
+            { name: 'operation', type: 'uint8' }
+          ],
+          outputs: [{ name: '', type: 'bytes' }],
+          stateMutability: 'nonpayable'
+        }
+      ] as const,
+      functionName: 'execute',
+      args: [
+        rewardsCoordinatorAddress,
+        0n,
+        calldata,
+        0
+      ],
+      account: walletAddress
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Simulation failed:', error);
+
+    // Extract the revert reason if available
+    let errorMessage = 'Failed to simulate rewards claim';
+    if (error.cause?.reason) {
+      errorMessage = error.cause.reason;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    return {
+      success: false,
+      error: errorMessage
+    };
+  }
+}

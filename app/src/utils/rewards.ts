@@ -118,67 +118,6 @@ export function createClaim(
   };
 }
 
-/**
- * Simulate a reward claim through the EigenAgent
- *
- * @param l1Client The L1 ethers client to use for the simulation
- * @param walletAddress The address of the connected wallet (owner of the EigenAgent)
- * @param eigenAgentAddress The address of the EigenAgent
- * @param rewardsCoordinatorAddress The address of the RewardsCoordinator contract
- * @param claim The claim to process
- * @param recipient The recipient address for the rewards
- * @returns True if the simulation was successful, false otherwise
- */
-export async function simulateRewardClaim(
-  l1Client: any,
-  walletAddress: Address,
-  eigenAgentAddress: Address,
-  rewardsCoordinatorAddress: Address,
-  claim: RewardsMerkleClaim,
-  recipient: Address
-): Promise<boolean> {
-  try {
-    // Encode the call to processClaim
-    const calldata = encodeProcessClaimMsg(claim, recipient);
-    console.log("Calldata processedClaim: ", calldata);
-
-    // Log the wallet address for debugging
-    console.log("Simulating with account:", walletAddress);
-
-    // Simulate the call through the EigenAgent with the provided wallet address
-    const result = await l1Client.simulateContract({
-      address: eigenAgentAddress,
-      abi: [
-        {
-          name: 'execute',
-          type: 'function',
-          inputs: [
-            { name: 'to', type: 'address' },
-            { name: 'value', type: 'uint256' },
-            { name: 'data', type: 'bytes' },
-            { name: 'operation', type: 'uint8' }
-          ],
-          outputs: [{ name: '', type: 'bytes' }],
-          stateMutability: 'nonpayable'
-        }
-      ] as const,
-      functionName: 'execute',
-      args: [
-        rewardsCoordinatorAddress,
-        0n,
-        calldata,
-        0
-      ],
-      account: walletAddress
-    });
-
-    console.log('Simulation result:', result);
-    return true;
-  } catch (error) {
-    console.error('Simulation failed:', error);
-    return false;
-  }
-}
 
 // Equivalent structure to TestRewardsTree in Solidity
 export interface TestRewardsTree {

@@ -3,7 +3,7 @@ import { Address, formatEther } from 'viem';
 import { useClientsContext } from '../contexts/ClientsContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { encodeProcessClaimMsg } from '../utils/encoders';
-import { simulateRewardClaim } from '../utils/rewards';
+import { createClaim } from '../utils/rewards';
 import { RewardsMerkleClaim } from '../abis/RewardsCoordinatorTypes';
 import { RewardsCoordinatorABI } from '../abis';
 import { useToast } from '../utils/toast';
@@ -20,13 +20,21 @@ import {
   EthSepolia
 } from '../addresses';
 import { APP_CONFIG } from '../configs';
+import { simulateOnEigenlayer, simulateRewardsClaim } from '../utils/simulation';
+
+// Define a type for the reward display info
+interface RewardInfo {
+  amount: bigint;
+  token: Address;
+}
 
 const RewardsComponent: React.FC = () => {
   const {
     l1Wallet,
     isConnected,
     eigenAgentInfo,
-    isLoadingEigenAgent
+    isLoadingEigenAgent,
+    switchChain
   } = useClientsContext();
   const { showToast } = useToast();
   const { addTransaction } = useTransactionHistory();
@@ -35,8 +43,10 @@ const RewardsComponent: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [simulationResult, setSimulationResult] = useState<boolean | null>(null);
-  const [rewardAmount, setRewardAmount] = useState<bigint>(0n);
-  const [rewardToken, setRewardToken] = useState<Address | null>(null);
+  const [rewardInfo, setRewardInfo] = useState<RewardInfo>({
+    amount: 0n,
+    token: EthSepolia.bridgeToken
+  });
 
   // Set up the EigenLayer operation hook
   const {
@@ -104,7 +114,7 @@ const RewardsComponent: React.FC = () => {
     }
   };
 
-  // Simulate the claim
+  // Simulate the claim using the simulateOnEigenlayer wrapper
   const simulateClaim = async () => {
     if (!l1Wallet.publicClient || !eigenAgentInfo?.eigenAgentAddress || currentDistRootIndex === null) {
       setError('Required data not available');
@@ -127,8 +137,15 @@ const RewardsComponent: React.FC = () => {
       );
 
       // Store the reward amount for display
-      setRewardAmount(proofData.amount);
-      setRewardToken(proofData.token);
+      // Ensure token is a valid Address using a type guard
+      const tokenAddress: Address = typeof proofData.token === 'string' && proofData.token.startsWith('0x')
+        ? proofData.token as Address
+        : EthSepolia.bridgeToken;
+
+      setRewardInfo({
+        amount: proofData.amount,
+        token: tokenAddress
+      });
 
       // Create the claim object
       const claim: RewardsMerkleClaim = createRewardClaim(
@@ -137,24 +154,31 @@ const RewardsComponent: React.FC = () => {
         proofData
       );
 
-      // Simulate the claim
-      const success = await simulateRewardClaim(
-        l1Wallet.publicClient,
-        l1Wallet.account,
-        eigenAgentInfo.eigenAgentAddress,
-        REWARDS_COORDINATOR_ADDRESS,
-        claim,
-        eigenAgentInfo.eigenAgentAddress
-      );
+      // Use the simulateOnEigenlayer wrapper to run the simulation
+      await simulateOnEigenlayer({
+        simulate: async () => {
+          return await simulateRewardsClaim(
+            l1Wallet.publicClient,
+            l1Wallet.account as Address,
+            eigenAgentInfo.eigenAgentAddress,
+            REWARDS_COORDINATOR_ADDRESS,
+            claim,
+            eigenAgentInfo.eigenAgentAddress
+          );
+        },
+        switchChain: switchChain,
+        onSuccess: () => {
+          setSimulationResult(true);
+          showToast('Simulation successful! You can now claim your rewards.', 'success');
+        },
+        onError: (errorMsg) => {
+          setSimulationResult(false);
+          setError(errorMsg);
+          showToast('Simulation failed. You may not be eligible for rewards or there might be an issue with your claim.', 'error');
+        }
+      });
 
-      setSimulationResult(success);
-
-      if (success) {
-        showToast('Simulation successful! You can now claim your rewards.', 'success');
-      } else {
-        showToast('Simulation failed. You may not be eligible for rewards or there might be an issue with your claim.', 'error');
-      }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error simulating claim:', err);
       setError('Failed to simulate claim. Please try again.');
       setSimulationResult(false);
@@ -243,8 +267,8 @@ const RewardsComponent: React.FC = () => {
                 </div>
               </td>
               {
-                rewardAmount > 0n ? (
-                  <td className="treasure-token-amount">{formatEther(rewardAmount)} MAGIC</td>
+                rewardInfo.amount > 0n ? (
+                  <td className="treasure-token-amount">{formatEther(rewardInfo.amount)} MAGIC</td>
                 ) : (
                   <td className="treasure-token-amount">0 MAGIC</td>
                 )
