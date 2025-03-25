@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { createServer } from 'https';
+import https from 'https';
 import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
@@ -14,6 +14,8 @@ import { parseAbi } from 'viem/utils';
 import { toEventSignature } from 'viem'
 import { signDelegationApproval } from './signDelegationApproval.js';
 import * as db from './db.js';
+import { Server, Socket } from 'socket.io';
+import { router } from './routes.js';
 
 // Load environment variables
 config();
@@ -60,26 +62,26 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.SERVER_PORT || 3001;
 
-// SSL options
+// SSL configuration using Let's Encrypt certificates
 const sslOptions = {
-  key: fs.readFileSync(path.join(__dirname, 'certs/private.key')),
-  cert: fs.readFileSync(path.join(__dirname, 'certs/certificate.crt'))
+  key: fs.readFileSync('/etc/letsencrypt/live/api.l2restaking.info/privkey.pem'),
+  cert: fs.readFileSync('/etc/letsencrypt/live/api.l2restaking.info/fullchain.pem')
 };
 
 // Middleware
 app.use(cors({
   origin: [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://137.184.229.15:5173',
     'https://l2-eigenlayer-restaking-git-frontend-peita-lins-projects.vercel.app',
-    /\.vercel\.app$/  // This will allow all vercel.app subdomains
+    /\.vercel\.app$/,
+    'http://localhost:5173',
+    'http://localhost:3000'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
 app.use(express.json());
+app.use('/api', router);
 
 // Data storage path - ensure the data directory exists for SQLite
 const dataDir = path.join(__dirname, 'data');
@@ -868,7 +870,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Start the server
-const httpsServer = createServer(sslOptions, app);
+const httpsServer = https.createServer(sslOptions, app);
 
 // Function to check and update pending transactions
 async function updatePendingTransactions() {
@@ -969,7 +971,7 @@ httpsServer.listen({
   port: PORT,
   host: '0.0.0.0'
 }, () => {
-  console.log(`Server running on port ${PORT} with HTTPS enabled and listening on all interfaces`);
+  console.log(`🚀 HTTPS Server running at https://api.l2restaking.info:${PORT}`);
 
   // Run an initial update when the server starts
   updatePendingTransactions();
@@ -1050,3 +1052,22 @@ try {
 } catch (error) {
   console.error('Error initializing database:', error);
 }
+
+// Socket.io connection handling
+const io = new Server(httpsServer, {
+  cors: {
+    origin: [
+      'https://l2-eigenlayer-restaking-git-frontend-peita-lins-projects.vercel.app',
+      /\.vercel\.app$/,
+      'http://localhost:5173',
+      'http://localhost:3000'
+    ],
+    methods: ['GET', 'POST']
+  }
+});
+
+// Socket.io connection handling
+io.on('connection', (socket: Socket) => {
+  console.log('Client connected');
+  socket.on('disconnect', () => console.log('Client disconnected'));
+});
