@@ -16,6 +16,7 @@ import { signDelegationApproval } from './signDelegationApproval.js';
 import * as db from './db.js';
 import { Server, Socket } from 'socket.io';
 import { router } from './routes.js';
+import { SecureVersion } from 'tls';
 
 // Load environment variables
 config();
@@ -65,7 +66,16 @@ const PORT = process.env.SERVER_PORT || 3001;
 // SSL configuration using Let's Encrypt certificates
 const sslOptions = {
   key: fs.readFileSync('/etc/letsencrypt/live/api.l2restaking.info/privkey.pem'),
-  cert: fs.readFileSync('/etc/letsencrypt/live/api.l2restaking.info/fullchain.pem')
+  cert: fs.readFileSync('/etc/letsencrypt/live/api.l2restaking.info/fullchain.pem'),
+  secureProtocol: 'TLS_method',
+  minVersion: 'TLSv1.2' as SecureVersion,
+  ciphers: [
+    'TLS_AES_256_GCM_SHA384',
+    'TLS_AES_128_GCM_SHA256',
+    'TLS_CHACHA20_POLY1305_SHA256',
+    'ECDHE-RSA-AES128-GCM-SHA256',
+    'ECDHE-RSA-AES256-GCM-SHA384'
+  ].join(':')
 };
 
 // Middleware
@@ -869,7 +879,16 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Start the server
+// Create HTTP server that redirects to HTTPS
+const httpServer = express();
+httpServer.use((req, res) => {
+  res.redirect(`https://${req.hostname}:${PORT}${req.url}`);
+});
+httpServer.listen(80, '0.0.0.0', () => {
+  console.log('HTTP server running on port 80 (redirecting to HTTPS)');
+});
+
+// Create HTTPS server
 const httpsServer = https.createServer(sslOptions, app);
 
 // Function to check and update pending transactions
