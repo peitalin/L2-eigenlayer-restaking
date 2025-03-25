@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Set environment variables
-export USE_SSL=false
+export USE_SSL=true
 export NODE_ENV=production
 export PORT=3001
 
