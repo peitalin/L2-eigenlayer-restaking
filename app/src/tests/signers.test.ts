@@ -29,8 +29,8 @@ vi.setConfig({ testTimeout: 10000 }); // 10 second timeout
 // Try to get the private key from environment variables
 // Fall back to a known testing key if not available
 let testKey: Hex;
-if (process.env.TEST_PRIVATE_KEY) {
-  testKey = process.env.TEST_PRIVATE_KEY as Hex;
+if (process.env.VITE_TEST_PRIVATE_KEY) {
+  testKey = process.env.VITE_TEST_PRIVATE_KEY as Hex;
   // Reduce logging
   // console.log('Using TEST_PRIVATE_KEY from environment variables');
 } else {

@@ -3,7 +3,8 @@ import { BaseSepolia } from "./addresses";
 import { ChainlinkConfig } from "./addresses";
 
 // Define server base URL
-export const SERVER_BASE_URL = 'http://localhost:3001';
+export const SERVER_BASE_URL = import.meta.env.VITE_SERVER_BASE_URL;
+console.log('SERVER_BASE_URL:', SERVER_BASE_URL);
 
 // RPC URLs
 export const SEPOLIA_RPC_URL = 'https://sepolia.gateway.tenderly.co';
