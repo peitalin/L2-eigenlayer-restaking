@@ -35,14 +35,23 @@ app-server/
 ```bash
 # Runs in HTTP mode (without SSL) for local development
 npm run server:watch
+
 ```
 
 ### Production Mode (HTTPS)
-
+Use `pm2`:
 ```bash
 # Runs in HTTPS mode with SSL for production
-npm run server:watch-prod
+npm install pm2 -g
+pm2 start ecosystem.config.js
 ```
+
+Stop the server with:
+```bash
+pm2 list
+pm2 stop app-server
+```
+
 
 ## Environment Variables
 

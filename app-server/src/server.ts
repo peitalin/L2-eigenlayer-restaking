@@ -22,6 +22,7 @@ import {
 } from './utils/operators';
 import { extractMessageIdFromTxHash, updateTransactionStatus } from './utils/transaction';
 import logger from './utils/logger';
+import transactionsRouter from './routes/transactions';
 
 // Load environment variables
 config();
@@ -98,6 +99,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use('/api', router);
+app.use('/api/transactions', transactionsRouter);
 
 // Data storage path - ensure the data directory exists for SQLite
 const dataDir = path.join(__dirname, '..', 'data');
@@ -148,16 +150,16 @@ app.get('/api/ccip/message/:messageId', async (req, res) => {
   }
 });
 
-// GET all transactions
-app.get('/api/transactions', (req, res) => {
-  try {
-    const transactions = db.getAllTransactions();
-    res.json(transactions);
-  } catch (error) {
-    console.error('Error reading transaction history:', error);
-    res.status(500).json({ error: 'Failed to read transaction history' });
-  }
-});
+// // GET all transactions
+// app.get('/api/transactions', (req, res) => {
+//   try {
+//     const transactions = db.getAllTransactions();
+//     res.json(transactions);
+//   } catch (error) {
+//     console.error('Error reading transaction history:', error);
+//     res.status(500).json({ error: 'Failed to read transaction history' });
+//   }
+// });
 
 // GET transactions by user address
 app.get('/api/transactions/user/:address', (req, res) => {
