@@ -1,6 +1,17 @@
 import { privateKeyToAccount } from 'viem/accounts';
-import { keccak256, toBytes, concat, encodeAbiParameters, Hex, Address } from 'viem';
-import { DELEGATION_MANAGER_ADDRESS, EIP712_DOMAIN_TYPEHASH } from './constants.js';
+import { keccak256, toBytes, concat, encodeAbiParameters, Hex, Address, createPublicClient, http } from 'viem';
+import { sepolia } from 'viem/chains';
+import {
+  DELEGATION_MANAGER_ADDRESS,
+  EIP712_DOMAIN_TYPEHASH,
+  DELEGATION_APPROVAL_TYPEHASH,
+  L1_CHAIN_ID
+} from './constants.js';
+
+const publicClient = createPublicClient({
+  chain: sepolia,
+  transport: http(process.env.SEPOLIA_RPC_URL || 'https://sepolia.drpc.org')
+});
 
 interface SignDelegationApprovalResult {
   signature: string;
@@ -13,7 +24,7 @@ interface SignDelegationApprovalResult {
 
 export async function signDelegationApproval(
   staker: string,
-  operator: string,
+  approver: string,
   operatorKey: `0x${string}`,
   expiry: bigint,
   testSalt?: Hex | undefined,
@@ -21,70 +32,54 @@ export async function signDelegationApproval(
   try {
     // Create account from private key
     const operatorAccount = privateKeyToAccount(operatorKey);
-    console.log("operatorAccount", operatorAccount.address);
-
     // Generate a random salt
     const salt: Hex = !!testSalt
       ? testSalt
       : keccak256(toBytes(Date.now().toString() + Math.random().toString()));
-    console.log("salt", salt);
+
+    console.log("========= Signing Delegation Approval==========");
+    console.log({
+      staker: staker,
+      approver: approver,
+      operator: operatorAccount.address,
+      expiry: expiry,
+      salt: salt
+    });
+
+    if (staker === approver) {
+      throw new Error("Staker and approver cannot be the same");
+    }
 
     // Use the EthSepolia chain ID and delegation manager address
-    const chainId = 11155111; // Ethereum Sepolia
+    const chainId = L1_CHAIN_ID; // Ethereum Sepolia
     const delegationManagerAddress = DELEGATION_MANAGER_ADDRESS;
 
-    // Calculate the digest hash
-    const delegationTypehash = keccak256(
-      toBytes('DelegationApproval(address delegationApprover,address staker,address operator,bytes32 salt,uint256 expiry)')
+    // Get digest hash directly from the contract
+    const digestHash = await callContractCalculateDelegationApprovalDigestHash(
+      staker as Address,
+      operatorAccount.address as Address,
+      approver as Address,
+      salt,
+      expiry
     );
 
-    const domainSeparator = keccak256(
-      encodeAbiParameters(
-        [
-          { name: 'typeHash', type: 'bytes32' },
-          { name: 'name', type: 'bytes32' },
-          { name: 'version', type: 'bytes32' },
-          { name: 'chainId', type: 'uint256' },
-          { name: 'verifyingContract', type: 'address' }
-        ],
-        [
-          EIP712_DOMAIN_TYPEHASH,
-          keccak256(toBytes('EigenLayer')),
-          keccak256(toBytes('v1')), // major version (Eigenlayer is currently on v1.3.0)
-          BigInt(chainId),
-          delegationManagerAddress as `0x${string}`
-        ]
-      )
+    const manualDigestHash = calculateDelegationApprovalDigestHash(
+      staker as Address,
+      operatorAccount.address as Address,
+      approver as Address,
+      salt,
+      expiry,
+      BigInt(chainId)
     );
 
-    const approverStructHash = keccak256(
-      encodeAbiParameters(
-        [
-          { type: 'bytes32' },
-          { type: 'address' },
-          { type: 'address' },
-          { type: 'address' },
-          { type: 'bytes32' },
-          { type: 'uint256' }
-        ],
-        [
-          delegationTypehash,
-          operator as `0x${string}`, // delegationApprover is the operator in this case
-          staker as `0x${string}`,
-          operator as `0x${string}`,
-          salt,
-          expiry
-        ]
-      )
-    );
-
-    const digestHash = keccak256(
-      concat([
-        toBytes('0x1901'),
-        toBytes(domainSeparator),
-        toBytes(approverStructHash)
-      ])
-    );
+    // If digests don't match, throw error
+    if (digestHash !== manualDigestHash) {
+      console.log("Contract digest hash:", digestHash);
+      console.log("Manual digest hash:", manualDigestHash);
+      console.log("Digests match:", digestHash === manualDigestHash);
+      console.error("Digest hash mismatch between contract and manual calculation");
+      console.error("Contract params: staker, operator, approver, salt, expiry", staker, operatorAccount.address, approver, salt, expiry.toString());
+    }
 
     // Sign the digest hash directly using sign() not signMessage()
     // Otherwise signMessage() automatically adds a EIP-191 prefix which won't
@@ -108,4 +103,114 @@ export async function signDelegationApproval(
     }
     throw new Error('Unknown error occurred while signing delegation approval');
   }
+}
+
+
+/**
+ * Calls the calculateDelegationApprovalDigestHash function directly on the DelegationManager contract
+ * @param staker The staker address
+ * @param operator The operator address
+ * @param delegationApprover The delegation approver address
+ * @param salt The approval salt
+ * @param expiry The expiry timestamp
+ * @returns Promise resolving to the digest hash from the contract
+ */
+export async function callContractCalculateDelegationApprovalDigestHash(
+  staker: Address,
+  operator: Address,
+  delegationApprover: Address,
+  salt: Hex,
+  expiry: bigint
+): Promise<Hex> {
+  try {
+    // Log all parameters to help diagnose
+
+    // Call the contract's calculateDelegationApprovalDigestHash function
+    const digestHash = await publicClient.readContract({
+      address: DELEGATION_MANAGER_ADDRESS,
+      abi: [
+        {
+          name: 'calculateDelegationApprovalDigestHash',
+          type: 'function',
+          stateMutability: 'view',
+          inputs: [
+            { name: 'staker', type: 'address' },
+            { name: 'operator', type: 'address' },
+            { name: 'approver', type: 'address' },
+            { name: 'approverSalt', type: 'bytes32' },
+            { name: 'expiry', type: 'uint256' }
+          ],
+          outputs: [{ name: '', type: 'bytes32' }]
+        }
+      ],
+      functionName: 'calculateDelegationApprovalDigestHash',
+      args: [staker, operator, delegationApprover, salt, expiry]
+    });
+
+    return digestHash as Hex;
+  } catch (error) {
+    console.error('Error calling calculateDelegationApprovalDigestHash on contract:', error);
+    throw new Error('Failed to call calculateDelegationApprovalDigestHash on contract');
+  }
+}
+
+
+function calculateDelegationApprovalDigestHash(
+  staker: Address,
+  operator: Address,
+  approver: Address,
+  salt: Hex,
+  expiry: bigint,
+  chainId: bigint
+): Hex {
+
+  const domainSeparator = keccak256(
+    encodeAbiParameters(
+      [
+        { name: 'typeHash', type: 'bytes32' },
+        { name: 'name', type: 'bytes32' },
+        { name: 'version', type: 'bytes32' },
+        { name: 'chainId', type: 'uint256' },
+        { name: 'verifyingContract', type: 'address' }
+      ],
+      [
+        EIP712_DOMAIN_TYPEHASH,
+        keccak256(toBytes('EigenLayer')),
+        keccak256(toBytes('v1')), // major version (Eigenlayer is currently on v1.3.0)
+        BigInt(chainId),
+        DELEGATION_MANAGER_ADDRESS
+      ]
+    )
+  );
+
+  const approverStructHash = keccak256(
+    encodeAbiParameters(
+      [
+        { type: 'bytes32' },
+        { type: 'address' },
+        { type: 'address' },
+        { type: 'address' },
+        { type: 'bytes32' },
+        { type: 'uint256' }
+      ],
+      [
+        DELEGATION_APPROVAL_TYPEHASH,
+        approver as Address, // delegationApprover is the operator in this case
+        staker as Address,
+        operator as Address, // operator
+        salt,
+        expiry
+      ]
+    )
+  );
+
+  const manualDigestHash = keccak256(
+    concat([
+      toBytes('0x1901'),
+      toBytes(domainSeparator),
+      toBytes(approverStructHash)
+    ])
+  );
+
+  return manualDigestHash;
 }
