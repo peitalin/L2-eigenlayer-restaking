@@ -39,17 +39,24 @@ npm run server:watch
 ```
 
 ### Production Mode (HTTPS)
-Use `pm2`:
+
+You will need to generate SSL certs and then use `pm2`.
+```bash
+sh generate_ssl_certs.sh
+```
+
+Then run:
 ```bash
 # Runs in HTTPS mode with SSL for production
 npm install pm2 -g
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.cjs
 ```
 
 Stop the server with:
 ```bash
 pm2 list
 pm2 stop app-server
+pm2 delete app-server
 ```
 
 

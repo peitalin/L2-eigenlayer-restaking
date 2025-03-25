@@ -3,7 +3,6 @@ module.exports = {
     name: "app-server",
     script: "tsx",
     args: "src/server.ts",
-    cwd: ".",
     env: {
       USE_SSL: "true",
       NODE_ENV: "production"
