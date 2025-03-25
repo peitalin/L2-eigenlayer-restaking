@@ -1,22 +1,27 @@
 import express from 'express';
 import cors from 'cors';
 import https from 'https';
+import * as nodeHttp from 'http';
 import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { promises as fsPromises } from 'fs';
-import { createPublicClient, http, decodeEventLog, PublicClient, keccak256, toBytes, toHex } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
-import { encodeAbiParameters, concat } from 'viem/utils';
-import { sepolia } from 'viem/chains';
-import { parseAbi } from 'viem/utils';
-import { toEventSignature } from 'viem'
-import { signDelegationApproval } from './signDelegationApproval.js';
-import * as db from './db.js';
-import { Server, Socket } from 'socket.io';
-import { router } from './routes.js';
-import { SecureVersion } from 'tls';
+import { createPublicClient, http, PublicClient } from 'viem';
+import { sepolia, baseSepolia } from 'viem/chains';
+import { signDelegationApproval } from './signers/signDelegationApproval';
+import * as db from './db';
+import { router } from './routes';
+import { fetchCCIPMessageData } from './utils/ccip';
+import { ErrorResponse } from './types';
+import { ETH_CHAINID, L2_CHAINID } from './utils/constants';
+import {
+  OPERATORS_DATA,
+  operatorsByAddress,
+  operatorAddressToKey,
+} from './utils/operators';
+import { extractMessageIdFromTxHash, updateTransactionStatus } from './utils/transaction';
+import logger from './utils/logger';
 
 // Load environment variables
 config();
@@ -27,10 +32,6 @@ const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 if (missingEnvVars.length > 0) {
   throw new Error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
 }
-
-// Chain ID constants
-const ETH_CHAINID = "11155111"; // Ethereum Sepolia
-const L2_CHAINID = "84532";     // Base Sepolia
 
 /**
  * L2-eigenlayer-restaking Transaction Server
@@ -63,21 +64,30 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.SERVER_PORT || 3001;
 
-// SSL configuration using Let's Encrypt certificates
-const sslOptions = {
-  key: fs.readFileSync('/etc/letsencrypt/live/api.l2restaking.info/privkey.pem'),
-  cert: fs.readFileSync('/etc/letsencrypt/live/api.l2restaking.info/fullchain.pem')
-};
+// Environment variable to control SSL usage
+const USE_SSL = process.env.USE_SSL === 'true';
+console.log(`Server running with SSL: ${USE_SSL ? 'ENABLED' : 'DISABLED'}`);
 
-// Log SSL configuration for debugging
-console.log('SSL configuration loaded:');
-console.log('- Key file exists:', fs.existsSync('/etc/letsencrypt/live/api.l2restaking.info/privkey.pem'));
-console.log('- Cert file exists:', fs.existsSync('/etc/letsencrypt/live/api.l2restaking.info/fullchain.pem'));
+// SSL configuration only when enabled
+let sslOptions;
+if (USE_SSL) {
+  try {
+    console.log('Loading SSL certificates...');
+    sslOptions = {
+      key: fs.readFileSync('/etc/letsencrypt/live/api.l2restaking.info/privkey.pem'),
+      cert: fs.readFileSync('/etc/letsencrypt/live/api.l2restaking.info/fullchain.pem'),
+    };
+    console.log('SSL certificates loaded successfully');
+  } catch (error) {
+    console.error('Failed to load SSL certificates:', error);
+    console.log('Falling back to HTTP mode');
+    process.env.USE_SSL = 'false';
+  }
+}
 
 // Middleware
 app.use(cors({
   origin: [
-    'https://l2-eigenlayer-restaking-git-frontend-peita-lins-projects.vercel.app',
     /\.vercel\.app$/,
     'http://localhost:5173',
     'http://localhost:3000'
@@ -90,43 +100,10 @@ app.use(express.json());
 app.use('/api', router);
 
 // Data storage path - ensure the data directory exists for SQLite
-const dataDir = path.join(__dirname, 'data');
+const dataDir = path.join(__dirname, '..', 'data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
-
-// Define types for CCIP message data
-interface CCIPMessageData {
-  messageId: string;
-  state: number;
-  status: string; // SUCCESS, INFLIGHT, FAILED, etc.
-  sourceChainId: string;
-  destChainId: string;
-  receiptTransactionHash?: string;
-  destTxHash?: string; // Destination transaction hash
-  data?: string;
-  sender?: string;
-  receiver?: string;
-  blessBlockNumber?: boolean;
-  execNonce?: number; // EigenAgent execution nonce
-}
-// See:
-// https://ccip.chain.link/api/h/atlas/message/0x405715b39feb8ce9771064ea9f9ad42b837c1e73dd811ab87f1e86ffa3d93f8c
-
-// Define the transaction history interface (now we use the one from db.ts)
-type CCIPTransaction = db.Transaction;
-
-// Add this constant for the MessageSent event signature
-const MESSAGE_SENT_SIGNATURE = keccak256(toBytes(toEventSignature('event MessageSent(bytes32 indexed, uint64 indexed, address, (address, uint256)[], address, uint256)')));
-// cast sig-event "MessageSent (bytes32 indexed, uint64 indexed, address, (address, uint256)[], address, uint256)"
-const KNOWN_MESSAGE_SENT_SIGNATURE = '0xf41bc76bbe18ec95334bdb88f45c769b987464044ead28e11193a766ae8225cb';
-if (MESSAGE_SENT_SIGNATURE !== KNOWN_MESSAGE_SENT_SIGNATURE) {
-  throw new Error('MESSAGE_SENT_SIGNATURE does not match KNOWN_MESSAGE_SENT_SIGNATURE');
-}
-
-// Add event signatures for bridging events
-const BRIDGING_WITHDRAWAL_TO_L2_SIGNATURE = keccak256(toBytes(toEventSignature('event BridgingWithdrawalToL2(address,(address,uint256)[])')));
-const BRIDGING_REWARDS_TO_L2_SIGNATURE = keccak256(toBytes(toEventSignature('event BridgingRewardsToL2(address,(address,uint256)[])')));
 
 // Create public clients to interact with different chains
 const publicClientL1 = createPublicClient({
@@ -134,8 +111,9 @@ const publicClientL1 = createPublicClient({
   transport: http(process.env.SEPOLIA_RPC_URL || 'https://ethereum-sepolia.publicnode.com')
 });
 
-// Import Base Sepolia chain configuration
-import { baseSepolia } from 'viem/chains';
+
+// Define the transaction history interface (now we use the one from db.ts)
+export type CCIPTransaction = db.Transaction;
 
 // Create a second client for Base Sepolia (L2)
 const publicClientL2 = createPublicClient({
@@ -143,217 +121,8 @@ const publicClientL2 = createPublicClient({
   transport: http(process.env.BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org')
 });
 
-// Function to fetch CCIP message data from an external API
-async function fetchCCIPMessageData(messageId: string): Promise<CCIPMessageData | null> {
-  try {
-    const response = await fetch(`https://ccip.chain.link/api/h/atlas/message/${messageId}`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch CCIP message data. Status: ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    // Map the API response to our simplified CCIPMessageData interface
-    return {
-      messageId: data.messageId,
-      state: data.state,
-      status: getStatusFromState(data.state, data), // Convert numeric state to string status
-      sourceChainId: data.sourceChainId,
-      destChainId: data.destChainId,
-      receiptTransactionHash: data.receiptTransactionHash || null,
-      destTxHash: data.receiptTransactionHash || null, // Use receiptTransactionHash as destTxHash
-      data: data.data,
-      sender: data.sender,
-      receiver: data.receiver,
-      execNonce: data.execNonce
-    };
-  } catch (error) {
-    console.error(`Error fetching CCIP message data for messageId ${messageId}:`, error);
-    return null;
-  }
-}
-
-// Helper function to convert numeric state to string status
-function getStatusFromState(state: number, data: any): string {
-  switch (state) {
-    case 0:
-      return 'INFLIGHT';
-    case 1:
-      return 'PENDING';
-    case 2:
-      return 'SUCCESS';
-    case 3:
-      return 'FAILED';
-    default:
-      // If we can't determine state, check if there's a receipt
-      if (data.receiptTransactionHash) {
-        return 'SUCCESS';
-      }
-      if (data.blessBlockNumber) {
-        return 'BLESSED';
-      }
-      return 'PENDING';
-  }
-}
-
-/**
- * Extract a CCIP messageId and agentOwner from a transaction receipt
- * @param txHash Transaction hash to extract data from
- * @param client Viem public client to use for fetching the receipt
- * @returns Object containing messageId and agentOwner if found
- */
-const extractMessageIdFromTxHash = async (
-  txHash: string,
-  client: PublicClient,
-  retryCount = 0
-): Promise<{ messageId: string | null, agentOwner: string | null }> => {
-  if (!txHash || !txHash.startsWith('0x')) {
-    console.error('Invalid tx hash provided:', txHash);
-    return { messageId: null, agentOwner: null };
-  }
-
-  try {
-    console.log(`Getting transaction receipt for: ${txHash}`);
-    const hash = txHash as `0x${string}`;
-
-    try {
-      const receipt = await client.getTransactionReceipt({
-        hash
-      });
-
-      console.log(`Receipt contains ${receipt.logs.length} logs`);
-
-      // Initialize return values
-      let foundMessageId: string | null = null;
-      let foundAgentOwner: string | null = null;
-
-      // Find logs that contain the events we're interested in
-      for (const log of receipt.logs) {
-        // Check for MessageSent event
-        if (log.topics[0] === MESSAGE_SENT_SIGNATURE) {
-          try {
-            console.log('Found MessageSent event, decoding...');
-            const decodedLog = decodeEventLog({
-              abi: parseAbi(['event MessageSent(bytes32 indexed, uint64 indexed, address, (address, uint256)[], address, uint256)']),
-              data: log.data,
-              topics: log.topics
-            });
-
-            if (decodedLog && decodedLog.args) {
-              foundMessageId = decodedLog.args[0];
-              console.log(`Extracted messageId: ${foundMessageId}`);
-            }
-          } catch (decodeError) {
-            console.error('Error decoding MessageSent event:', decodeError);
-            // Fallback extraction for messageId
-            if (log.topics.length > 1) {
-              const topic = log.topics[1];
-              if (topic) {
-                foundMessageId = topic;
-                console.log(`Extracted messageId using fallback method: ${foundMessageId}`);
-              }
-            }
-          }
-        }
-
-        // Check for BridgingWithdrawalToL2 event
-        else if (log.topics[0] === BRIDGING_WITHDRAWAL_TO_L2_SIGNATURE) {
-          try {
-            console.log('Found BridgingWithdrawalToL2 event, decoding...');
-            const decodedLog = decodeEventLog({
-              abi: parseAbi(['event BridgingWithdrawalToL2(address indexed agentOwner, (address, uint256)[] withdrawalTokenAmounts)']),
-              data: log.data,
-              topics: log.topics
-            });
-
-            if (decodedLog && decodedLog.args) {
-              const args = decodedLog.args as any;
-              if (args.agentOwner) {
-                foundAgentOwner = args.agentOwner.toLowerCase();
-                console.log(`Extracted agentOwner from BridgingWithdrawalToL2: ${foundAgentOwner}`);
-              }
-            }
-          } catch (decodeError) {
-            console.error('Error decoding BridgingWithdrawalToL2 event:', decodeError);
-            // Fallback extraction for agentOwner
-            if (log.topics.length > 1) {
-              const topic = log.topics[1];
-              if (topic) {
-                const address = `0x${topic.slice(26).toLowerCase()}`;
-                // Validate that we have a proper address
-                if (address.length === 42) {
-                  foundAgentOwner = address;
-                  console.log(`Extracted agentOwner using fallback method: ${foundAgentOwner}`);
-                }
-              }
-            }
-          }
-        }
-
-        // Check for BridgingRewardsToL2 event
-        else if (log.topics[0] === BRIDGING_REWARDS_TO_L2_SIGNATURE) {
-          try {
-            console.log('Found BridgingRewardsToL2 event, decoding...');
-            const decodedLog = decodeEventLog({
-              abi: parseAbi(['event BridgingRewardsToL2(address indexed agentOwner, (address, uint256)[] rewardsTokenAmounts)']),
-              data: log.data,
-              topics: log.topics
-            });
-
-            if (decodedLog && decodedLog.args) {
-              const args = decodedLog.args as any;
-              if (args.agentOwner) {
-                foundAgentOwner = args.agentOwner.toLowerCase();
-                console.log(`Extracted agentOwner from BridgingRewardsToL2: ${foundAgentOwner}`);
-              }
-            }
-          } catch (decodeError) {
-            console.error('Error decoding BridgingRewardsToL2 event:', decodeError);
-            // Fallback extraction for agentOwner
-            if (log.topics.length > 1) {
-              const topic = log.topics[1];
-              if (topic) {
-                const address = `0x${topic.slice(26).toLowerCase()}`;
-                // Validate that we have a proper address
-                if (address.length === 42) {
-                  foundAgentOwner = address;
-                  console.log(`Extracted agentOwner using fallback method: ${foundAgentOwner}`);
-                }
-              }
-            }
-          }
-        }
-      }
-
-      return { messageId: foundMessageId, agentOwner: foundAgentOwner };
-    } catch (error) {
-      const errorResponse = error as ErrorResponse;
-      // Check if this is a TransactionReceiptNotFoundError (transaction not mined yet)
-      if (errorResponse.shortMessage && errorResponse.shortMessage.includes('could not be found') && retryCount < 3) {
-        // Transaction not mined yet, retry with exponential backoff if within retry limit
-        const delayMs = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
-        console.log(`Transaction ${txHash} not mined yet. Retrying in ${delayMs/1000} seconds... (attempt ${retryCount + 1}/3)`);
-
-        // Wait and retry
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-        return extractMessageIdFromTxHash(txHash, client, retryCount + 1);
-      }
-
-      console.error(`Error processing transaction receipt for ${txHash}:`, error);
-      return { messageId: null, agentOwner: null };
-    }
-  } catch (outerError) {
-    console.error(`Unexpected error processing transaction receipt for ${txHash}:`, outerError);
-    return { messageId: null, agentOwner: null };
-  }
-};
 
 // API Routes
-
-// Simple health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', version: '1.0.0' });
-});
 
 // Fetch CCIP message data
 app.get('/api/ccip/message/:messageId', async (req, res) => {
@@ -581,7 +350,7 @@ app.post('/api/transactions/add', async (req, res) => {
 });
 
 // Helper function to determine which client to use based on transaction properties
-function determineClientFromTransaction(transaction: CCIPTransaction): PublicClient {
+export function determineClientFromTransaction(transaction: CCIPTransaction): PublicClient {
   // If the transaction has a sourceChainId, use it to determine the client
   if (transaction.sourceChainId) {
     const sourceChain = transaction.sourceChainId;
@@ -602,58 +371,6 @@ function determineClientFromTransaction(transaction: CCIPTransaction): PublicCli
   }
 }
 
-// Function to update a transaction's status by checking its CCIP message
-async function updateTransactionStatus(messageId: string): Promise<void> {
-  try {
-    // Get the transaction by messageId
-    const transaction = db.getTransactionByMessageId(messageId);
-    if (!transaction) {
-      console.log(`No transaction found with messageId ${messageId}`);
-      return;
-    }
-
-    // Skip if transaction is already complete
-    if (transaction.isComplete) {
-      console.log(`Transaction ${transaction.txHash} is already complete`);
-      return;
-    }
-
-    // Fetch the CCIP message data
-    const messageData = await fetchCCIPMessageData(messageId);
-    if (!messageData) {
-      console.log(`No CCIP message data found for messageId ${messageId}`);
-      return;
-    }
-
-    // Update transaction based on message status
-    let updates: Partial<CCIPTransaction> = {};
-
-    if (messageData.status === 'SUCCESS') {
-      updates = {
-        status: 'confirmed',
-        isComplete: true,
-        receiptTransactionHash: messageData.receiptTransactionHash || transaction.receiptTransactionHash
-      };
-      console.log(`Updating transaction ${transaction.txHash} to confirmed status`);
-    } else if (messageData.status === 'FAILED') {
-      updates = {
-        status: 'failed',
-        isComplete: true
-      };
-      console.log(`Updating transaction ${transaction.txHash} to failed status`);
-    } else {
-      // Transaction is still in progress, no updates needed
-      console.log(`Transaction ${transaction.txHash} is still in progress (${messageData.status})`);
-      return;
-    }
-
-    // Apply the updates
-    db.updateTransactionByMessageId(messageId, updates);
-  } catch (error) {
-    console.error(`Error updating transaction status for messageId ${messageId}:`, error);
-    throw error;
-  }
-}
 
 // PUT update a transaction (server-side only - not exposed to frontend)
 app.put('/api/transactions/:txHash', (req, res) => {
@@ -694,37 +411,6 @@ app.put('/api/transactions/messageId/:messageId', (req, res) => {
     res.status(500).json({ error: 'Failed to update transaction' });
   }
 });
-
-// Load operator keys from environment variables
-const OPERATOR_KEYS: { [key: string]: string | undefined } = {};
-for (let i = 1; i <= 10; i++) {
-  const keyName = `OPERATOR_KEY${i}`;
-  if (process.env[keyName]) {
-    OPERATOR_KEYS[keyName] = process.env[keyName];
-  }
-}
-
-// Validate that at least one operator key is set
-if (Object.keys(OPERATOR_KEYS).length === 0) {
-  console.warn('Warning: No operator keys found in environment variables (OPERATOR_KEY1 through OPERATOR_KEY10)');
-}
-
-// Create a map of operator addresses to their private keys
-const operatorAddressToKey = new Map<string, string>();
-
-// Initialize operator addresses
-Object.entries(OPERATOR_KEYS).forEach(([keyName, privateKey]) => {
-  if (privateKey) {
-    try {
-      const account = privateKeyToAccount(privateKey as `0x${string}`);
-      operatorAddressToKey.set(account.address.toLowerCase(), privateKey);
-      console.log(`Initialized operator ${keyName} with address ${account.address}`);
-    } catch (error) {
-      console.error(`Error initializing operator account for ${keyName}:`, error);
-    }
-  }
-});
-
 
 // Update the endpoint before starting the server
 app.post('/api/delegation/sign', async (req, res) => {
@@ -777,60 +463,6 @@ app.post('/api/delegation/sign', async (req, res) => {
   }
 });
 
-interface ErrorResponse {
-  message?: string;
-  details?: string;
-  code?: string;
-  shortMessage?: string;
-}
-
-// Define the Operator type
-interface Operator {
-  name: string;
-  address: string;
-  magicStaked: string;
-  ethStaked: string;
-  stakers: number;
-  fee: string;
-  isActive: boolean;
-}
-
-// Operator data
-const OPERATORS_DATA: Operator[] = [
-  {
-    address: '0xA4D423ED017F063AaF65f6B6B9C6Bc59f97d5164',
-    name: 'Treasure Node 1',
-    magicStaked: '1,250,000',
-    ethStaked: '432.5',
-    stakers: 42,
-    fee: '1%',
-    isActive: true
-  },
-  {
-    address: '0xaA61cC14ac3e048f26b9312E57ECf8156D9D27e3',
-    name: 'Treasure Node2',
-    magicStaked: '890,500',
-    ethStaked: '122.2',
-    stakers: 36,
-    fee: '2%',
-    isActive: true
-  },
-  {
-    address: '0x3d2FB9D26c5C66D0CA55247E4d40Cb4FBe0f5C03',
-    name: "Inactive Operator",
-    magicStaked: '2,100,000',
-    ethStaked: '95.8',
-    stakers: 65,
-    fee: '4%',
-    isActive: false
-  }
-];
-
-// Create a map to quickly look up operators by address
-const operatorsByAddress = new Map<string, Operator>();
-OPERATORS_DATA.forEach(operator => {
-  operatorsByAddress.set(operator.address.toLowerCase(), operator);
-});
 
 // Add endpoint to get all operators
 app.get('/api/operators', (req, res) => {
@@ -875,15 +507,21 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Create HTTPS server
-let httpsServer;
+// Create either HTTP or HTTPS server
+let server;
 try {
-  console.log('Creating HTTPS server...');
-  httpsServer = https.createServer(sslOptions, app);
-  console.log('HTTPS server created successfully');
+  if (USE_SSL && sslOptions) {
+    console.log('Creating HTTPS server...');
+    server = https.createServer(sslOptions, app);
+    console.log('HTTPS server created successfully');
+  } else {
+    console.log('Creating HTTP server...');
+    server = nodeHttp.createServer(app);
+    console.log('HTTP server created successfully');
+  }
 } catch (error) {
-  console.error('Failed to create HTTPS server:', error);
-  process.exit(1); // Exit if HTTPS server creation fails
+  console.error('Failed to create server:', error);
+  process.exit(1); // Exit if server creation fails
 }
 
 // Function to check and update pending transactions
@@ -965,8 +603,8 @@ startPendingTransactionChecker();
 process.on('SIGINT', () => {
   console.log('Shutting down server gracefully...');
   stopPendingTransactionChecker();
-  httpsServer.close(() => {
-    console.log('HTTPS server closed');
+  server.close(() => {
+    console.log('Server closed');
     process.exit(0);
   });
 });
@@ -974,48 +612,31 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down server gracefully...');
   stopPendingTransactionChecker();
-  httpsServer.close(() => {
-    console.log('HTTPS server closed');
+  server.close(() => {
+    console.log('Server closed');
     process.exit(0);
   });
 });
 
 // After initializing the server, fix any transactions with missing fields
 try {
-  httpsServer.listen({
-    port: PORT,
-    host: '0.0.0.0'
-  }, () => {
-    console.log(`🚀 HTTPS Server running at https://api.l2restaking.info:${PORT}`);
+  server.listen(Number(PORT), '0.0.0.0', () => {
+    const protocol = USE_SSL ? 'https' : 'http';
+    console.log(`🚀 Server running at ${protocol}://api.l2restaking.info:${PORT}`);
 
     // Run an initial update when the server starts
     updatePendingTransactions();
     startPendingTransactionChecker();
   });
 
-  httpsServer.on('error', (error) => {
-    console.error('HTTPS server error:', error);
+  server.on('error', (error: Error) => {
+    console.error('Server error:', error);
   });
 } catch (error) {
-  console.error('Failed to start HTTPS server:', error);
+  console.error('Failed to start server:', error);
   process.exit(1);
 }
 
-// Utility function to convert CCIP message state to a human-readable status
-export function getCCIPMessageStatusText(state: number): string {
-  switch (state) {
-    case 0:
-      return 'Pending';
-    case 1:
-      return 'In Flight';
-    case 2:
-      return 'Confirmed';
-    case 3:
-      return 'Failed';
-    default:
-      return 'Unknown';
-  }
-}
 
 // Database initialization
 try {
@@ -1075,22 +696,3 @@ try {
 } catch (error) {
   console.error('Error initializing database:', error);
 }
-
-// Socket.io connection handling
-const io = new Server(httpsServer, {
-  cors: {
-    origin: [
-      'https://l2-eigenlayer-restaking-git-frontend-peita-lins-projects.vercel.app',
-      /\.vercel\.app$/,
-      'http://localhost:5173',
-      'http://localhost:3000'
-    ],
-    methods: ['GET', 'POST']
-  }
-});
-
-// Socket.io connection handling
-io.on('connection', (socket: Socket) => {
-  console.log('Client connected');
-  socket.on('disconnect', () => console.log('Client disconnected'));
-});

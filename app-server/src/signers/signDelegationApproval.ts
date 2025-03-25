@@ -5,8 +5,9 @@ import {
   DELEGATION_MANAGER_ADDRESS,
   EIP712_DOMAIN_TYPEHASH,
   DELEGATION_APPROVAL_TYPEHASH,
-  L1_CHAIN_ID
-} from './constants.js';
+  ETH_CHAINID,
+  L2_CHAINID
+} from '../utils/constants';
 
 const publicClient = createPublicClient({
   chain: sepolia,
@@ -51,7 +52,7 @@ export async function signDelegationApproval(
     }
 
     // Use the EthSepolia chain ID and delegation manager address
-    const chainId = L1_CHAIN_ID; // Ethereum Sepolia
+    const chainId = ETH_CHAINID; // Ethereum Sepolia
     const delegationManagerAddress = DELEGATION_MANAGER_ADDRESS;
 
     // Get digest hash directly from the contract

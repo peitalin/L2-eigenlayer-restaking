@@ -1,17 +1,16 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-// Chain ID constants
-const ETH_CHAINID = '11155111'; // Ethereum Sepolia
-const L2_CHAINID = '84532';     // Base Sepolia
+import { ErrorResponse } from '../types';
+import { ETH_CHAINID, L2_CHAINID } from '../utils/constants';
 
 // Get the directory name
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Database file path
-const dbPath = path.join(__dirname, 'data', 'transactions.db');
+const dbPath = path.join(__dirname, '..', 'data', 'transactions.db');
+console.log('Database path:', dbPath);
 
 // Create or open the database
 const db = new Database(dbPath);
@@ -135,8 +134,9 @@ export function initDatabase() {
       // If we get here, the constraint check passed, so delete the test transaction
       db.prepare('DELETE FROM transactions WHERE txHash = ?').run(testTxHash);
     } catch (error) {
+      const errorResponse = error as ErrorResponse;
       // If there's a constraint error, the table needs to be migrated
-      if (error.code === 'SQLITE_CONSTRAINT_CHECK') {
+      if (errorResponse.code === 'SQLITE_CONSTRAINT_CHECK') {
         console.log('Migrating database schema to support processClaim transaction type...');
 
         // SQLite doesn't support direct ALTER TABLE for modifying constraints
