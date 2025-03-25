@@ -5,12 +5,16 @@ import { StrategyManagerABI } from '../abis';
 import { STRATEGY_MANAGER_ADDRESS, STRATEGY } from '../addresses';
 import { useToast } from '../utils/toast';
 
-interface UserDeposit {
+export interface UserDeposit {
   strategy: Address;
   shares: bigint;
 }
 
-const UserDeposits: React.FC = () => {
+interface UserDepositsProps {
+  onDepositsLoaded?: (deposits: UserDeposit[]) => void;
+}
+
+const UserDeposits: React.FC<UserDepositsProps> = ({ onDepositsLoaded }) => {
   const { l1Wallet, eigenAgentInfo, isConnected } = useClientsContext();
   const [deposits, setDeposits] = useState<UserDeposit[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,6 +45,11 @@ const UserDeposits: React.FC = () => {
       }));
 
       setDeposits(depositItems);
+
+      // Pass deposits to parent component if callback provided
+      if (onDepositsLoaded) {
+        onDepositsLoaded(depositItems);
+      }
     } catch (err) {
       console.error('Error fetching deposits:', err);
       setError('Failed to fetch deposits. Please try again later.');

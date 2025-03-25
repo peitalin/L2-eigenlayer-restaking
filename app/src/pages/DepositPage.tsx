@@ -209,6 +209,18 @@ const DepositPage: React.FC = () => {
     }
   };
 
+  // Handle Max button click
+  const handleMaxButtonClick = () => {
+    if (tokenBalance && tokenBalance > 0n) {
+      // Format the bigint balance to a string with appropriate decimal places
+      const formattedAmount = formatEther(tokenBalance);
+      setTransactionAmount(formattedAmount);
+      showToast('Max amount set', 'info');
+    } else {
+      showToast('No MAGIC tokens available', 'warning');
+    }
+  };
+
   // Handle deposit into strategy
   const handleDepositIntoStrategy = async () => {
     if (!transactionAmount) {
@@ -407,7 +419,13 @@ const DepositPage: React.FC = () => {
                 className="treasure-input"
                 disabled={isInputDisabled}
               />
-              <button className="treasure-max-button">Max</button>
+              <button
+                className="treasure-max-button"
+                onClick={handleMaxButtonClick}
+                disabled={isInputDisabled || !tokenBalance || tokenBalance === 0n}
+              >
+                Max
+              </button>
             </div>
           </div>
 

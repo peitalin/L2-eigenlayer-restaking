@@ -39,7 +39,7 @@ import {EthSepolia} from "./Addresses.sol";
 
 
 string constant EIGENLAYER_VERSION = "v1.3.0";
-// forge install git@github.com/Layr-Labs/eigenlayer-contracts@v1.3.0
+// forge install git@github.com/Layr-Labs/eigenlayer-contracts@v1.3.0-updates
 
 /// @dev This deploys mock Eigenlayer contracts from the `dev` branch for the purpose
 /// of testing deposits, withdrawals, and delegation with custom ERC20 strategies only.

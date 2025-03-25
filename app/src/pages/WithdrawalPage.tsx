@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { parseEther, Address } from 'viem';
+import { parseEther, Address, formatEther } from 'viem';
 import { encodeQueueWithdrawalMsg, encodeCompleteWithdrawalMsg, WithdrawalStruct } from '../utils/encoders';
 import { STRATEGY, DELEGATION_MANAGER_ADDRESS } from '../addresses';
 import { EthSepolia, BaseSepolia } from '../addresses';
@@ -9,7 +9,7 @@ import { useClientsContext } from '../contexts/ClientsContext';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { useToast } from '../utils/toast';
-import UserDeposits from '../components/UserDeposits';
+import UserDeposits, { UserDeposit } from '../components/UserDeposits';
 import Expandable from '../components/Expandable';
 import QueuedWithdrawals from '../components/QueuedWithdrawals';
 import TransactionSuccessModal from '../components/TransactionSuccessModal';
@@ -52,6 +52,7 @@ const WithdrawalPage: React.FC = () => {
   const receiveAsTokens = true;
   const [isCompletingWithdrawal, setIsCompletingWithdrawal] = useState<boolean>(false);
   const [completeError, setCompleteError] = useState<string | null>(null);
+  const [userDeposits, setUserDeposits] = useState<UserDeposit[]>([]);
 
   // Add state for success modal
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -74,6 +75,28 @@ const WithdrawalPage: React.FC = () => {
   const handleCloseSuccessModal = () => {
     setShowSuccessModal(false);
     setSuccessData(null);
+  };
+
+  // Handler for when deposits are loaded from the UserDeposits component
+  const handleDepositsLoaded = (deposits: UserDeposit[]) => {
+    setUserDeposits(deposits);
+  };
+
+  // Handler for the Max button click
+  const handleMaxButtonClick = () => {
+    // Find the deposit for the MAGIC strategy
+    const magicDeposit = userDeposits.find(
+      deposit => deposit.strategy.toLowerCase() === STRATEGY.toLowerCase()
+    );
+
+    if (magicDeposit && magicDeposit.shares > 0n) {
+      // Format the bigint shares to a string with appropriate decimal places
+      const formattedAmount = formatEther(magicDeposit.shares);
+      setWithdrawalAmount(formattedAmount);
+      showToast('Max amount set', 'info');
+    } else {
+      showToast('No MAGIC deposits found', 'warning');
+    }
   };
 
   // Memoize the parsed amount to update whenever withdrawalAmount changes
@@ -110,7 +133,6 @@ const WithdrawalPage: React.FC = () => {
         try {
           setIsLoadingL1Data(true);
 
-          // Get both values in parallel to reduce API calls
           const [nonce, delegated] = await Promise.all([
             l1Wallet.publicClient.readContract({
               address: DELEGATION_MANAGER_ADDRESS,
@@ -476,7 +498,7 @@ const WithdrawalPage: React.FC = () => {
         </div>
 
         {/* Display user deposits */}
-        <UserDeposits />
+        <UserDeposits onDepositsLoaded={handleDepositsLoaded} />
 
         <div className="treasure-stat-label">
           <label htmlFor="amount">
@@ -493,7 +515,13 @@ const WithdrawalPage: React.FC = () => {
             placeholder="0.05"
             disabled={isInputDisabled}
           />
-          <button className="treasure-max-button">Max</button>
+          <button
+            className="treasure-max-button"
+            onClick={handleMaxButtonClick}
+            disabled={isInputDisabled || userDeposits.length === 0}
+          >
+            Max
+          </button>
         </div>
 
         <button

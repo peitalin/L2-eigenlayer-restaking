@@ -8,9 +8,12 @@ import { useToast } from '../utils/toast';
 
 // Define types for the withdrawal data structure based on the Solidity contract
 interface Withdrawal {
-  strategies: Address[];
+  delegatedTo: Address;
   nonce: bigint;
+  scaledShares: bigint[];
+  staker: Address;
   startBlock: bigint;
+  strategies: Address[];
   withdrawer: Address;
 }
 
@@ -109,7 +112,7 @@ const QueuedWithdrawals: React.FC<QueuedWithdrawalsProps> = ({
           try {
             withdrawalRoot = calculateWithdrawalRoot(
               eigenAgentInfo.eigenAgentAddress,
-              delegatedAddress,
+              withdrawal.delegatedTo,
               eigenAgentInfo.eigenAgentAddress,
               withdrawal.nonce,
               startBlock,
@@ -154,7 +157,6 @@ const QueuedWithdrawals: React.FC<QueuedWithdrawalsProps> = ({
     }
   };
 
-  // Call fetchQueuedWithdrawals when dependencies change
   useEffect(() => {
     fetchQueuedWithdrawals();
   }, [eigenAgentInfo?.eigenAgentAddress, isConnected, l1Wallet.publicClient]);
