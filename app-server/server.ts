@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { createServer } from 'http';
+import { createServer } from 'https';
 import { config } from 'dotenv';
 import fs from 'fs';
 import path from 'path';
@@ -59,6 +59,12 @@ const __dirname = path.dirname(__filename);
 // Initialize express app
 const app = express();
 const PORT = process.env.SERVER_PORT || 3001;
+
+// SSL options
+const sslOptions = {
+  key: fs.readFileSync(path.join(__dirname, 'certs/private.key')),
+  cert: fs.readFileSync(path.join(__dirname, 'certs/certificate.crt'))
+};
 
 // Middleware
 app.use(cors({
@@ -862,7 +868,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Start the server
-const httpServer = createServer(app);
+const httpsServer = createServer(sslOptions, app);
 
 // Function to check and update pending transactions
 async function updatePendingTransactions() {
@@ -943,8 +949,8 @@ startPendingTransactionChecker();
 process.on('SIGINT', () => {
   console.log('Shutting down server gracefully...');
   stopPendingTransactionChecker();
-  httpServer.close(() => {
-    console.log('HTTP server closed');
+  httpsServer.close(() => {
+    console.log('HTTPS server closed');
     process.exit(0);
   });
 });
@@ -952,18 +958,18 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
   console.log('SIGTERM received. Shutting down server gracefully...');
   stopPendingTransactionChecker();
-  httpServer.close(() => {
-    console.log('HTTP server closed');
+  httpsServer.close(() => {
+    console.log('HTTPS server closed');
     process.exit(0);
   });
 });
 
 // After initializing the server, fix any transactions with missing fields
-httpServer.listen({
+httpsServer.listen({
   port: PORT,
   host: '0.0.0.0'
 }, () => {
-  console.log(`Server running on port ${PORT} and listening on all interfaces`);
+  console.log(`Server running on port ${PORT} with HTTPS enabled and listening on all interfaces`);
 
   // Run an initial update when the server starts
   updatePendingTransactions();
