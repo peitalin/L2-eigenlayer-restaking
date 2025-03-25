@@ -9,6 +9,8 @@ forge script script/6b_delegateTo.s.sol:DelegateToScript  \
     --private-key $DEPLOYER_KEY \
     -vvvv
 
+cast storage 0xAf03f2a302A2C4867d622dE44b213b8F870c0f1a --rpc-url ethsepolia --etherscan-api-key $ETHERSCAN_API_KEY
+
 
 ## Example DelegateTo CCIP message:
 # https://ccip.chain.link/msg/0x241da6f1da5d9a8262c6767486a0134de9e12db1ac3d49e4f8e8ff364c7b6236

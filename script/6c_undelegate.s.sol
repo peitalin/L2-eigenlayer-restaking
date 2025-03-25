@@ -38,7 +38,7 @@ contract UndelegateScript is BaseScript {
         deployer = vm.addr(deployerKey);
         readContractsAndSetupEnvironment(isTest, deployer);
 
-        operatorKey = vm.envUint("OPERATOR_KEY1);
+        operatorKey = vm.envUint("OPERATOR_KEY1");
         operator = vm.addr(operatorKey);
         address TARGET_CONTRACT = address(delegationManager);
 
