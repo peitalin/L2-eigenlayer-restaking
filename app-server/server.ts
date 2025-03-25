@@ -173,23 +173,23 @@ function getStatusFromState(state: number, data: any): string {
 
 /**
  * Extract a CCIP messageId and agentOwner from a transaction receipt
- * @param receiptHash Transaction hash to extract data from
+ * @param txHash Transaction hash to extract data from
  * @param client Viem public client to use for fetching the receipt
  * @returns Object containing messageId and agentOwner if found
  */
-const extractMessageIdFromReceipt = async (
-  receiptHash: string,
+const extractMessageIdFromTxHash = async (
+  txHash: string,
   client: PublicClient,
   retryCount = 0
 ): Promise<{ messageId: string | null, agentOwner: string | null }> => {
-  if (!receiptHash || !receiptHash.startsWith('0x')) {
-    console.error('Invalid receipt hash provided:', receiptHash);
+  if (!txHash || !txHash.startsWith('0x')) {
+    console.error('Invalid tx hash provided:', txHash);
     return { messageId: null, agentOwner: null };
   }
 
   try {
-    console.log(`Getting transaction receipt for: ${receiptHash}`);
-    const hash = receiptHash as `0x${string}`;
+    console.log(`Getting transaction receipt for: ${txHash}`);
+    const hash = txHash as `0x${string}`;
 
     try {
       const receipt = await client.getTransactionReceipt({
@@ -307,18 +307,18 @@ const extractMessageIdFromReceipt = async (
       if (errorResponse.shortMessage && errorResponse.shortMessage.includes('could not be found') && retryCount < 3) {
         // Transaction not mined yet, retry with exponential backoff if within retry limit
         const delayMs = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
-        console.log(`Transaction ${receiptHash} not mined yet. Retrying in ${delayMs/1000} seconds... (attempt ${retryCount + 1}/3)`);
+        console.log(`Transaction ${txHash} not mined yet. Retrying in ${delayMs/1000} seconds... (attempt ${retryCount + 1}/3)`);
 
         // Wait and retry
         await new Promise(resolve => setTimeout(resolve, delayMs));
-        return extractMessageIdFromReceipt(receiptHash, client, retryCount + 1);
+        return extractMessageIdFromTxHash(txHash, client, retryCount + 1);
       }
 
-      console.error(`Error processing transaction receipt for ${receiptHash}:`, error);
+      console.error(`Error processing transaction receipt for ${txHash}:`, error);
       return { messageId: null, agentOwner: null };
     }
   } catch (outerError) {
-    console.error(`Unexpected error processing transaction receipt for ${receiptHash}:`, outerError);
+    console.error(`Unexpected error processing transaction receipt for ${txHash}:`, outerError);
     return { messageId: null, agentOwner: null };
   }
 };
@@ -503,7 +503,7 @@ app.post('/api/transactions/add', async (req, res) => {
         const client = determineClientFromTransaction(newTransaction);
 
         // Extract messageId from the transaction receipt
-        const { messageId, agentOwner } = await extractMessageIdFromReceipt(newTransaction.txHash, client);
+        const { messageId, agentOwner } = await extractMessageIdFromTxHash(newTransaction.txHash, client);
 
         if (messageId) {
           console.log(`Successfully extracted messageId ${messageId} from transaction ${newTransaction.txHash}`);
@@ -893,68 +893,9 @@ async function updatePendingTransactions() {
         } catch (error) {
           console.error(`Error updating transaction ${tx.txHash} (messageId: ${tx.messageId}):`, error);
         }
-      }
-      // For transactions where messageId is the same as txHash, try to extract the real messageId
-      else if (tx.messageId === tx.txHash) {
-        try {
-          console.log(`Checking transaction ${tx.txHash} for messageId...`);
-
-          // Determine which client to use
-          const client = determineClientFromTransaction(tx);
-
-          // Attempt to extract messageId
-          const { messageId, agentOwner } = await extractMessageIdFromReceipt(tx.txHash, client);
-
-          if (messageId && messageId !== tx.messageId) {
-            console.log(`Found messageId ${messageId} for transaction ${tx.txHash}`);
-
-            // Update the transaction with the real messageId
-            const updates: Partial<CCIPTransaction> = {
-              messageId
-            };
-
-            // If we found an agent owner and the transaction doesn't have a valid user
-            if (agentOwner &&
-                (!tx.user || tx.user === '0x0000000000000000000000000000000000000000')) {
-              updates.user = agentOwner;
-            }
-
-            // Apply the updates
-            db.updateTransaction(tx.txHash, updates);
-
-            // Now check the status of this transaction with the new messageId
-            await updateTransactionStatus(messageId);
-          } else {
-            // If we still couldn't extract a messageId, check if the transaction is confirmed on chain
-            try {
-              const receipt = await client.getTransactionReceipt({
-                hash: tx.txHash as `0x${string}`
-              });
-
-              // If we got here, the transaction is confirmed on chain
-              // Cast the status to number first to avoid type issues
-              const status = Number(receipt.status);
-              if (status === 1) {
-                console.log(`Transaction ${tx.txHash} confirmed on chain, but no messageId found`);
-                db.updateTransaction(tx.txHash, {
-                  status: 'confirmed',
-                  isComplete: true
-                });
-              } else if (status === 0) {
-                console.log(`Transaction ${tx.txHash} reverted on chain`);
-                db.updateTransaction(tx.txHash, {
-                  status: 'failed',
-                  isComplete: true
-                });
-              }
-            } catch (receiptError) {
-              // Transaction might still be pending, do nothing
-              console.log(`Transaction ${tx.txHash} not yet confirmed on chain`);
-            }
-          }
-        } catch (error) {
-          console.error(`Error checking for messageId in transaction ${tx.txHash}:`, error);
-        }
+      } else if (tx.messageId === tx.txHash) {
+        // For transactions where messageId is the same as txHash
+        throw new Error('MessageId cannot be the same as the transaction hash');
       }
     }
   } catch (error) {
