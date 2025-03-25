@@ -948,8 +948,11 @@ process.on('SIGTERM', () => {
 });
 
 // After initializing the server, fix any transactions with missing fields
-httpServer.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+httpServer.listen({
+  port: PORT,
+  host: '0.0.0.0'
+}, () => {
+  console.log(`Server running on port ${PORT} and listening on all interfaces`);
 
   // Run an initial update when the server starts
   updatePendingTransactions();
