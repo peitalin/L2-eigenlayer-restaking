@@ -42,8 +42,7 @@ contract DelegateToScript is BaseScript {
         //////////////////////////////////////////////////////////
         vm.selectFork(ethForkId);
 
-        // operatorKey = vm.envUint("OPERATOR_KEY1");
-        operatorKey = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
+        operatorKey = vm.envUint("OPERATOR_KEY1");
         operator = vm.addr(operatorKey);
 
         //// Get User's EigenAgent
@@ -58,18 +57,27 @@ contract DelegateToScript is BaseScript {
 
         uint256 execNonce = eigenAgent.execNonce();
         uint256 sigExpiry = block.timestamp + 1 hours;
+        uint256 randomSalt = vm.randomUint();
+        bytes32 approverSalt = bytes32(randomSalt);
+
+        bytes32 digestHash0 = delegationManager.calculateDelegationApprovalDigestHash(
+            address(eigenAgent), // staker
+            operator, // operator
+            operator, // _delegationApprover,
+            approverSalt,
+            sigExpiry
+        );
 
         /////////////////////////////////////////////////////////////////
         /////// Broadcast DelegateTo message on L2
         /////////////////////////////////////////////////////////////////
-        vm.selectFork(l2ForkId);
 
         // Operator Approver signs the delegateTo call
-        uint256 randomSalt = vm.randomUint();
-        bytes32 approverSalt = bytes32(randomSalt);
+        console.log("Operator address:", operator);
         console.log("approverSalt: ");
         console.logBytes32(approverSalt);
-        console.log("Operator address:", operator);
+
+        vm.selectFork(l2ForkId);
 
         ISignatureUtilsMixinTypes.SignatureWithExpiry memory approverSignatureAndExpiry;
         {
@@ -82,7 +90,9 @@ contract DelegateToScript is BaseScript {
                 address(delegationManager), // delegationManagerAddr
                 EthSepolia.ChainId
             );
-            console.log("Operator digestHash:");
+            console.log("Operator digestHash0:");
+            console.logBytes32(digestHash0);
+            console.log("Operator digestHash1:");
             console.logBytes32(digestHash1);
 
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(operatorKey, digestHash1);
@@ -90,6 +100,8 @@ contract DelegateToScript is BaseScript {
 
             console.log("Operator signature:");
             console.logBytes(signature1);
+
+            require(digestHash0 == digestHash1, "Digest hash mismatch");
 
             approverSignatureAndExpiry = ISignatureUtilsMixinTypes.SignatureWithExpiry({
                 signature: signature1,

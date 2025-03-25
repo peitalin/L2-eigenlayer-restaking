@@ -4,7 +4,10 @@ import { useClientsContext } from '../contexts/ClientsContext';
 import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
 import { encodeUndelegateMsg, encodeDelegateTo, SignatureWithExpiry } from '../utils/encoders';
-import { signDelegationApprovalServer } from '../utils/signers';
+import {
+  signDelegationApprovalServer,
+  simulateDelegateTo
+} from '../utils/signers';
 import { DELEGATION_MANAGER_ADDRESS, EthSepolia, BaseSepolia } from '../addresses';
 import TransactionSuccessModal from '../components/TransactionSuccessModal';
 import { TransactionType } from '../types';
@@ -319,6 +322,53 @@ const DelegatePage: React.FC = () => {
     );
   };
 
+  // Add a function to simulate delegation before proceeding with actual delegation
+  const simulateDelegation = async (
+    eigenAgentAddress: Address,
+    selectedOp: string,
+    signature: string,
+    expiry: string,
+    salt: string
+  ) => {
+    if (!l1Wallet.publicClient) {
+      console.error("Public client not available");
+      return false;
+    }
+
+    try {
+      // Convert parameters to the right format
+      const signatureWithExpiry = {
+        signature: signature as Hex,
+        expiry: BigInt(expiry)
+      };
+
+      // Run the simulation
+      const simulationResult = await simulateDelegateTo(
+        getAddress(selectedOp),
+        signatureWithExpiry,
+        salt as Hex,
+        eigenAgentAddress,
+        l1Wallet.publicClient
+      );
+
+      // Log the result
+      if (simulationResult.success) {
+        console.log("Delegation simulation successful!");
+        showToast("Delegation simulation successful!", "success");
+        return true;
+      } else {
+        console.error("Delegation simulation failed:", simulationResult.error);
+        showToast(`Delegation simulation failed: ${simulationResult.error}`, "error");
+        setError(`Delegation would fail: ${simulationResult.error}`);
+        return false;
+      }
+    } catch (error) {
+      console.error("Error in delegation simulation:", error);
+      showToast("Error simulating delegation", "error");
+      return false;
+    }
+  };
+
   // Handle delegation to selected operator
   const handleDelegate = async () => {
     if (!selectedOperator) {
@@ -326,7 +376,7 @@ const DelegatePage: React.FC = () => {
       return;
     }
 
-    if (!l1Wallet.client || !l1Wallet.account) {
+    if (!l1Wallet.client || !l1Wallet.account || !l1Wallet.publicClient) {
       setError('Wallet not connected');
       return;
     }
@@ -361,13 +411,31 @@ const DelegatePage: React.FC = () => {
       // Get the signature from the connected wallet
       // NOTE: In a real implementation, the operator should provide this signature
       // For demo purposes, we're signing on behalf of the operator which isn't valid in practice
-      const { signature, expiry } = await signDelegationApprovalServer(
+      const { signature, expiry, salt: serverSalt } = await signDelegationApprovalServer(
         eigenAgentAddress,
         getAddress(selectedOperator),
+        l1Wallet.publicClient
       );
 
       if (!signature || !expiry) {
         setError('Failed to sign delegation approval');
+        return;
+      }
+
+      // Simulate the delegation before proceeding
+      const simulationSuccess = await simulateDelegation(
+        eigenAgentAddress,
+        selectedOperator,
+        signature,
+        expiry,
+        serverSalt || randomSalt
+      );
+
+      if (!simulationSuccess) {
+        // If simulation fails, don't proceed with the actual delegation
+        setShowSuccessModal(false);
+        setSuccessData(null);
+        setIsLoading(false);
         return;
       }
 
@@ -381,7 +449,7 @@ const DelegatePage: React.FC = () => {
       const delegateToMessage = encodeDelegateTo(
         getAddress(selectedOperator),
         approverSignatureAndExpiry,
-        randomSalt as `0x${string}`
+        (serverSalt || randomSalt) as `0x${string}`
       );
 
       // Execute the delegation operation

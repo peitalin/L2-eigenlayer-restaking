@@ -42,9 +42,6 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
-      // Log the server URL to help debug connection issues
-      console.log(`Using server URL: ${SERVER_BASE_URL}`);
-
       // First check if server is reachable
       try {
         const healthCheck = await fetch(`${SERVER_BASE_URL}/api/health`, {
@@ -103,8 +100,7 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
   // Function to start polling for transaction updates
   const startPolling = useCallback(() => {
     if (isPollingRef.current) return; // Already polling
-
-    console.log('Starting transaction polling');
+    // console.log('Starting transaction polling');
 
     // Clear any existing interval first
     if (intervalRef.current) {
@@ -126,7 +122,7 @@ export const TransactionHistoryProvider: React.FC<{ children: React.ReactNode }>
 
   // Function to stop polling
   const stopPolling = useCallback(() => {
-    console.log('Stopping transaction polling');
+    // console.log('Stopping transaction polling');
 
     if (intervalRef.current) {
       clearInterval(intervalRef.current);

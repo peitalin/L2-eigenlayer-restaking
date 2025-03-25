@@ -168,59 +168,58 @@ export function createEigenAgentCallDigestHash(
   );
 }
 
-// /**
-//  * Calculates the delegation approval digest hash
-//  * Implementation of the Solidity function calculateDelegationApprovalDigestHash
-//  * @param staker The staker address (eigenAgent address)
-//  * @param operator The operator address
-//  * @param delegationApprover The delegation approver address
-//  * @param approverSalt A random salt for the approval
-//  * @param expiry Expiry time for the signature
-//  * @param delegationManagerAddr The address of the DelegationManager contract
-//  * @param chainId The chain ID where the DelegationManager contract is deployed
-//  * @returns The digest hash to be signed
-//  */
-// export function calculateDelegationApprovalDigestHash(
-//   staker: Address,
-//   operator: Address,
-//   delegationApprover: Address,
-//   approverSalt: Hex,
-//   expiry: bigint,
-//   delegationManagerAddr: Address = DELEGATION_MANAGER_ADDRESS,
-//   chainId: number = EthSepolia.chainId
-// ): Hex {
-//   // Create the approver struct hash
-//   const approverStructHash = keccak256(
-//     encodeAbiParameters(
-//       [
-//         { type: 'bytes32' },
-//         { type: 'address' },
-//         { type: 'address' },
-//         { type: 'address' },
-//         { type: 'bytes32' },
-//         { type: 'uint256' }
-//       ],
-//       [
-//         DELEGATION_APPROVAL_TYPEHASH,
-//         delegationApprover,
-//         staker,
-//         operator,
-//         approverSalt,
-//         expiry
-//       ]
-//     )
-//   );
+/**
+ * Calls the calculateDelegationApprovalDigestHash function directly on the DelegationManager contract
+ * @param staker The staker address
+ * @param operator The operator address
+ * @param delegationApprover The delegation approver address
+ * @param salt The approval salt
+ * @param expiry The expiry timestamp
+ * @param publicClient The Ethereum public client
+ * @returns Promise resolving to the digest hash from the contract
+ */
+export async function callContractCalculateDelegationApprovalDigestHash(
+  staker: Address,
+  operator: Address,
+  delegationApprover: Address,
+  salt: Hex,
+  expiry: bigint,
+  publicClient: any
+): Promise<Hex> {
+  try {
 
-//   // Create the approver digest hash
-//   const approverDigestHash = keccak256(
-//     encodePacked(
-//       ['string', 'bytes32', 'bytes32'],
-//       ['\x19\x01', domainSeparatorEigenlayer(delegationManagerAddr, chainId), approverStructHash]
-//     )
-//   );
+    if (staker === delegationApprover) {
+      throw new Error("Staker and approver cannot be the same");
+    }
 
-//   return approverDigestHash;
-// }
+    // Call the contract's calculateDelegationApprovalDigestHash function
+    const digestHash = await publicClient.readContract({
+      address: DELEGATION_MANAGER_ADDRESS,
+      abi: [
+        {
+          name: 'calculateDelegationApprovalDigestHash',
+          type: 'function',
+          stateMutability: 'view',
+          inputs: [
+            { name: 'staker', type: 'address' },
+            { name: 'operator', type: 'address' },
+            { name: 'approver', type: 'address' },
+            { name: 'approverSalt', type: 'bytes32' },
+            { name: 'expiry', type: 'uint256' }
+          ],
+          outputs: [{ name: '', type: 'bytes32' }]
+        }
+      ],
+      functionName: 'calculateDelegationApprovalDigestHash',
+      args: [staker, operator, delegationApprover, salt, expiry]
+    });
+
+    return digestHash as Hex;
+  } catch (error) {
+    console.error('Error calling calculateDelegationApprovalDigestHash on contract:', error);
+    throw new Error('Failed to call calculateDelegationApprovalDigestHash on contract');
+  }
+}
 
 /**
  * Create a signature for EigenAgent execution
@@ -308,51 +307,6 @@ export async function signMessageForEigenAgentExecution(
   };
 }
 
-// /**
-//  * Signs a delegation approval message using EIP-712 with personal_sign
-//  * This method uses the raw keccak256 hash to generate a signature
-//  * @param walletClient The wallet client to use for signing
-//  * @param account The account address to sign with
-//  * @param staker The staker address (eigenAgent address)
-//  * @param operator The operator address
-//  * @param delegationApprover The delegation approver address
-//  * @param approverSalt A random salt for the approval
-//  * @param expiry Expiry time for the signature
-//  * @param delegationManagerAddr The address of the DelegationManager contract
-//  * @param chainId The chain ID where the DelegationManager contract is deployed
-//  * @returns The signature as a hex string
-//  */
-// export async function signDelegationApproval(
-//   walletClient: WalletClient,
-//   account: Address,
-//   staker: Address,
-//   operator: Address,
-//   delegationApprover: Address,
-//   approverSalt: Hex,
-//   expiry: bigint,
-//   delegationManagerAddr: Address = DELEGATION_MANAGER_ADDRESS,
-//   chainId: number = EthSepolia.chainId
-// ): Promise<Hex> {
-//   // Calculate the digest hash
-//   const digestHash = calculateDelegationApprovalDigestHash(
-//     staker,
-//     operator,
-//     delegationApprover,
-//     approverSalt,
-//     expiry,
-//     delegationManagerAddr,
-//     chainId
-//   );
-
-//   // Sign the digest hash using personal_sign
-//   const signature = await walletClient.signMessage({
-//     account,
-//     message: { raw: digestHash }
-//   });
-
-//   return signature;
-// }
-
 interface SignDelegationApprovalResult {
   signature: string;
   digestHash: string;
@@ -364,9 +318,11 @@ interface SignDelegationApprovalResult {
 
 export async function signDelegationApprovalServer(
   staker: `0x${string}`,
-  operator: `0x${string}`
+  operator: `0x${string}`,
+  publicClient: any
 ): Promise<SignDelegationApprovalResult> {
   try {
+    // Call the server API for delegation approval
     const response = await fetch(`${SERVER_BASE_URL}/api/delegation/sign`, {
       method: 'POST',
       headers: {
@@ -382,10 +338,131 @@ export async function signDelegationApprovalServer(
       throw new Error(`Server responded with status: ${response.status}`);
     }
 
+    // Parse the server response
     const data = await response.json() as SignDelegationApprovalResult;
+
+    try {
+      // Call the contract's function with the same parameters
+      const contractDigestHash = await callContractCalculateDelegationApprovalDigestHash(
+        staker as Address,
+        operator as Address,
+        operator as Address, // operator is also the delegationApprover in our case
+        data.salt as Hex,
+        BigInt(data.expiry),
+        publicClient
+      );
+
+      // Log comparison of the digests
+      if (data.digestHash !== contractDigestHash) {
+        // Log detailed information for debugging
+        console.log('Server delegation approval data:', data);
+        console.log("staker:", staker);
+        console.log("operator:", operator);
+        console.log("salt:", data.salt);
+        console.log("expiry:", data.expiry);
+        console.log('Server digest hash:', data.digestHash);
+        console.log('Contract digest hash:', contractDigestHash);
+        console.log('Digests match:', data.digestHash === contractDigestHash);
+        throw new Error('Digest hash mismatch');
+      }
+
+      // Also log the signature from the server
+      console.log('Server signature:', data.signature);
+    } catch (compareError) {
+      console.error('Error comparing digest hashes:', compareError);
+      // Don't fail the overall function if comparison fails
+    }
+
     return data;
   } catch (error) {
     console.error('Error signing delegation approval:', error);
     throw new Error('Failed to sign delegation approval');
+  }
+}
+
+/**
+ * Simulates a call to the DelegationManager's delegateTo function
+ * This helps verify if the delegation would succeed before actually submitting the transaction
+ *
+ * @param operator The operator address to delegate to
+ * @param signatureWithExpiry The signature struct containing signature and expiry
+ * @param salt The salt used for the delegation approval
+ * @param staker The staker address (sender of the transaction)
+ * @param publicClient The Ethereum public client
+ * @returns Result of the simulation (success/failure and any error message)
+ */
+export async function simulateDelegateTo(
+  operator: Address,
+  signatureWithExpiry: { signature: Hex, expiry: bigint },
+  salt: Hex,
+  staker: Address,
+  publicClient: any
+): Promise<{ success: boolean, error?: string }> {
+  try {
+    console.log("Simulating delegateTo with parameters:");
+    console.log("operator:", operator);
+    console.log("staker:", staker);
+    console.log("salt:", salt);
+    console.log("expiry:", signatureWithExpiry.expiry.toString());
+    console.log("signature:", signatureWithExpiry.signature);
+
+    // Simulate the call using eth_call
+    const result = await publicClient.simulateContract({
+      address: DELEGATION_MANAGER_ADDRESS,
+      abi: [
+        {
+          name: 'delegateTo',
+          type: 'function',
+          stateMutability: 'nonpayable',
+          inputs: [
+            { name: 'operator', type: 'address' },
+            {
+              name: 'approverSignatureAndExpiry',
+              type: 'tuple',
+              components: [
+                { name: 'signature', type: 'bytes' },
+                { name: 'expiry', type: 'uint256' }
+              ]
+            },
+            { name: 'approverSalt', type: 'bytes32' }
+          ],
+          outputs: []
+        }
+      ],
+      functionName: 'delegateTo',
+      args: [
+        operator,
+        {
+          signature: signatureWithExpiry.signature,
+          expiry: signatureWithExpiry.expiry
+        },
+        salt
+      ],
+      account: staker
+    });
+
+    console.log("Simulation successful:", result);
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error simulating delegateTo:', error);
+    // Extract the revert reason if available
+    let errorMessage = 'Failed to simulate delegateTo';
+    if (error.cause?.reason) {
+      errorMessage = error.cause.reason;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
+    return {
+      success: false,
+      error: errorMessage
+    };
+  }
+}
+
+// Add declaration for window.ethereum
+declare global {
+  interface Window {
+    ethereum?: any;
   }
 }
