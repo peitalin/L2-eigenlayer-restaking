@@ -49,7 +49,9 @@ Then run:
 ```bash
 # Runs in HTTPS mode with SSL for production
 npm install pm2 -g
-pm2 start ecosystem.config.cjs
+# pm2 start ecosystem.config.cjs
+chmod +x start-server.sh
+pm2 start start-server.sh --name "app-server"
 ```
 
 Stop the server with:
