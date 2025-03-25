@@ -61,7 +61,18 @@ const app = express();
 const PORT = process.env.SERVER_PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://137.184.229.15:5173',
+    'https://l2-eigenlayer-restaking-git-frontend-peita-lins-projects.vercel.app',
+    /\.vercel\.app$/  // This will allow all vercel.app subdomains
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
 app.use(express.json());
 
 // Data storage path - ensure the data directory exists for SQLite
