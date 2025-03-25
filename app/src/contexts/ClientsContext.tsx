@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+import React, { createContext, useContext, ReactNode, useState, useEffect, useRef } from 'react';
 import { useClients, ClientsState } from '../hooks/useClients';
 import { getEigenAgentAndExecNonce, predictEigenAgentAddress } from '../utils/eigenlayerUtils';
 import { Address } from 'viem';
@@ -37,37 +37,58 @@ export const ClientsProvider: React.FC<ClientsProviderProps> = ({ children }) =>
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [connectionAttempted, setConnectionAttempted] = useState(false);
 
-  // Fetch EigenAgent info whenever L1 account changes
-  useEffect(() => {
-    if (l1Wallet.account) {
-      fetchEigenAgentInfo();
-    }
-  }, [l1Wallet.account]);
+  // Add refs to track fetch state
+  const lastFetchTimestamp = useRef<number>(0);
+  const fetchCooldown = 5000; // 5 seconds cooldown between fetches
+  const isFetching = useRef<boolean>(false);
 
-  // Function to fetch EigenAgent info
+  // Function to fetch EigenAgent info with cooldown and state tracking
   const fetchEigenAgentInfo = async () => {
-    if (!l1Wallet.account) return;
+    // Don't fetch if:
+    // 1. No wallet connected
+    // 2. Already fetching
+    // 3. Not enough time has passed since last fetch
+    // 4. We already have eigenAgentInfo
+    if (!l1Wallet.account ||
+        isFetching.current ||
+        Date.now() - lastFetchTimestamp.current < fetchCooldown ||
+        (eigenAgentInfo && !isLoadingEigenAgent)) {
+      return;
+    }
 
+    isFetching.current = true;
     setIsLoadingEigenAgent(true);
+
     try {
       // Fetch current EigenAgent info
       const info = await getEigenAgentAndExecNonce(l1Wallet.account);
       setEigenAgentInfo(info);
 
-      // If user doesn't have an EigenAgent, predict what it will be
-      if (!info) {
+      // Only predict address if we don't have an EigenAgent and haven't predicted one yet
+      if (!info && !predictedEigenAgentAddress) {
         const predicted = await predictEigenAgentAddress(l1Wallet.account);
         setPredictedEigenAgentAddress(predicted);
-      } else {
+      } else if (info) {
+        // Clear predicted address if we have an actual EigenAgent
         setPredictedEigenAgentAddress(null);
       }
     } catch (err) {
       console.error('Error checking EigenAgent:', err);
       setEigenAgentInfo(null);
+      setPredictedEigenAgentAddress(null);
     } finally {
       setIsLoadingEigenAgent(false);
+      isFetching.current = false;
+      lastFetchTimestamp.current = Date.now();
     }
   };
+
+  // Single useEffect to handle EigenAgent info fetching
+  useEffect(() => {
+    if (l1Wallet.account && isConnected && !eigenAgentInfo && !isLoadingEigenAgent) {
+      fetchEigenAgentInfo();
+    }
+  }, [l1Wallet.account, isConnected]);
 
   // Handle wallet connection
   const handleConnect = async () => {
@@ -101,7 +122,6 @@ export const ClientsProvider: React.FC<ClientsProviderProps> = ({ children }) =>
     connectionError
   };
 
-  // Always provide the context to children, regardless of connection state
   return (
     <ClientsContext.Provider value={extendedState}>
       {children}

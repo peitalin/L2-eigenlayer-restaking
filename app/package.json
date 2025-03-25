@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev-with-server": "cd ../app-server && npm run server:watch & vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run --config vitest.config.ts",

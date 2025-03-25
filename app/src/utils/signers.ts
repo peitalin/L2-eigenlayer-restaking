@@ -334,6 +334,8 @@ export async function callContractCalculateDelegationApprovalDigestHash(
   }
 }
 
+
+
 // Add declaration for window.ethereum
 declare global {
   interface Window {

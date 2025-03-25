@@ -570,3 +570,20 @@
 .navbar a:hover {
   color: var(--treasure-text-primary);
 }
+
+.first-time-notice {
+  margin-top: 16px;
+  padding: 12px;
+  background-color: var(--treasure-bg-tertiary);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.first-time-notice strong {
+  display: inline-block;
+  margin-bottom: 4px;
+}
+
+.first-time-notice .predicted-address {
+  margin-top: 8px;
+}

@@ -219,9 +219,10 @@ const RewardsComponent: React.FC = () => {
           <div className="loading-spinner"></div>
         </div>
       ) : !eigenAgentInfo?.eigenAgentAddress ? (
-        <div style={{ padding: '12px', backgroundColor: 'rgba(247, 179, 0, 0.1)', borderRadius: '8px', fontSize: '0.9rem' }}>
+        <div className="first-time-notice">
           <p>You need an EigenAgent to claim rewards. Please set up your EigenAgent first.</p>
         </div>
+
       ) : (
         <table className="treasure-rewards-table">
           <thead>

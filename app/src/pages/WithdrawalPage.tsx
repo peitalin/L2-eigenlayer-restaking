@@ -34,7 +34,8 @@ const WithdrawalPage: React.FC = () => {
     refreshBalances,
     eigenAgentInfo,
     isLoadingEigenAgent,
-    fetchEigenAgentInfo
+    fetchEigenAgentInfo,
+    predictedEigenAgentAddress
   } = useClientsContext();
 
   // State for transaction details
@@ -102,16 +103,7 @@ const WithdrawalPage: React.FC = () => {
 
   // Add a useEffect that will run once when the component mounts
   useEffect(() => {
-    // Check if we already have the l1Account and still need to fetch eigenAgentInfo
-    // Only fetch if not already loading and not already fetched
-    if (l1Wallet.account && !eigenAgentInfo && isConnected && !isLoadingEigenAgent) {
-      fetchEigenAgentInfo();
-    }
-    // Don't include eigenAgentInfo in deps to avoid refetching when it changes
-  }, [l1Wallet.account, isConnected, isLoadingEigenAgent, fetchEigenAgentInfo]);
-
-  // Fetch L1 data needed for withdrawal - with debouncing
-  useEffect(() => {
+    // Fetch L1 data needed for withdrawal - with debouncing
     // Skip if conditions aren't met or if we're already loading
     if (!isConnected || !eigenAgentInfo || !l1Wallet.publicClient || isLoadingL1Data) {
       return;

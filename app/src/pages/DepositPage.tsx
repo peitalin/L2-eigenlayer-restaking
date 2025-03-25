@@ -182,18 +182,8 @@ const DepositPage: React.FC = () => {
   };
 
   useEffect(() => {
-    // Check if we already have the l1Account and still need to fetch eigenAgentInfo
-    // Only fetch if not already loading and not already fetched
-    if (l1Wallet.account && !eigenAgentInfo && isConnected && !isLoadingEigenAgent) {
-      fetchEigenAgentInfo();
-    }
-    // Don't include eigenAgentInfo in deps to avoid refetching when it changes
-  }, [l1Wallet.account, isConnected, isLoadingEigenAgent, fetchEigenAgentInfo]);
-
-  // Fetch strategy stats when component mounts
-  useEffect(() => {
+    // Fetch strategy stats when component mounts
     fetchStrategyStats();
-
   }, []);
 
   // Fetch token balance when account changes or after successful deposit
@@ -497,12 +487,10 @@ const DepositPage: React.FC = () => {
             ) : isFirstTimeUser ? 'Mint EigenAgent & Deposit' : 'Deposit'}
           </button>
 
-          {!!isFirstTimeUser && (
-            <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(247, 179, 0, 0.1)', borderRadius: '8px', fontSize: '0.9rem' }}>
-              <strong>First-time User:</strong> This transaction will mint a new EigenAgent for you.
-              <div style={{ marginTop: '8px' }}>Predicted address: {predictedEigenAgentAddress || 'Loading...'}</div>
-            </div>
-          )}
+          <div className="first-time-notice">
+            <strong>First-time User:</strong> This transaction will mint a new EigenAgent for you.
+            <div className="predicted-address">Predicted address: {predictedEigenAgentAddress || 'Loading...'}</div>
+          </div>
 
           {isApprovingToken && (
             <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(31, 111, 235, 0.1)', borderRadius: '8px', fontSize: '0.9rem' }}>

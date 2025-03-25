@@ -80,8 +80,34 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({
         </div>
 
         <div className="modal-body">
-          <div className={`success-icon ${isLoading ? 'loading' : ''}`}>
-            {isLoading ? <div className="loading-spinner"></div> : '✓'}
+          <div className={`modal-loading-container ${isLoading ? 'loading' : ''}`}>
+            {isLoading ? (
+              <div className="loading-container">
+                <img
+                  src="/assets/logos/treasure/eigenlayer-logo.webp"
+                  alt="EigenLayer Logo"
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    padding: '2px',
+                    backgroundColor: 'white',
+                    objectFit: 'contain',
+                    marginRight: '8px'
+                  }}
+                />
+                <img
+                  src="/assets/logos/treasure/treasure-logo.svg"
+                  alt="Treasure Logo"
+                  style={{
+                    height: '40px',
+                    marginLeft: '-12px',
+                    marginRight: '8px'
+                  }}
+                />
+                <div className="loading-spinner"></div>
+              </div>
+            ) : '✓'}
           </div>
 
           <div className="transaction-details">
