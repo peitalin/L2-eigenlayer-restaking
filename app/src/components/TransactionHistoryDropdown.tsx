@@ -3,6 +3,7 @@ import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
 import { useToast } from '../utils/toast';
 import CCIPStatusChecker from './CCIPStatusChecker';
 import { EXPLORER_URLS } from '../configs';
+import { getExplorerUrl } from '../pages/TransactionsPage';
 
 interface TransactionHistoryDropdownProps {}
 
@@ -64,14 +65,6 @@ const TransactionHistoryDropdown: React.FC<TransactionHistoryDropdownProps> = ()
 
   const isValidMessageId = (messageId: string): boolean => {
     return !!messageId && messageId !== '';
-  };
-
-  const getExplorerUrl = (chainName: string, hash: string): string => {
-    const chainExplorerMap: Record<string, string> = {
-      'Base': EXPLORER_URLS.basescan + '/tx/',
-      'Ethereum': EXPLORER_URLS.etherscan + '/tx/',
-    };
-    return `${chainExplorerMap[chainName] || chainExplorerMap['Ethereum']}${hash}`;
   };
 
   return (

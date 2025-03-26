@@ -499,7 +499,7 @@ const DepositPage: React.FC = () => {
                 <div style={{ marginTop: '8px' }}>
                   Approval Transaction:
                   <a
-                    href={`${EXPLORER_URLS.basescan}/tx/${approvalHash}`}
+                    href={`${EXPLORER_URLS.L2}/tx/${approvalHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ marginLeft: '6px', color: 'var(--treasure-accent-secondary)' }}

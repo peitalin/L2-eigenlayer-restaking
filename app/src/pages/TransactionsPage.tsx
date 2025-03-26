@@ -4,6 +4,17 @@ import CCIPStatusChecker from '../components/CCIPStatusChecker';
 import { EXPLORER_URLS } from '../configs';
 import { getTransactionTypeLabel } from '../components/TransactionHistoryDropdown';
 
+export const getExplorerUrl = (chainId: string, hash: string): string => {
+  // TODO: Add more chains
+  const chainExplorerMap: Record<string, string> = {
+    '84532': EXPLORER_URLS.L2, // Base Sepolia
+    '11155111': EXPLORER_URLS.L1, // Eth Sepolia
+    '1': EXPLORER_URLS.L1, // Eth Mainnet
+  };
+  let blockExplorerUrl = chainExplorerMap[chainId] ? chainExplorerMap[chainId] : EXPLORER_URLS.L1;
+  return `${blockExplorerUrl}/tx/${hash}`;
+};
+
 const TransactionsPage: React.FC = () => {
   const { transactions, isLoading, error } = useTransactionHistory();
 
@@ -46,14 +57,6 @@ const TransactionsPage: React.FC = () => {
   // Helper to get chain badge class
   const getChainBadgeClass = (chainName: string): string => {
     return `chain-${chainName.toLowerCase()}`;
-  };
-
-  const getExplorerUrl = (chainId: string, txHash: string): string => {
-    const chainExplorerMap: Record<string, string> = {
-      'Base': EXPLORER_URLS.basescan + '/tx/',
-      'Ethereum': EXPLORER_URLS.etherscan + '/tx/',
-    };
-    return `${chainExplorerMap[chainId]}${txHash}` || `${chainExplorerMap['Ethereum']}${txHash}`;
   };
 
   return (

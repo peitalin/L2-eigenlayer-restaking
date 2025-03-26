@@ -33,11 +33,11 @@ const TransactionSuccessModal: React.FC<TransactionSuccessModalProps> = ({
   const getExplorerUrl = (chainId: string, hash: string) => {
     // Base Sepolia
     if (chainId === BaseSepolia.chainId.toString()) {
-      return `${EXPLORER_URLS.basescan}/tx/${hash}`;
+      return `${EXPLORER_URLS.L2}/tx/${hash}`;
     }
     // Ethereum Sepolia
     if (chainId === EthSepolia.chainId.toString()) {
-      return `${EXPLORER_URLS.etherscan}/tx/${hash}`;
+      return `${EXPLORER_URLS.L1}/tx/${hash}`;
     }
     return `${EXPLORER_URLS.ccip}/msg/${hash}`;
   };

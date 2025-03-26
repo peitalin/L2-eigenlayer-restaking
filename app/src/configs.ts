@@ -35,8 +35,8 @@ export const APP_CONFIG = {
 };
 
 export const EXPLORER_URLS = {
-  basescan: 'https://sepolia.basescan.org',
-  etherscan: 'https://sepolia.etherscan.io',
+  L2: 'https://sepolia.basescan.org',
+  L1: 'https://sepolia.etherscan.io',
   ccip: 'https://ccip.chain.link'
 }
 
