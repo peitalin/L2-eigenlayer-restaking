@@ -79,8 +79,8 @@ vi.mock('../server', async () => {
 
   // Prevent the server from attempting to listen on a port
   if (actual.server) {
-    actual.server.listen = vi.fn();
-    actual.server.close = vi.fn();
+    (actual.server as any).listen = vi.fn();
+    (actual.server as any).close = vi.fn();
   }
 
   return {

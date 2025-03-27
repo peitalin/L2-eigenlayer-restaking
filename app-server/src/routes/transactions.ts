@@ -5,6 +5,7 @@ import { ETH_CHAINID, L2_CHAINID } from '../utils/constants';
 import { extractMessageIdFromTxHash, updateTransactionStatus } from '../utils/transaction';
 import { determineClientFromTransaction } from '../utils/clients';
 import type { Transaction } from '../db';
+import logger from '../utils/logger';
 
 const router = express.Router();
 
@@ -15,7 +16,7 @@ router.get('/user/:address', (req, res) => {
     const transactions = db.getTransactionsByUser(address);
     res.json(transactions);
   } catch (error) {
-    console.error('Error fetching user transactions:', error);
+    logger.error('Error fetching user transactions:', error);
     res.status(500).json({ error: 'Failed to fetch user transactions' });
   }
 });
@@ -32,7 +33,7 @@ router.get('/hash/:txHash', (req, res) => {
 
     res.json(transaction);
   } catch (error) {
-    console.error('Error fetching transaction by hash:', error);
+    logger.error('Error fetching transaction by hash:', error);
     res.status(500).json({ error: 'Failed to fetch transaction' });
   }
 });
@@ -49,7 +50,7 @@ router.get('/messageId/:messageId', (req, res) => {
 
     res.json(transaction);
   } catch (error) {
-    console.error('Error fetching transaction by messageId:', error);
+    logger.error('Error fetching transaction by messageId:', error);
     res.status(500).json({ error: 'Failed to fetch transaction' });
   }
 });
@@ -58,7 +59,7 @@ router.get('/messageId/:messageId', (req, res) => {
 router.post('/add', async (req, res) => {
   try {
     const newTransaction: Transaction = req.body;
-    console.log('inbound newTransaction: ', newTransaction);
+    logger.info('inbound newTransaction: ', newTransaction);
 
     // Validate transaction type before proceeding
     const validTypes = [
@@ -76,7 +77,7 @@ router.post('/add', async (req, res) => {
       'other'
     ];
     if (!validTypes.includes(newTransaction.txType)) {
-      console.error(`Invalid transaction type: ${newTransaction.txType}. Valid types are: ${validTypes.join(', ')}`);
+      logger.error(`Invalid transaction type: ${newTransaction.txType}. Valid types are: ${validTypes.join(', ')}`);
       return res.status(400).json({
         error: `Invalid transaction type: ${newTransaction.txType}. Valid types are: ${validTypes.join(', ')}`
       });
@@ -84,7 +85,7 @@ router.post('/add', async (req, res) => {
 
     // Ensure required fields have values
     if (!newTransaction.sourceChainId) {
-      console.log(`No sourceChainId provided for tx ${newTransaction.txHash}, setting default based on type`);
+      logger.info(`No sourceChainId provided for tx ${newTransaction.txHash}, setting default based on type`);
       // Set default source chain ID based on transaction type
       if (
         newTransaction.txType === 'bridgingWithdrawalToL2' ||
@@ -97,7 +98,7 @@ router.post('/add', async (req, res) => {
     }
 
     if (!newTransaction.destinationChainId) {
-      console.log(`No destinationChainId provided for transaction ${newTransaction.txHash}, setting default based on type`);
+      logger.info(`No destinationChainId provided for transaction ${newTransaction.txHash}, setting default based on type`);
       // Set default destination chain ID based on transaction type
       newTransaction.destinationChainId =
         newTransaction.sourceChainId === L2_CHAINID
@@ -109,13 +110,13 @@ router.post('/add', async (req, res) => {
     if (newTransaction.execNonce !== undefined) {
       // Make sure it's a number
       newTransaction.execNonce = Number(newTransaction.execNonce);
-      console.log(`Transaction includes execNonce: ${newTransaction.execNonce}`);
+      logger.info(`Transaction includes execNonce: ${newTransaction.execNonce}`);
     }
 
     // Continue with extracting messageId if needed
     if (!newTransaction.messageId && newTransaction.txHash) {
       try {
-        console.log(`Transaction ${newTransaction.txHash} doesn't have a messageId. Attempting to extract...`);
+        logger.info(`Transaction ${newTransaction.txHash} doesn't have a messageId. Attempting to extract...`);
 
         // Determine which client to use based on transaction type or chainId
         const client = determineClientFromTransaction(newTransaction);
@@ -124,7 +125,7 @@ router.post('/add', async (req, res) => {
         const { messageId, agentOwner } = await extractMessageIdFromTxHash(newTransaction.txHash, client);
 
         if (messageId) {
-          console.log(`Successfully extracted messageId ${messageId} from transaction ${newTransaction.txHash}`);
+          logger.info(`Successfully extracted messageId ${messageId} from transaction ${newTransaction.txHash}`);
           newTransaction.messageId = messageId;
 
           // If we found an agent owner and the transaction doesn't have a user field
@@ -133,11 +134,11 @@ router.post('/add', async (req, res) => {
           }
         } else {
           // If no messageId found, use txHash as the messageId
-          console.log(`No messageId found for transaction ${newTransaction.txHash}, using txHash as messageId`);
+          logger.info(`No messageId found for transaction ${newTransaction.txHash}, using txHash as messageId`);
           newTransaction.messageId = newTransaction.txHash;
         }
       } catch (extractError) {
-        console.error(`Error extracting messageId from transaction ${newTransaction.txHash}:`, extractError);
+        logger.error(`Error extracting messageId from transaction ${newTransaction.txHash}:`, extractError);
         // Use txHash as fallback for messageId
         newTransaction.messageId = newTransaction.txHash;
       }
@@ -153,7 +154,7 @@ router.post('/add', async (req, res) => {
         try {
           await updateTransactionStatus(newTransaction.messageId as string);
         } catch (updateError) {
-          console.error(`Error updating transaction status for ${newTransaction.messageId}:`, updateError);
+          logger.error(`Error updating transaction status for ${newTransaction.messageId}:`, updateError);
         }
       }, 2000);
     }
@@ -161,7 +162,7 @@ router.post('/add', async (req, res) => {
     res.json({ success: true, transaction: savedTransaction });
   } catch (error) {
     const errorResponse = error as ErrorResponse;
-    console.error('Error adding transaction:', error);
+    logger.error('Error adding transaction:', error);
     // Provide more specific error message for constraint violations
     if (errorResponse.code === 'SQLITE_CONSTRAINT_CHECK') {
       return res.status(400).json({
@@ -188,7 +189,7 @@ router.put('/:txHash', (req, res) => {
 
     res.json({ success: true, transaction: updatedTransaction });
   } catch (error) {
-    console.error('Error updating transaction:', error);
+    logger.error('Error updating transaction:', error);
     res.status(500).json({ error: 'Failed to update transaction' });
   }
 });
@@ -208,7 +209,7 @@ router.put('/messageId/:messageId', (req, res) => {
 
     res.json({ success: true, transaction: updatedTransaction });
   } catch (error) {
-    console.error('Error updating transaction by messageId:', error);
+    logger.error('Error updating transaction by messageId:', error);
     res.status(500).json({ error: 'Failed to update transaction' });
   }
 });

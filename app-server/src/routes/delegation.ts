@@ -2,6 +2,7 @@ import express from 'express';
 import { signDelegationApproval } from '../signers/signDelegationApproval';
 import { ErrorResponse } from '../types';
 import { operatorAddressToKey } from '../utils/operators';
+import logger from '../utils/logger';
 
 const router = express.Router();
 
@@ -66,7 +67,7 @@ router.post('/sign', async (req, res) => {
     res.json(serializeBigInt(result));
   } catch (error) {
     const errorResponse = error as ErrorResponse;
-    console.error('Error in delegation signing endpoint:', error);
+    logger.error('Error in delegation signing endpoint:', error);
     // Return a 401 status if the operator is not authorized
     if (errorResponse.message === 'Unauthorized operator address') {
       return res.status(401).json({

@@ -8,6 +8,7 @@ import {
   ETH_CHAINID,
   L2_CHAINID
 } from '../utils/constants';
+import logger from '../utils/logger';
 
 const publicClient = createPublicClient({
   chain: sepolia,
@@ -38,13 +39,13 @@ export async function signDelegationApproval(
       ? testSalt
       : keccak256(toBytes(Date.now().toString() + Math.random().toString()));
 
-    console.log("========= Signing Delegation Approval==========");
-    console.log({
-      staker: staker,
-      approver: approver,
+    logger.debug("========= Signing Delegation Approval==========");
+    logger.debug({
+      staker,
+      approver,
       operator: operatorAccount.address,
-      expiry: expiry,
-      salt: salt
+      expiry,
+      salt
     });
 
     if (staker === approver) {
@@ -75,11 +76,11 @@ export async function signDelegationApproval(
 
     // If digests don't match, throw error
     if (digestHash !== manualDigestHash) {
-      console.log("Contract digest hash:", digestHash);
-      console.log("Manual digest hash:", manualDigestHash);
-      console.log("Digests match:", digestHash === manualDigestHash);
-      console.error("Digest hash mismatch between contract and manual calculation");
-      console.error("Contract params: staker, operator, approver, salt, expiry", staker, operatorAccount.address, approver, salt, expiry.toString());
+      logger.debug("Contract digest hash:", digestHash);
+      logger.debug("Manual digest hash:", manualDigestHash);
+      logger.debug("Digests match:", digestHash === manualDigestHash);
+      logger.error("Digest hash mismatch between contract and manual calculation");
+      logger.error("Contract params: staker, operator, approver, salt, expiry", staker, operatorAccount.address, approver, salt, expiry.toString());
     }
 
     // Sign the digest hash directly using sign() not signMessage()
@@ -99,7 +100,7 @@ export async function signDelegationApproval(
     };
   } catch (error: unknown) {
     if (error instanceof Error) {
-      console.error('Error signing delegation approval:', error.message);
+      logger.error('Error signing delegation approval:', error.message);
       throw error;
     }
     throw new Error('Unknown error occurred while signing delegation approval');
@@ -150,7 +151,7 @@ export async function callContractCalculateDelegationApprovalDigestHash(
 
     return digestHash as Hex;
   } catch (error) {
-    console.error('Error calling calculateDelegationApprovalDigestHash on contract:', error);
+    logger.error('Error calling calculateDelegationApprovalDigestHash on contract:', error);
     throw new Error('Failed to call calculateDelegationApprovalDigestHash on contract');
   }
 }

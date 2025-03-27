@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { ErrorResponse } from '../types';
 import { ETH_CHAINID, L2_CHAINID } from '../utils/constants';
+import logger from '../utils/logger';
 
 // Get the directory name
 const __filename = fileURLToPath(import.meta.url);
@@ -13,7 +14,7 @@ const dbPath = process.env.NODE_ENV === 'test'
   ? ':memory:'
   : process.env.DATABASE_PATH || path.join(__dirname, '..', '..', 'data', 'transactions.db');
 
-console.log(`Database path: ${dbPath}`);
+logger.info(`Database path: ${dbPath}`);
 
 // Create or open the database
 const db = new Database(dbPath);
@@ -98,13 +99,13 @@ export function initDatabase() {
       hasExecNonceColumn = tableInfo.some((column: any) => column.name === 'execNonce');
 
       if (!hasExecNonceColumn) {
-        console.log('Adding execNonce column to transactions table...');
+        logger.info('Adding execNonce column to transactions table...');
         db.prepare('ALTER TABLE transactions ADD COLUMN execNonce INTEGER').run();
 
         // After adding the column, set NULL for all existing transactions
         db.prepare('UPDATE transactions SET execNonce = NULL').run();
 
-        console.log('execNonce column added successfully');
+        logger.info('execNonce column added successfully');
 
         // Create index for the new column
         db.prepare('CREATE INDEX IF NOT EXISTS idx_eigen_agent_exec_nonce ON transactions(user, execNonce)').run();
@@ -113,7 +114,7 @@ export function initDatabase() {
         db.prepare('CREATE INDEX IF NOT EXISTS idx_eigen_agent_exec_nonce ON transactions(user, execNonce)').run();
       }
     } catch (error) {
-      console.error('Error checking or adding execNonce column:', error);
+      logger.error('Error checking or adding execNonce column:', error);
       throw error;
     }
 
@@ -140,7 +141,7 @@ export function initDatabase() {
       const errorResponse = error as ErrorResponse;
       // If there's a constraint error, the table needs to be migrated
       if (errorResponse.code === 'SQLITE_CONSTRAINT_CHECK') {
-        console.log('Migrating database schema to support processClaim transaction type...');
+        logger.info('Migrating database schema to support processClaim transaction type...');
 
         // SQLite doesn't support direct ALTER TABLE for modifying constraints
         // We need to rename the old table, create a new one with the updated schema,
@@ -184,16 +185,16 @@ export function initDatabase() {
         // 5. Drop old table
         db.prepare('DROP TABLE transactions_old').run();
 
-        console.log('Database schema successfully migrated');
+        logger.info('Database schema successfully migrated');
       } else {
         // If it's not a constraint error, re-throw it
         throw error;
       }
     }
 
-    console.log('Database initialized successfully');
+    logger.info('Database initialized successfully');
   } catch (error) {
-    console.error('Error initializing database:', error);
+    logger.error('Error initializing database:', error);
     throw error;
   }
 }
@@ -428,7 +429,7 @@ export function getLatestExecNonceForAgent(agentAddress: string): number | null 
 // Clear all transactions from the database
 export function clearTransactions(): void {
   db.prepare('DELETE FROM transactions').run();
-  console.log('All transactions cleared from the database');
+  logger.info('All transactions cleared from the database');
 }
 
 // Add multiple transactions at once

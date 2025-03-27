@@ -8,7 +8,8 @@
     "server:watch": "USE_SSL=false tsx watch src/server.ts",
     "server:watch-prod": "USE_SSL=true tsx watch src/server.ts",
     "build": "tsc",
-    "test": "vitest run --reporter=verbose",
+    "test": "NODE_ENV=test vitest run",
+    "test:verbose": "NODE_ENV=test vitest run --reporter=verbose",
     "start": "node dist/server.js"
   },
   "dependencies": {
