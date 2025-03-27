@@ -35,7 +35,11 @@ app-server/
 ```bash
 # Runs in HTTP mode (without SSL) for local development
 npm run server:watch
+```
 
+Run route tests:
+```bash
+npm run test
 ```
 
 ### Production Mode (HTTPS)

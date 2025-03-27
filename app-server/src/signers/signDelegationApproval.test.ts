@@ -21,7 +21,7 @@ describe('signDelegationApproval', () => {
     expect(result.signature.startsWith('0x')).toBe(true);
   });
 
-  test('should generate valid delegation approval signature', async () => {
+  it('should generate valid delegation approval signature', async () => {
     // Ensure OPERATOR_KEY1 is available and properly formatted
     const operatorKeyRaw = process.env.OPERATOR_KEY1;
     if (!operatorKeyRaw) {

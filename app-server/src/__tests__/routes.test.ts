@@ -76,9 +76,16 @@ vi.mock('../utils/clients', () => {
 // Make sure we don't start the server or initialize the database during tests
 vi.mock('../server', async () => {
   const actual = await vi.importActual('../server.js');
+
+  // Prevent the server from attempting to listen on a port
+  if (actual.server) {
+    actual.server.listen = vi.fn();
+    actual.server.close = vi.fn();
+  }
+
   return {
     ...actual,
-    // Prevent server from starting when imported
+    // Prevent server processes from starting
     startPendingTransactionChecker: vi.fn(),
     updatePendingTransactions: vi.fn()
   };

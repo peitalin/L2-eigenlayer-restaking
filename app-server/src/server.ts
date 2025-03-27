@@ -223,47 +223,29 @@ function stopPendingTransactionChecker() {
   }
 }
 
-// Start the checker when the server starts
-startPendingTransactionChecker();
+// Only start the server and checker if not in test mode
+const isTestMode = process.env.NODE_ENV === 'test';
+if (!isTestMode) {
+  try {
+    server.listen(Number(PORT), '0.0.0.0', () => {
+      const protocol = USE_SSL ? 'https' : 'http';
+      console.log(`🚀 Server running at ${protocol}://api.l2restaking.info:${PORT}`);
 
-// Clean shutdown handler
-process.on('SIGINT', () => {
-  console.log('Shutting down server gracefully...');
-  stopPendingTransactionChecker();
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-});
+      // Run an initial update when the server starts
+      updatePendingTransactions();
+      startPendingTransactionChecker();
+    });
 
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down server gracefully...');
-  stopPendingTransactionChecker();
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-});
-
-// After initializing the server, fix any transactions with missing fields
-try {
-  server.listen(Number(PORT), '0.0.0.0', () => {
-    const protocol = USE_SSL ? 'https' : 'http';
-    console.log(`🚀 Server running at ${protocol}://api.l2restaking.info:${PORT}`);
-
-    // Run an initial update when the server starts
-    updatePendingTransactions();
-    startPendingTransactionChecker();
-  });
-
-  server.on('error', (error: Error) => {
-    console.error('Server error:', error);
-  });
-} catch (error) {
-  console.error('Failed to start server:', error);
-  process.exit(1);
+    server.on('error', (error: Error) => {
+      console.error('Server error:', error);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+} else {
+  console.log('Running in test mode - not starting server');
 }
-
 
 // Database initialization
 try {
