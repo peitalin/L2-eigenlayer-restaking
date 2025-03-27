@@ -1,10 +1,15 @@
 import express from 'express';
 
-const router = express.Router();
+// Create the main router
+export const router = express.Router();
 
-// Simple health check endpoint
+// Add a health check endpoint for checking API status
 router.get('/health', (req, res) => {
-  res.json({ status: 'ok', version: '1.0.0' });
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString()
+  });
 });
 
-export { router };
+// Export the router as both default and named export
+export default router;

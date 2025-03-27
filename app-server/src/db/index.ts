@@ -8,9 +8,12 @@ import { ETH_CHAINID, L2_CHAINID } from '../utils/constants';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Database file path
-const dbPath = path.join(__dirname, '..', 'data', 'transactions.db');
-console.log('Database path:', dbPath);
+// Use in-memory database for tests
+const dbPath = process.env.NODE_ENV === 'test'
+  ? ':memory:'
+  : process.env.DATABASE_PATH || path.join(__dirname, '..', '..', 'data', 'transactions.db');
+
+console.log(`Database path: ${dbPath}`);
 
 // Create or open the database
 const db = new Database(dbPath);

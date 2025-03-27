@@ -9,19 +9,20 @@
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
     "rootDir": ".",
-    "types": ["jest", "node"],
+    "types": ["vitest", "node"],
     "allowJs": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "allowImportingTsExtensions": true,
     "emitDeclarationOnly": false,
     "declaration": false,
-    "noEmit": true
+    "noEmit": true,
+    "ignoreDeprecations": "5.0"
   },
   "ts-node": {
     "esm": true,
     "experimentalSpecifierResolution": "node"
   },
-  "include": ["./**/*.ts", "server.bak"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/__tests__/**/*"]
 }
