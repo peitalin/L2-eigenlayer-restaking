@@ -59,8 +59,6 @@ if (missingEnvVars.length > 0) {
  * GET /api/transactions/messageId/:messageId
  * GET /api/execnonce/:agentAddress
  * POST /api/transactions/add
- * PUT /api/transactions/:txHash
- * PUT /api/transactions/messageId/:messageId
  * POST /api/delegation/sign
  * GET /api/operators
  * GET /api/operators/:address

@@ -174,45 +174,4 @@ router.post('/add', async (req, res) => {
   }
 });
 
-// PUT update a transaction (server-side only - not exposed to frontend)
-router.put('/:txHash', (req, res) => {
-  try {
-    const { txHash } = req.params;
-    const updates = req.body;
-
-    // Update the transaction in the database
-    const updatedTransaction = db.updateTransaction(txHash, updates);
-
-    if (!updatedTransaction) {
-      return res.status(404).json({ error: 'Transaction not found' });
-    }
-
-    res.json({ success: true, transaction: updatedTransaction });
-  } catch (error) {
-    logger.error('Error updating transaction:', error);
-    res.status(500).json({ error: 'Failed to update transaction' });
-  }
-});
-
-// PUT update a transaction by messageId (server-side only - not exposed to frontend)
-router.put('/messageId/:messageId', (req, res) => {
-  try {
-    const { messageId } = req.params;
-    const updates = req.body;
-
-    // Update the transaction in the database
-    const updatedTransaction = db.updateTransactionByMessageId(messageId, updates);
-
-    if (!updatedTransaction) {
-      return res.status(404).json({ error: 'Transaction not found for messageId' });
-    }
-
-    res.json({ success: true, transaction: updatedTransaction });
-  } catch (error) {
-    logger.error('Error updating transaction by messageId:', error);
-    res.status(500).json({ error: 'Failed to update transaction' });
-  }
-});
-
-
 export default router;
