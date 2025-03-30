@@ -29,6 +29,7 @@ docs/
 /app-server/node_modules
 /app-server/.env
 /app-server/certs
+/app-server/logs
 
 /.vscode
 .DS_Store
