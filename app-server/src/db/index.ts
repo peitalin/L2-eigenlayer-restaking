@@ -19,16 +19,26 @@ logger.info(`Database path: ${dbPath}`);
 // Create or open the database
 const db = new Database(dbPath);
 
-export type TransactionTypes =
-  | 'deposit'
-  | 'queueWithdrawal'
-  | 'completeWithdrawal'
-  | 'processClaim'
-  | 'bridgingWithdrawalToL2'
-  | 'bridgingRewardsToL2'
-  | 'delegateTo'
-  | 'undelegate'
-  | 'redelegate';
+export enum TransactionTypes {
+  DEPOSIT = 'deposit',
+  DEPOSIT_AND_MINT_EIGEN_AGENT = 'depositAndMintEigenAgent',
+  MINT_EIGEN_AGENT = 'mintEigenAgent',
+  QUEUE_WITHDRAWAL = 'queueWithdrawal',
+  COMPLETE_WITHDRAWAL = 'completeWithdrawal',
+  PROCESS_CLAIM = 'processClaim',
+  BRIDGING_WITHDRAWAL_TO_L2 = 'bridgingWithdrawalToL2',
+  BRIDGING_REWARDS_TO_L2 = 'bridgingRewardsToL2',
+  DELEGATE_TO = 'delegateTo',
+  UNDELEGATE = 'undelegate',
+  REDELEGATE = 'redelegate',
+  OTHER = 'other',
+}
+
+export enum TransactionStatus {
+  PENDING = 'pending',
+  CONFIRMED = 'confirmed',
+  FAILED = 'failed',
+}
 
 // Define transaction interface (matches CCIPTransaction in server.ts)
 export interface Transaction {
@@ -36,7 +46,7 @@ export interface Transaction {
   messageId: string;
   timestamp: number;
   txType: TransactionTypes;
-  status: 'pending' | 'confirmed' | 'failed';
+  status: TransactionStatus;
   from: string;
   to: string;
   receiptTransactionHash: string | null;
@@ -53,7 +63,7 @@ type TransactionRow = {
   messageId: string;
   timestamp: number;
   txType: TransactionTypes;
-  status: 'pending' | 'confirmed' | 'failed';
+  status: TransactionStatus;
   from_address: string;
   to_address: string;
   receiptTransactionHash: string | null;
@@ -455,11 +465,14 @@ export function addTransactions(transactions: Transaction[]): Transaction[] {
 
       // If chain IDs are missing, set defaults based on transaction type
       if (!sourceChain || !destChain) {
-        if (tx.txType === 'bridgingWithdrawalToL2' || tx.txType === 'bridgingRewardsToL2') {
+        if (
+          tx.txType === TransactionTypes.BRIDGING_WITHDRAWAL_TO_L2 ||
+          tx.txType === TransactionTypes.BRIDGING_REWARDS_TO_L2
+        ) {
           // Default for L1->L2 transactions
           sourceChain = sourceChain || ETH_CHAINID; // Sepolia
           destChain = destChain || L2_CHAINID;      // Base Sepolia
-        } else if (tx.txType === 'deposit') {
+        } else if (tx.txType === TransactionTypes.DEPOSIT) {
           // Default for L2->L1 transactions
           sourceChain = sourceChain || L2_CHAINID;   // Base Sepolia
           destChain = destChain || ETH_CHAINID;      // Sepolia

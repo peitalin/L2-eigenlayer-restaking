@@ -1,6 +1,6 @@
 import express from 'express';
 import * as db from '../db';
-import { ErrorResponse } from '../types';
+import { ErrorResponse, validTxTypes } from '../types';
 import { ETH_CHAINID, L2_CHAINID } from '../utils/constants';
 import { extractMessageIdFromTxHash, updateTransactionStatus } from '../utils/transaction';
 import { determineClientFromTransaction } from '../utils/clients';
@@ -61,25 +61,10 @@ router.post('/add', async (req, res) => {
     const newTransaction: Transaction = req.body;
     logger.info('inbound newTransaction: ', newTransaction);
 
-    // Validate transaction type before proceeding
-    const validTypes = [
-      'deposit',
-      'depositAndMintEigenAgent',
-      'mintEigenAgent',
-      'queueWithdrawal',
-      'completeWithdrawal',
-      'processClaim',
-      'bridgingWithdrawalToL2',
-      'bridgingRewardsToL2',
-      'delegateTo',
-      'undelegate',
-      'redelegate',
-      'other'
-    ];
-    if (!validTypes.includes(newTransaction.txType)) {
-      logger.error(`Invalid transaction type: ${newTransaction.txType}. Valid types are: ${validTypes.join(', ')}`);
+    if (!validTxTypes.includes(newTransaction.txType)) {
+      logger.error(`Invalid transaction type: ${newTransaction.txType}. Valid types are: ${validTxTypes.join(', ')}`);
       return res.status(400).json({
-        error: `Invalid transaction type: ${newTransaction.txType}. Valid types are: ${validTypes.join(', ')}`
+        error: `Invalid transaction type: ${newTransaction.txType}. Valid types are: ${validTxTypes.join(', ')}`
       });
     }
 

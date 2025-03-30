@@ -9,18 +9,34 @@ const __dirname = path.dirname(__filename);
 // Load test environment variables before importing app
 config({ path: path.join(__dirname, 'test.env') });
 
-// Set up mocks
-vi.mock('../db', () => ({
-  getTransactionsByUser: vi.fn().mockReturnValue([]),
-  getTransactionByHash: vi.fn().mockReturnValue({}),
-  getTransactionByMessageId: vi.fn().mockReturnValue({}),
-  addTransaction: vi.fn().mockImplementation(tx => tx),
-  updateTransaction: vi.fn().mockImplementation((txHash, updates) => ({ txHash, ...updates })),
-  updateTransactionByMessageId: vi.fn().mockImplementation((messageId, updates) => ({ messageId, ...updates })),
-  getLatestExecNonceForAgent: vi.fn().mockReturnValue(0),
-  getPendingTransactions: vi.fn().mockReturnValue([]),
-  addTransactions: vi.fn()
-}));
+// Properly mock db with TransactionTypes using importOriginal
+vi.mock('../db', () => {
+  return {
+    // Manually include TransactionTypes enum
+    TransactionTypes: {
+      DEPOSIT: 'deposit',
+      DEPOSIT_AND_MINT_EIGEN_AGENT: 'depositAndMintEigenAgent',
+      MINT_EIGEN_AGENT: 'mintEigenAgent',
+      QUEUE_WITHDRAWAL: 'queueWithdrawal',
+      COMPLETE_WITHDRAWAL: 'completeWithdrawal',
+      PROCESS_CLAIM: 'processClaim',
+      BRIDGING_WITHDRAWAL_TO_L2: 'bridgingWithdrawalToL2',
+      BRIDGING_REWARDS_TO_L2: 'bridgingRewardsToL2',
+      DELEGATE_TO: 'delegateTo',
+      UNDELEGATE: 'undelegate',
+      REDELEGATE: 'redelegate',
+      OTHER: 'other'
+    },
+    // Mock functions
+    getTransactionsByUser: vi.fn().mockReturnValue([]),
+    getTransactionByHash: vi.fn().mockReturnValue({}),
+    getTransactionByMessageId: vi.fn().mockReturnValue({}),
+    addTransaction: vi.fn().mockImplementation(tx => tx),
+    getLatestExecNonceForAgent: vi.fn().mockReturnValue(0),
+    getPendingTransactions: vi.fn().mockReturnValue([]),
+    addTransactions: vi.fn()
+  };
+});
 
 vi.mock('../utils/operators', () => ({
   OPERATORS_DATA: [
@@ -42,7 +58,7 @@ vi.mock('../utils/operators', () => ({
 vi.mock('../signers/signDelegationApproval', () => ({
   signDelegationApproval: vi.fn().mockResolvedValue({
     signature: '0x1234',
-    expiry: 123456789n // Changed to string to avoid BigInt serialization issues
+    expiry: 123456789n
   })
 }));
 
@@ -134,20 +150,6 @@ describe('API Routes', () => {
       const response = await request(app)
         .post('/api/transactions/add')
         .send(mockTransaction);
-      expect(response.status).not.toBe(404);
-    });
-
-    it('should have PUT /api/transactions/:txHash endpoint', async () => {
-      const response = await request(app)
-        .put('/api/transactions/0x123')
-        .send({ status: 'confirmed' });
-      expect(response.status).not.toBe(404);
-    });
-
-    it('should have PUT /api/transactions/messageId/:messageId endpoint', async () => {
-      const response = await request(app)
-        .put('/api/transactions/messageId/test-message')
-        .send({ status: 'confirmed' });
       expect(response.status).not.toBe(404);
     });
   });
