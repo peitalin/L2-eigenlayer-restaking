@@ -228,14 +228,8 @@ The protocol claims multiple tokens and bridges just the MAGIC rewards back to t
 - Alternatively we can just claim MAGIC and let users manually claim their other tokens and ETH rewards on L1 (but this is arguable worse UX).
 
 There's a configurable list of reward tokens (the mapping `bridgeTokensL1toL2`) that the protocol will try bridge back to the user's address on L2. This list needs to mirror the tokens that have a CCIP lane setup. If we want to bridge other reward tokens back to L2, CCIP lanes needs to be setup for those tokens as well, and we need to make sure `bridgeTokensL1toL2` and tokens with CCIP lanes match (or rewards claiming attempts will revert).
-- [ ] We should write tests to ensure that CCIP lanes the list of tokens in `bridgeTokensL1toL2` once CCIP deploys on Treasure chain.
 
-
-### WithdrawalTransferRoot and RewardsTransferRoot
-In [`Sender.sol`](https://github.com/TreasureProject/L2-eigenlayer-restaking/blob/b6a8d052ba62cb2330ed254af99402568718614e/src/SenderHooks.sol#L19) you will see code relating to withdrawal TransferRoots and rewards claiming TransferRoots. 
-- These commitment roots are in place in case a CCIP node tries to tamper with withdrawal and rewards claiming messages (e.g. swap destination address). 
-- CCIP checks for this as part of their protocol (see their [Risk Management Network](https://docs.chain.link/ccip/concepts#onchain-risk-management-contract)), so it these TransferRoots may be redundant. They are an extra security check.
-
+NOTE: The ERC-6551 NFTs are transferrable, but must unset Eigenlaye rewards claimer before transferring (or transfer will revert). This is to prevent someone attempting to sell their NFT and the claiming rewards from deposits associated with the ERC-6551 account afterwards.
 
 
 <a name="message-encoding-and-decoding"/>
@@ -305,18 +299,3 @@ The decoding functions can be found in `src/utils/EigenlayerMsgDecoders.sol` wit
         - [x] Transfer L1 rewards tokens to AgentOwner address on L1.
 
 
-### Todo Checklist
-
-- [x] Upgradeability
-    - [ ] Remove proxies for specific contracts if we don't need upgradeability.
-- [x] CCIP
-    - [ ] Chainlink to setup a "lane" for CCIP token bridges:
-        - [ ] Setup Chainlink lanes on Holesky and target L2.
-        - [ ] Adapt differences in bridging model (mint/burn vs lock/mint) for target chain.
-- [ ] Frontend Helper Functions
-    - [ ] Frontend message signing helper functions (to append signatures for the 6551 EigenAgent account to the CCIP messages).
-- [ ] Extra Tests
-    - [ ] Write tests to ensure that the tokens with CCIP lanes matches the list of bridgeable tokens (the mapping `bridgeTokensL1toL2` on `RestakingConnectorStorage.sol` and `SenderHooks.sol`) once CCIP deploys on Treasure chain.
-- [x] Gas optimization
-    - [x] Estimate gas limit for each of the previous operations
-    - [x] Reduce gas costs associated with 6551 accounts creation + delegate calls
