@@ -9,6 +9,21 @@ import logger from '../utils/logger';
 
 const router = express.Router();
 
+// GET latest transactions (limited to 20)
+router.get('/', (req, res) => {
+  try {
+    const allTransactions = db.getAllTransactions();
+    // Sort by timestamp in descending order and take the first 20
+    const transactions = allTransactions
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 20);
+    res.json(transactions);
+  } catch (error) {
+    logger.error('Error fetching latest transactions:', error);
+    res.status(500).json({ error: 'Failed to fetch latest transactions' });
+  }
+});
+
 // GET transactions by user address
 router.get('/user/:address', (req, res) => {
   try {
