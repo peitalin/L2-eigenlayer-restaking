@@ -9,6 +9,7 @@ import SenderHooksAbiRaw from './ISenderHooks.json';
 import EigenAgent6551AbiRaw from './IEigenAgent6551.json';
 import AgentFactoryAbiRaw from './IAgentFactory.json';
 import RewardsCoordinatorAbiRaw from './IRewardsCoordinator.json';
+import FaucetAbiRaw from './Faucet.json';
 
 // Export the ABIs with proper typing
 export const DelegationManagerABI = DelegationManagerAbiRaw.abi as Abi;
@@ -19,6 +20,7 @@ export const SenderHooksABI = SenderHooksAbiRaw.abi as Abi;
 export const EigenAgent6551ABI = EigenAgent6551AbiRaw.abi as Abi;
 export const AgentFactoryABI = AgentFactoryAbiRaw.abi as Abi;
 export const RewardsCoordinatorABI = RewardsCoordinatorAbiRaw.abi as Abi;
+export const FaucetABI = FaucetAbiRaw.abi as Abi;
 // For backward compatibility
 export const ERC20_ABI = IERC20ABI;
 

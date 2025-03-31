@@ -27,6 +27,8 @@ export const EthSepolia: ChainlinkConfig = {
   explorerUrl: 'https://sepolia.etherscan.io',
 };
 
+export const FaucetL2 = '0xf99Ae69F60edBFf5a6D5E0627D997fc9585Ff937' as Address;
+
 export const BaseSepolia: ChainlinkConfig = {
   router: '0xD3b06cEbF099CE7DA4AcCf578aaebFDBd6e88a93' as Address,
   chainSelector: '10344971235874465080',

@@ -7,7 +7,8 @@ import {
   SenderHooksABI,
   EigenAgent6551ABI,
   AgentFactoryABI,
-  RewardsCoordinatorABI
+  RewardsCoordinatorABI,
+  FaucetABI
 } from './abiImporter';
 
 // Export the ABIs
@@ -19,7 +20,8 @@ export {
   SenderHooksABI,
   EigenAgent6551ABI,
   AgentFactoryABI,
-  RewardsCoordinatorABI
+  RewardsCoordinatorABI,
+  FaucetABI
 };
 
 // Export chainlink ABIs

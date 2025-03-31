@@ -5,5 +5,6 @@ echo forge script script/9_submitRewards.s.sol:SubmitRewardsScript --rpc-url eth
 
 forge script script/9_submitRewards.s.sol:SubmitRewardsScript \
     --rpc-url ethsepolia \
+    --broadcast \
     --private-key $DEPLOYER_KEY \
     -vvvv

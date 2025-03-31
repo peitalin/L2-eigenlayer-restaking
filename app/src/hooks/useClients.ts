@@ -74,6 +74,7 @@ export const publicClients: Record<number, PublicClient> = {
 // Interface for wallet state
 export interface WalletState {
   client: WalletClient | null;
+  walletClient: WalletClient | null;
   account: Address | null;
   balance: string | null;
   publicClient: PublicClient;
@@ -98,6 +99,7 @@ export function useClients(): ClientsState {
   // Consolidated L1 wallet state (Ethereum Sepolia)
   const [l1Wallet, setL1Wallet] = useState<WalletState>({
     client: null,
+    walletClient: null,
     account: null,
     balance: null,
     publicClient: publicClients[sepolia.id]
@@ -106,6 +108,7 @@ export function useClients(): ClientsState {
   // Consolidated L2 wallet state (Base Sepolia)
   const [l2Wallet, setL2Wallet] = useState<WalletState>({
     client: null,
+    walletClient: null,
     account: null,
     balance: null,
     publicClient: publicClients[baseSepolia.id]
@@ -190,6 +193,7 @@ export function useClients(): ClientsState {
       setL1Wallet(prev => ({
         ...prev,
         client: null,
+        walletClient: null,
         account: null,
         balance: null
       }));
@@ -197,6 +201,7 @@ export function useClients(): ClientsState {
       setL2Wallet(prev => ({
         ...prev,
         client: null,
+        walletClient: null,
         account: null,
         balance: null
       }));
@@ -260,6 +265,7 @@ export function useClients(): ClientsState {
       // Update L1 and L2 wallet states first
       setL1Wallet({
         client: sepoliaClient,
+        walletClient: sepoliaClient,
         account: address as Address,
         balance: null,
         publicClient: publicClients[sepolia.id]
@@ -267,6 +273,7 @@ export function useClients(): ClientsState {
 
       setL2Wallet({
         client: baseClient,
+        walletClient: baseClient,
         account: address as Address,
         balance: null,
         publicClient: publicClients[baseSepolia.id]
@@ -357,6 +364,7 @@ export function useClients(): ClientsState {
         setL1Wallet(prev => ({
           ...prev,
           client: sepoliaClient,
+          walletClient: sepoliaClient,
           account: address,
           balance: null
         }));
@@ -364,6 +372,7 @@ export function useClients(): ClientsState {
         setL2Wallet(prev => ({
           ...prev,
           client: baseClient,
+          walletClient: baseClient,
           account: address,
           balance: null
         }));
