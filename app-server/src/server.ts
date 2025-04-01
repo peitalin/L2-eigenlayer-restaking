@@ -269,10 +269,12 @@ try {
     logger.info('Data directory created or confirmed');
 
     // Check if we need to migrate existing data
-    fs.access(path.join(dataDir, 'transactions.json'), fs.constants.F_OK, (err) => {
+    const transactionsFilePath = path.join(__dirname, '..', 'data', 'transactions.json');
+    logger.info(`Checking for transactions.json file at ${transactionsFilePath}`);
+    fs.access(transactionsFilePath, fs.constants.F_OK, (err) => {
       if (!err) {
         logger.info('Found existing transactions.json file, migrating to SQLite...');
-        fs.readFile(path.join(dataDir, 'transactions.json'), 'utf8', (err, data) => {
+        fs.readFile(transactionsFilePath, 'utf8', (err, data) => {
           if (err) {
             logger.error('Error reading transactions file:', err);
           } else {
