@@ -75,7 +75,7 @@ export interface EigenAgentInfo {
 
 // Rewards Types
 export interface RewardProofData {
-  proof: string[];
+  proof: Hex;
   earnerIndex: number;
   amount: bigint;
   token: Address;

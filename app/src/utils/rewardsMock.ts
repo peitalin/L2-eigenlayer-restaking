@@ -30,7 +30,6 @@ export function generateTestEarnerTreeData(eigenAgentAddress: Address): RewardsT
     "0x0000000000000000000000000000000000000004" as Address
   ];
 
-  // In production, this would be a real token address from the API
   const tokenAddress = EthSepolia.bridgeToken;
 
   return {
@@ -48,8 +47,7 @@ export function generateTestEarnerTreeData(eigenAgentAddress: Address): RewardsT
  * @returns Proof data for claiming rewards
  */
 export async function getRewardsProofData(
-  eigenAgentAddress: Address,
-  currentDistRootIndex: number
+  eigenAgentAddress: Address
 ): Promise<RewardProofData> {
   try {
     // In production, we would fetch this (earnerIndex and proof) from an API endpoint
@@ -60,16 +58,11 @@ export async function getRewardsProofData(
       treeData.token,
       treeData.amounts as [bigint, bigint, bigint, bigint]
     );
+    console.log("rewards merkle tree: ", tree);
 
-    // First earner is the eigenAgentAddress
-    const earnerIndex = 0;
-    const proofResult = generateClaimProof(tree, earnerIndex);
-
-    // Convert the proof to the expected format - an array of strings
-    // In a real API response, this would already be in the correct format
-    const proof: string[] = Array.isArray(proofResult)
-      ? proofResult
-      : [proofResult as unknown as string];
+    // hardcoded the earnerIndex to be 1 for this EigenAgent. Based on 9_submitRewards.s.sol script
+    const earnerIndex = 1;
+    const proof = generateClaimProof(tree, earnerIndex);
 
     return {
       proof,
@@ -93,9 +86,12 @@ export function createRewardClaim(
 ): RewardsMerkleClaim {
   // Convert the proof array to the expected format for createClaim
   // This is specific to our mock implementation
-  const formattedProof = Array.isArray(proofData.proof) && proofData.proof.length > 0
-    ? proofData.proof[0] as unknown as Hex
-    : "0x0" as Hex;
+  // const formattedProof = Array.isArray(proofData.proof) && proofData.proof.length > 0
+  //   ? proofData.proof[0] as unknown as Hex
+  //   : "0x0" as Hex;
+
+  const formattedProof = proofData.proof;
+  console.log("Formatted proof: ", formattedProof);
 
   return createClaim(
     currentDistRootIndex,

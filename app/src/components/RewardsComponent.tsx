@@ -1,25 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Address, formatEther } from 'viem';
 import { useClientsContext } from '../contexts/ClientsContext';
+import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
+import { useToast } from '../utils/toast';
 import { useEigenLayerOperation } from '../hooks/useEigenLayerOperation';
+import { APP_CONFIG } from '../configs';
+
 import { encodeProcessClaimMsg } from '../utils/encoders';
-import { createClaim } from '../utils/rewards';
 import { RewardsMerkleClaim } from '../abis/RewardsCoordinatorTypes';
 import { RewardsCoordinatorABI } from '../abis';
-import { useToast } from '../utils/toast';
-import { useTransactionHistory } from '../contexts/TransactionHistoryContext';
-import {
-  getRewardsProofData,
-  createRewardClaim
-} from '../utils/rewardsMock';
-import {
-  REWARDS_COORDINATOR_ADDRESS,
-} from '../addresses';
-import {
-  BaseSepolia,
-  EthSepolia
-} from '../addresses';
-import { APP_CONFIG } from '../configs';
+import { getRewardsProofData } from '../utils/rewardsMock';
+import { createClaim } from '../utils/rewards';
+import { REWARDS_COORDINATOR_ADDRESS } from '../addresses';
+import { BaseSepolia, EthSepolia } from '../addresses';
 import { simulateOnEigenlayer, simulateRewardsClaim } from '../utils/simulation';
 
 // Define a type for the reward display info
@@ -132,26 +125,25 @@ const RewardsComponent: React.FC = () => {
 
       // Get proof data from service (in production, would be from API)
       const proofData = await getRewardsProofData(
-        eigenAgentInfo.eigenAgentAddress,
-        currentDistRootIndex
+        eigenAgentInfo.eigenAgentAddress
       );
 
-      // Store the reward amount for display
-      // Ensure token is a valid Address using a type guard
-      const tokenAddress: Address = typeof proofData.token === 'string' && proofData.token.startsWith('0x')
-        ? proofData.token as Address
-        : EthSepolia.bridgeToken;
+      const tokenAddress: Address = EthSepolia.bridgeToken;
 
       setRewardInfo({
         amount: proofData.amount,
         token: tokenAddress
       });
 
+      console.log("currentDistRootIndex: ", currentDistRootIndex);
+      console.log("proofData: ", proofData);
       // Create the claim object
-      const claim: RewardsMerkleClaim = createRewardClaim(
+      const claim: RewardsMerkleClaim = createClaim(
         currentDistRootIndex,
         eigenAgentInfo.eigenAgentAddress,
-        proofData
+        proofData.amount,
+        proofData.proof,
+        proofData.earnerIndex
       );
 
       // Use the simulateOnEigenlayer wrapper to run the simulation
@@ -197,15 +189,16 @@ const RewardsComponent: React.FC = () => {
     try {
       // Get proof data from service
       const proofData = await getRewardsProofData(
-        eigenAgentInfo.eigenAgentAddress,
-        currentDistRootIndex
+        eigenAgentInfo.eigenAgentAddress
       );
 
       // Create the claim object
-      const claim: RewardsMerkleClaim = createRewardClaim(
+      const claim: RewardsMerkleClaim = createClaim(
         currentDistRootIndex,
         eigenAgentInfo.eigenAgentAddress,
-        proofData
+        proofData.amount,
+        proofData.proof,
+        proofData.earnerIndex
       );
 
       // Encode the message for processing the claim

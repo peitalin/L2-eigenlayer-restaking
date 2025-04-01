@@ -2,6 +2,7 @@ import { Address, Hex, keccak256, encodeAbiParameters, toHex, encodePacked } fro
 import { publicClients } from '../hooks/useClients';
 import { StrategyManagerABI, DelegationManagerABI } from '../abis';
 import { EthSepolia, BaseSepolia, DELEGATION_MANAGER_ADDRESS, STRATEGY_MANAGER_ADDRESS } from '../addresses';
+import { encodeProcessClaimMsg } from './encoders';
 
 /**
  * Simulates a call to the DelegationManager's delegateTo function
@@ -479,12 +480,10 @@ export async function simulateRewardsClaim(
   recipient: Address
 ): Promise<{ success: boolean, error?: string }> {
   try {
-    // Import the encoder for the message
-    const { encodeProcessClaimMsg } = await import('./encoders');
 
     // Encode the call to processClaim
     const calldata = encodeProcessClaimMsg(claim, recipient);
-    console.log("Calldata processedClaim: ", calldata);
+    console.log("Calldata processClaim: ", calldata);
 
     // Log the wallet address for debugging
     console.log("Simulating with account:", walletAddress);

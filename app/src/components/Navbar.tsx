@@ -126,7 +126,7 @@ const Navbar: React.FC<NavbarProps> = () => {
         </div>
       </div>
       <div className="navbar-actions">
-        {isConnected && !isEthereumChain && (
+        {isConnected && (
           <button
             className="claim-button"
             onClick={handleClaim}
