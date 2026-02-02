@@ -2,7 +2,7 @@
 
 This repo allows users to make Eigenlayer operations directly from L2, without needing gas balances on L1 Ethereum.
 
-Eigenlayer does not allow third-party proxy withdrawals, so a service provider cannot deposit funds, or withdraw on behalf of users via L1 bridge contracts directly. Users must submit transactions themselves (and thus pay gas which they may not have on adresses on L1).
+Eigenlayer does not allow third-party proxy withdrawals, so a service provider cannot deposit funds, or withdraw on behalf of users via L1 bridge contracts directly. Users must submit transactions themselves (and thus pay gas which they may not have on addresses on L1).
 
 We use 6551 proxies to bypass this restriction, and routes contract calls through user-owned 6551 accounts on L1 to deposit into Eigenlayer from L2, allow L2-native users to use these services easily.
 
