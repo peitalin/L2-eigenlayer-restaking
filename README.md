@@ -1,10 +1,10 @@
 # L2 Eigenlayer Restaking via ERC-6551 accounts
 
-This repo lets users perform Eigenlayer operations directly from L2, withing needing gas balances on L1 Ethereum.
+This repo allows users to make Eigenlayer operations directly from L2, without needing gas balances on L1 Ethereum.
 
-Eigenlayer does not allow third-party proxy withdrawals, users must use their wallets to deposit and withdraw funds. So we cannot withdraw on behalf of our users via L1 bridge contracts directly, and users must subit transactions themselves (pay gas).
+Eigenlayer does not allow third-party proxy withdrawals, so a service provider cannot deposit funds, or withdraw on behalf of users via L1 bridge contracts directly. Users must submit transactions themselves (and thus pay gas which they may not have on adresses on L1).
 
-We use 6551 proxies to bypass this restriction, and routes contract calls through user-owned 6551 accounts on L1 to deposit into Eigenlayer from L2.
+We use 6551 proxies to bypass this restriction, and routes contract calls through user-owned 6551 accounts on L1 to deposit into Eigenlayer from L2, allow L2-native users to use these services easily.
 
 This also keeps custody of funds with the user (who owns the 6551 NFT) and gives them an escape option to withdraw funds on L1.
 
