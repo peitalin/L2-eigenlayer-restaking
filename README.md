@@ -1,8 +1,10 @@
 # L2 Eigenlayer Restaking via ERC-6551 accounts
 
-This repo routes contract calls through user-owned 6551 accounts to deposit into Eigenlayer from L2.
+This lets users perform Eigenlayer operations directly from L2, withing needing gas balances on L1 Ethereum.
 
-Eigenlayer does not allow ThirdParty withdrawals, users must use their wallets to deposit and withdraw funds. So we cannot withdraw on behalf of our users via L1 bridge contracts. Using 6551 proxies addresses this restriction.
+Eigenlayer does not allow third-party proxy withdrawals, users must use their wallets to deposit and withdraw funds. So we cannot withdraw on behalf of our users via L1 bridge contracts directly, and users must subit transactions themselves (pay gas).
+
+We use 6551 proxies to bypass this restriction, and routes contract calls through user-owned 6551 accounts on L1 to deposit into Eigenlayer from L2.
 
 This also keeps custody of funds with the user (who owns the 6551 NFT) and gives them an escape option to withdraw funds on L1.
 
@@ -74,7 +76,7 @@ Everytime a user undelegates, there is a cooldown timer.
 Bridging times depend on the finality times of source and destination chains.
 It currently takes +20 minutes to bridge a message [Base and ZkSync has finality times of 20min, ETH is 15min](https://docs.chain.link/ccip/concepts/ccip-execution-latency#finality)
 
-Tests dependencies note: We deploy Eigenlayer contracts as part of our tests, and Eigenlayer depends on Open Zepplin v4.7, however our protocol uses Open Zeppelin v5. 
+Tests dependencies note: We deploy Eigenlayer contracts as part of our tests, and Eigenlayer depends on Open Zepplin v4.7, however our protocol uses Open Zeppelin v5.
 So we use [context aware remappings](https://github.com/foundry-rs/foundry/issues/1855) to use v5 along with v4.7.
 
 
